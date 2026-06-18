@@ -1,0 +1,43 @@
+<!-- @dsCard group="Components" viewport="700x560" name="Content cards — space, plan, room, perk" subtitle="The core marketing & booking cards" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="stylesheet" href="../../styles.css" />
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style> body { padding: 26px; background: var(--surface-page); } .grid { display:grid; grid-template-columns:repeat(2,1fr); gap:20px; align-items:start; } </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+  const { SpaceCard, PlanCard, RoomCard, PerkCard } = window.TheQuarterDesignSystem_2f2064;
+  function Demo() {
+    return (
+      <div className="grid">
+        <SpaceCard name="The Quarter Café" tag="Open social space"
+          blurb="The cathedral view, natural light and the breakfast. Not bookable — just ours to share."
+          imageCaption="Café with cathedral view & plants"
+          meta={[{icon:'coffee',label:'Lavazza & breakfast'},{icon:'leaf',label:'Plantspiration'}]} />
+        <RoomCard name="The Hop Yard" capacity="8–10" status="available"
+          blurb="High-spec meeting room, hybrid-ready, cathedral on the skyline."
+          imageCaption="Bright meeting room with AV"
+          features={[{icon:'monitor',label:'Plug-and-play A/V'},{icon:'wifi',label:'Fibre'}]}
+          priceNote="Half & full-day packages" />
+        <PlanCard name="Citizen" price="£258" period="a month" featured badge="Most popular"
+          summary="Unrestricted access for those who are here most days."
+          features={['Everything in Resident','Unrestricted access','Priority room booking','Daily breakfast & Lavazza']} />
+        <div style={{ display:'grid', gap:20 }}>
+          <PerkCard partner="The Pound Bar" category="Food & drink" perk="20% off brunch, Mon–Fri" expires="Ends 30 Jun" />
+          <PerkCard partner="Curzon Canterbury" category="Culture" perk="2-for-1 cinema tickets midweek" redeemed />
+        </div>
+      </div>
+    );
+  }
+  ReactDOM.createRoot(document.getElementById('root')).render(<Demo />);
+</script>
+</body>
+</html>

@@ -1,0 +1,47 @@
+<!-- @dsCard group="Components" viewport="700x620" name="Dashboard — stat tiles, Quarter Card, availability, empty state" subtitle="The member-product building blocks" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="stylesheet" href="../../styles.css" />
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style> body { padding: 26px; background: var(--surface-page); } </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+  const { StatTile, QuarterCard, AvailabilityCalendar, EmptyState } = window.TheQuarterDesignSystem_2f2064;
+  const days = [{label:'Mon',date:'16'},{label:'Tue',date:'17'},{label:'Wed',date:'18'},{label:'Thu',date:'19'},{label:'Fri',date:'20'}];
+  const slots = ['09:00','10:00','11:00','12:00','14:00','15:00'];
+  const data = [
+    ['available','busy','available','soon','available'],
+    ['busy','available','available','busy','available'],
+    ['available','available','busy','available','soon'],
+    ['busy','busy','available','available','available'],
+    ['available','soon','available','busy','available'],
+    ['available','available','busy','available','busy'],
+  ];
+  function Demo() {
+    return (
+      <div style={{ display:'flex', flexDirection:'column', gap:22 }}>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:16 }}>
+          <StatTile label="Days remaining" value="6" unit="of 10" icon="calendar" progress={60} hint="Resets 1 Jul" />
+          <StatTile label="Your plan" value="Resident" icon="user" tone="gold" />
+          <StatTile label="Perks redeemed" value="3" icon="gift" tone="ink" hint="This month" />
+        </div>
+        <div style={{ display:'grid', gridTemplateColumns:'380px 1fr', gap:20, alignItems:'start' }}>
+          <QuarterCard memberName="Maya Holloway" plan="Citizen" cardId="0042" logoSrc="../../assets/logo-wordmark-black.png" />
+          <EmptyState icon="calendar" title="No bookings yet" message="When you reserve a room or desk, it'll show up right here." actionLabel="Find a room" />
+        </div>
+        <AvailabilityCalendar roomName="The Hop Yard" days={days} slots={slots} data={data} />
+      </div>
+    );
+  }
+  ReactDOM.createRoot(document.getElementById('root')).render(<Demo />);
+</script>
+</body>
+</html>

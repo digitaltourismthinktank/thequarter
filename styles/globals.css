@@ -1,0 +1,40 @@
+/* The Quarter — global stylesheet entry point (imported once in app/layout.tsx).
+   Mirrors the design system's styles.css manifest. Fonts are handled by
+   next/font (see app/layout.tsx), so tokens/fonts.css is intentionally omitted. */
+
+@import './tokens/colors.css';
+@import './tokens/typography.css';
+@import './tokens/spacing.css';
+@import './tokens/elevation.css';
+@import './tokens/base.css';
+
+/* ---- App-level helpers (layout scaffolding shared across pages) ---- */
+
+/* Respect users who prefer reduced motion — disable the soft lifts & fades. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Skip link for keyboard users — visually hidden until focused. */
+.q-skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 100;
+  padding: 12px 20px;
+  background: var(--ink-900);
+  color: var(--sand-50);
+  border-radius: 0 0 var(--radius-md) 0;
+  font-size: var(--text-sm);
+  font-weight: var(--fw-semibold);
+}
+.q-skip-link:focus {
+  left: 0;
+}
+
+html { scroll-behavior: smooth; }

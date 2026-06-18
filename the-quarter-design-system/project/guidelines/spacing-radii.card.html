@@ -1,0 +1,19 @@
+<!-- @dsCard group="Spacing" viewport="700x180" name="Corner radii" subtitle="Soft, rounded — pills for actions, generous radii for cards" -->
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" />
+<link rel="stylesheet" href="../styles.css" />
+<style>
+  body { margin:0; padding:24px 26px; background:var(--surface-page); }
+  .row { display:flex; gap:18px; align-items:flex-end; }
+  .col { display:flex; flex-direction:column; align-items:center; gap:9px; }
+  .box { width:84px; height:64px; background:var(--pure-white); border:1.5px solid var(--border-default); }
+  .n { font-size:12px; font-weight:600; color:var(--ink-900); }
+  .m { font-size:10px; font-family:var(--font-mono); color:var(--text-muted); }
+</style></head><body>
+<div class="row">
+  <div class="col"><div class="box" style="border-radius:var(--radius-sm)"></div><span class="n">sm</span><span class="m">10px</span></div>
+  <div class="col"><div class="box" style="border-radius:var(--radius-md)"></div><span class="n">md · inputs</span><span class="m">14px</span></div>
+  <div class="col"><div class="box" style="border-radius:var(--radius-lg)"></div><span class="n">lg · cards</span><span class="m">20px</span></div>
+  <div class="col"><div class="box" style="border-radius:var(--radius-xl)"></div><span class="n">xl · feature</span><span class="m">28px</span></div>
+  <div class="col"><div class="box" style="border-radius:var(--radius-pill);width:120px"></div><span class="n">pill · buttons</span><span class="m">999px</span></div>
+</div>
+</body></html>

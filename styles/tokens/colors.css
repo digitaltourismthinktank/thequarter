@@ -1,0 +1,68 @@
+/* The Quarter — Colour tokens
+   Foundation: black, white, gold (logo is a black wordmark; gold is the accent).
+   Extended with refined, warm neutrals (sand + stone). Greenery lives in
+   photography, never as a UI colour. */
+
+:root {
+  /* ---- Warm ink (near-black, espresso warmth) ---- */
+  --ink-900: #1E1A15;   /* primary text, confident surfaces */
+  --ink-800: #2A251E;
+  --ink-700: #3A332A;
+  --pure-black: #000000; /* reserved for the logo lock-up only */
+  --pure-white: #FFFFFF;
+
+  /* ---- Warm neutrals: Sand (paper / surfaces) ---- */
+  --sand-50:  #FBF8F2;  /* page background — warm cream */
+  --sand-100: #F6F1E8;
+  --sand-200: #EEE6D8;
+  --sand-300: #E3D8C4;
+  --sand-400: #D2C3A8;
+
+  /* ---- Warm neutrals: Stone (text / borders / muted) ---- */
+  --stone-300: #BCB1A0;
+  --stone-400: #9C8F7B;
+  --stone-500: #7E715E;  /* muted text */
+  --stone-600: #645949;
+  --stone-700: #4A4136;
+
+  /* ---- Gold (the accent) ---- */
+  --gold-700: #8A6A2E;  /* gold text on light — passes contrast */
+  --gold-600: #A6823C;
+  --gold-500: #BE9B53;  /* primary gold — fills, highlights, the Quarter Card */
+  --gold-400: #D2B576;
+  --gold-300: #E4CE9F;
+  --gold-200: #F0E3C7;
+  --gold-100: #F7EEDA;  /* soft gold wash */
+
+  /* ---- Functional (used sparingly; warm-shifted, never green for UI) ---- */
+  --success: #4B7A52;   /* status text only (e.g. "available"), not a brand colour */
+  --warning: #B5862F;
+  --danger:  #A9442F;
+  --info:    #4A6275;
+
+  /* ---- Semantic aliases ---- */
+  --text-strong:    var(--ink-900);
+  --text-body:      var(--stone-700);
+  --text-muted:     var(--stone-500);
+  --text-on-dark:   var(--sand-50);
+  --text-on-gold:   var(--ink-900);
+  --text-accent:    var(--gold-700);
+
+  --surface-page:   var(--sand-50);
+  --surface-card:   var(--pure-white);
+  --surface-raised: var(--pure-white);
+  --surface-sunken: var(--sand-100);
+  --surface-inverse:var(--ink-900);
+  --surface-accent-soft: var(--gold-100);
+
+  --border-subtle:  var(--sand-200);
+  --border-default: var(--sand-300);
+  --border-strong:  var(--stone-400);
+  --border-accent:  var(--gold-500);
+
+  --accent:         var(--gold-500);
+  --accent-hover:   var(--gold-600);
+  --accent-press:   var(--gold-700);
+
+  --focus-ring:     var(--gold-500);
+}

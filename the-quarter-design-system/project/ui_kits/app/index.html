@@ -1,0 +1,143 @@
+<!-- @dsCard group="App" viewport="860x760" name="Member app (phone)" subtitle="The two highest-value actions: book a room & redeem perks" -->
+<!-- @startingPoint section="App" subtitle="The Quarter member app — phone screens" viewport="860x760" -->
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>The Quarter — Member app</title>
+<link rel="stylesheet" href="../../styles.css" />
+<link rel="icon" href="../../assets/app-icon.png" />
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>
+  body { margin: 0; background: var(--sand-100); padding: 30px; display: flex; gap: 34px; justify-content: center; align-items: flex-start; flex-wrap: wrap; min-height: 100vh; box-sizing: border-box; }
+  .phone { width: 340px; height: 700px; background: #000; border-radius: 46px; padding: 11px; box-shadow: var(--shadow-xl); flex: none; }
+  .screen { width: 100%; height: 100%; background: var(--surface-page); border-radius: 36px; overflow: hidden; position: relative; display: flex; flex-direction: column; }
+  .notch { position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 130px; height: 26px; background: #000; border-radius: 0 0 18px 18px; z-index: 20; }
+  .scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  .cap { text-align: center; font-size: 12px; color: var(--text-muted); width: 340px; margin-top: 14px; font-weight: 600; }
+  .col { display: flex; flex-direction: column; align-items: center; }
+</style>
+</head>
+<body>
+<div class="col"><div class="phone"><div class="screen" id="book"><div class="notch"></div></div></div><div class="cap">Book a room</div></div>
+<div class="col"><div class="phone"><div class="screen" id="perks"><div class="notch"></div></div></div><div class="cap">Perks & Quarter Card</div></div>
+
+<script type="text/babel">
+  const { Icon, Badge, Button, QuarterCard, Avatar } = window.TheQuarterDesignSystem_2f2064;
+
+  function StatusBar() {
+    return <div style={{ height: 50, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', padding: '0 24px 6px', fontSize: 13, fontWeight: 600, color: 'var(--ink-900)', flex: 'none' }}>
+      <span>9:41</span><span style={{ display: 'flex', gap: 6, alignItems: 'center' }}><Icon name="wifi" size={15} /></span>
+    </div>;
+  }
+  function TabBar({ active }) {
+    const tabs = [['calendar', 'Book'], ['gift', 'Perks'], ['user', 'You']];
+    return <div style={{ flex: 'none', display: 'flex', justifyContent: 'space-around', padding: '12px 18px 26px', borderTop: '1px solid var(--border-subtle)', background: 'var(--surface-card)' }}>
+      {tabs.map(([ic, l]) => (
+        <div key={l} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, color: active === l ? 'var(--ink-900)' : 'var(--stone-400)' }}>
+          <Icon name={ic} size={23} color={active === l ? 'var(--ink-900)' : 'var(--stone-400)'} />
+          <span style={{ fontSize: 11, fontWeight: 600 }}>{l}</span>
+        </div>
+      ))}
+    </div>;
+  }
+
+  /* ---- Screen 1: Book a room ---- */
+  function BookScreen() {
+    const days = [['Mon', '16'], ['Tue', '17'], ['Wed', '18'], ['Thu', '19'], ['Fri', '20']];
+    const [day, setDay] = React.useState(2);
+    const [sel, setSel] = React.useState('11:00');
+    const slots = [
+      { t: '09:00', s: 'available' }, { t: '10:00', s: 'busy' }, { t: '11:00', s: 'available' },
+      { t: '12:00', s: 'available' }, { t: '14:00', s: 'soon' }, { t: '15:00', s: 'busy' }, { t: '16:00', s: 'available' },
+    ];
+    const meta = { available: ['Free', 'var(--success)', 'rgba(75,122,82,0.1)'], busy: ['Booked', 'var(--stone-400)', 'var(--sand-100)'], soon: ['Held', 'var(--warning)', 'rgba(181,134,47,0.12)'] };
+    return (
+      <>
+        <StatusBar />
+        <div style={{ height: 132, flex: 'none', margin: '0 14px', borderRadius: 18, backgroundImage: 'url(../../assets/photos/photo-3937.jpg)', backgroundSize: 'cover', backgroundPosition: 'center 45%' }} />
+        <div style={{ padding: '12px 22px 14px', flex: 'none' }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--gold-700)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Book a room</div>
+          <h1 style={{ fontSize: 27, fontWeight: 700, letterSpacing: '-0.03em', marginTop: 4 }}>The Hop Yard</h1>
+          <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+            <Badge tone="neutral" icon="users" size="sm">6–8</Badge>
+            <Badge tone="available" dot size="sm">Free at 11:00</Badge>
+          </div>
+        </div>
+        <div className="scroll" style={{ padding: '0 22px 16px' }}>
+          <div style={{ display: 'flex', gap: 8, paddingBottom: 16, overflowX: 'auto' }}>
+            {days.map(([d, n], i) => (
+              <button key={d} onClick={() => setDay(i)} style={{ flex: 'none', width: 52, padding: '10px 0', borderRadius: 14, border: '1.5px solid', borderColor: i === day ? 'var(--ink-900)' : 'var(--border-default)', background: i === day ? 'var(--ink-900)' : 'var(--surface-card)', color: i === day ? 'var(--sand-50)' : 'var(--ink-900)', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
+                <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.75 }}>{d}</div>
+                <div style={{ fontSize: 18, fontWeight: 700 }}>{n}</div>
+              </button>
+            ))}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {slots.map(sl => {
+              const [lbl, col, bg] = meta[sl.s];
+              const on = sel === sl.t;
+              const disabled = sl.s === 'busy';
+              return (
+                <button key={sl.t} disabled={disabled} onClick={() => setSel(sl.t)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '15px 18px', borderRadius: 16, border: '1.5px solid', borderColor: on ? 'var(--ink-900)' : 'var(--border-subtle)', background: on ? 'var(--ink-900)' : 'var(--surface-card)', cursor: disabled ? 'default' : 'pointer', fontFamily: 'var(--font-sans)' }}>
+                  <span style={{ fontSize: 17, fontWeight: 700, color: on ? 'var(--sand-50)' : disabled ? 'var(--stone-400)' : 'var(--ink-900)' }}>{sl.t}</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, padding: '4px 11px', borderRadius: 999, color: on ? 'var(--gold-400)' : col, background: on ? 'rgba(251,248,242,0.12)' : bg }}>{on ? 'Selected' : lbl}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <div style={{ flex: 'none', padding: '12px 22px', background: 'var(--surface-card)', borderTop: '1px solid var(--border-subtle)' }}>
+          <Button variant="accent" fullWidth iconAfter="arrow-right">Reserve · Wed 18, {sel}</Button>
+        </div>
+        <TabBar active="Book" />
+      </>
+    );
+  }
+
+  /* ---- Screen 2: Perks ---- */
+  function PerksScreen() {
+    const perks = [
+      { p: 'The Pound Bar', c: 'Food & drink', d: '20% off brunch, Mon–Fri' },
+      { p: 'Curzon Canterbury', c: 'Culture', d: '2-for-1 cinema midweek' },
+      { p: 'The Goods Shed', c: 'Food & drink', d: 'Free pastry with any coffee' },
+    ];
+    return (
+      <>
+        <StatusBar />
+        <div className="scroll" style={{ padding: '6px 20px 16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+            <h1 style={{ fontSize: 27, fontWeight: 700, letterSpacing: '-0.03em' }}>Your perks</h1>
+            <Avatar name="Maya Holloway" size="sm" />
+          </div>
+          <QuarterCard memberName="Maya Holloway" plan="Resident" cardId="0042" logoSrc="../../assets/logo-wordmark-black.png" qr={false} style={{ maxWidth: '100%' }} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 18 }}>
+            {perks.map(pk => (
+              <div key={pk.p} style={{ background: 'var(--surface-card)', border: '1px solid var(--border-subtle)', borderRadius: 18, padding: '15px 17px', boxShadow: 'var(--shadow-card)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 11, marginBottom: 9 }}>
+                  <span style={{ width: 38, height: 38, borderRadius: 11, background: 'var(--sand-100)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, color: 'var(--ink-900)' }}>{pk.p[0]}</span>
+                  <div>
+                    <div style={{ fontSize: 15, fontWeight: 600 }}>{pk.p}</div>
+                    <div style={{ fontSize: 11, color: 'var(--gold-700)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{pk.c}</div>
+                  </div>
+                </div>
+                <div style={{ fontSize: 15, fontWeight: 500, color: 'var(--text-strong)', marginBottom: 12 }}>{pk.d}</div>
+                <Button size="sm" variant="primary" fullWidth>Redeem</Button>
+              </div>
+            ))}
+          </div>
+        </div>
+        <TabBar active="Perks" />
+      </>
+    );
+  }
+
+  ReactDOM.createRoot(document.getElementById('book')).render(<><div className="notch"></div><BookScreen /></>);
+  ReactDOM.createRoot(document.getElementById('perks')).render(<><div className="notch"></div><PerksScreen /></>);
+</script>
+</body>
+</html>
