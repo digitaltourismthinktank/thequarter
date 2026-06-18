@@ -1,6 +1,9 @@
 import type { Metadata } from 'next';
 import { DM_Sans } from 'next/font/google';
 import { SITE } from '@/lib/site';
+import { AnnouncementBar } from '@/components/site/AnnouncementBar';
+import { Navbar } from '@/components/site/Navbar';
+import { Footer } from '@/components/site/Footer';
 import '@/styles/globals.css';
 
 /* DM Sans — the one family, self-hosted via next/font (no render-blocking
@@ -46,7 +49,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <a href="#main" className="q-skip-link">
           Skip to content
         </a>
-        {children}
+        <AnnouncementBar
+          message="New here? The Day Pass is our way in — a full day, breakfast included."
+          href="/day-pass"
+          linkLabel="Book a Day Pass"
+        />
+        <Navbar />
+        <main id="main">{children}</main>
+        <Footer />
       </body>
     </html>
   );

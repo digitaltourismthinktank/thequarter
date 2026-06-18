@@ -1,0 +1,97 @@
+.planGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(232px, 1fr));
+  gap: 20px;
+  align-items: stretch;
+}
+
+.split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 48px;
+  align-items: center;
+}
+@media (max-width: 900px) {
+  .split {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+}
+
+.includedTitle {
+  font-size: 32px;
+  font-weight: var(--fw-bold);
+  letter-spacing: -0.03em;
+  margin: 12px 0 22px;
+}
+
+.teamsPanel {
+  background: var(--ink-900);
+  border-radius: var(--radius-xl);
+  padding: 34px 32px;
+  color: var(--sand-50);
+}
+.teamsTitle {
+  font-size: 26px;
+  font-weight: var(--fw-bold);
+  letter-spacing: -0.02em;
+  color: var(--sand-50);
+  margin: 16px 0 12px;
+}
+.teamsText {
+  font-size: 16px;
+  line-height: 1.6;
+  color: rgba(251, 248, 242, 0.78);
+}
+.teamsActions {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+  flex-wrap: wrap;
+}
+
+.faq {
+  max-width: 760px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.faqItem {
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 18px 4px;
+}
+.faqItem summary {
+  font-size: 17px;
+  font-weight: var(--fw-semibold);
+  color: var(--ink-900);
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+.faqItem summary::-webkit-details-marker {
+  display: none;
+}
+.faqItem summary .chevron {
+  transition: transform var(--duration-base) var(--ease-standard);
+  flex: none;
+}
+.faqItem[open] summary .chevron {
+  transform: rotate(180deg);
+}
+.faqAnswer {
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text-body);
+  margin-top: 10px;
+}
+
+.vatNote {
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  margin-top: 20px;
+}
