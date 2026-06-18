@@ -1,0 +1,121 @@
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: rgba(251, 248, 242, 0.86);
+  backdrop-filter: saturate(140%) blur(12px);
+  -webkit-backdrop-filter: saturate(140%) blur(12px);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  max-width: var(--container-wide);
+  margin: 0 auto;
+  padding: 14px var(--gutter);
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  flex: none;
+}
+.logoImg {
+  height: 28px;
+  width: auto;
+}
+
+.links {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  justify-content: center;
+}
+.link {
+  padding: 9px 15px;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-sm);
+  font-weight: var(--fw-medium);
+  color: var(--stone-600);
+  transition: color var(--duration-fast), background var(--duration-fast);
+}
+.link:hover {
+  color: var(--ink-900);
+  background: var(--sand-100);
+}
+.linkActive {
+  color: var(--ink-900);
+  background: var(--sand-100);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+}
+.signIn {
+  font-size: var(--text-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--ink-900);
+  padding: 10px 6px;
+}
+.signIn:hover {
+  color: var(--stone-600);
+}
+.cta {
+  display: inline-flex;
+}
+
+.menuBtn {
+  display: none;
+}
+
+.mobile {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px var(--gutter) 20px;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--sand-50);
+}
+.mobileLink {
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  font-size: var(--text-base);
+  font-weight: var(--fw-medium);
+  color: var(--ink-900);
+}
+.mobileLink:hover {
+  background: var(--sand-100);
+}
+.mobileLinkActive {
+  background: var(--sand-100);
+}
+.mobileActions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+@media (max-width: 860px) {
+  .links,
+  .signIn,
+  .cta {
+    display: none;
+  }
+  .menuBtn {
+    display: inline-flex;
+  }
+}
+
+@media (min-width: 861px) {
+  .mobile {
+    display: none;
+  }
+}

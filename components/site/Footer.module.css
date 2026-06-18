@@ -1,0 +1,83 @@
+.footer {
+  background: var(--ink-900);
+  color: var(--sand-50);
+  padding: 72px var(--gutter) 36px;
+}
+.inner {
+  max-width: var(--container-max);
+  margin: 0 auto;
+}
+
+.top {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 48px;
+  justify-content: space-between;
+  padding-bottom: 56px;
+  border-bottom: 1px solid rgba(251, 248, 242, 0.14);
+}
+.brand {
+  max-width: 320px;
+}
+.logoImg {
+  height: 28px;
+  width: auto;
+  margin-bottom: 20px;
+}
+.tagline {
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+  color: rgba(251, 248, 242, 0.72);
+}
+.address {
+  display: flex;
+  gap: 8px;
+  margin-top: 18px;
+  color: rgba(251, 248, 242, 0.72);
+  font-size: var(--text-sm);
+}
+
+.cols {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 56px;
+}
+.col {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.colTitle {
+  font-size: var(--text-2xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  color: var(--gold-400);
+  font-weight: var(--fw-semibold);
+}
+.colLink {
+  font-size: var(--text-sm);
+  color: rgba(251, 248, 242, 0.82);
+}
+.colLink:hover {
+  color: var(--sand-50);
+}
+
+.bottom {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  justify-content: space-between;
+  padding-top: 28px;
+  font-size: var(--text-xs);
+  color: rgba(251, 248, 242, 0.55);
+}
+.legal {
+  display: flex;
+  gap: 22px;
+}
+.legalLink {
+  color: rgba(251, 248, 242, 0.7);
+}
+.legalLink:hover {
+  color: var(--sand-50);
+}

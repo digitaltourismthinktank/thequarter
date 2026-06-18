@@ -1,0 +1,60 @@
+/* The Quarter — Badge styling. Tone sets bg / fg / dot via local custom props. */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.01em;
+  line-height: 1;
+  white-space: nowrap;
+  background: var(--badge-bg);
+  color: var(--badge-fg);
+}
+
+.sm {
+  padding: 3px 9px;
+  font-size: var(--text-2xs);
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--badge-dot);
+}
+
+.neutral {
+  --badge-bg: var(--sand-100);
+  --badge-fg: var(--stone-700);
+  --badge-dot: var(--stone-400);
+}
+.gold {
+  --badge-bg: var(--gold-100);
+  --badge-fg: var(--gold-700);
+  --badge-dot: var(--gold-500);
+}
+.ink {
+  --badge-bg: var(--ink-900);
+  --badge-fg: var(--sand-50);
+  --badge-dot: var(--gold-400);
+}
+.available {
+  --badge-bg: rgba(75, 122, 82, 0.12);
+  --badge-fg: var(--success);
+  --badge-dot: var(--success);
+}
+.busy {
+  --badge-bg: rgba(169, 68, 47, 0.12);
+  --badge-fg: var(--danger);
+  --badge-dot: var(--danger);
+}
+.soon {
+  --badge-bg: rgba(181, 134, 47, 0.14);
+  --badge-fg: var(--warning);
+  --badge-dot: var(--warning);
+}

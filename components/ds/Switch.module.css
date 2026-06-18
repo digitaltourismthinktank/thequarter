@@ -1,0 +1,57 @@
+.root {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+}
+.root[data-disabled] {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+
+.track {
+  position: relative;
+  width: 46px;
+  height: 27px;
+  flex: none;
+  border-radius: 999px;
+  background: var(--sand-300);
+  transition: background var(--duration-base) var(--ease-standard);
+}
+
+.knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 21px;
+  height: 21px;
+  border-radius: 50%;
+  background: var(--pure-white);
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--duration-base) var(--ease-out), background var(--duration-base) var(--ease-standard);
+}
+
+.input:checked ~ .track {
+  background: var(--ink-900);
+}
+.input:checked ~ .track .knob {
+  transform: translateX(19px);
+  background: var(--gold-400);
+}
+.input:focus-visible ~ .track {
+  outline: var(--focus-ring-width) solid var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.label {
+  font-size: var(--text-base);
+  color: var(--text-strong);
+  font-weight: var(--fw-medium);
+}

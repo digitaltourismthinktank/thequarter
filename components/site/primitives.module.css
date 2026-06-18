@@ -1,0 +1,109 @@
+/* ---- Eyebrow ---- */
+.eyebrow {
+  font-size: var(--text-xs);
+  font-weight: var(--fw-semibold);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  color: var(--gold-700);
+}
+.eyebrowDark {
+  color: var(--gold-400);
+}
+
+/* ---- Section ---- */
+.section {
+  padding: clamp(56px, 8vw, 104px) var(--gutter);
+}
+.inner {
+  max-width: var(--container-max);
+  margin: 0 auto;
+}
+.page {
+  background: var(--surface-page);
+}
+.card {
+  background: var(--surface-card);
+}
+.ink {
+  background: var(--ink-900);
+}
+.gold {
+  background: var(--gold-100);
+}
+.sunken {
+  background: var(--surface-sunken);
+}
+
+/* ---- SectionHead ---- */
+.sectionHead {
+  margin-bottom: 44px;
+}
+.center {
+  margin-left: auto;
+  margin-right: auto;
+  text-align: center;
+}
+.headTitle {
+  font-size: clamp(30px, 4vw, 44px);
+  font-weight: var(--fw-bold);
+  letter-spacing: -0.03em;
+  line-height: 1.06;
+  margin-top: 14px;
+  color: var(--ink-900);
+}
+.headTitleDark {
+  color: var(--sand-50);
+}
+.headIntro {
+  font-size: var(--text-md);
+  line-height: 1.6;
+  margin-top: 16px;
+  color: var(--text-body);
+}
+.headIntroDark {
+  color: rgba(251, 248, 242, 0.78);
+}
+
+/* ---- IncludedStrip ---- */
+.included {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 18px;
+}
+.includedItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.includedIcon {
+  width: 42px;
+  height: 42px;
+  flex: none;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--gold-100);
+}
+.includedIconDark {
+  background: rgba(251, 248, 242, 0.08);
+}
+.includedLabel {
+  font-size: 15px;
+  font-weight: var(--fw-medium);
+  color: var(--text-strong);
+}
+.includedLabelDark {
+  color: var(--sand-50);
+}
+
+/* ---- Photo ---- */
+.photo {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  background: var(--sand-100);
+}
+.photoImg {
+  object-fit: cover;
+}
