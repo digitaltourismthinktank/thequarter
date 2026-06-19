@@ -1,0 +1,17 @@
+# The Quarter — Netlify build config.
+# Static export (next.config.mjs → output: 'export') outputs to `out/`,
+# served straight from Netlify's CDN. Netlify Forms picks up the enquiry/contact
+# forms automatically from the built HTML.
+
+[build]
+  command = "npm run build"
+  publish = "out"
+
+[build.environment]
+  NODE_VERSION = "20"
+  NEXT_TELEMETRY_DISABLED = "1"
+  # Set NEXT_PUBLIC_SITE_URL in the Netlify UI (Site settings → Environment) to the
+  # production domain so canonical URLs, sitemap and Open Graph resolve correctly.
+  # Set the commerce URLs too when ready:
+  #   NEXT_PUBLIC_STRIPE_VISITOR_URL / _RESIDENT_URL / _CITIZEN_URL / _HYBRID_OFFICE_URL
+  #   NEXT_PUBLIC_TYPEFORM_DAYPASS_URL
