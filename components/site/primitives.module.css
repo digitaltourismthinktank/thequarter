@@ -13,6 +13,7 @@
 /* ---- Section ---- */
 .section {
   padding: clamp(56px, 8vw, 104px) var(--gutter);
+  scroll-margin-top: 88px;
 }
 .inner {
   max-width: var(--container-max);

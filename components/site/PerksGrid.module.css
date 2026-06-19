@@ -1,0 +1,32 @@
+.filters {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 32px;
+}
+.pill {
+  padding: 9px 17px;
+  border-radius: 999px;
+  border: 1.5px solid var(--border-default);
+  background: transparent;
+  color: var(--stone-600);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+  transition: background var(--duration-fast), color var(--duration-fast), border-color var(--duration-fast);
+}
+.pill:hover {
+  border-color: var(--border-strong);
+}
+.pillActive {
+  background: var(--ink-900);
+  border-color: var(--ink-900);
+  color: var(--sand-50);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+}

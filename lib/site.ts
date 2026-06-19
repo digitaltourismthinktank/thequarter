@@ -13,4 +13,7 @@ export const SITE = {
   address: 'First floor, Cathedral Quarter, Canterbury',
   // A representative, warm photograph used as the default Open Graph image.
   ogImage: '/photos/photo-3939.jpg',
+  // Contact — PLACEHOLDERS, replace with the real details.
+  email: 'hello@thequarter.co.uk',
+  phone: '+44 (0)1227 000000',
 } as const;
