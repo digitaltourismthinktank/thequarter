@@ -1,0 +1,35 @@
+.wrap {
+  max-width: 560px;
+  margin: 0 auto;
+  text-align: center;
+  padding: 40px 0 24px;
+}
+.icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--gold-100);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+.title {
+  font-size: clamp(28px, 4vw, 40px);
+  font-weight: var(--fw-bold);
+  letter-spacing: -0.03em;
+  line-height: 1.06;
+}
+.text {
+  font-size: 17px;
+  line-height: 1.65;
+  color: var(--text-body);
+  margin-top: 16px;
+}
+.actions {
+  display: flex;
+  gap: 14px;
+  justify-content: center;
+  margin-top: 28px;
+  flex-wrap: wrap;
+}

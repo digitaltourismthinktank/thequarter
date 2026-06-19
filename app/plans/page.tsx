@@ -6,6 +6,7 @@ import { Icon } from '@/components/ds/Icon';
 import { PlanCard } from '@/components/ds/PlanCard';
 import { PLANS } from '@/lib/plans';
 import { INCLUDED } from '@/lib/spaces';
+import { JsonLd } from '@/components/site/JsonLd';
 import styles from './plans.module.css';
 
 export const metadata: Metadata = {
@@ -109,6 +110,18 @@ export default function PlansPage() {
           ))}
         </div>
       </Section>
+
+      <JsonLd
+        data={{
+          '@context': 'https://schema.org',
+          '@type': 'FAQPage',
+          mainEntity: FAQS.map(([q, a]) => ({
+            '@type': 'Question',
+            name: q,
+            acceptedAnswer: { '@type': 'Answer', text: a },
+          })),
+        }}
+      />
     </>
   );
 }

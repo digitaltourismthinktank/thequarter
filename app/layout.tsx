@@ -4,6 +4,7 @@ import { SITE } from '@/lib/site';
 import { AnnouncementBar } from '@/components/site/AnnouncementBar';
 import { Navbar } from '@/components/site/Navbar';
 import { Footer } from '@/components/site/Footer';
+import { JsonLd } from '@/components/site/JsonLd';
 import '@/styles/globals.css';
 
 /* DM Sans — the one family, self-hosted via next/font (no render-blocking
@@ -42,10 +43,39 @@ export const metadata: Metadata = {
   },
 };
 
+const LOCAL_BUSINESS = {
+  '@context': 'https://schema.org',
+  '@type': 'LocalBusiness',
+  '@id': SITE.url,
+  name: SITE.name,
+  description: SITE.description,
+  url: SITE.url,
+  image: `${SITE.url.replace(/\/$/, '')}${SITE.ogImage}`,
+  email: SITE.email,
+  telephone: SITE.phone,
+  address: {
+    '@type': 'PostalAddress',
+    streetAddress: 'First floor, Cathedral Quarter',
+    addressLocality: 'Canterbury',
+    addressRegion: 'Kent',
+    addressCountry: 'GB',
+  },
+  areaServed: 'Canterbury',
+  openingHoursSpecification: [
+    {
+      '@type': 'OpeningHoursSpecification',
+      dayOfWeek: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+      opens: '08:00',
+      closes: '18:00',
+    },
+  ],
+};
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en-GB" className={dmSans.variable}>
       <body>
+        <JsonLd data={LOCAL_BUSINESS} />
         <a href="#main" className="q-skip-link">
           Skip to content
         </a>

@@ -1,0 +1,71 @@
+.layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 48px;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+}
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--stone-600);
+  font-size: 14px;
+  font-weight: var(--fw-semibold);
+  margin-bottom: 24px;
+}
+.back:hover {
+  color: var(--ink-900);
+}
+
+.h1 {
+  font-size: clamp(32px, 4vw, 46px);
+  font-weight: var(--fw-bold);
+  letter-spacing: -0.03em;
+  line-height: 1.04;
+  margin: 14px 0 8px;
+}
+.lead {
+  font-size: 17px;
+  color: var(--text-body);
+  line-height: 1.55;
+  max-width: 480px;
+}
+
+.included {
+  list-style: none;
+  margin: 28px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.includedItem {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  font-size: 15px;
+  color: var(--text-strong);
+}
+
+.priceRow {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-top: 28px;
+}
+.price {
+  font-size: 36px;
+  font-weight: var(--fw-bold);
+  letter-spacing: -0.02em;
+}
+.priceNote {
+  font-size: 14px;
+  color: var(--text-muted);
+}

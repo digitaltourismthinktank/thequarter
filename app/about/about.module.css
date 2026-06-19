@@ -1,0 +1,94 @@
+.header {
+  max-width: 720px;
+}
+.h1 {
+  font-size: clamp(38px, 5.5vw, 64px);
+  font-weight: var(--fw-bold);
+  letter-spacing: -0.035em;
+  line-height: 1;
+  color: var(--sand-50);
+  margin: 18px 0 0;
+}
+.lead {
+  font-size: 19px;
+  line-height: 1.6;
+  color: rgba(251, 248, 242, 0.82);
+  margin-top: 18px;
+  max-width: 600px;
+}
+
+.split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 48px;
+  align-items: center;
+}
+@media (max-width: 900px) {
+  .split {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+}
+.featureTitle {
+  font-size: clamp(28px, 3.4vw, 40px);
+  font-weight: var(--fw-bold);
+  letter-spacing: -0.03em;
+  line-height: 1.08;
+  margin-top: 14px;
+}
+.featureText {
+  font-size: 17px;
+  line-height: 1.65;
+  color: var(--text-body);
+  margin-top: 16px;
+}
+.featureText + .featureText {
+  margin-top: 14px;
+}
+
+.values {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 22px;
+  margin-top: 40px;
+}
+.valueCard {
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-card);
+  padding: 26px 26px 28px;
+}
+.valueIcon {
+  width: 46px;
+  height: 46px;
+  border-radius: var(--radius-md);
+  background: var(--gold-100);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+.valueTitle {
+  font-size: 19px;
+  font-weight: var(--fw-semibold);
+  margin-bottom: 8px;
+}
+.valueText {
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text-body);
+}
+
+.closing {
+  text-align: center;
+  max-width: 640px;
+  margin: 0 auto;
+}
+.closingActions {
+  display: flex;
+  gap: 14px;
+  justify-content: center;
+  margin-top: 28px;
+  flex-wrap: wrap;
+}

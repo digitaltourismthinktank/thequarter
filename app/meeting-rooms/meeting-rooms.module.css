@@ -1,0 +1,38 @@
+.roomsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 24px;
+}
+
+.enquireGrid {
+  display: grid;
+  grid-template-columns: 0.85fr 1.15fr;
+  gap: 48px;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .enquireGrid {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+}
+.enquireText {
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--text-body);
+  margin-top: 16px;
+}
+.enquireList {
+  margin-top: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.enquireItem {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  font-size: 15px;
+  color: var(--text-strong);
+  line-height: 1.45;
+}

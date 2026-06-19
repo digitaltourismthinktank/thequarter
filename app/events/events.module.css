@@ -1,0 +1,104 @@
+.layout {
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  gap: 40px;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.event {
+  display: flex;
+  gap: 20px;
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 20px 22px;
+  box-shadow: var(--shadow-card);
+}
+.date {
+  flex: none;
+  width: 64px;
+  text-align: center;
+}
+.dateDay {
+  font-size: 12px;
+  font-weight: var(--fw-semibold);
+  color: var(--gold-700);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.dateNum {
+  font-size: 26px;
+  font-weight: var(--fw-bold);
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+.dateMon {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.eventBody {
+  flex: 1;
+  min-width: 0;
+}
+.eventTitle {
+  font-size: 19px;
+  font-weight: var(--fw-semibold);
+  margin: 8px 0 4px;
+}
+.eventBlurb {
+  font-size: 14px;
+  color: var(--text-body);
+  line-height: 1.5;
+}
+.eventTime {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 10px;
+}
+.eventAction {
+  align-self: center;
+  flex: none;
+}
+@media (max-width: 520px) {
+  .event {
+    flex-wrap: wrap;
+  }
+  .eventAction {
+    align-self: flex-start;
+  }
+}
+
+.aside {
+  position: sticky;
+  top: 90px;
+}
+.asideCard {
+  background: var(--gold-100);
+  border-radius: var(--radius-lg);
+  padding: 20px 22px;
+  margin-top: 16px;
+}
+.asideTitle {
+  font-size: 17px;
+  font-weight: var(--fw-semibold);
+}
+.asideText {
+  font-size: 14px;
+  color: var(--stone-700);
+  line-height: 1.5;
+  margin: 8px 0 16px;
+}
