@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
+import Script from 'next/script';
 import { DM_Sans } from 'next/font/google';
 import { SITE } from '@/lib/site';
+import { MEMBERSTACK_APP_ID } from '@/lib/memberstack';
 import { AnnouncementBar } from '@/components/site/AnnouncementBar';
 import { Navbar } from '@/components/site/Navbar';
 import { Footer } from '@/components/site/Footer';
@@ -75,6 +77,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en-GB" className={dmSans.variable}>
       <body>
+        <Script
+          src="https://static.memberstack.com/scripts/v1/memberstack.js"
+          data-memberstack-app={MEMBERSTACK_APP_ID}
+          strategy="afterInteractive"
+        />
         <JsonLd data={LOCAL_BUSINESS} />
         <a href="#main" className="q-skip-link">
           Skip to content

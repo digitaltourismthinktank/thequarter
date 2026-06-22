@@ -89,3 +89,30 @@
 .mediaImg {
   object-fit: cover;
 }
+
+.error {
+  font-size: 13px;
+  color: var(--danger);
+}
+.info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text-strong);
+  background: var(--gold-100);
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+}
+.linkBtn {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--gold-700);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+}
+.linkBtn:hover {
+  color: var(--ink-900);
+}

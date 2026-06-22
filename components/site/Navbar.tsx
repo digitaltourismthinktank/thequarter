@@ -8,11 +8,15 @@ import { Button } from '@/components/ds/Button';
 import { IconButton } from '@/components/ds/IconButton';
 import { NAV_LINKS } from '@/lib/nav';
 import { cn } from '@/lib/cn';
+import { useMember } from './useMember';
 import styles from './Navbar.module.css';
 
 export function Navbar() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const { member } = useMember();
+  const accountHref = member ? '/dashboard' : '/login';
+  const accountLabel = member ? 'Dashboard' : 'Member login';
 
   const isActive = (href: string) => (href === '/' ? pathname === '/' : pathname.startsWith(href));
 
@@ -44,8 +48,8 @@ export function Navbar() {
         </nav>
 
         <div className={styles.actions}>
-          <Link href="/login" className={styles.signIn}>
-            Member login
+          <Link href={accountHref} className={styles.signIn}>
+            {accountLabel}
           </Link>
           <span className={styles.cta}>
             <Button size="sm" variant="primary" href="/day-pass" iconAfter="arrow-right">
@@ -79,8 +83,8 @@ export function Navbar() {
             </Link>
           ))}
           <div className={styles.mobileActions}>
-            <Button variant="secondary" href="/login" fullWidth onClick={() => setOpen(false)}>
-              Member login
+            <Button variant="secondary" href={accountHref} fullWidth onClick={() => setOpen(false)}>
+              {accountLabel}
             </Button>
             <Button variant="primary" href="/day-pass" iconAfter="arrow-right" fullWidth onClick={() => setOpen(false)}>
               Book a Day Pass

@@ -28,6 +28,12 @@ export const STRIPE_HYBRID_OFFICE_URL =
 export const TYPEFORM_DAYPASS_URL =
   process.env.NEXT_PUBLIC_TYPEFORM_DAYPASS_URL ?? 'https://dttt.typeform.com/to/VScIAjrW';
 
+/** Stripe billing portal (members manage/switch plan). Used as the fallback for
+ * the dashboard's "Manage plan" button until the one-click Netlify Function
+ * (/.netlify/functions/billing-portal) is live with a Stripe key. */
+export const STRIPE_BILLING_PORTAL_URL =
+  process.env.NEXT_PUBLIC_STRIPE_BILLING_PORTAL_URL ?? 'https://billing.stripe.com/p/login/fZe0346QK2iQ3Wo4gg';
+
 /** Where a CTA points when its checkout URL isn't configured yet. */
 export const CHECKOUT_FALLBACK = '/location';
 
