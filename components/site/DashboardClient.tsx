@@ -17,6 +17,7 @@ export function DashboardClient() {
   const { loading, member } = useMember();
   const [planName, setPlanName] = useState<string | null>(null);
   const [billingBusy, setBillingBusy] = useState(false);
+  const [billingError, setBillingError] = useState<string | null>(null);
 
   // Patient redirect: only send to /login once we're sure there's no member.
   useEffect(() => {
@@ -74,6 +75,7 @@ export function DashboardClient() {
   // Stripe portal link if the function isn't configured yet or has no match.
   async function handleManageBilling() {
     setBillingBusy(true);
+    setBillingError(null);
     try {
       const ms = await getMemberstack();
       let token = ms?.getMemberCookie?.();
@@ -82,24 +84,25 @@ export function DashboardClient() {
         if (m) token = decodeURIComponent(m[1]);
       }
       if (!token) {
-        console.warn('[billing] No member token found — using fallback portal.');
-      } else {
-        const res = await fetch('/.netlify/functions/billing-portal', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
-          body: JSON.stringify({ token }),
-        });
-        const data = (await res.json().catch(() => ({}))) as { url?: string; error?: string; detail?: string };
-        if (res.ok && data.url) {
-          window.location.assign(data.url);
-          return;
-        }
-        console.warn('[billing] Portal function returned', res.status, data.error ?? '', data.detail ?? '');
+        setBillingError('no member token');
+        return;
       }
+      const res = await fetch('/.netlify/functions/billing-portal', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: JSON.stringify({ token }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { url?: string; error?: string; detail?: string };
+      if (res.ok && data.url) {
+        window.location.assign(data.url);
+        return;
+      }
+      setBillingError(`${res.status} ${data.error ?? ''} ${data.detail ?? ''}`.trim());
     } catch (e) {
-      console.warn('[billing] Error calling portal function:', e);
+      setBillingError(String((e as Error)?.message || e));
+    } finally {
+      setBillingBusy(false);
     }
-    window.location.assign(STRIPE_BILLING_PORTAL_URL);
   }
 
   return (
@@ -136,6 +139,12 @@ export function DashboardClient() {
               </Button>
             )}
           </div>
+          {billingError ? (
+            <p className={styles.billingError}>
+              Couldn&rsquo;t open one-click billing ({billingError}).{' '}
+              <a href={STRIPE_BILLING_PORTAL_URL}>Open the standard portal</a>.
+            </p>
+          ) : null}
         </div>
 
         {/* Quick links */}

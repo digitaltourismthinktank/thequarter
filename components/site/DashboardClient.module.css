@@ -99,3 +99,14 @@
 .logout {
   margin-top: 28px;
 }
+
+.billingError {
+  margin-top: 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--danger);
+}
+.billingError a {
+  color: var(--gold-700);
+  font-weight: var(--fw-semibold);
+}
