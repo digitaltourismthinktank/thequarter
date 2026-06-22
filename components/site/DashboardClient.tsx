@@ -76,21 +76,28 @@ export function DashboardClient() {
     setBillingBusy(true);
     try {
       const ms = await getMemberstack();
-      const token = ms?.getMemberCookie();
-      if (token) {
+      let token = ms?.getMemberCookie?.();
+      if (!token && typeof document !== 'undefined') {
+        const m = document.cookie.match(/(?:^|;\s*)_ms-mid=([^;]+)/);
+        if (m) token = decodeURIComponent(m[1]);
+      }
+      if (!token) {
+        console.warn('[billing] No member token found — using fallback portal.');
+      } else {
         const res = await fetch('/.netlify/functions/billing-portal', {
           method: 'POST',
           headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
           body: JSON.stringify({ token }),
         });
-        const data = (await res.json().catch(() => ({}))) as { url?: string };
+        const data = (await res.json().catch(() => ({}))) as { url?: string; error?: string; detail?: string };
         if (res.ok && data.url) {
           window.location.assign(data.url);
           return;
         }
+        console.warn('[billing] Portal function returned', res.status, data.error ?? '', data.detail ?? '');
       }
-    } catch {
-      /* fall through to the generic portal */
+    } catch (e) {
+      console.warn('[billing] Error calling portal function:', e);
     }
     window.location.assign(STRIPE_BILLING_PORTAL_URL);
   }
