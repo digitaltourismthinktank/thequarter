@@ -66,10 +66,16 @@ export default async function handler(req) {
     const customerId = customers?.data?.[0]?.id;
     if (!customerId) return json({ error: 'no-customer' }, 404);
 
-    const session = await stripe('/v1/billing_portal/sessions', 'POST', {
+    const portalForm = {
       customer: customerId,
       return_url: `${SITE_URL}/dashboard/`,
-    });
+    };
+    // Optional: use the specific Stripe billing-portal configuration (defines
+    // which plans members can switch between).
+    if (process.env.STRIPE_BILLING_PORTAL_CONFIG) {
+      portalForm.configuration = process.env.STRIPE_BILLING_PORTAL_CONFIG;
+    }
+    const session = await stripe('/v1/billing_portal/sessions', 'POST', portalForm);
     if (!session?.url) return json({ error: 'no-session', detail: session?.error?.message }, 502);
 
     return json({ url: session.url });
