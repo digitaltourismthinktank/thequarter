@@ -62,6 +62,7 @@ export interface MemberstackDom {
   sendMemberResetPasswordEmail(p: { email: string }): Promise<{ data: string }>;
   resetMemberPassword(p: { token: string; newPassword: string }): Promise<{ data: unknown }>;
   addPlan(p: { planId: string }): Promise<{ data: unknown }>;
+  getPlan(p: { planId: string }): Promise<{ data: { id?: string; name?: string } | null }>;
   getMemberCookie(): string | undefined;
 }
 

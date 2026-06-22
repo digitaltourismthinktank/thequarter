@@ -80,7 +80,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Script
           src="https://static.memberstack.com/scripts/v1/memberstack.js"
           data-memberstack-app={MEMBERSTACK_APP_ID}
-          strategy="afterInteractive"
+          strategy="beforeInteractive"
         />
         <JsonLd data={LOCAL_BUSINESS} />
         <a href="#main" className="q-skip-link">

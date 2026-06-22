@@ -45,6 +45,17 @@ export function AuthScreen({ mode }: { mode: 'login' | 'signup' }) {
           metaData: name ? { name } : undefined,
         });
       }
+      // Wait until the session is readable before navigating, so the dashboard
+      // gate doesn't bounce back to /login on the first attempt.
+      for (let i = 0; i < 20; i += 1) {
+        try {
+          const { data } = await ms.getCurrentMember();
+          if (data) break;
+        } catch {
+          /* keep waiting */
+        }
+        await new Promise((r) => setTimeout(r, 150));
+      }
       window.location.assign('/dashboard');
     } catch (err) {
       setStatus('error');
