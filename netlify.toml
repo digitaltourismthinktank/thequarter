@@ -15,3 +15,8 @@
   # Set the commerce URLs too when ready:
   #   NEXT_PUBLIC_STRIPE_VISITOR_URL / _RESIDENT_URL / _CITIZEN_URL / _HYBRID_OFFICE_URL
   #   NEXT_PUBLIC_TYPEFORM_DAYPASS_URL
+  # For the one-click billing-portal function: MEMBERSTACK_SECRET_KEY, STRIPE_SECRET_KEY
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"

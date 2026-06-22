@@ -33,3 +33,6 @@ yarn-error.log*
 
 # design-system handoff: keep source, drop the unused full-res originals
 the-quarter-design-system/project/uploads/
+
+# lockfile omitted — Netlify resolves via npm install (local npm is unreliable here)
+package-lock.json

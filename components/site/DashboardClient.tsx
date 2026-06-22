@@ -16,6 +16,7 @@ import styles from './DashboardClient.module.css';
 export function DashboardClient() {
   const { loading, member } = useMember();
   const [planName, setPlanName] = useState<string | null>(null);
+  const [billingBusy, setBillingBusy] = useState(false);
 
   // Patient redirect: only send to /login once we're sure there's no member.
   useEffect(() => {
@@ -69,6 +70,31 @@ export function DashboardClient() {
     window.location.assign('/');
   }
 
+  // One-click billing portal via the Netlify Function; falls back to the generic
+  // Stripe portal link if the function isn't configured yet or has no match.
+  async function handleManageBilling() {
+    setBillingBusy(true);
+    try {
+      const ms = await getMemberstack();
+      const token = ms?.getMemberCookie();
+      if (token) {
+        const res = await fetch('/.netlify/functions/billing-portal', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+          body: JSON.stringify({ token }),
+        });
+        const data = (await res.json().catch(() => ({}))) as { url?: string };
+        if (res.ok && data.url) {
+          window.location.assign(data.url);
+          return;
+        }
+      }
+    } catch {
+      /* fall through to the generic portal */
+    }
+    window.location.assign(STRIPE_BILLING_PORTAL_URL);
+  }
+
   return (
     <div>
       <div className={styles.head}>
@@ -94,8 +120,8 @@ export function DashboardClient() {
           </p>
           <div className={styles.actions}>
             {hasPlan ? (
-              <Button variant="primary" href={STRIPE_BILLING_PORTAL_URL} iconAfter="arrow-right">
-                Manage plan &amp; billing
+              <Button variant="primary" onClick={handleManageBilling} disabled={billingBusy} iconAfter="arrow-right">
+                {billingBusy ? 'Opening…' : 'Manage plan & billing'}
               </Button>
             ) : (
               <Button variant="primary" href="/plans" iconAfter="arrow-right">
