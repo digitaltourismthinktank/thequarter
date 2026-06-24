@@ -8,7 +8,7 @@ export const SITE = {
   tagline: 'So much more than a workspace',
   description:
     "A boutique coworking home above Canterbury's Cathedral Quarter. Come for the warmth, the natural light and the breakfast — find your focus, and an escape from home.",
-  url: process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000',
+  url: process.env.NEXT_PUBLIC_SITE_URL ?? 'https://thequarter.netlify.app',
   locale: 'en_GB',
   address: 'First floor, Cathedral Quarter, Canterbury',
   // A representative, warm photograph used as the default Open Graph image.
