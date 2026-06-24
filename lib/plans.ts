@@ -108,3 +108,16 @@ export const PLANS: Plan[] = [
 export function getPlan(id: PlanId): Plan | undefined {
   return PLANS.find((p) => p.id === id);
 }
+
+/**
+ * Monthly day allowance per plan (null = unlimited). Mirrors the server-side
+ * PLAN_ALLOWANCE in netlify/functions/_quarter-sync.mjs; used on the dashboard to
+ * show how many of the member's remaining days are rolled over from last month.
+ */
+export const PLAN_DAY_ALLOWANCE: Record<PlanId, number | null> = {
+  'day-pass': 1,
+  visitor: 5,
+  resident: 10,
+  citizen: null,
+  'hybrid-office': 12,
+};

@@ -2,32 +2,21 @@
  * The Quarter — Stripe → Memberstack sync (Part B).
  *
  * On a renewal (invoice.paid) we reset the member's day balance to their plan's
- * allowance and update their renewal date — removing the manual reset. On
- * subscription changes we refresh the renewal date; on cancellation we lapse the
- * balance. Keeps Memberstack in lockstep with Stripe.
+ * allowance (with rollover) and update their renewal date — removing the manual
+ * reset. On subscription changes we refresh the renewal date; on cancellation we
+ * lapse the balance. Keeps Memberstack in lockstep with Stripe.
  *
- * Netlify env vars required: STRIPE_WEBHOOK_SECRET (whsec_…), MEMBERSTACK_SECRET_KEY.
- * Uses STRIPE_SECRET_KEY (Customers: Read) to resolve a customer's email when the
- * event doesn't include it.
- *
- * Plan allowances keyed by Memberstack plan id (null = unlimited). Citizen &
- * Resident are known; set MS_PLN_VISITOR / MS_PLN_HYBRID env vars (the pln_… ids)
- * to activate those — no code change needed. Day Pass is one-off (Typeform), so
- * it has no renewal here.
+ * The day-reset + rollover rule lives in ./_quarter-sync.mjs (shared with the
+ * sim-renewal test endpoint). Netlify env vars required: STRIPE_WEBHOOK_SECRET
+ * (whsec_…), MEMBERSTACK_SECRET_KEY. STRIPE_SECRET_KEY (Customers: Read) resolves
+ * a customer's email when the event doesn't include it.
  */
 import crypto from 'node:crypto';
-import memberstackAdmin from '@memberstack/admin';
+import { renewMember, formatDate } from './_quarter-sync.mjs';
 
 const MS_SECRET = process.env.MEMBERSTACK_SECRET_KEY;
 const STRIPE_SECRET = process.env.STRIPE_SECRET_KEY;
 const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
-
-const PLAN_ALLOWANCE = {
-  [process.env.MS_PLN_CITIZEN || 'pln_citizen-plan-q9oa04p9']: null, // unlimited
-  [process.env.MS_PLN_RESIDENT || 'pln_resident-plan-mqjy0f6w']: 10,
-  ...(process.env.MS_PLN_VISITOR ? { [process.env.MS_PLN_VISITOR]: 5 } : {}),
-  ...(process.env.MS_PLN_HYBRID ? { [process.env.MS_PLN_HYBRID]: 12 } : {}),
-};
 
 function ok(body = { received: true }) {
   return new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
@@ -47,14 +36,6 @@ function verifyStripeSignature(rawBody, header, secret) {
   });
 }
 
-function formatDate(unixSeconds) {
-  if (!unixSeconds) return '';
-  const d = new Date(unixSeconds * 1000);
-  const dd = String(d.getUTCDate()).padStart(2, '0');
-  const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
-  return `${dd}/${mm}/${d.getUTCFullYear()}`;
-}
-
 async function emailFromCustomer(customerId) {
   if (!customerId || !STRIPE_SECRET) return null;
   try {
@@ -68,43 +49,6 @@ async function emailFromCustomer(customerId) {
   }
 }
 
-/** Day allowance for a member from their Memberstack plan(s); null = unlimited. */
-function allowanceForMember(member) {
-  let found;
-  for (const c of member?.planConnections || []) {
-    if (c.planId in PLAN_ALLOWANCE) {
-      const a = PLAN_ALLOWANCE[c.planId];
-      if (a === null) return null; // unlimited wins
-      if (found === undefined) found = a;
-    }
-  }
-  return found;
-}
-
-async function syncMember(email, { renewal, resetDays, lapse }) {
-  const admin = memberstackAdmin.init(MS_SECRET);
-  let member;
-  try {
-    const r = await admin.members.retrieve({ email });
-    member = r?.data;
-  } catch {
-    return; // not a member / lookup failed — ignore
-  }
-  if (!member) return;
-
-  const fields = {};
-  if (renewal !== undefined) fields['renewal-date'] = renewal;
-  if (lapse) {
-    fields['days-remaining'] = '0';
-  } else if (resetDays) {
-    const allowance = allowanceForMember(member);
-    if (allowance === null) fields['days-remaining'] = 'Unlimited';
-    else if (allowance !== undefined) fields['days-remaining'] = String(allowance);
-  }
-  if (Object.keys(fields).length === 0) return;
-  await admin.members.update({ id: member.id, data: { customFields: fields } });
-}
-
 async function handleEvent(event) {
   const obj = event?.data?.object || {};
   switch (event?.type) {
@@ -112,8 +56,8 @@ async function handleEvent(event) {
     case 'invoice.payment_succeeded': {
       const email = obj.customer_email || (await emailFromCustomer(obj.customer));
       if (!email) return;
-      const renewal = formatDate(obj.lines?.data?.[0]?.period?.end || obj.period_end);
-      await syncMember(email, { renewal, resetDays: true });
+      const renewalDate = formatDate(obj.lines?.data?.[0]?.period?.end || obj.period_end);
+      await renewMember(MS_SECRET, email, { renewalDate, resetDays: true });
       return;
     }
     case 'customer.subscription.created':
@@ -121,13 +65,13 @@ async function handleEvent(event) {
       const email = await emailFromCustomer(obj.customer);
       if (!email) return;
       // Refresh renewal date only; the day balance resets on the actual payment.
-      await syncMember(email, { renewal: formatDate(obj.current_period_end) });
+      await renewMember(MS_SECRET, email, { renewalDate: formatDate(obj.current_period_end), resetDays: false });
       return;
     }
     case 'customer.subscription.deleted': {
       const email = await emailFromCustomer(obj.customer);
       if (!email) return;
-      await syncMember(email, { renewal: '', lapse: true });
+      await renewMember(MS_SECRET, email, { renewalDate: '', lapse: true });
       return;
     }
     default:

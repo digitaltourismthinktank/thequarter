@@ -5,7 +5,7 @@ import { Button } from '@/components/ds/Button';
 import { Icon } from '@/components/ds/Icon';
 import { useMember } from './useMember';
 import { getMemberstack, memberDaysRemaining, memberRenewalDate, memberDoorCode } from '@/lib/memberstack';
-import { PLANS } from '@/lib/plans';
+import { PLANS, PLAN_DAY_ALLOWANCE } from '@/lib/plans';
 import { STRIPE_BILLING_PORTAL_URL } from '@/lib/commerce';
 import styles from './DashboardClient.module.css';
 
@@ -88,6 +88,12 @@ export function DashboardClient() {
   const days = memberDaysRemaining(member);
   const renewal = memberRenewalDate(member);
   const doorCode = memberDoorCode(member);
+  // How many of the remaining days are rolled over from last month (days above
+  // this plan's monthly allowance). Mirrors the webhook's rollover rule.
+  const planAllowance = matched ? PLAN_DAY_ALLOWANCE[matched.id] : undefined;
+  const daysNum = days !== null ? parseInt(days, 10) : NaN;
+  const rolledOver =
+    planAllowance != null && Number.isFinite(daysNum) && daysNum > planAllowance ? daysNum - planAllowance : 0;
   const debug =
     typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === '1';
 
@@ -211,6 +217,11 @@ export function DashboardClient() {
                 {days} <span className={styles.daysUnit}>days left</span>
               </div>
               {renewal ? <p className={styles.planMeta}>Resets on {renewal}</p> : null}
+              {rolledOver > 0 ? (
+                <p className={styles.rolled}>
+                  Includes {rolledOver} day{rolledOver === 1 ? '' : 's'} rolled over
+                </p>
+              ) : null}
             </>
           ) : (
             <>
