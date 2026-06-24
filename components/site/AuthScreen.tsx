@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { FormEvent } from 'react';
+import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Input } from '@/components/ds/Input';
 import { Button } from '@/components/ds/Button';
@@ -18,6 +19,7 @@ type Status = 'idle' | 'submitting' | 'error' | 'sent';
 
 export function AuthScreen({ mode }: { mode: 'login' | 'signup' }) {
   const isLogin = mode === 'login';
+  const router = useRouter();
   const [view, setView] = useState<'main' | 'forgot'>('main');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -45,18 +47,9 @@ export function AuthScreen({ mode }: { mode: 'login' | 'signup' }) {
           metaData: name ? { name } : undefined,
         });
       }
-      // Wait until the session is readable before navigating, so the dashboard
-      // gate doesn't bounce back to /login on the first attempt.
-      for (let i = 0; i < 20; i += 1) {
-        try {
-          const { data } = await ms.getCurrentMember();
-          if (data) break;
-        } catch {
-          /* keep waiting */
-        }
-        await new Promise((r) => setTimeout(r, 150));
-      }
-      window.location.assign('/dashboard');
+      // Client-side navigation keeps the just-authenticated Memberstack instance
+      // in memory; a full page reload raced session restore and bounced to /login.
+      router.push('/dashboard');
     } catch (err) {
       setStatus('error');
       setError(memberstackError(err));
