@@ -18,6 +18,7 @@ export function DashboardClient() {
   const [planName, setPlanName] = useState<string | null>(null);
   const [billingBusy, setBillingBusy] = useState(false);
   const [billingError, setBillingError] = useState<string | null>(null);
+  const [allPlans, setAllPlans] = useState<unknown>(null);
 
   // Patient redirect: only send to /login once we're sure there's no member.
   useEffect(() => {
@@ -45,6 +46,25 @@ export function DashboardClient() {
       active = false;
     };
   }, [member]);
+
+  // Debug only (?debug=1): list all Memberstack plans to capture their pln_ ids.
+  useEffect(() => {
+    const isDebug = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === '1';
+    if (!isDebug) return;
+    let active = true;
+    (async () => {
+      const ms = await getMemberstack();
+      try {
+        const res = await ms?.getPlans?.();
+        if (active && res) setAllPlans(res.data);
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   if (loading) return <p className={styles.state}>Loading your dashboard…</p>;
   if (!member) return <p className={styles.state}>Please sign in — taking you to the login page…</p>;
@@ -209,6 +229,7 @@ export function DashboardClient() {
               email: member.auth?.email,
               planConnections: member.planConnections,
               customFields: member.customFields,
+              allPlans,
             },
             null,
             2,
