@@ -33,6 +33,7 @@ async function syncFromStripe(email) {
   if (!customerId) return { ok: false, step: 'no-customer', email };
 
   const subs = await stripeGet(`/v1/subscriptions?customer=${customerId}&status=all&limit=10`);
+  if (!subs?.data) return { ok: false, step: 'subscriptions-read-failed', customerId, stripe: subs };
   const allSubscriptions = (subs?.data || []).map((s) => ({
     id: s.id,
     status: s.status,
@@ -60,6 +61,7 @@ async function syncFromStripe(email) {
 async function recentSubs() {
   if (!STRIPE_SECRET) return { ok: false, step: 'no-stripe-key' };
   const subs = await stripeGet(`/v1/subscriptions?status=all&limit=20`);
+  if (!subs?.data) return { ok: false, step: 'subscriptions-read-failed', stripe: subs };
   const rows = [];
   for (const s of subs?.data || []) {
     const price = s.items?.data?.[0]?.price;
