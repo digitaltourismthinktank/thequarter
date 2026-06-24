@@ -12,7 +12,7 @@
  * a customer's email when the event doesn't include it.
  */
 import crypto from 'node:crypto';
-import { renewMember, formatDate } from './_quarter-sync.mjs';
+import { renewMember, formatDate, setMemberPlan, targetPlanForPrice, PAUSED_PLAN_ID } from './_quarter-sync.mjs';
 
 const MS_SECRET = process.env.MEMBERSTACK_SECRET_KEY;
 const STRIPE_SECRET = process.env.STRIPE_SECRET_KEY;
@@ -64,6 +64,14 @@ async function handleEvent(event) {
     case 'customer.subscription.updated': {
       const email = await emailFromCustomer(obj.customer);
       if (!email) return;
+      const price = obj.items?.data?.[0]?.price;
+      const target = targetPlanForPrice(price?.id, price?.unit_amount);
+      if (target === PAUSED_PLAN_ID) {
+        // Paused (£0 plan): move to the Paused tier and freeze the day balance.
+        await setMemberPlan(MS_SECRET, email, PAUSED_PLAN_ID);
+        return;
+      }
+      if (target) await setMemberPlan(MS_SECRET, email, target); // plan switch → re-tag
       // Refresh renewal date only; the day balance resets on the actual payment.
       await renewMember(MS_SECRET, email, { renewalDate: formatDate(obj.current_period_end), resetDays: false });
       return;

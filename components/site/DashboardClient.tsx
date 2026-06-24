@@ -77,12 +77,15 @@ export function DashboardClient() {
           p.name.toLowerCase().includes(planName.toLowerCase()),
       )
     : undefined;
-  const planLabel = planName ?? (hasPlan ? 'Active plan' : 'No active plan');
-  const planMeta = matched
-    ? `${matched.price} · ${matched.period}`
-    : hasPlan
-      ? 'Active membership'
-      : 'Choose a plan to unlock the space.';
+  const isPaused = planName ? planName.toLowerCase().includes('paus') : false;
+  const planLabel = isPaused ? 'Plan paused' : (planName ?? (hasPlan ? 'Active plan' : 'No active plan'));
+  const planMeta = isPaused
+    ? 'Your membership is paused — your days are held. Resume any time.'
+    : matched
+      ? `${matched.price} · ${matched.period}`
+      : hasPlan
+        ? 'Active membership'
+        : 'Choose a plan to unlock the space.';
   const email = member.auth?.email ?? 'your account';
   const isUnlimited = matched?.id === 'citizen' || (planName?.toLowerCase().includes('citizen') ?? false);
   const days = memberDaysRemaining(member);
@@ -206,7 +209,14 @@ export function DashboardClient() {
         {/* Days remaining */}
         <div className={styles.card}>
           <span className={styles.cardEyebrow}>Your days</span>
-          {isUnlimited ? (
+          {isPaused ? (
+            <>
+              <h2 className={styles.planName}>On hold</h2>
+              <p className={styles.planMeta}>
+                {days ?? '0'} day{days === '1' ? '' : 's'} held while your plan is paused.
+              </p>
+            </>
+          ) : isUnlimited ? (
             <>
               <h2 className={styles.planName}>Unlimited</h2>
               <p className={styles.planMeta}>Citizen members have unrestricted access.</p>

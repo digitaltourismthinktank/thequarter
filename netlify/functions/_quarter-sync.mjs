@@ -17,6 +17,31 @@ export const PLAN_ALLOWANCE = {
   'pln_daily-plan-45nv0v26': 1, // Day Pass — one-off (no recurring renewal)
 };
 
+/** The dedicated "Paused" Memberstack plan (member moves here on the £0 Stripe plan). */
+export const PAUSED_PLAN_ID = 'pln_paused-fns0m38';
+
+/**
+ * Stripe price id → Memberstack plan id. Lets the webhook re-tag a member when
+ * they switch plan in the Stripe portal. Hybrid's price id isn't known yet —
+ * set STRIPE_PRICE_HYBRID in Netlify to enable Hybrid switches without a deploy.
+ */
+export const PRICE_TO_PLAN = {
+  'price_0PgS1pw5GSGOu4zJQpVlN6Gm': 'pln_citizen-plan-q9oa04p9', // Citizen
+  'price_0PgRphw5GSGOu4zJ0dnCFwjp': 'pln_resident-plan-mqjy0f6w', // Resident
+  'price_0PgRo1w5GSGOu4zJdycNlCpy': 'pln_visitor-plan-blk50re2', // Visitor
+  'price_0PgRmsw5GSGOu4zJxWrmYHWg': 'pln_daily-plan-45nv0v26', // Day Pass (one-off)
+  ...(process.env.STRIPE_PRICE_HYBRID ? { [process.env.STRIPE_PRICE_HYBRID]: 'pln_hybrid-plan-r4k60rjp' } : {}),
+};
+
+/** Every Memberstack plan we manage — we only swap among these, never touching others. */
+const MANAGED_PLANS = new Set([...Object.values(PRICE_TO_PLAN), 'pln_hybrid-plan-r4k60rjp', PAUSED_PLAN_ID]);
+
+/** The Memberstack plan a Stripe subscription should map to (a £0 price = paused). */
+export function targetPlanForPrice(priceId, amount) {
+  if (amount === 0) return PAUSED_PLAN_ID;
+  return PRICE_TO_PLAN[priceId];
+}
+
 /** Format a unix-seconds timestamp as DD/MM/YYYY (UTC), or '' if absent. */
 export function formatDate(unixSeconds) {
   if (!unixSeconds) return '';
@@ -85,4 +110,40 @@ export async function renewMember(secret, email, { renewalDate, resetDays = true
   if (Object.keys(fields).length === 0) return { ok: true, memberId: member.id, fields: {} };
   await admin.members.update({ id: member.id, data: { customFields: fields } });
   return { ok: true, memberId: member.id, fields };
+}
+
+/**
+ * Ensure the member holds exactly `targetPlanId` among the plans we manage:
+ * add it if missing, and remove any other managed plan (so a switch/pause leaves
+ * one clean tag). Untouched: any plan we don't manage. Days are left alone here
+ * (a switch resets them on the next invoice.paid; a pause freezes them).
+ */
+export async function setMemberPlan(secret, email, targetPlanId) {
+  if (!secret || !email || !targetPlanId) return { ok: false, reason: 'missing-args' };
+  const admin = memberstackAdmin.init(secret);
+
+  let member;
+  try {
+    const r = await admin.members.retrieve({ email });
+    member = r?.data;
+  } catch {
+    return { ok: false, reason: 'lookup-failed' };
+  }
+  if (!member) return { ok: false, reason: 'not-found' };
+
+  const current = (member.planConnections || []).map((c) => c.planId).filter(Boolean);
+  const added = [];
+  const removed = [];
+
+  if (!current.includes(targetPlanId)) {
+    await admin.members.addFreePlan({ id: member.id, data: { planId: targetPlanId } });
+    added.push(targetPlanId);
+  }
+  for (const planId of current) {
+    if (planId !== targetPlanId && MANAGED_PLANS.has(planId)) {
+      await admin.members.removeFreePlan({ id: member.id, data: { planId } });
+      removed.push(planId);
+    }
+  }
+  return { ok: true, memberId: member.id, targetPlanId, added, removed };
 }
