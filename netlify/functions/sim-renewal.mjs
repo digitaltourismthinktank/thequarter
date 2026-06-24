@@ -1,42 +1,47 @@
 /**
- * The Quarter — renewal simulator (admin test tool).
+ * The Quarter — admin test / debug tool (SIM_KEY-gated; never wired into any UI).
+ * Set SIM_KEY in Netlify to enable; remove it to disable.
  *
- * Runs the EXACT same day-reset + rollover logic as the real Stripe webhook, but
- * on demand, so you can verify the behaviour and the dashboard without taking a
- * subscription. Gated by a SIM_KEY secret (set it in Netlify to enable; remove it
- * to disable). Never exposed to members — it's not wired into any UI.
- *
- *   GET /.netlify/functions/sim-renewal?key=YOUR_SIM_KEY&email=member@example.com
- *
- * Pass &lapse=1 to simulate a cancellation (zeroes the balance) instead.
+ *   Inspect a member (read-only):
+ *     GET /.netlify/functions/sim-renewal?key=KEY&email=…&inspect=1
+ *   Force a plan re-tag (test the switch/pause logic without Stripe):
+ *     GET /.netlify/functions/sim-renewal?key=KEY&email=…&plan=pln_visitor-plan-blk50re2
+ *   Simulate a renewal (reset days + rollover; &lapse=1 to simulate a cancel):
+ *     GET /.netlify/functions/sim-renewal?key=KEY&email=…
  */
-import { renewMember, formatDate } from './_quarter-sync.mjs';
+import { renewMember, formatDate, setMemberPlan, inspectMember } from './_quarter-sync.mjs';
 
 const MS_SECRET = process.env.MEMBERSTACK_SECRET_KEY;
 const SIM_KEY = process.env.SIM_KEY;
 
+const json = (body, status = 200) =>
+  new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+
 export default async function handler(req) {
-  if (!MS_SECRET || !SIM_KEY) {
-    return new Response(JSON.stringify({ error: 'not-configured' }), { status: 503, headers: { 'content-type': 'application/json' } });
-  }
+  if (!MS_SECRET || !SIM_KEY) return json({ error: 'not-configured' }, 503);
 
   const url = new URL(req.url);
-  if (url.searchParams.get('key') !== SIM_KEY) {
-    return new Response(JSON.stringify({ error: 'forbidden' }), { status: 403, headers: { 'content-type': 'application/json' } });
-  }
+  if (url.searchParams.get('key') !== SIM_KEY) return json({ error: 'forbidden' }, 403);
 
   const email = url.searchParams.get('email');
-  if (!email) {
-    return new Response(JSON.stringify({ error: 'missing-email' }), { status: 400, headers: { 'content-type': 'application/json' } });
+  if (!email) return json({ error: 'missing-email' }, 400);
+
+  // Read-only inspection of the member's plan tags + custom fields.
+  if (url.searchParams.get('inspect') === '1') {
+    const result = await inspectMember(MS_SECRET, email);
+    return json(result, result.ok ? 200 : 404);
   }
 
-  const lapse = url.searchParams.get('lapse') === '1';
-  // Simulate a renewal dated ~30 days out (or clear it on a simulated cancel).
-  const renewalDate = lapse ? '' : formatDate(Math.floor(Date.now() / 1000) + 30 * 86400);
+  // Force a plan re-tag (exercises the exact switch/pause logic the webhook uses).
+  const plan = url.searchParams.get('plan');
+  if (plan) {
+    const result = await setMemberPlan(MS_SECRET, email, plan);
+    return json(result, result.ok ? 200 : 404);
+  }
 
+  // Default: simulate a renewal (reset days + rollover, or lapse).
+  const lapse = url.searchParams.get('lapse') === '1';
+  const renewalDate = lapse ? '' : formatDate(Math.floor(Date.now() / 1000) + 30 * 86400);
   const result = await renewMember(MS_SECRET, email, { renewalDate, resetDays: !lapse, lapse });
-  return new Response(JSON.stringify(result), {
-    status: result.ok ? 200 : 404,
-    headers: { 'content-type': 'application/json' },
-  });
+  return json(result, result.ok ? 200 : 404);
 }

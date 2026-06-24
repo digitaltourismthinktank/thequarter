@@ -131,7 +131,9 @@ export async function setMemberPlan(secret, email, targetPlanId) {
   }
   if (!member) return { ok: false, reason: 'not-found' };
 
-  const current = (member.planConnections || []).map((c) => c.planId).filter(Boolean);
+  // Admin SDK may return each connection as a plain id string OR an object — handle both.
+  const planIdOf = (c) => (typeof c === 'string' ? c : c?.planId);
+  const current = (member.planConnections || []).map(planIdOf).filter(Boolean);
   const added = [];
   const removed = [];
 
@@ -146,4 +148,18 @@ export async function setMemberPlan(secret, email, targetPlanId) {
     }
   }
   return { ok: true, memberId: member.id, targetPlanId, added, removed };
+}
+
+/** Read-only: a member's plan tags + custom fields (admin view) for debugging. */
+export async function inspectMember(secret, email) {
+  if (!secret || !email) return { ok: false, reason: 'missing-args' };
+  const admin = memberstackAdmin.init(secret);
+  try {
+    const r = await admin.members.retrieve({ email });
+    const m = r?.data;
+    if (!m) return { ok: false, reason: 'not-found' };
+    return { ok: true, id: m.id, planConnections: m.planConnections, customFields: m.customFields };
+  } catch (e) {
+    return { ok: false, reason: 'lookup-failed', detail: String(e?.message || e) };
+  }
 }
