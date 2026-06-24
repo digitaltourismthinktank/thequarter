@@ -56,11 +56,41 @@ async function syncFromStripe(email) {
   };
 }
 
+/** List recent Stripe subscriptions (any customer) with email + price, to see where test subs landed. */
+async function recentSubs() {
+  if (!STRIPE_SECRET) return { ok: false, step: 'no-stripe-key' };
+  const subs = await stripeGet(`/v1/subscriptions?status=all&limit=20`);
+  const rows = [];
+  for (const s of subs?.data || []) {
+    const price = s.items?.data?.[0]?.price;
+    let email = null;
+    try {
+      const c = await stripeGet(`/v1/customers/${s.customer}`);
+      email = c?.email;
+    } catch {
+      /* ignore */
+    }
+    rows.push({
+      sub: s.id,
+      status: s.status,
+      customer: s.customer,
+      email,
+      priceId: price?.id,
+      unit_amount: price?.unit_amount,
+      mapped: !!targetPlanForPrice(price?.id, price?.unit_amount),
+    });
+  }
+  return { ok: true, count: rows.length, rows };
+}
+
 export default async function handler(req) {
   if (!MS_SECRET || !SIM_KEY) return json({ error: 'not-configured' }, 503);
 
   const url = new URL(req.url);
   if (url.searchParams.get('key') !== SIM_KEY) return json({ error: 'forbidden' }, 403);
+
+  // No email needed: list recent subscriptions across all customers.
+  if (url.searchParams.get('recentsubs') === '1') return json(await recentSubs());
 
   const email = url.searchParams.get('email');
   if (!email) return json({ error: 'missing-email' }, 400);
