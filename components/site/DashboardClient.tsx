@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/ds/Button';
 import { Icon } from '@/components/ds/Icon';
 import { useMember } from './useMember';
-import { getMemberstack } from '@/lib/memberstack';
+import { getMemberstack, memberDaysRemaining, memberRenewalDate } from '@/lib/memberstack';
 import { PLANS } from '@/lib/plans';
 import { STRIPE_BILLING_PORTAL_URL } from '@/lib/commerce';
 import styles from './DashboardClient.module.css';
@@ -64,6 +64,9 @@ export function DashboardClient() {
       ? 'Active membership'
       : 'Choose a plan to unlock the space.';
   const email = member.auth?.email ?? 'your account';
+  const isUnlimited = matched?.id === 'citizen' || (planName?.toLowerCase().includes('citizen') ?? false);
+  const days = memberDaysRemaining(member);
+  const renewal = memberRenewalDate(member);
 
   async function handleLogout() {
     const ms = await getMemberstack();
@@ -163,13 +166,27 @@ export function DashboardClient() {
           </div>
         </div>
 
-        {/* Coming soon */}
+        {/* Days remaining */}
         <div className={styles.card}>
           <span className={styles.cardEyebrow}>Your days</span>
-          <h2 className={styles.planName}>Coming soon</h2>
-          <p className={styles.cardText}>
-            Day-balance tracking, live room booking and one-tap perk redemption are on the way for members.
-          </p>
+          {isUnlimited ? (
+            <>
+              <h2 className={styles.planName}>Unlimited</h2>
+              <p className={styles.planMeta}>Citizen members have unrestricted access.</p>
+            </>
+          ) : days !== null ? (
+            <>
+              <div className={styles.daysBig}>
+                {days} <span className={styles.daysUnit}>days left</span>
+              </div>
+              {renewal ? <p className={styles.planMeta}>Resets on {renewal}</p> : null}
+            </>
+          ) : (
+            <>
+              <h2 className={styles.planName}>—</h2>
+              <p className={styles.cardText}>Your day balance will show here once it&rsquo;s set.</p>
+            </>
+          )}
         </div>
       </div>
     </div>

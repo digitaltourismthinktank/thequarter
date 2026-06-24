@@ -98,3 +98,24 @@ export function memberstackError(e: unknown): string {
   }
   return 'Something went wrong. Please try again.';
 }
+
+/** Read a custom field off the member by a key predicate (tolerant of key-naming variants). */
+function findCustomField(member: Member | null, test: (key: string) => boolean): string | null {
+  const cf = member?.customFields;
+  if (!cf) return null;
+  for (const [k, v] of Object.entries(cf)) {
+    if (v === null || v === undefined || v === '') continue;
+    if (test(k.toLowerCase())) return String(v);
+  }
+  return null;
+}
+
+/** The member's remaining day balance (Memberstack custom field), or null. */
+export function memberDaysRemaining(member: Member | null): string | null {
+  return findCustomField(member, (k) => k.includes('day'));
+}
+
+/** The member's plan renewal / reset date (custom field), or null. */
+export function memberRenewalDate(member: Member | null): string | null {
+  return findCustomField(member, (k) => k.includes('renew'));
+}

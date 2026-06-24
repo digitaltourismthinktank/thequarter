@@ -100,6 +100,21 @@
   margin-top: 28px;
 }
 
+.daysBig {
+  font-size: 44px;
+  font-weight: var(--fw-bold);
+  letter-spacing: -0.03em;
+  color: var(--ink-900);
+  margin: 6px 0 4px;
+  line-height: 1;
+}
+.daysUnit {
+  font-size: 16px;
+  font-weight: var(--fw-medium);
+  color: var(--text-muted);
+  letter-spacing: 0;
+}
+
 .billingError {
   margin-top: 12px;
   font-size: 13px;
