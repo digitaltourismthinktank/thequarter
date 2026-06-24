@@ -17,28 +17,28 @@ export const PLAN_ALLOWANCE = {
   'pln_daily-plan-45nv0v26': 1, // Day Pass — one-off (no recurring renewal)
 };
 
-/** The dedicated "Paused" Memberstack plan (member moves here on the £0 Stripe plan). */
+/** The dedicated "Paused" Memberstack plan + the Stripe £0 "Pause my Plan" price. */
 export const PAUSED_PLAN_ID = 'pln_paused-fns0m38';
+export const PAUSE_PRICE_ID = 'price_0PoNQ6w5GSGOu4zJbBJkYlBT';
 
 /**
  * Stripe price id → Memberstack plan id. Lets the webhook re-tag a member when
- * they switch plan in the Stripe portal. Hybrid's price id isn't known yet —
- * set STRIPE_PRICE_HYBRID in Netlify to enable Hybrid switches without a deploy.
+ * they switch plan in the Stripe portal.
  */
 export const PRICE_TO_PLAN = {
   'price_0PgS1pw5GSGOu4zJQpVlN6Gm': 'pln_citizen-plan-q9oa04p9', // Citizen
   'price_0PgRphw5GSGOu4zJ0dnCFwjp': 'pln_resident-plan-mqjy0f6w', // Resident
   'price_0PgRo1w5GSGOu4zJdycNlCpy': 'pln_visitor-plan-blk50re2', // Visitor
+  'price_0OtrBRw5GSGOu4zJC3vsROvC': 'pln_hybrid-plan-r4k60rjp', // Hybrid Office
   'price_0PgRmsw5GSGOu4zJxWrmYHWg': 'pln_daily-plan-45nv0v26', // Day Pass (one-off)
-  ...(process.env.STRIPE_PRICE_HYBRID ? { [process.env.STRIPE_PRICE_HYBRID]: 'pln_hybrid-plan-r4k60rjp' } : {}),
 };
 
 /** Every Memberstack plan we manage — we only swap among these, never touching others. */
-const MANAGED_PLANS = new Set([...Object.values(PRICE_TO_PLAN), 'pln_hybrid-plan-r4k60rjp', PAUSED_PLAN_ID]);
+const MANAGED_PLANS = new Set([...Object.values(PRICE_TO_PLAN), PAUSED_PLAN_ID]);
 
-/** The Memberstack plan a Stripe subscription should map to (a £0 price = paused). */
+/** The Memberstack plan a Stripe subscription should map to (the £0 pause price = paused). */
 export function targetPlanForPrice(priceId, amount) {
-  if (amount === 0) return PAUSED_PLAN_ID;
+  if (priceId === PAUSE_PRICE_ID || amount === 0) return PAUSED_PLAN_ID;
   return PRICE_TO_PLAN[priceId];
 }
 

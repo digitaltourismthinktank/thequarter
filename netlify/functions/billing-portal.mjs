@@ -62,9 +62,19 @@ export default async function handler(req) {
     const email = member?.auth?.email || member?.email;
     if (!email) return json({ error: 'no-email' }, 404);
 
-    const customers = await stripe(`/v1/customers?email=${encodeURIComponent(email)}&limit=1`, 'GET');
-    const customerId = customers?.data?.[0]?.id;
-    if (!customerId) return json({ error: 'no-customer' }, 404);
+    const customers = await stripe(`/v1/customers?email=${encodeURIComponent(email)}&limit=10`, 'GET');
+    const list = customers?.data || [];
+    if (list.length === 0) return json({ error: 'no-customer' }, 404);
+    // Prefer a customer that actually has a subscription — Stripe can hold several
+    // customers with the same email, and only one carries the membership.
+    let customerId = list[0].id;
+    for (const c of list) {
+      const subs = await stripe(`/v1/subscriptions?customer=${c.id}&status=all&limit=1`, 'GET');
+      if (subs?.data?.length) {
+        customerId = c.id;
+        break;
+      }
+    }
 
     const portalForm = {
       customer: customerId,
