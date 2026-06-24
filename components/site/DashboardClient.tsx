@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/ds/Button';
 import { Icon } from '@/components/ds/Icon';
 import { useMember } from './useMember';
-import { getMemberstack, memberDaysRemaining, memberRenewalDate } from '@/lib/memberstack';
+import { getMemberstack, memberDaysRemaining, memberRenewalDate, memberDoorCode } from '@/lib/memberstack';
 import { PLANS } from '@/lib/plans';
 import { STRIPE_BILLING_PORTAL_URL } from '@/lib/commerce';
 import styles from './DashboardClient.module.css';
@@ -67,6 +67,7 @@ export function DashboardClient() {
   const isUnlimited = matched?.id === 'citizen' || (planName?.toLowerCase().includes('citizen') ?? false);
   const days = memberDaysRemaining(member);
   const renewal = memberRenewalDate(member);
+  const doorCode = memberDoorCode(member);
 
   async function handleLogout() {
     const ms = await getMemberstack();
@@ -119,6 +120,14 @@ export function DashboardClient() {
           Log out
         </Button>
       </div>
+
+      {doorCode ? (
+        <div className={styles.doorCode}>
+          <Icon name="door-open" size={18} color="var(--gold-700)" />
+          <span className={styles.doorCodeLabel}>Door code</span>
+          <strong className={styles.doorCodeValue}>{doorCode}</strong>
+        </div>
+      ) : null}
 
       <div className={styles.grid}>
         {/* Plan */}

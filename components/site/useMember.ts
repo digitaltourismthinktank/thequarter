@@ -23,7 +23,7 @@ export function useMember(): MemberState {
         return;
       }
       try {
-        const { data } = await ms.getCurrentMember();
+        const { data } = await ms.getCurrentMember({ useCache: false });
         if (active) setState({ loading: false, member: data ?? null });
       } catch {
         if (active) setState({ loading: false, member: null });

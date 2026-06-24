@@ -119,3 +119,8 @@ export function memberDaysRemaining(member: Member | null): string | null {
 export function memberRenewalDate(member: Member | null): string | null {
   return findCustomField(member, (k) => k.includes('renew'));
 }
+
+/** The member's door entry code (custom field), or null if not set. */
+export function memberDoorCode(member: Member | null): string | null {
+  return findCustomField(member, (k) => k.includes('door'));
+}
