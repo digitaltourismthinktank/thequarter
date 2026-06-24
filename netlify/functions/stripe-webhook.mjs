@@ -56,7 +56,13 @@ async function handleEvent(event) {
     case 'invoice.payment_succeeded': {
       const email = obj.customer_email || (await emailFromCustomer(obj.customer));
       if (!email) return;
-      const renewalDate = formatDate(obj.lines?.data?.[0]?.period?.end || obj.period_end);
+      const line = obj.lines?.data?.[0];
+      const price = line?.price;
+      const target = targetPlanForPrice(price?.id, price?.unit_amount);
+      // Keep the plan tag correct on payment too — covers a fresh subscription even
+      // if customer.subscription.created isn't subscribed. Skip the £0 pause price.
+      if (target && target !== PAUSED_PLAN_ID) await setMemberPlan(MS_SECRET, email, target);
+      const renewalDate = formatDate(line?.period?.end || obj.period_end);
       await renewMember(MS_SECRET, email, { renewalDate, resetDays: true });
       return;
     }
