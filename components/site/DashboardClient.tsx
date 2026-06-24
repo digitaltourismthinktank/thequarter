@@ -68,6 +68,8 @@ export function DashboardClient() {
   const days = memberDaysRemaining(member);
   const renewal = memberRenewalDate(member);
   const doorCode = memberDoorCode(member);
+  const debug =
+    typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === '1';
 
   async function handleLogout() {
     const ms = await getMemberstack();
@@ -198,6 +200,21 @@ export function DashboardClient() {
           )}
         </div>
       </div>
+
+      {debug ? (
+        <pre className={styles.debug}>
+          {JSON.stringify(
+            {
+              id: member.id,
+              email: member.auth?.email,
+              planConnections: member.planConnections,
+              customFields: member.customFields,
+            },
+            null,
+            2,
+          )}
+        </pre>
+      ) : null}
     </div>
   );
 }
