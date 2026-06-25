@@ -11,7 +11,15 @@
  * GET debug view of the most recent events this instance processed.
  */
 import crypto from 'node:crypto';
-import { renewMember, formatDate, setMemberPlan, targetPlanForPrice, PAUSED_PLAN_ID } from './_quarter-sync.mjs';
+import {
+  renewMember,
+  formatDate,
+  setMemberPlan,
+  targetPlanForPrice,
+  PAUSED_PLAN_ID,
+  getMemberSync,
+  stampSync,
+} from './_quarter-sync.mjs';
 
 const MS_SECRET = process.env.MEMBERSTACK_SECRET_KEY;
 const STRIPE_SECRET = process.env.STRIPE_SECRET_KEY;
@@ -61,49 +69,64 @@ async function emailFromCustomer(customerId) {
   }
 }
 
-/** Process one Stripe event and return a compact summary (for the debug ring). */
+/**
+ * Process one Stripe event and return a compact summary (for the debug ring).
+ *
+ * Stale-event guard: Stripe doesn't guarantee delivery order and retries failed
+ * events, so we stamp each member with the time/id of the last event we applied
+ * and skip any event that's older (or a duplicate). This makes the member always
+ * reflect the LATEST change, whatever order events arrive in.
+ */
 async function handleEvent(event) {
   const obj = event?.data?.object || {};
-  const base = { at: event?.created, type: event?.type };
+  const type = event?.type;
+  const created = event?.created || 0;
+  const eventId = event?.id;
+  const base = { at: created, id: eventId, type };
 
-  switch (event?.type) {
-    case 'invoice.paid':
-    case 'invoice.payment_succeeded': {
-      const email = obj.customer_email || (await emailFromCustomer(obj.customer));
-      const line = obj.lines?.data?.[0];
-      const price = line?.price;
-      const target = targetPlanForPrice(price?.id, price?.unit_amount);
-      let setResult = null;
-      if (email && target && target !== PAUSED_PLAN_ID) setResult = await setMemberPlan(MS_SECRET, email, target);
-      let renewResult = null;
-      if (email) {
-        renewResult = await renewMember(MS_SECRET, email, { renewalDate: formatDate(line?.period?.end || obj.period_end), resetDays: true });
-      }
-      return { ...base, customer: obj.customer, email, priceId: price?.id, amount: price?.unit_amount, target, setResult, renewResult };
-    }
-    case 'customer.subscription.created':
-    case 'customer.subscription.updated': {
-      const email = await emailFromCustomer(obj.customer);
-      const price = obj.items?.data?.[0]?.price;
-      const target = targetPlanForPrice(price?.id, price?.unit_amount);
-      let result = null;
-      if (email && target === PAUSED_PLAN_ID) {
-        result = await setMemberPlan(MS_SECRET, email, PAUSED_PLAN_ID); // pause: freeze days
-      } else {
-        if (email && target) result = await setMemberPlan(MS_SECRET, email, target); // switch
-        if (email) await renewMember(MS_SECRET, email, { renewalDate: formatDate(obj.current_period_end), resetDays: false });
-      }
-      return { ...base, customer: obj.customer, email, priceId: price?.id, amount: price?.unit_amount, target, result };
-    }
-    case 'customer.subscription.deleted': {
-      const email = await emailFromCustomer(obj.customer);
-      let result = null;
-      if (email) result = await renewMember(MS_SECRET, email, { renewalDate: '', lapse: true });
-      return { ...base, customer: obj.customer, email, result };
-    }
-    default:
-      return { ...base, ignored: true };
+  // Resolve the member email for the event types we handle.
+  let email = null;
+  if (type === 'invoice.paid' || type === 'invoice.payment_succeeded') {
+    email = obj.customer_email || (await emailFromCustomer(obj.customer));
+  } else if (type === 'customer.subscription.created' || type === 'customer.subscription.updated' || type === 'customer.subscription.deleted') {
+    email = await emailFromCustomer(obj.customer);
+  } else {
+    return { ...base, ignored: true };
   }
+  if (!email) return { ...base, noEmail: true };
+
+  // Stale-event guard.
+  const { member, lastSyncAt, lastEventId, metaData } = await getMemberSync(MS_SECRET, email);
+  if (!member) return { ...base, email, noMember: true };
+  if (eventId && eventId === lastEventId) return { ...base, email, skipped: 'duplicate' };
+  if (created < lastSyncAt) return { ...base, email, skipped: 'stale', lastSyncAt };
+
+  let applied = {};
+  if (type === 'customer.subscription.deleted') {
+    await renewMember(MS_SECRET, email, { renewalDate: '', lapse: true });
+    applied = { lapsed: true };
+  } else if (type === 'invoice.paid' || type === 'invoice.payment_succeeded') {
+    const line = obj.lines?.data?.[0];
+    const price = line?.price;
+    const target = targetPlanForPrice(price?.id, price?.unit_amount);
+    if (target && target !== PAUSED_PLAN_ID) await setMemberPlan(MS_SECRET, email, target);
+    await renewMember(MS_SECRET, email, { renewalDate: formatDate(line?.period?.end || obj.period_end), resetDays: true });
+    applied = { target, priceId: price?.id, amount: price?.unit_amount };
+  } else {
+    // customer.subscription.created / updated
+    const price = obj.items?.data?.[0]?.price;
+    const target = targetPlanForPrice(price?.id, price?.unit_amount);
+    if (target === PAUSED_PLAN_ID) {
+      await setMemberPlan(MS_SECRET, email, PAUSED_PLAN_ID); // pause: freeze days
+    } else {
+      if (target) await setMemberPlan(MS_SECRET, email, target); // switch
+      await renewMember(MS_SECRET, email, { renewalDate: formatDate(obj.current_period_end), resetDays: false });
+    }
+    applied = { target, priceId: price?.id, amount: price?.unit_amount };
+  }
+
+  await stampSync(MS_SECRET, member.id, metaData, created, eventId);
+  return { ...base, email, ...applied };
 }
 
 export default async function handler(req) {

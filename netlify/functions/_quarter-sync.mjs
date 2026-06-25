@@ -150,6 +150,34 @@ export async function setMemberPlan(secret, email, targetPlanId) {
   return { ok: true, memberId: member.id, targetPlanId, added, removed };
 }
 
+/** Read the member + the last-applied event time/id (for the stale-event guard). */
+export async function getMemberSync(secret, email) {
+  if (!secret || !email) return { member: null };
+  const admin = memberstackAdmin.init(secret);
+  try {
+    const r = await admin.members.retrieve({ email });
+    const m = r?.data;
+    if (!m) return { member: null };
+    const md = m.metaData || {};
+    return { member: m, lastSyncAt: Number(md.lastSyncAt) || 0, lastEventId: md.lastEventId || null, metaData: md };
+  } catch {
+    return { member: null };
+  }
+}
+
+/** Record the last-applied event time + id on the member (merged into metaData). */
+export async function stampSync(secret, memberId, metaData, eventCreated, eventId) {
+  const admin = memberstackAdmin.init(secret);
+  try {
+    await admin.members.update({
+      id: memberId,
+      data: { metaData: { ...(metaData || {}), lastSyncAt: eventCreated, lastEventId: eventId } },
+    });
+  } catch {
+    /* ignore */
+  }
+}
+
 /** Read-only: a member's plan tags + custom fields (admin view) for debugging. */
 export async function inspectMember(secret, email) {
   if (!secret || !email) return { ok: false, reason: 'missing-args' };
