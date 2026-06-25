@@ -106,12 +106,12 @@ async function handleEvent(event) {
     await renewMember(MS_SECRET, email, { renewalDate: '', lapse: true });
     applied = { lapsed: true };
   } else if (type === 'invoice.paid' || type === 'invoice.payment_succeeded') {
+    // A payment = a renewal: reset days from the member's CURRENT plan tag only.
+    // Do NOT re-tag from the invoice price — proration/backlog invoices can carry
+    // an old plan (the plan is owned by subscription.created/updated below).
     const line = obj.lines?.data?.[0];
-    const price = line?.price;
-    const target = targetPlanForPrice(price?.id, price?.unit_amount);
-    if (target && target !== PAUSED_PLAN_ID) await setMemberPlan(MS_SECRET, email, target);
     await renewMember(MS_SECRET, email, { renewalDate: formatDate(line?.period?.end || obj.period_end), resetDays: true });
-    applied = { target, priceId: price?.id, amount: price?.unit_amount };
+    applied = { renewedOnly: true, priceId: line?.price?.id };
   } else {
     // customer.subscription.created / updated
     const price = obj.items?.data?.[0]?.price;

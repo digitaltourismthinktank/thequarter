@@ -186,7 +186,7 @@ export async function inspectMember(secret, email) {
     const r = await admin.members.retrieve({ email });
     const m = r?.data;
     if (!m) return { ok: false, reason: 'not-found' };
-    return { ok: true, id: m.id, planConnections: m.planConnections, customFields: m.customFields };
+    return { ok: true, id: m.id, planConnections: m.planConnections, customFields: m.customFields, metaData: m.metaData || {} };
   } catch (e) {
     return { ok: false, reason: 'lookup-failed', detail: String(e?.message || e) };
   }
