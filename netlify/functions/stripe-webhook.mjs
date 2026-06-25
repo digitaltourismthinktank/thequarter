@@ -106,23 +106,34 @@ async function handleEvent(event) {
     await renewMember(MS_SECRET, email, { renewalDate: '', lapse: true });
     applied = { lapsed: true };
   } else if (type === 'invoice.paid' || type === 'invoice.payment_succeeded') {
-    // A payment = a renewal: reset days from the member's CURRENT plan tag only.
-    // Do NOT re-tag from the invoice price — proration/backlog invoices can carry
-    // an old plan (the plan is owned by subscription.created/updated below).
+    // Only a genuine renewal (billing_reason 'subscription_cycle') resets the day
+    // balance, with rollover. Plan-change prorations (subscription_update/create)
+    // are handled by the subscription.* events; for those we just refresh the date.
     const line = obj.lines?.data?.[0];
-    await renewMember(MS_SECRET, email, { renewalDate: formatDate(line?.period?.end || obj.period_end), resetDays: true });
-    applied = { renewedOnly: true, priceId: line?.price?.id };
+    const isRenewal = obj.billing_reason === 'subscription_cycle';
+    await renewMember(MS_SECRET, email, {
+      renewalDate: formatDate(line?.period?.end || obj.period_end),
+      resetDays: isRenewal,
+    });
+    applied = { billingReason: obj.billing_reason, resetDays: isRenewal };
   } else {
     // customer.subscription.created / updated
     const price = obj.items?.data?.[0]?.price;
     const target = targetPlanForPrice(price?.id, price?.unit_amount);
     if (target === PAUSED_PLAN_ID) {
       await setMemberPlan(MS_SECRET, email, PAUSED_PLAN_ID); // pause: freeze days
+      applied = { target, paused: true };
     } else {
-      if (target) await setMemberPlan(MS_SECRET, email, target); // switch
-      await renewMember(MS_SECRET, email, { renewalDate: formatDate(obj.current_period_end), resetDays: false });
+      let changed = false;
+      if (target) {
+        const r = await setMemberPlan(MS_SECRET, email, target);
+        changed = (r?.added?.length || 0) > 0;
+      }
+      // On an actual plan change, set days to the NEW plan's allowance (flat, no
+      // rollover); otherwise just refresh the renewal date.
+      await renewMember(MS_SECRET, email, { renewalDate: formatDate(obj.current_period_end), resetDays: changed, flat: true });
+      applied = { target, changed };
     }
-    applied = { target, priceId: price?.id, amount: price?.unit_amount };
   }
 
   await stampSync(MS_SECRET, member.id, metaData, created, eventId);

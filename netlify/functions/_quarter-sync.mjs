@@ -82,7 +82,7 @@ export function nextBalance(prevRaw, allowance) {
  * false) reset the day balance with rollover. lapse zeroes the balance.
  * Returns a small status object; never throws on a missing member.
  */
-export async function renewMember(secret, email, { renewalDate, resetDays = true, lapse = false } = {}) {
+export async function renewMember(secret, email, { renewalDate, resetDays = true, lapse = false, flat = false } = {}) {
   if (!secret || !email) return { ok: false, reason: 'missing-args' };
   const admin = memberstackAdmin.init(secret);
 
@@ -103,7 +103,13 @@ export async function renewMember(secret, email, { renewalDate, resetDays = true
   } else if (resetDays) {
     const allowance = allowanceForMember(member);
     if (allowance !== undefined) {
-      fields['days-remaining'] = nextBalance(member?.customFields?.['days-remaining'], allowance);
+      // flat = set to the plan's base allowance (used on a plan switch);
+      // otherwise apply the 1-month rollover (used on a genuine renewal).
+      fields['days-remaining'] = flat
+        ? allowance === null
+          ? 'Unlimited'
+          : String(allowance)
+        : nextBalance(member?.customFields?.['days-remaining'], allowance);
     }
   }
 
