@@ -82,3 +82,43 @@ export const reserveDay = (date: string, length: 'Full' | 'Half') =>
   call<{ ok: boolean }>('checkin', { method: 'POST', body: { action: 'reserve', date, length } });
 export const cancelReservation = (id: string) =>
   call<{ ok: boolean }>('checkin', { method: 'POST', body: { action: 'cancel', id } });
+
+// ---- Admin (staff only; the function also enforces the @thinkdigital.travel gate) ----
+export interface AdminMember {
+  id: string;
+  email: string | null;
+  name: string | null;
+  plan: string | null;
+  days: string | null;
+  renewal: string | null;
+  doorCode: string | null;
+  paused: boolean;
+}
+export interface AdminBooking {
+  id: string;
+  space: string | null;
+  startMin: number;
+  endMin: number;
+  kind: string;
+  name: string | null;
+  email: string | null;
+}
+export interface AdminSpace {
+  id: string;
+  name: string;
+  type: string;
+  bookable: boolean;
+}
+
+export const adminGetMembers = () => call<{ members: AdminMember[] }>('admin?action=members');
+export const adminGetSpaces = () => call<{ spaces: AdminSpace[] }>('admin?action=spaces');
+export const adminGetCalendar = (date: string) => call<{ date: string; bookings: AdminBooking[] }>(`admin?action=calendar&date=${date}`);
+export const adminBlock = (b: { spaceId: string; date: string; start: string; end: string; name?: string; notes?: string }) =>
+  call<{ ok: boolean }>('admin', { method: 'POST', body: { action: 'block', ...b } });
+export const adminExternal = (b: { spaceId: string; date: string; start: string; end: string; name?: string; notes?: string }) =>
+  call<{ ok: boolean }>('admin', { method: 'POST', body: { action: 'external', ...b } });
+export const adminCancel = (id: string) => call<{ ok: boolean }>('admin', { method: 'POST', body: { action: 'cancelBooking', id } });
+export const adminAdjustDays = (memberId: string, days: string) =>
+  call<{ ok: boolean }>('admin', { method: 'POST', body: { action: 'adjustDays', memberId, days } });
+export const adminCheckinMember = (memberId: string, length: 'Full' | 'Half') =>
+  call<{ ok: boolean }>('admin', { method: 'POST', body: { action: 'checkinMember', memberId, length } });

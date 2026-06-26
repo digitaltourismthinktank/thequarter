@@ -13,8 +13,8 @@
 import memberstackAdmin from '@memberstack/admin';
 import { verifyMember, isAdmin, tokenFromRequest } from './_member.mjs';
 import { listRecords, createRecord, updateRecord, T, F, airtableReady, esc } from './_airtable.mjs';
-import { londonWallClockToISO, isoToLondonMin, hhmmToMin } from './_time.mjs';
-import { PLAN_NAMES } from './_quarter-sync.mjs';
+import { londonWallClockToISO, isoToLondonMin, hhmmToMin, londonNow } from './_time.mjs';
+import { PLAN_NAMES, allowanceForMember } from './_quarter-sync.mjs';
 
 const MS_SECRET = process.env.MEMBERSTACK_SECRET_KEY;
 const PAUSED = 'pln_paused-fns0m38';
@@ -131,6 +131,41 @@ export default async function handler(req) {
     if (!body.memberId) return json({ error: 'missing-member' }, 400);
     const admin = memberstackAdmin.init(MS_SECRET);
     await admin.members.update({ id: body.memberId, data: { customFields: { 'days-remaining': String(body.days ?? '') } } });
+    return json({ ok: true });
+  }
+
+  // Manually check a member in for today (admin), deducting a day unless unlimited.
+  if (action === 'checkinMember') {
+    if (!body.memberId) return json({ error: 'missing-member' }, 400);
+    const admin = memberstackAdmin.init(MS_SECRET);
+    const r = await admin.members.retrieve({ id: body.memberId });
+    const m = r?.data;
+    if (!m) return json({ error: 'not-found' }, 404);
+    const email = m.auth?.email || m.email || null;
+    const cf = m.customFields || {};
+    const name = [cf['first-name'], cf['last-name']].filter(Boolean).join(' ').trim() || email || 'Member';
+    const length = body.length === 'Half' ? 'Half' : 'Full';
+    const cost = length === 'Half' ? 0.5 : 1;
+    const unlimited = allowanceForMember(m) === null;
+    const today = londonNow().dateStr;
+
+    if (!unlimited) {
+      const raw = cf['days-remaining'];
+      const cur = String(raw).toLowerCase() === 'unlimited' ? null : Math.max(0, parseFloat(String(raw)) || 0);
+      if (cur !== null) {
+        await admin.members.update({ id: body.memberId, data: { customFields: { 'days-remaining': String(Math.max(0, cur - cost)) } } });
+      }
+    }
+    await createRecord(T.checkins, {
+      [F.checkins.ref]: `${name} · ${today}`,
+      [F.checkins.email]: email,
+      [F.checkins.name]: name,
+      [F.checkins.date]: today,
+      [F.checkins.length]: length,
+      [F.checkins.dayCost]: unlimited ? 0 : cost,
+      [F.checkins.status]: 'Checked-in',
+      [F.checkins.source]: 'Admin',
+    });
     return json({ ok: true });
   }
 
