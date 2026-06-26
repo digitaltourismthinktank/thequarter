@@ -54,6 +54,11 @@ export function isoToLondonMin(iso) {
   return h * 60 + +p.minute;
 }
 
+/** A stored UTC ISO → the Europe/London calendar date (YYYY-MM-DD). */
+export function isoToLondonDate(iso) {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(iso));
+}
+
 /** Current Europe/London date + minutes-from-midnight. */
 export function londonNow() {
   const f = new Intl.DateTimeFormat('en-GB', {

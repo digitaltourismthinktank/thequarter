@@ -122,3 +122,23 @@ export const adminAdjustDays = (memberId: string, days: string) =>
   call<{ ok: boolean }>('admin', { method: 'POST', body: { action: 'adjustDays', memberId, days } });
 export const adminCheckinMember = (memberId: string, length: 'Full' | 'Half') =>
   call<{ ok: boolean }>('admin', { method: 'POST', body: { action: 'checkinMember', memberId, length } });
+
+// ---- Events ----
+export interface QuarterEvent {
+  id: string;
+  title: string;
+  start: string | null;
+  end: string | null;
+  location: string | null;
+  description: string | null;
+  category: string | null;
+  published?: boolean;
+}
+export const getUpcomingEvents = () => call<{ events: QuarterEvent[] }>('events?action=upcoming', { auth: false });
+export const adminGetEvents = () => call<{ events: QuarterEvent[] }>('events?action=all');
+export const adminCreateEvent = (e: Partial<QuarterEvent>) =>
+  call<{ ok: boolean; id: string }>('events', { method: 'POST', body: { action: 'create', ...e } });
+export const adminUpdateEvent = (id: string, e: Partial<QuarterEvent>) =>
+  call<{ ok: boolean }>('events', { method: 'POST', body: { action: 'update', id, ...e } });
+export const adminDeleteEvent = (id: string) =>
+  call<{ ok: boolean }>('events', { method: 'POST', body: { action: 'delete', id } });

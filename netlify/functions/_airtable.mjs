@@ -12,6 +12,7 @@ export const T = {
   spaces: 'tblMA8yMgaRwK1jqY',
   bookings: 'tblrqFJaYYl3pzYoN',
   checkins: 'tblW7PzgfJwsLH1N9',
+  events: 'tblP5tfMIUOZ7CcHh',
 };
 
 export const F = {
@@ -47,6 +48,15 @@ export const F = {
     status: 'fldV7uUbNOFdQMxpH',
     source: 'fld9gOm46QD0x1LaW',
     notes: 'fld2E75Aho57pfUPq',
+  },
+  events: {
+    title: 'fldr7mACJVZerZOIt',
+    start: 'fldGlQUHppIQW9pd3',
+    end: 'fldr6wX4Ivnzpksmd',
+    location: 'fldQojJTlG97C95u9',
+    description: 'fldRJlKuxdOxPhhEv',
+    category: 'fldUOPMNtBsDhJjza',
+    published: 'fldjzX67LPMCPzyvi',
   },
 };
 
@@ -87,6 +97,10 @@ export async function createRecord(tableId, fields) {
 
 export async function updateRecord(tableId, id, fields) {
   return req(`${API}/${BASE}/${tableId}/${id}`, { method: 'PATCH', body: JSON.stringify({ fields }) });
+}
+
+export async function deleteRecord(tableId, id) {
+  return req(`${API}/${BASE}/${tableId}/${id}`, { method: 'DELETE' });
 }
 
 /** Airtable string-escape for filterByFormula literals. */
