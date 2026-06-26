@@ -160,3 +160,19 @@ export interface ScreenBooking {
 }
 export const getTodayScreen = () =>
   call<{ date: string; nowMin: number; spaces: ScreenSpace[]; bookings: ScreenBooking[] }>('bookings?action=today', { auth: false });
+
+// ---- Kiosk (per-room iPad) ----
+export const getMyPin = () => call<{ pin: string }>('checkin?action=pin');
+
+export interface KioskRoom {
+  date: string;
+  nowMin: number;
+  weekday: boolean;
+  openMin: number;
+  closeMin: number;
+  space: { id: string; name: string; type: string; capacityLabel: string | null; bookable: boolean };
+  bookings: { startMin: number; endMin: number; kind: string }[];
+}
+export const kioskRoom = (id: string) => call<KioskRoom>(`kiosk?action=room&id=${encodeURIComponent(id)}`, { auth: false });
+export const kioskBook = (b: { spaceId: string; date: string; start: string; end: string; pin: string }) =>
+  call<{ ok: boolean; member?: string }>('kiosk', { method: 'POST', body: { action: 'book', ...b }, auth: false });

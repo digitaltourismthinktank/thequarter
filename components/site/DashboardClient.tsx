@@ -10,6 +10,7 @@ import { EventsCard } from './EventsCard';
 import { getMemberstack, memberDaysRemaining, memberRenewalDate, memberDoorCode } from '@/lib/memberstack';
 import { PLANS, PLAN_DAY_ALLOWANCE } from '@/lib/plans';
 import { STRIPE_BILLING_PORTAL_URL } from '@/lib/commerce';
+import { getMyPin } from '@/lib/booking';
 import styles from './DashboardClient.module.css';
 
 /* PHASE-2 member dashboard. Client-gated. Reads the member's plan name straight
@@ -22,6 +23,7 @@ export function DashboardClient() {
   const [billingBusy, setBillingBusy] = useState(false);
   const [billingError, setBillingError] = useState<string | null>(null);
   const [allPlans, setAllPlans] = useState<unknown>(null);
+  const [pin, setPin] = useState<string | null>(null);
 
   // Patient redirect: only send to /login once we're sure there's no member.
   useEffect(() => {
@@ -68,6 +70,19 @@ export function DashboardClient() {
       active = false;
     };
   }, []);
+
+  // Booking PIN (kiosk identification) — fetched/created on load.
+  useEffect(() => {
+    if (!member) return;
+    let active = true;
+    (async () => {
+      const r = await getMyPin();
+      if (active && r.ok) setPin(r.data.pin);
+    })();
+    return () => {
+      active = false;
+    };
+  }, [member]);
 
   if (loading) return <p className={styles.state}>Loading your dashboard…</p>;
   if (!member) return <p className={styles.state}>Please sign in — taking you to the login page…</p>;
@@ -155,11 +170,21 @@ export function DashboardClient() {
         </Button>
       </div>
 
-      {doorCode ? (
-        <div className={styles.doorCode}>
-          <Icon name="door-open" size={18} color="var(--gold-700)" />
-          <span className={styles.doorCodeLabel}>Door code</span>
-          <strong className={styles.doorCodeValue}>{doorCode}</strong>
+      {doorCode || pin ? (
+        <div className={styles.chips}>
+          {doorCode ? (
+            <div className={styles.doorCode}>
+              <Icon name="door-open" size={18} color="var(--gold-700)" />
+              <span className={styles.doorCodeLabel}>Door code</span>
+              <strong className={styles.doorCodeValue}>{doorCode}</strong>
+            </div>
+          ) : null}
+          {pin ? (
+            <div className={styles.doorCode}>
+              <span className={styles.doorCodeLabel}>Booking PIN</span>
+              <strong className={styles.doorCodeValue}>{pin}</strong>
+            </div>
+          ) : null}
         </div>
       ) : null}
 

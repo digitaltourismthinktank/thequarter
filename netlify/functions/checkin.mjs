@@ -40,11 +40,24 @@ async function checkinsFor(email, dateStr) {
 export default async function handler(req) {
   if (!airtableReady() || !MS_SECRET) return json({ error: 'not-configured' }, 503);
 
-  // GET today's status
   if (req.method === 'GET') {
-    if (new URL(req.url).searchParams.get('action') !== 'today') return json({ error: 'unknown-action' }, 400);
+    const action = new URL(req.url).searchParams.get('action');
     const vm = await verifyMember(tokenFromRequest(req, null));
     if (!vm.ok) return json({ error: vm.reason }, 401);
+
+    // Booking PIN for kiosk identification — generate + store on first request.
+    if (action === 'pin') {
+      const m = vm.member;
+      let pin = m.metaData?.bookingPin;
+      if (!pin) {
+        pin = String(Math.floor(100000 + Math.random() * 900000));
+        const admin = memberstackAdmin.init(MS_SECRET);
+        await admin.members.update({ id: m.id, data: { metaData: { ...(m.metaData || {}), bookingPin: pin } } });
+      }
+      return json({ pin });
+    }
+
+    if (action !== 'today') return json({ error: 'unknown-action' }, 400);
     const email = memberEmail(vm.member);
     const today = londonNow().dateStr;
     const recs = await checkinsFor(email, today);
