@@ -67,6 +67,9 @@ async function req(url, opts = {}) {
 /** List records. Returns records[] (handles a single page; raise pageSize/iterate if needed). */
 export async function listRecords(tableId, { filterByFormula, fields, sort, maxRecords } = {}) {
   const url = new URL(`${API}/${BASE}/${tableId}`);
+  // Return record fields keyed by FIELD ID (matches our F.* constants); the API
+  // otherwise keys them by field name.
+  url.searchParams.set('returnFieldsByFieldId', 'true');
   if (filterByFormula) url.searchParams.set('filterByFormula', filterByFormula);
   if (maxRecords) url.searchParams.set('maxRecords', String(maxRecords));
   (fields || []).forEach((f) => url.searchParams.append('fields[]', f));
