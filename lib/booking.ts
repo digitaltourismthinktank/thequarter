@@ -176,3 +176,7 @@ export interface KioskRoom {
 export const kioskRoom = (id: string) => call<KioskRoom>(`kiosk?action=room&id=${encodeURIComponent(id)}`, { auth: false });
 export const kioskBook = (b: { spaceId: string; date: string; start: string; end: string; pin: string }) =>
   call<{ ok: boolean; member?: string }>('kiosk', { method: 'POST', body: { action: 'book', ...b }, auth: false });
+
+// ---- Welcome (post-payment) ----
+export const getWelcomeSession = (sessionId: string) =>
+  call<{ email: string | null }>(`welcome?session_id=${encodeURIComponent(sessionId)}`, { auth: false });

@@ -121,3 +121,12 @@ export const PLAN_DAY_ALLOWANCE: Record<PlanId, number | null> = {
   citizen: null,
   'hybrid-office': 12,
 };
+
+/** Our plan slug → Memberstack plan id (for the post-payment /welcome signup). */
+export const PLAN_MEMBERSTACK_ID: Record<PlanId, string> = {
+  'day-pass': 'pln_daily-plan-45nv0v26',
+  visitor: 'pln_visitor-plan-blk50re2',
+  resident: 'pln_resident-plan-mqjy0f6w',
+  citizen: 'pln_citizen-plan-q9oa04p9',
+  'hybrid-office': 'pln_hybrid-plan-r4k60rjp',
+};
