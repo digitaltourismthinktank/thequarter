@@ -9,6 +9,7 @@ import {
   cancelReservation,
   type CheckinStatus,
 } from '@/lib/booking';
+import { WeekStrip } from './WeekStrip';
 import styles from './CheckInCard.module.css';
 
 /** Format a YYYY-MM-DD as e.g. "Mon 29 Jun" (treat as a calendar date, UTC). */
@@ -97,10 +98,14 @@ export function CheckInCard() {
       ) : (
         <>
           <h2 className={styles.title}>Coming in?</h2>
-          <label className={styles.toggle}>
-            <input type="checkbox" checked={half} onChange={(e) => setHalf(e.target.checked)} />
-            Half day
-          </label>
+          <div className={styles.seg}>
+            <button type="button" className={`${styles.segBtn} ${!half ? styles.segOn : ''}`} onClick={() => setHalf(false)}>
+              Full day
+            </button>
+            <button type="button" className={`${styles.segBtn} ${half ? styles.segOn : ''}`} onClick={() => setHalf(true)}>
+              Half day
+            </button>
+          </div>
           <div className={styles.actions}>
             <Button variant="primary" size="sm" onClick={doCheckIn} disabled={busy}>
               I&rsquo;m in today
@@ -109,10 +114,7 @@ export function CheckInCard() {
               I&rsquo;ll be in tomorrow
             </Button>
           </div>
-          <label className={styles.datePick}>
-            <span>Plan another day</span>
-            <input type="date" min={status?.date} onChange={(e) => doReserveDate(e.target.value)} disabled={busy} />
-          </label>
+          <WeekStrip label="Plan ahead" onSelect={doReserveDate} />
         </>
       )}
 

@@ -38,6 +38,29 @@
   width: 16px;
   height: 16px;
 }
+.seg {
+  display: inline-flex;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  overflow: hidden;
+  margin: 10px 0 16px;
+}
+.segBtn {
+  padding: 7px 16px;
+  border: none;
+  background: var(--surface-card);
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-body);
+}
+.segBtn + .segBtn {
+  border-left: 1px solid var(--border-subtle);
+}
+.segOn {
+  background: var(--gold-600);
+  color: #fff;
+}
+
 .actions {
   display: flex;
   gap: 10px;

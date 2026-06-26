@@ -12,6 +12,7 @@ import {
   type Space,
   type MyBooking,
 } from '@/lib/booking';
+import { WeekStrip } from './WeekStrip';
 import styles from './BookingClient.module.css';
 
 const SLOT = 30;
@@ -40,11 +41,6 @@ function nextWeekdays(n: number): string[] {
   }
   return out;
 }
-function isWeekdayISO(iso: string): boolean {
-  const [y, m, d] = iso.split('-').map(Number);
-  const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
-  return dow >= 1 && dow <= 5;
-}
 function dayLabel(iso: string): string {
   const [y, m, d] = iso.split('-').map(Number);
   return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', timeZone: 'UTC' });
@@ -54,8 +50,6 @@ export function BookingClient() {
   const { loading, member } = useMember();
   const [spaces, setSpaces] = useState<Space[]>([]);
   const [spaceId, setSpaceId] = useState<string | null>(null);
-  const [days] = useState<string[]>(() => nextWeekdays(8));
-  const [today] = useState<string>(() => toISO(new Date()));
   const [date, setDate] = useState<string>(() => nextWeekdays(1)[0]);
   const [avail, setAvail] = useState<Avail | null>(null);
   const [loadingAvail, setLoadingAvail] = useState(false);
@@ -156,15 +150,6 @@ export function BookingClient() {
     setMsg(null);
   }
 
-  function pickDate(v: string) {
-    if (!v) return;
-    if (!isWeekdayISO(v)) {
-      setMsg('The Quarter is open Monday to Friday.');
-      return;
-    }
-    setDate(v);
-  }
-
   async function confirm() {
     if (!sel || !spaceId) return;
     setBusyAction(true);
@@ -229,19 +214,7 @@ export function BookingClient() {
         ))}
       </div>
 
-      <div className={styles.dateRow}>
-        <div className={styles.days}>
-          {days.map((d) => (
-            <button key={d} type="button" className={`${styles.day} ${date === d ? styles.dayOn : ''}`} onClick={() => setDate(d)}>
-              {dayLabel(d)}
-            </button>
-          ))}
-        </div>
-        <label className={styles.datePick}>
-          <span>Or pick a date</span>
-          <input type="date" min={today} value={date} onChange={(e) => pickDate(e.target.value)} />
-        </label>
-      </div>
+      <WeekStrip value={date} onSelect={setDate} />
 
       <div className={styles.presets}>
         <button type="button" className={styles.preset} onClick={() => preset(8 * 60, 13 * 60)}>
