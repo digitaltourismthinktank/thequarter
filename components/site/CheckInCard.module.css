@@ -1,0 +1,87 @@
+.card {
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-card);
+  padding: 26px;
+  display: flex;
+  flex-direction: column;
+}
+.eyebrow {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  color: var(--gold-700);
+  font-weight: var(--fw-semibold);
+}
+.title {
+  font-size: 24px;
+  font-weight: var(--fw-bold);
+  letter-spacing: -0.02em;
+  margin: 8px 0 4px;
+}
+.meta {
+  color: var(--text-muted);
+  font-size: 14px;
+}
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text-body);
+  margin: 10px 0 16px;
+  cursor: pointer;
+}
+.toggle input {
+  accent-color: var(--gold-600);
+  width: 16px;
+  height: 16px;
+}
+.actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: auto;
+}
+.planned {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 18px;
+}
+.plannedLabel {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  color: var(--text-muted);
+  width: 100%;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--sand-100);
+  border-radius: 999px;
+  padding: 4px 6px 4px 12px;
+  font-size: 13px;
+  color: var(--text-strong);
+}
+.chipX {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 17px;
+  line-height: 1;
+  color: var(--text-muted);
+  padding: 0 4px;
+}
+.chipX:hover {
+  color: var(--danger);
+}
+.error {
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--danger);
+}

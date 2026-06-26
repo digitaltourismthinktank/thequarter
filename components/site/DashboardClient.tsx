@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/ds/Button';
 import { Icon } from '@/components/ds/Icon';
 import { useMember } from './useMember';
+import { CheckInCard } from './CheckInCard';
 import { getMemberstack, memberDaysRemaining, memberRenewalDate, memberDoorCode } from '@/lib/memberstack';
 import { PLANS, PLAN_DAY_ALLOWANCE } from '@/lib/plans';
 import { STRIPE_BILLING_PORTAL_URL } from '@/lib/commerce';
@@ -190,12 +191,15 @@ export function DashboardClient() {
           ) : null}
         </div>
 
+        {/* Check-in */}
+        <CheckInCard />
+
         {/* Quick links */}
         <div className={styles.card}>
           <span className={styles.cardEyebrow}>Quick links</span>
           <div className={styles.quick} style={{ marginTop: 12 }}>
-            <a className={styles.quickLink} href="/meeting-rooms">
-              Book a meeting room <Icon name="arrow-right" size={16} color="var(--gold-600)" />
+            <a className={styles.quickLink} href="/book">
+              Book a room or pod <Icon name="arrow-right" size={16} color="var(--gold-600)" />
             </a>
             <a className={styles.quickLink} href="/perks">
               Member perks <Icon name="arrow-right" size={16} color="var(--gold-600)" />

@@ -91,6 +91,17 @@ export function getMemberstack(): Promise<MemberstackDom | null> {
   });
 }
 
+/** The member's Memberstack JWT (to authenticate Netlify Function calls), or null. */
+export async function getMemberToken(): Promise<string | null> {
+  const ms = await getMemberstack();
+  let token = ms?.getMemberCookie?.() ?? undefined;
+  if (!token && typeof document !== 'undefined') {
+    const m = document.cookie.match(/(?:^|;\s*)_ms-mid=([^;]+)/);
+    if (m) token = decodeURIComponent(m[1]);
+  }
+  return token ?? null;
+}
+
 /** A friendly message from a Memberstack error. */
 export function memberstackError(e: unknown): string {
   if (e && typeof e === 'object') {
