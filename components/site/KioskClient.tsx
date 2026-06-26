@@ -1,12 +1,11 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { kioskRoom, kioskBook, type KioskRoom } from '@/lib/booking';
+import { kioskRoom, type KioskRoom } from '@/lib/booking';
 import styles from './KioskClient.module.css';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const minToHHMM = (m: number) => `${pad(Math.floor(m / 60))}:${pad(m % 60)}`;
-const ceil30 = (m: number) => Math.ceil(m / 30) * 30;
 
 function londonNowMin(): number {
   const p = Object.fromEntries(
@@ -18,29 +17,15 @@ function londonNowMin(): number {
   return h * 60 + Number(p.minute);
 }
 
-function friendly(code?: string): string {
-  switch (code) {
-    case 'bad-pin':
-      return 'PIN not recognised — please try again.';
-    case 'slot-taken':
-      return 'Just taken — pick another time.';
-    case 'closed-weekend':
-      return 'Open Monday to Friday.';
-    case 'outside-hours':
-      return 'Bookings run 08:00–18:00.';
-    default:
-      return 'Could not book — please try again.';
-  }
-}
-
+/**
+ * Per-room kiosk. Shows live status + today's schedule, and a QR that opens the
+ * room's booking page on the member's phone (logged into their own account). No
+ * PIN, no kiosk input — works on a plain display too.
+ */
 export function KioskClient() {
   const [roomId, setRoomId] = useState<string | null>(null);
   const [data, setData] = useState<KioskRoom | null>(null);
   const [nowMin, setNowMin] = useState<number>(() => londonNowMin());
-  const [pending, setPending] = useState<{ start: number; end: number } | null>(null);
-  const [pin, setPin] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -79,41 +64,9 @@ export function KioskClient() {
     );
   }
 
-  const { space, bookings, openMin, closeMin, weekday } = data;
+  const { space, bookings, closeMin, weekday } = data;
   const current = bookings.find((b) => b.startMin <= nowMin && nowMin < b.endMin);
   const free = !current && weekday && nowMin < closeMin;
-  const isFree = (s: number, e: number) => !bookings.some((b) => s < b.endMin && e > b.startMin);
-
-  function startBook(durMin: number) {
-    setMsg(null);
-    const s = Math.max(openMin, ceil30(nowMin));
-    const e = s + durMin;
-    if (s >= closeMin || e > closeMin) {
-      setMsg('No time left today.');
-      return;
-    }
-    if (!isFree(s, e)) {
-      setMsg('That time isn’t free — see today’s schedule.');
-      return;
-    }
-    setPending({ start: s, end: e });
-    setPin('');
-  }
-  async function confirm() {
-    if (!pending) return;
-    setBusy(true);
-    setMsg(null);
-    const r = await kioskBook({ spaceId: roomId, date: data.date, start: minToHHMM(pending.start), end: minToHHMM(pending.end), pin });
-    if (r.ok) {
-      setMsg(`Booked for ${r.data.member}. Enjoy.`);
-      setPending(null);
-      setPin('');
-      await load();
-    } else {
-      setMsg(friendly(r.data?.error));
-    }
-    setBusy(false);
-  }
 
   const statusText = !weekday
     ? 'Closed today'
@@ -122,6 +75,9 @@ export function KioskClient() {
       : nowMin >= closeMin
         ? 'Closed for today'
         : 'Available now';
+
+  const bookUrl = typeof window !== 'undefined' ? `${window.location.origin}/book?room=${encodeURIComponent(roomId)}` : '';
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=360x360&margin=10&data=${encodeURIComponent(bookUrl)}`;
 
   return (
     <div className={`${styles.kiosk} ${free ? styles.kFree : styles.kBusy}`}>
@@ -134,47 +90,12 @@ export function KioskClient() {
 
       <div className={styles.statusBig}>{statusText}</div>
 
-      {weekday && space.bookable && free ? (
-        pending ? (
-          <div className={styles.bookBox}>
-            <p className={styles.bookLine}>
-              Book {minToHHMM(pending.start)}–{minToHHMM(pending.end)} — enter your PIN
-            </p>
-            <input
-              className={styles.pinInput}
-              inputMode="numeric"
-              value={pin}
-              onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              placeholder="••••••"
-              aria-label="Booking PIN"
-              autoFocus
-            />
-            <div className={styles.bookBtns}>
-              <button type="button" className={styles.primary} onClick={confirm} disabled={busy || pin.length < 4}>
-                Confirm
-              </button>
-              <button
-                type="button"
-                className={styles.ghost}
-                onClick={() => {
-                  setPending(null);
-                  setMsg(null);
-                }}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className={styles.bookBtns}>
-            <button type="button" className={styles.primary} onClick={() => startBook(30)}>
-              Book 30 min
-            </button>
-            <button type="button" className={styles.primary} onClick={() => startBook(60)}>
-              Book 1 hour
-            </button>
-          </div>
-        )
+      {space.bookable ? (
+        <div className={styles.qrBox}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img className={styles.qr} src={qrUrl} alt="Scan to book" width={200} height={200} />
+          <span className={styles.qrLabel}>Scan to book on your phone</span>
+        </div>
       ) : null}
 
       {bookings.length ? (
@@ -190,8 +111,6 @@ export function KioskClient() {
           ))}
         </div>
       ) : null}
-
-      {msg ? <p className={styles.msg}>{msg}</p> : null}
     </div>
   );
 }

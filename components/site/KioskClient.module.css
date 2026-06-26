@@ -44,56 +44,23 @@
   letter-spacing: -0.02em;
 }
 
-.bookBtns {
-  display: flex;
-  gap: 16px;
-  flex-wrap: wrap;
-  justify-content: center;
-}
-.primary {
-  padding: 16px 30px;
-  border: none;
-  border-radius: 999px;
-  background: var(--gold-600);
-  color: #fff;
-  font-size: clamp(18px, 2.4vw, 26px);
-  font-weight: var(--fw-semibold);
-  cursor: pointer;
-}
-.primary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-.ghost {
-  padding: 16px 30px;
-  border: 1px solid currentColor;
-  border-radius: 999px;
-  background: none;
-  color: inherit;
-  font-size: clamp(16px, 2vw, 22px);
-  cursor: pointer;
-  opacity: 0.8;
-}
-
-.bookBox {
+.qrBox {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 18px;
+  gap: clamp(10px, 1.6vh, 18px);
 }
-.bookLine {
-  font-size: clamp(18px, 2.4vw, 28px);
-}
-.pinInput {
-  font-size: clamp(32px, 5vw, 56px);
-  letter-spacing: 0.3em;
-  text-align: center;
-  padding: 12px 20px;
-  border-radius: var(--radius-md);
-  border: 2px solid var(--gold-600);
+.qr {
+  width: clamp(160px, 22vw, 260px);
+  height: auto;
   background: #fff;
-  color: var(--ink-900);
-  width: 8ch;
+  padding: clamp(10px, 1.4vw, 18px);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+}
+.qrLabel {
+  font-size: clamp(16px, 2.2vw, 26px);
+  font-weight: var(--fw-semibold);
 }
 
 .schedule {

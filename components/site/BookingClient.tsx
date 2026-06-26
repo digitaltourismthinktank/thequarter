@@ -75,7 +75,10 @@ export function BookingClient() {
       const s = await getSpaces();
       if (s.ok) {
         setSpaces(s.data.spaces);
-        if (s.data.spaces[0]) setSpaceId(s.data.spaces[0].id);
+        // Preselect a room from ?room= (e.g. scanned from a kiosk QR), else the first.
+        const wanted = new URLSearchParams(window.location.search).get('room');
+        const pre = (wanted && s.data.spaces.find((x) => x.id === wanted)?.id) || s.data.spaces[0]?.id;
+        if (pre) setSpaceId(pre);
       }
       await loadMine();
     })();
