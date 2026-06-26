@@ -117,7 +117,10 @@ docs/                     This spec
   `renewal-date`, `door-code`, `first-name`, `last-name`, `company`, `member-since`, `phone-number`, `entry`.
   Citizen shows "Unlimited". `metaData.lastSyncAt` / `metaData.lastEventId` are used by the webhook's
   stale-event guard (see §6).
-- **Admin gating (Phase 3):** a Memberstack **permission/role** assigned to staff; admin dashboard checks it.
+- **Admin gating (Phase 3):** by **email domain** — anyone signed in `@thinkdigital.travel` is staff
+  (env `ADMIN_EMAIL_DOMAIN`, default `thinkdigital.travel`; optional `ADMIN_EMAILS` comma-list for extras).
+  No Memberstack permission to manage. Enforced server-side in `_member.mjs` `isAdmin()`. Relies on account
+  emails being trustworthy (keep Memberstack email verification on).
 
 ### 5.2 Stripe (payments)
 - **Payment Links** (in `lib/commerce.ts`): Visitor, Resident, Citizen, Hybrid Office checkout URLs;
@@ -185,7 +188,10 @@ in-memory event ring readable via `GET ?key=SIM_KEY`.
 | `billing-portal.mjs` | One-click Stripe billing portal session | `MEMBERSTACK_SECRET_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_BILLING_PORTAL_CONFIG` |
 | `_quarter-sync.mjs` | Shared sync logic (helper, not an endpoint — leading `_`) | — |
 | `sim-renewal.mjs` | Admin test/debug tool (remove before handover) | `MEMBERSTACK_SECRET_KEY`, `STRIPE_SECRET_KEY`, `SIM_KEY` |
-| _Phase 3 (to build)_ | bookings (availability/create/cancel), check-in, admin actions, kiosk | `AIRTABLE_API_KEY`, `MEMBERSTACK_SECRET_KEY`, kiosk token |
+| `bookings.mjs` | Spaces, availability, my-bookings, book, cancel (Mon–Fri 08–18, 30-min, overlap guard) | `AIRTABLE_API_KEY`, `MEMBERSTACK_SECRET_KEY` |
+| `checkin.mjs` | Self check-in (full/half), Today/Tomorrow reserve, day deduction, usage ledger | `AIRTABLE_API_KEY`, `MEMBERSTACK_SECRET_KEY` |
+| `_airtable.mjs` / `_member.mjs` / `_time.mjs` | Shared helpers: Airtable client+IDs; member verify + `isAdmin`; London time + booking rules | — |
+| _Still to build_ | admin actions, kiosk endpoints, member booking/check-in UI | `AIRTABLE_API_KEY`, kiosk token |
 
 Function signature is Netlify v2: `export default async function handler(req) → Response`.
 
@@ -227,6 +233,7 @@ auto-generated **booking PIN + QR** on their dashboard for kiosk identification.
 `STRIPE_BILLING_PORTAL_CONFIG` (bpc_…), `SIM_KEY` (debug — remove on handover), `AIRTABLE_API_KEY` (Phase 3).
 
 **Public/derivable:** `NEXT_PUBLIC_SITE_URL` (production domain; `lib/site.ts` defaults to the Netlify URL).
+`ADMIN_EMAIL_DOMAIN` (default `thinkdigital.travel`) + optional `ADMIN_EMAILS` allowlist control admin access.
 Memberstack App ID and plan/price IDs are public and currently hardcoded.
 
 > Note: the Netlify MCP reliably writes only NON-secret env vars; **set secret keys in the Netlify UI.**

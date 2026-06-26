@@ -5,9 +5,15 @@
 import memberstackAdmin from '@memberstack/admin';
 
 const MS_SECRET = process.env.MEMBERSTACK_SECRET_KEY;
-// The Memberstack permission that marks staff/admins. Configurable so we can match
-// whatever the client names it without a code change.
-const ADMIN_PERMISSION = process.env.MS_ADMIN_PERMISSION || 'admin';
+// Admins are identified by email domain — anyone @thinkdigital.travel is staff.
+// No Memberstack permission to manage. Both are env-configurable; ADMIN_EMAILS is an
+// optional comma-separated allowlist for any extra admins outside the domain.
+const ADMIN_DOMAIN = (process.env.ADMIN_EMAIL_DOMAIN || 'thinkdigital.travel').toLowerCase();
+const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '')
+  .toLowerCase()
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
 
 /** Verify a member token → { ok, member } or { ok:false, reason }. */
 export async function verifyMember(token) {
@@ -36,10 +42,11 @@ export function memberName(m) {
   return name || memberEmail(m) || 'Member';
 }
 
-/** Does the member hold the admin permission? (Memberstack permissions[] array.) */
+/** Is this member staff? True if their (verified) email is on the admin domain or allowlist. */
 export function isAdmin(m) {
-  const perms = m?.permissions || [];
-  return Array.isArray(perms) && perms.includes(ADMIN_PERMISSION);
+  const email = (memberEmail(m) || '').toLowerCase();
+  if (!email) return false;
+  return email.endsWith(`@${ADMIN_DOMAIN}`) || ADMIN_EMAILS.includes(email);
 }
 
 /** Read the member's Bearer token from the request (Authorization header or JSON body). */
