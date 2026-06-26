@@ -1,0 +1,150 @@
+/**
+ * The Quarter — Bookings API (meeting rooms + phone pods).
+ *
+ * GET  ?action=spaces                         → bookable spaces (public)
+ * GET  ?action=availability&space=&date=      → busy ranges for a space/day (public; no names)
+ * GET  ?action=mine            (member token) → the member's upcoming bookings
+ * POST {action:'book', spaceId, date, start, end}   (member token)
+ * POST {action:'cancel', bookingId}                 (member token; owner or admin)
+ *
+ * Rules: Mon–Fri 08:00–18:00, 30-min increments, no overlaps. Free for members.
+ * Admin-created external bookings / blocks come later via the admin function.
+ */
+import { verifyMember, memberEmail, memberName, isAdmin, tokenFromRequest } from './_member.mjs';
+import { listRecords, createRecord, updateRecord, T, F, airtableReady, esc } from './_airtable.mjs';
+import { BUSINESS, hhmmToMin, isWeekday, londonWallClockToISO, isoToLondonMin, londonNow } from './_time.mjs';
+
+const json = (b, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { 'content-type': 'application/json' } });
+
+function validateSlot(dateStr, start, end) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr || '')) return 'bad-date';
+  if (!/^\d{2}:\d{2}$/.test(start || '') || !/^\d{2}:\d{2}$/.test(end || '')) return 'bad-time';
+  if (!isWeekday(dateStr)) return 'closed-weekend';
+  const s = hhmmToMin(start);
+  const e = hhmmToMin(end);
+  if (!(s >= BUSINESS.openMin && e <= BUSINESS.closeMin && s < e)) return 'outside-hours';
+  if (s % BUSINESS.slotMin !== 0 || e % BUSINESS.slotMin !== 0) return 'bad-increment';
+  return null;
+}
+
+/** Confirmed bookings for a space on a date (filters by date+status in Airtable, space in JS). */
+async function bookingsForSpaceDate(spaceId, dateStr) {
+  const recs = await listRecords(T.bookings, {
+    filterByFormula: `AND(DATETIME_FORMAT({Date}, 'YYYY-MM-DD')='${esc(dateStr)}', {Status}='Confirmed')`,
+  });
+  return recs.filter((r) => {
+    const sp = r.fields[F.bookings.space];
+    return Array.isArray(sp) && sp.includes(spaceId);
+  });
+}
+
+export default async function handler(req) {
+  if (!airtableReady()) return json({ error: 'not-configured' }, 503);
+  const url = new URL(req.url);
+
+  if (req.method === 'GET') {
+    const action = url.searchParams.get('action');
+
+    if (action === 'spaces') {
+      const recs = await listRecords(T.spaces, { sort: [{ field: 'Order' }] });
+      const spaces = recs
+        .map((r) => ({
+          id: r.id,
+          name: r.fields[F.spaces.name],
+          type: r.fields[F.spaces.type],
+          capacity: r.fields[F.spaces.capacity] ?? null,
+          capacityLabel: r.fields[F.spaces.capacityLabel] ?? null,
+          bookable: !!r.fields[F.spaces.bookable],
+          colour: r.fields[F.spaces.colour] ?? null,
+        }))
+        .filter((s) => s.bookable);
+      return json({ spaces });
+    }
+
+    if (action === 'availability') {
+      const spaceId = url.searchParams.get('space');
+      const dateStr = url.searchParams.get('date');
+      if (!spaceId || !dateStr) return json({ error: 'missing-params' }, 400);
+      const recs = await bookingsForSpaceDate(spaceId, dateStr);
+      const busy = recs.map((r) => ({
+        startMin: isoToLondonMin(r.fields[F.bookings.start]),
+        endMin: isoToLondonMin(r.fields[F.bookings.end]),
+      }));
+      return json({ date: dateStr, space: spaceId, openMin: BUSINESS.openMin, closeMin: BUSINESS.closeMin, slotMin: BUSINESS.slotMin, busy });
+    }
+
+    if (action === 'mine') {
+      const vm = await verifyMember(tokenFromRequest(req, null));
+      if (!vm.ok) return json({ error: vm.reason }, 401);
+      const email = memberEmail(vm.member);
+      const today = londonNow().dateStr;
+      const recs = await listRecords(T.bookings, {
+        filterByFormula: `AND({Member email}='${esc(email)}', {Status}='Confirmed', DATETIME_FORMAT({Date}, 'YYYY-MM-DD')>='${today}')`,
+        sort: [{ field: 'Start' }],
+      });
+      const mine = recs.map((r) => ({
+        id: r.id,
+        date: r.fields[F.bookings.date],
+        startMin: isoToLondonMin(r.fields[F.bookings.start]),
+        endMin: isoToLondonMin(r.fields[F.bookings.end]),
+        space: Array.isArray(r.fields[F.bookings.space]) ? r.fields[F.bookings.space][0] : null,
+        title: r.fields[F.bookings.title],
+      }));
+      return json({ bookings: mine });
+    }
+
+    return json({ error: 'unknown-action' }, 400);
+  }
+
+  if (req.method !== 'POST') return json({ error: 'method-not-allowed' }, 405);
+
+  const body = await req.json().catch(() => ({}));
+  const vm = await verifyMember(tokenFromRequest(req, body));
+  if (!vm.ok) return json({ error: vm.reason }, 401);
+  const me = vm.member;
+  const email = memberEmail(me);
+
+  if (body.action === 'book') {
+    const { spaceId, date, start, end } = body;
+    if (!spaceId) return json({ error: 'missing-space' }, 400);
+    const err = validateSlot(date, start, end);
+    if (err) return json({ error: err }, 400);
+
+    const s = hhmmToMin(start);
+    const e = hhmmToMin(end);
+    const existing = await bookingsForSpaceDate(spaceId, date);
+    const clash = existing.some((r) => {
+      const rs = isoToLondonMin(r.fields[F.bookings.start]);
+      const re = isoToLondonMin(r.fields[F.bookings.end]);
+      return s < re && e > rs;
+    });
+    if (clash) return json({ error: 'slot-taken' }, 409);
+
+    const rec = await createRecord(T.bookings, {
+      [F.bookings.title]: `${start}–${end} · ${memberName(me)}`,
+      [F.bookings.space]: [spaceId],
+      [F.bookings.date]: date,
+      [F.bookings.start]: londonWallClockToISO(date, start),
+      [F.bookings.end]: londonWallClockToISO(date, end),
+      [F.bookings.kind]: 'Member',
+      [F.bookings.email]: email,
+      [F.bookings.name]: memberName(me),
+      [F.bookings.status]: 'Confirmed',
+      [F.bookings.source]: 'Web',
+    });
+    return json({ ok: true, id: rec.id });
+  }
+
+  if (body.action === 'cancel') {
+    const { bookingId } = body;
+    if (!bookingId) return json({ error: 'missing-booking' }, 400);
+    const recs = await listRecords(T.bookings, { filterByFormula: `RECORD_ID()='${esc(bookingId)}'`, maxRecords: 1 });
+    const r = recs[0];
+    if (!r) return json({ error: 'not-found' }, 404);
+    if (r.fields[F.bookings.email] !== email && !isAdmin(me)) return json({ error: 'forbidden' }, 403);
+    await updateRecord(T.bookings, bookingId, { [F.bookings.status]: 'Cancelled' });
+    return json({ ok: true });
+  }
+
+  return json({ error: 'unknown-action' }, 400);
+}
