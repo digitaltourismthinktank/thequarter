@@ -86,6 +86,58 @@
   font-weight: var(--fw-semibold);
 }
 
+.dateRow {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+.dateRow .days {
+  margin-bottom: 0;
+}
+.datePick {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.datePick span {
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  font-weight: var(--fw-semibold);
+}
+.datePick input {
+  padding: 7px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+  font-size: 14px;
+  color: var(--ink-900);
+}
+.hintRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.hint {
+  font-size: 14px;
+  color: var(--text-body);
+}
+.clear {
+  border: none;
+  background: none;
+  color: var(--gold-700);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+  font-size: 13px;
+  flex: none;
+}
+
 .presets {
   display: flex;
   gap: 8px;
@@ -135,6 +187,12 @@
   background: var(--gold-600);
   color: #fff;
   border-color: var(--gold-600);
+  font-weight: var(--fw-semibold);
+}
+.slotStart {
+  background: var(--gold-100);
+  border-color: var(--gold-600);
+  color: var(--ink-900);
   font-weight: var(--fw-semibold);
 }
 

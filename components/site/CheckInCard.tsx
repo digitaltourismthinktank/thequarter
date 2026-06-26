@@ -66,6 +66,16 @@ export function CheckInCard() {
     setBusy(false);
   }
 
+  async function doReserveDate(v: string) {
+    if (!v) return;
+    setBusy(true);
+    setError(null);
+    const r = await reserveDay(v, half ? 'Half' : 'Full');
+    if (!r.ok) setError(friendly(r.data?.error));
+    await refresh();
+    setBusy(false);
+  }
+
   async function doCancel(id: string) {
     setBusy(true);
     await cancelReservation(id);
@@ -99,6 +109,10 @@ export function CheckInCard() {
               I&rsquo;ll be in tomorrow
             </Button>
           </div>
+          <label className={styles.datePick}>
+            <span>Plan another day</span>
+            <input type="date" min={status?.date} onChange={(e) => doReserveDate(e.target.value)} disabled={busy} />
+          </label>
         </>
       )}
 

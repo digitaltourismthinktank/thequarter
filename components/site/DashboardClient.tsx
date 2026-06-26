@@ -5,6 +5,7 @@ import { Button } from '@/components/ds/Button';
 import { Icon } from '@/components/ds/Icon';
 import { useMember } from './useMember';
 import { CheckInCard } from './CheckInCard';
+import { MyBookingsCard } from './MyBookingsCard';
 import { getMemberstack, memberDaysRemaining, memberRenewalDate, memberDoorCode } from '@/lib/memberstack';
 import { PLANS, PLAN_DAY_ALLOWANCE } from '@/lib/plans';
 import { STRIPE_BILLING_PORTAL_URL } from '@/lib/commerce';
@@ -244,6 +245,9 @@ export function DashboardClient() {
             </>
           )}
         </div>
+
+        {/* Upcoming room/pod bookings */}
+        <MyBookingsCard />
       </div>
 
       {debug ? (

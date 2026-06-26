@@ -40,6 +40,11 @@ function nextWeekdays(n: number): string[] {
   }
   return out;
 }
+function isWeekdayISO(iso: string): boolean {
+  const [y, m, d] = iso.split('-').map(Number);
+  const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+  return dow >= 1 && dow <= 5;
+}
 function dayLabel(iso: string): string {
   const [y, m, d] = iso.split('-').map(Number);
   return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', timeZone: 'UTC' });
@@ -49,12 +54,13 @@ export function BookingClient() {
   const { loading, member } = useMember();
   const [spaces, setSpaces] = useState<Space[]>([]);
   const [spaceId, setSpaceId] = useState<string | null>(null);
-  const [days] = useState<string[]>(() => nextWeekdays(10));
+  const [days] = useState<string[]>(() => nextWeekdays(8));
+  const [today] = useState<string>(() => toISO(new Date()));
   const [date, setDate] = useState<string>(() => nextWeekdays(1)[0]);
   const [avail, setAvail] = useState<Avail | null>(null);
   const [loadingAvail, setLoadingAvail] = useState(false);
-  const [anchor, setAnchor] = useState<number | null>(null);
-  const [sel, setSel] = useState<{ start: number; end: number } | null>(null);
+  const [start, setStart] = useState<number | null>(null); // pending start tap
+  const [sel, setSel] = useState<{ start: number; end: number } | null>(null); // committed range
   const [mine, setMine] = useState<MyBooking[]>([]);
   const [busyAction, setBusyAction] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -91,8 +97,8 @@ export function BookingClient() {
     if (!spaceId || !date) return;
     let active = true;
     setLoadingAvail(true);
+    setStart(null);
     setSel(null);
-    setAnchor(null);
     (async () => {
       const r = await getAvailability(spaceId, date);
       if (!active) return;
@@ -104,28 +110,33 @@ export function BookingClient() {
     };
   }, [spaceId, date]);
 
-  const slotBusy = (start: number) => (avail?.busy || []).some((b) => start < b.endMin && start + SLOT > b.startMin);
+  const slotBusy = (s: number) => (avail?.busy || []).some((b) => s < b.endMin && s + SLOT > b.startMin);
   const rangeFree = (lo: number, hi: number) => {
     for (let s = lo; s < hi; s += SLOT) if (slotBusy(s)) return false;
     return true;
   };
 
+  // Two-tap selection: tap a start time, then an end time.
   function clickSlot(s: number) {
     setMsg(null);
     if (slotBusy(s)) return;
-    if (anchor === null) {
-      setAnchor(s);
-      setSel({ start: s, end: s + SLOT });
+    if (sel) {
+      // already have a range -> start a fresh selection
+      setSel(null);
+      setStart(s);
       return;
     }
-    const lo = Math.min(anchor, s);
-    const hi = Math.max(anchor, s) + SLOT;
+    if (start === null) {
+      setStart(s); // first tap = start
+      return;
+    }
+    const lo = Math.min(start, s);
+    const hi = Math.max(start, s) + SLOT; // end tap is inclusive
     if (rangeFree(lo, hi)) {
       setSel({ start: lo, end: hi });
-      setAnchor(null);
+      setStart(null);
     } else {
-      setAnchor(s);
-      setSel({ start: s, end: s + SLOT });
+      setStart(s); // crossed a busy slot -> restart here
     }
   }
 
@@ -133,10 +144,25 @@ export function BookingClient() {
     setMsg(null);
     if (rangeFree(lo, hi)) {
       setSel({ start: lo, end: hi });
-      setAnchor(null);
+      setStart(null);
     } else {
       setMsg('That block isn’t free.');
     }
+  }
+
+  function clearSel() {
+    setStart(null);
+    setSel(null);
+    setMsg(null);
+  }
+
+  function pickDate(v: string) {
+    if (!v) return;
+    if (!isWeekdayISO(v)) {
+      setMsg('The Quarter is open Monday to Friday.');
+      return;
+    }
+    setDate(v);
   }
 
   async function confirm() {
@@ -146,8 +172,7 @@ export function BookingClient() {
     const r = await createBooking({ spaceId, date, start: minToHHMM(sel.start), end: minToHHMM(sel.end) });
     if (r.ok) {
       setMsg('Booked ✓');
-      setSel(null);
-      setAnchor(null);
+      clearSel();
       await reloadAvail();
       await loadMine();
     } else {
@@ -172,6 +197,12 @@ export function BookingClient() {
   const slots: number[] = [];
   for (let s = open; s < close; s += SLOT) slots.push(s);
   const spaceName = (id: string | null) => spaces.find((x) => x.id === id)?.name ?? 'Room';
+
+  const hint = sel
+    ? `Selected ${fmtRange(sel.start, sel.end)}`
+    : start !== null
+      ? `Start ${minToHHMM(start)} — now tap your end time`
+      : 'Tap a start time, then an end time (or use a preset)';
 
   return (
     <div>
@@ -198,12 +229,18 @@ export function BookingClient() {
         ))}
       </div>
 
-      <div className={styles.days}>
-        {days.map((d) => (
-          <button key={d} type="button" className={`${styles.day} ${date === d ? styles.dayOn : ''}`} onClick={() => setDate(d)}>
-            {dayLabel(d)}
-          </button>
-        ))}
+      <div className={styles.dateRow}>
+        <div className={styles.days}>
+          {days.map((d) => (
+            <button key={d} type="button" className={`${styles.day} ${date === d ? styles.dayOn : ''}`} onClick={() => setDate(d)}>
+              {dayLabel(d)}
+            </button>
+          ))}
+        </div>
+        <label className={styles.datePick}>
+          <span>Or pick a date</span>
+          <input type="date" min={today} value={date} onChange={(e) => pickDate(e.target.value)} />
+        </label>
       </div>
 
       <div className={styles.presets}>
@@ -218,6 +255,15 @@ export function BookingClient() {
         </button>
       </div>
 
+      <div className={styles.hintRow}>
+        <span className={styles.hint}>{hint}</span>
+        {start !== null || sel ? (
+          <button type="button" className={styles.clear} onClick={clearSel}>
+            Clear
+          </button>
+        ) : null}
+      </div>
+
       {loadingAvail ? (
         <p className={styles.state}>Checking availability…</p>
       ) : (
@@ -225,13 +271,14 @@ export function BookingClient() {
           {slots.map((s) => {
             const isBusy = slotBusy(s);
             const isSel = !!sel && s >= sel.start && s < sel.end;
+            const isStart = start === s && !sel;
             return (
               <button
                 key={s}
                 type="button"
                 disabled={isBusy}
                 onClick={() => clickSlot(s)}
-                className={`${styles.slot} ${isBusy ? styles.slotBusy : ''} ${isSel ? styles.slotSel : ''}`}
+                className={`${styles.slot} ${isBusy ? styles.slotBusy : ''} ${isSel ? styles.slotSel : ''} ${isStart ? styles.slotStart : ''}`}
               >
                 {minToHHMM(s)}
               </button>
@@ -242,7 +289,7 @@ export function BookingClient() {
 
       <div className={styles.confirm}>
         <span className={styles.selLabel}>
-          {sel ? `${spaceName(spaceId)} · ${dayLabel(date)} · ${fmtRange(sel.start, sel.end)}` : 'Tap slots or a preset to choose a time.'}
+          {sel ? `${spaceName(spaceId)} · ${dayLabel(date)} · ${fmtRange(sel.start, sel.end)}` : 'Choose a time above.'}
         </span>
         <Button variant="primary" onClick={confirm} disabled={!sel || busyAction}>
           {busyAction ? 'Booking…' : 'Confirm booking'}
