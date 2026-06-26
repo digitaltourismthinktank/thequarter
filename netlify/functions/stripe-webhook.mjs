@@ -17,6 +17,8 @@ import {
   setMemberPlan,
   targetPlanForPrice,
   PAUSED_PLAN_ID,
+  PLAN_ALLOWANCE,
+  daysUsedThisCycle,
   getMemberSync,
   stampSync,
 } from './_quarter-sync.mjs';
@@ -124,15 +126,23 @@ async function handleEvent(event) {
       await setMemberPlan(MS_SECRET, email, PAUSED_PLAN_ID); // pause: freeze days
       applied = { target, paused: true };
     } else {
+      // Usage-aware switch: new days = new plan's allowance − days already used this
+      // cycle. `member` here is PRE-retag, so it still has the old plan + balance.
+      const used = daysUsedThisCycle(member);
       let changed = false;
       if (target) {
         const r = await setMemberPlan(MS_SECRET, email, target);
         changed = (r?.added?.length || 0) > 0;
       }
-      // On an actual plan change, set days to the NEW plan's allowance (flat, no
-      // rollover); otherwise just refresh the renewal date.
-      await renewMember(MS_SECRET, email, { renewalDate: formatDate(obj.current_period_end), resetDays: changed, flat: true });
-      applied = { target, changed };
+      if (changed && target) {
+        const newAllowance = PLAN_ALLOWANCE[target];
+        const explicitDays =
+          newAllowance === null ? 'Unlimited' : newAllowance === undefined ? undefined : String(Math.max(0, newAllowance - used));
+        await renewMember(MS_SECRET, email, { renewalDate: formatDate(obj.current_period_end), explicitDays });
+      } else {
+        await renewMember(MS_SECRET, email, { renewalDate: formatDate(obj.current_period_end), resetDays: false });
+      }
+      applied = { target, changed, used };
     }
   }
 

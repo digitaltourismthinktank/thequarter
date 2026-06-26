@@ -74,6 +74,15 @@ export function allowanceForMember(member) {
   return found;
 }
 
+/** Days used so far this cycle = allowance − remaining (0 if unlimited/unknown). */
+export function daysUsedThisCycle(member) {
+  const allowance = allowanceForMember(member);
+  if (allowance === null || allowance === undefined) return 0;
+  const raw = member?.customFields?.['days-remaining'];
+  const remaining = String(raw).toLowerCase() === 'unlimited' ? 0 : Math.max(0, parseFloat(String(raw)) || 0);
+  return Math.max(0, allowance - remaining);
+}
+
 /**
  * The new day balance at a renewal, given the previous balance + allowance.
  * Rollover rule: a fresh allowance PLUS at most one month's unused days, with
@@ -92,7 +101,7 @@ export function nextBalance(prevRaw, allowance) {
  * false) reset the day balance with rollover. lapse zeroes the balance.
  * Returns a small status object; never throws on a missing member.
  */
-export async function renewMember(secret, email, { renewalDate, resetDays = true, lapse = false, flat = false } = {}) {
+export async function renewMember(secret, email, { renewalDate, resetDays = true, lapse = false, flat = false, explicitDays } = {}) {
   if (!secret || !email) return { ok: false, reason: 'missing-args' };
   const admin = memberstackAdmin.init(secret);
 
@@ -110,6 +119,8 @@ export async function renewMember(secret, email, { renewalDate, resetDays = true
 
   if (lapse) {
     fields['days-remaining'] = '0';
+  } else if (explicitDays !== undefined && explicitDays !== null) {
+    fields['days-remaining'] = explicitDays;
   } else if (resetDays) {
     const allowance = allowanceForMember(member);
     if (allowance !== undefined) {
