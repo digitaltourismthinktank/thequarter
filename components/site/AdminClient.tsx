@@ -13,9 +13,14 @@ import {
   adminCancel,
   adminAdjustDays,
   adminCheckinMember,
+  adminGetEvents,
+  adminCreateEvent,
+  adminUpdateEvent,
+  adminDeleteEvent,
   type AdminMember,
   type AdminBooking,
   type AdminSpace,
+  type QuarterEvent,
 } from '@/lib/booking';
 import styles from './AdminClient.module.css';
 
@@ -36,7 +41,7 @@ const isAdminEmail = (e?: string) => !!e && e.toLowerCase().endsWith('@thinkdigi
 
 export function AdminClient() {
   const { loading, member } = useMember();
-  const [tab, setTab] = useState<'members' | 'rooms'>('members');
+  const [tab, setTab] = useState<'members' | 'rooms' | 'events'>('members');
 
   useEffect(() => {
     if (loading || member) return;
@@ -73,9 +78,12 @@ export function AdminClient() {
         <button type="button" className={`${styles.tab} ${tab === 'rooms' ? styles.tabOn : ''}`} onClick={() => setTab('rooms')}>
           Rooms &amp; bookings
         </button>
+        <button type="button" className={`${styles.tab} ${tab === 'events' ? styles.tabOn : ''}`} onClick={() => setTab('events')}>
+          Events
+        </button>
       </div>
 
-      {tab === 'members' ? <MembersPane /> : <RoomsPane />}
+      {tab === 'members' ? <MembersPane /> : tab === 'rooms' ? <RoomsPane /> : <EventsPane />}
     </div>
   );
 }
@@ -291,6 +299,171 @@ function RoomsPane() {
               <span className={styles.bWho}>{b.name || b.email || ''}</span>
               <button type="button" className={styles.smallBtn} onClick={() => cancel(b.id)} disabled={busy}>
                 Cancel
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      {msg ? <p className={styles.msg}>{msg}</p> : null}
+    </div>
+  );
+}
+
+function toLocalInput(iso: string): string {
+  const p = Object.fromEntries(
+    new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Europe/London',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    })
+      .formatToParts(new Date(iso))
+      .map((x) => [x.type, x.value]),
+  );
+  const hour = p.hour === '24' ? '00' : p.hour;
+  return `${p.year}-${p.month}-${p.day}T${hour}:${p.minute}`;
+}
+function fmtEvent(iso: string): string {
+  return new Date(iso).toLocaleString('en-GB', {
+    timeZone: 'Europe/London',
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+}
+
+function EventsPane() {
+  const [events, setEvents] = useState<QuarterEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [title, setTitle] = useState('');
+  const [start, setStart] = useState('');
+  const [end, setEnd] = useState('');
+  const [location, setLocation] = useState('The Kentish Pantry');
+  const [category, setCategory] = useState('Social');
+  const [published, setPublished] = useState(true);
+
+  const refresh = useCallback(async () => {
+    const r = await adminGetEvents();
+    if (r.ok) setEvents(r.data.events);
+    setLoading(false);
+  }, []);
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  function resetForm() {
+    setEditingId(null);
+    setTitle('');
+    setStart('');
+    setEnd('');
+    setLocation('The Kentish Pantry');
+    setCategory('Social');
+    setPublished(true);
+  }
+  function edit(e: QuarterEvent) {
+    setEditingId(e.id);
+    setTitle(e.title);
+    setStart(e.start ? toLocalInput(e.start) : '');
+    setEnd(e.end ? toLocalInput(e.end) : '');
+    setLocation(e.location || 'The Kentish Pantry');
+    setCategory(e.category || 'Social');
+    setPublished(e.published !== false);
+  }
+  async function save() {
+    if (!title || !start) {
+      setMsg('Title and start are required.');
+      return;
+    }
+    setBusy(true);
+    setMsg(null);
+    const payload = {
+      title,
+      start: new Date(start).toISOString(),
+      end: end ? new Date(end).toISOString() : undefined,
+      location,
+      category,
+      published,
+    };
+    const r = editingId ? await adminUpdateEvent(editingId, payload) : await adminCreateEvent(payload);
+    if (r.ok) {
+      resetForm();
+      await refresh();
+      setMsg('Saved ✓');
+    } else {
+      setMsg(r.data?.error || 'Save failed');
+    }
+    setBusy(false);
+  }
+  async function del(id: string) {
+    setBusy(true);
+    await adminDeleteEvent(id);
+    await refresh();
+    setBusy(false);
+  }
+
+  return (
+    <div>
+      <div className={styles.panel}>
+        <span className={styles.panelTitle}>{editingId ? 'Edit event' : 'Add an event'}</span>
+        <div className={styles.formRow}>
+          <input className={styles.label} placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
+          <label className={styles.field}>
+            <span>Start</span>
+            <input type="datetime-local" className={styles.select} value={start} onChange={(e) => setStart(e.target.value)} />
+          </label>
+          <label className={styles.field}>
+            <span>End</span>
+            <input type="datetime-local" className={styles.select} value={end} onChange={(e) => setEnd(e.target.value)} />
+          </label>
+          <input className={styles.label} placeholder="Location" value={location} onChange={(e) => setLocation(e.target.value)} />
+          <select className={styles.select} value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Category">
+            <option>Social</option>
+            <option>Business briefing</option>
+            <option>Charity Friday</option>
+            <option>Other</option>
+          </select>
+          <label className={styles.check}>
+            <input type="checkbox" checked={published} onChange={(e) => setPublished(e.target.checked)} /> Published
+          </label>
+          <Button variant="primary" size="sm" onClick={save} disabled={busy}>
+            {editingId ? 'Update' : 'Add'}
+          </Button>
+          {editingId ? (
+            <button type="button" className={styles.smallBtn} onClick={resetForm}>
+              Cancel
+            </button>
+          ) : null}
+        </div>
+      </div>
+
+      {loading ? (
+        <p className={styles.state}>Loading…</p>
+      ) : events.length === 0 ? (
+        <p className={styles.muted}>No events yet.</p>
+      ) : (
+        <div className={styles.list}>
+          {events.map((e) => (
+            <div key={e.id} className={styles.bRow}>
+              <span className={styles.bSpace}>{e.title}</span>
+              <span className={styles.bTime}>{e.start ? fmtEvent(e.start) : ''}</span>
+              <span className={styles.bWho}>
+                {e.location || ''}
+                {e.published ? '' : ' · (draft)'}
+              </span>
+              <button type="button" className={styles.smallBtn} onClick={() => edit(e)}>
+                Edit
+              </button>
+              <button type="button" className={styles.smallBtn} onClick={() => del(e.id)} disabled={busy}>
+                Delete
               </button>
             </div>
           ))}
