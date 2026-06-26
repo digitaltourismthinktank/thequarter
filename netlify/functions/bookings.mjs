@@ -73,6 +73,31 @@ export default async function handler(req) {
       return json({ date: dateStr, space: spaceId, openMin: BUSINESS.openMin, closeMin: BUSINESS.closeMin, slotMin: BUSINESS.slotMin, busy });
     }
 
+    if (action === 'today') {
+      // Public snapshot for the entrance screen: all spaces + today's confirmed
+      // bookings/blocks (no names). The screen computes availability + busyness.
+      const today = londonNow();
+      const spaceRecs = await listRecords(T.spaces, { sort: [{ field: 'Order' }] });
+      const spaces = spaceRecs.map((r) => ({
+        id: r.id,
+        name: r.fields[F.spaces.name],
+        type: r.fields[F.spaces.type],
+        capacityLabel: r.fields[F.spaces.capacityLabel] ?? null,
+        colour: r.fields[F.spaces.colour] ?? null,
+        bookable: !!r.fields[F.spaces.bookable],
+      }));
+      const recs = await listRecords(T.bookings, {
+        filterByFormula: `AND(DATETIME_FORMAT({Date}, 'YYYY-MM-DD')='${today.dateStr}', {Status}='Confirmed')`,
+      });
+      const bookings = recs.map((r) => ({
+        space: Array.isArray(r.fields[F.bookings.space]) ? r.fields[F.bookings.space][0] : null,
+        startMin: isoToLondonMin(r.fields[F.bookings.start]),
+        endMin: isoToLondonMin(r.fields[F.bookings.end]),
+        kind: r.fields[F.bookings.kind],
+      }));
+      return json({ date: today.dateStr, nowMin: today.min, spaces, bookings });
+    }
+
     if (action === 'mine') {
       const vm = await verifyMember(tokenFromRequest(req, null));
       if (!vm.ok) return json({ error: vm.reason }, 401);

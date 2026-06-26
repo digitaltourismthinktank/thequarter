@@ -1,0 +1,169 @@
+/* Entrance lobby display — portrait, full-bleed, auto-refreshing. Black/white/gold,
+   no green, no traffic lights. Busyness shown as a tonal gold scale. */
+.screen {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  overflow-y: auto;
+  background: var(--surface-page);
+  color: var(--ink-900);
+  padding: clamp(24px, 4vw, 56px);
+  display: flex;
+  flex-direction: column;
+  gap: clamp(20px, 3vh, 40px);
+  font-family: var(--font-sans);
+}
+
+.top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+.logo {
+  height: clamp(40px, 5vw, 60px);
+  width: auto;
+}
+.when {
+  text-align: right;
+}
+.date {
+  font-size: clamp(18px, 2.6vw, 30px);
+  font-weight: var(--fw-semibold);
+  color: var(--ink-900);
+}
+.time {
+  font-size: clamp(40px, 7vw, 76px);
+  font-weight: var(--fw-bold);
+  letter-spacing: -0.03em;
+  line-height: 1;
+  color: var(--ink-900);
+}
+
+.hero {
+  border-radius: var(--radius-xl);
+  padding: clamp(28px, 5vw, 60px);
+  text-align: center;
+}
+.heroEyebrow {
+  font-size: clamp(13px, 1.8vw, 18px);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  opacity: 0.75;
+}
+.heroLabel {
+  display: block;
+  font-size: clamp(48px, 10vw, 112px);
+  font-weight: var(--fw-bold);
+  letter-spacing: -0.03em;
+  line-height: 1;
+  margin: 10px 0 0;
+}
+.heroLine {
+  font-size: clamp(18px, 2.4vw, 28px);
+  line-height: 1.4;
+  max-width: 24ch;
+  margin: 14px auto 0;
+}
+
+.band_quiet {
+  background: var(--sand-100);
+  color: var(--ink-900);
+}
+.band_steady {
+  background: var(--gold-100);
+  color: var(--ink-900);
+}
+.band_busy {
+  background: var(--gold-300);
+  color: var(--ink-900);
+}
+.band_buzzing {
+  background: var(--gold-600);
+  color: #fff;
+}
+.bandClosed {
+  background: var(--ink-900);
+  color: var(--sand-50);
+}
+
+.block {
+  display: flex;
+  flex-direction: column;
+}
+.h2 {
+  font-size: clamp(20px, 2.6vw, 30px);
+  font-weight: var(--fw-bold);
+  letter-spacing: -0.02em;
+  margin-bottom: 16px;
+}
+.spaceGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+.spaceCard {
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.busyCard {
+  border-color: var(--gold-400);
+}
+.spaceName {
+  font-size: clamp(18px, 2.2vw, 24px);
+  font-weight: var(--fw-semibold);
+  color: var(--ink-900);
+}
+.spaceType {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+.spaceStatus {
+  font-size: clamp(15px, 1.8vw, 20px);
+  font-weight: var(--fw-semibold);
+  margin-top: 4px;
+}
+.statusFree {
+  color: var(--gold-700);
+}
+.statusBusy {
+  color: var(--ink-900);
+}
+.note {
+  font-size: 15px;
+  color: var(--text-muted);
+  margin-top: 14px;
+}
+
+.events {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.event {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px 18px;
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+.evTitle {
+  font-size: clamp(17px, 2vw, 22px);
+  font-weight: var(--fw-semibold);
+  color: var(--ink-900);
+}
+.evMeta {
+  font-size: 15px;
+  color: var(--text-muted);
+}
+.loading {
+  text-align: center;
+  color: var(--text-muted);
+}

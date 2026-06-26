@@ -142,3 +142,21 @@ export const adminUpdateEvent = (id: string, e: Partial<QuarterEvent>) =>
   call<{ ok: boolean }>('events', { method: 'POST', body: { action: 'update', id, ...e } });
 export const adminDeleteEvent = (id: string) =>
   call<{ ok: boolean }>('events', { method: 'POST', body: { action: 'delete', id } });
+
+// ---- Entrance screen (public, no auth) ----
+export interface ScreenSpace {
+  id: string;
+  name: string;
+  type: string;
+  capacityLabel: string | null;
+  colour: string | null;
+  bookable: boolean;
+}
+export interface ScreenBooking {
+  space: string | null;
+  startMin: number;
+  endMin: number;
+  kind: string;
+}
+export const getTodayScreen = () =>
+  call<{ date: string; nowMin: number; spaces: ScreenSpace[]; bookings: ScreenBooking[] }>('bookings?action=today', { auth: false });
