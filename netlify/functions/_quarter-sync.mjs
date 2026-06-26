@@ -17,6 +17,16 @@ export const PLAN_ALLOWANCE = {
   'pln_daily-plan-45nv0v26': 1, // Day Pass — one-off (no recurring renewal)
 };
 
+/** Memberstack plan id → display name (admin views + dashboards). */
+export const PLAN_NAMES = {
+  'pln_citizen-plan-q9oa04p9': 'Citizen',
+  'pln_resident-plan-mqjy0f6w': 'Resident',
+  'pln_visitor-plan-blk50re2': 'Visitor',
+  'pln_hybrid-plan-r4k60rjp': 'Hybrid Office',
+  'pln_daily-plan-45nv0v26': 'Day Pass',
+  'pln_paused-fns0m38': 'Paused',
+};
+
 /** The dedicated "Paused" Memberstack plan + the Stripe £0 "Pause my Plan" price. */
 export const PAUSED_PLAN_ID = 'pln_paused-fns0m38';
 export const PAUSE_PRICE_ID = 'price_0PoNQ6w5GSGOu4zJbBJkYlBT';
