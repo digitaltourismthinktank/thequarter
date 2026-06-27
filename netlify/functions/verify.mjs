@@ -21,6 +21,7 @@ export default async function handler(req) {
   if (!token) return json({ error: 'missing-token', state: 'unknown' }, 400);
 
   const resolved = await resolveToken(token);
-  await logScan(token, resolved);
+  await logScan(token, resolved); // logScan uses reward.funding for float draw-down…
+  if (resolved?.reward) delete resolved.reward.funding; // …then we drop it (admin-only)
   return json(resolved);
 }

@@ -180,3 +180,73 @@ export const kioskBook = (b: { spaceId: string; date: string; start: string; end
 // ---- Welcome (post-payment) ----
 export const getWelcomeSession = (sessionId: string) =>
   call<{ email: string | null }>(`welcome?session_id=${encodeURIComponent(sessionId)}`, { auth: false });
+
+// ---- Quarter Rewards ----
+export interface RewardItem {
+  id: string;
+  partner: string;
+  title: string;
+  cost: number;
+  category: string;
+  icon: string;
+  hero: boolean;
+  image: string | null;
+  pos: string;
+  avail: 'ok' | 'soon';
+}
+export interface Redemption {
+  id: string;
+  reward: string;
+  rewardId: string;
+  partner: string;
+  cost: number;
+  status: string;
+  at: string | null;
+}
+export const getRewards = () =>
+  call<{ points: number; catalogue: RewardItem[]; redemptions: Redemption[] }>('rewards');
+export const redeemReward = (rewardId: string) =>
+  call<{ ok: boolean; balance: number; reward: RewardItem; token: string }>('rewards', {
+    method: 'POST',
+    body: { action: 'redeem', rewardId },
+  });
+
+// ---- Member perks ----
+export interface PerkItem {
+  id: string;
+  partner: string;
+  offer: string;
+  category: string;
+  type: string;
+  days: string;
+  pos: string;
+  authorisedBy: string;
+  ref: string;
+  contact: string;
+  icon: string;
+  image: string | null;
+  status: string;
+}
+export const getMemberPerks = () => call<{ perks: PerkItem[] }>('perks');
+export const usePerk = (perkId: string) =>
+  call<{ ok: boolean; token: string; perk: PerkItem }>('perks', { method: 'POST', body: { action: 'use', perkId } });
+
+// ---- Verification (/v/[token]) — public, no auth ----
+export interface VerifyMember {
+  name: string;
+  planName: string | null;
+  since: number | null;
+  active: boolean;
+}
+export interface VerifyResult {
+  ok: boolean;
+  state: 'valid' | 'inactive' | 'expired' | 'lapsed' | 'rotating' | 'unknown';
+  kind: 'perk' | 'reward' | 'wallet';
+  member?: VerifyMember;
+  perk?: PerkItem;
+  reward?: RewardItem;
+  partner?: string;
+  wallet?: boolean;
+}
+export const verifyToken = (token: string) =>
+  call<VerifyResult>(`verify?token=${encodeURIComponent(token)}`, { auth: false });
