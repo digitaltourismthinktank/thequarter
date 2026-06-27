@@ -694,3 +694,125 @@
   font-weight: var(--fw-semibold);
   cursor: pointer;
 }
+
+/* ---- Member profile pop-over ---- */
+.profOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(20, 17, 13, 0.6);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.profCard {
+  width: 100%;
+  max-width: 560px;
+  max-height: 92vh;
+  overflow-y: auto;
+  background: var(--surface-card);
+  border-radius: 22px;
+  padding: 24px;
+  animation: profIn var(--duration-base) var(--ease-out);
+}
+@keyframes profIn {
+  from {
+    transform: translateY(12px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+.profHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.profName {
+  font-size: 20px;
+  font-weight: var(--fw-bold);
+  letter-spacing: -0.02em;
+}
+.profSub {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.profClose {
+  display: inline-flex;
+  flex: none;
+  padding: 7px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: var(--surface-card);
+  color: var(--ink-900);
+  cursor: pointer;
+}
+.statGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 10px;
+}
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--surface-sunken);
+}
+.stat strong {
+  font-size: 20px;
+  font-weight: var(--fw-bold);
+  letter-spacing: -0.02em;
+  color: var(--ink-900);
+}
+.stat span {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  font-weight: var(--fw-semibold);
+}
+.profSection {
+  margin-top: 18px;
+}
+.profSectionTitle {
+  display: block;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  color: var(--text-muted);
+  font-weight: var(--fw-semibold);
+  margin-bottom: 8px;
+}
+.caution {
+  font-size: 13px;
+  font-weight: var(--fw-semibold);
+  color: var(--danger);
+}
+.profHist {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.profHistRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--text-body);
+}
+.histNeg {
+  color: var(--danger);
+  font-weight: var(--fw-semibold);
+}
+.histPos {
+  color: var(--gold-700);
+  font-weight: var(--fw-semibold);
+}

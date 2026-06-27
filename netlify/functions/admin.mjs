@@ -15,7 +15,7 @@ import { verifyMember, isAdmin, tokenFromRequest } from './_member.mjs';
 import { listRecords, createRecord, updateRecord, deleteRecord, T, F, airtableReady, esc } from './_airtable.mjs';
 import { londonWallClockToISO, isoToLondonMin, hhmmToMin, londonNow } from './_time.mjs';
 import { PLAN_NAMES, allowanceForMember } from './_quarter-sync.mjs';
-import { listRewards, listPerks, listFloats, floatStatus } from './_rewards.mjs';
+import { listRewards, listPerks, listFloats, floatStatus, awardPoints, redeemReward } from './_rewards.mjs';
 
 const PERK_TYPES = ['Discount', 'On the house', 'Upgrade', 'Extra', 'Bundle', 'Priority', 'Welcome gift', 'Experience'];
 const FUNDINGS = ['inventory', 'partner', 'quarter'];
@@ -57,6 +57,55 @@ async function listAllMembers() {
   }
   out.sort((a, b) => (a.name || a.email || '').localeCompare(b.name || b.email || ''));
   return out;
+}
+
+/** Rich per-member profile for the admin pop-over: basics + lifetime stats + history. */
+async function memberProfile(id) {
+  const admin = memberstackAdmin.init(MS_SECRET);
+  let m;
+  try {
+    const r = await admin.members.retrieve({ id });
+    m = r?.data;
+  } catch {
+    return null;
+  }
+  if (!m) return null;
+  const email = m.auth?.email || m.email || '';
+  const cf = m.customFields || {};
+  const md = m.metaData || {};
+  const planId = (m.planConnections || []).map(planIdOf).filter(Boolean)[0] || null;
+  const [checkins, redemptions, ledger, scans] = await Promise.all([
+    listRecords(T.checkins, { filterByFormula: `AND({Member email}='${esc(email)}', {Status}='Checked-in')` }),
+    listRecords(T.redemptions, { filterByFormula: `{Member email}='${esc(email)}'`, sort: [{ field: 'At', direction: 'desc' }] }),
+    listRecords(T.pointsLedger, { filterByFormula: `{Member email}='${esc(email)}'`, sort: [{ field: 'At', direction: 'desc' }] }),
+    listRecords(T.scanLog, { filterByFormula: `{Member email}='${esc(email)}'` }),
+  ]);
+  return {
+    id: m.id,
+    email,
+    name: [cf['first-name'], cf['last-name']].filter(Boolean).join(' ').trim() || email,
+    plan: planId ? PLAN_NAMES[planId] || planId : null,
+    paused: planId === PAUSED,
+    since: m.createdAt || null,
+    days: cf['days-remaining'] ?? null,
+    company: md.company || null,
+    bday: md.bday || null,
+    points: Math.max(0, Math.round(Number(md.points) || 0)),
+    daysIn: checkins.length,
+    rewardsRedeemed: redemptions.length,
+    pointsRedeemed: redemptions.reduce((s, x) => s + (Number(x.fields[F.redemptions.cost]) || 0), 0),
+    perksUsed: scans.length,
+    recentRedemptions: redemptions.slice(0, 6).map((x) => ({
+      reward: x.fields[F.redemptions.reward] || '',
+      cost: Number(x.fields[F.redemptions.cost]) || 0,
+      at: x.fields[F.redemptions.at] || null,
+    })),
+    recentLedger: ledger.slice(0, 8).map((x) => ({
+      delta: Number(x.fields[F.pointsLedger.delta]) || 0,
+      reason: x.fields[F.pointsLedger.reason] || '',
+      at: x.fields[F.pointsLedger.at] || null,
+    })),
+  };
 }
 
 async function allSpaces() {
@@ -120,6 +169,12 @@ export default async function handler(req) {
     if (action === 'rewards') return json({ rewards: await listRewards({ liveOnly: false }) });
     if (action === 'perks') return json({ perks: await listPerks({ liveOnly: false }) });
     if (action === 'floats') return json({ floats: await listFloats() });
+    if (action === 'memberProfile') {
+      const id = new URL(req.url).searchParams.get('id');
+      if (!id) return json({ error: 'missing-id' }, 400);
+      const p = await memberProfile(id);
+      return p ? json(p) : json({ error: 'not-found' }, 404);
+    }
     return json({ error: 'unknown-action' }, 400);
   }
 
@@ -266,6 +321,29 @@ export default async function handler(req) {
     if (!body.id) return json({ error: 'missing-id' }, 400);
     await deleteRecord(T.perks, body.id);
     return json({ ok: true });
+  }
+
+  // ---- Member points: manual adjust (with a reason) + redeem a reward for them ----
+  if (action === 'adjustPoints') {
+    if (!body.memberId) return json({ error: 'missing-member' }, 400);
+    const delta = Math.round(Number(body.delta) || 0);
+    if (!delta) return json({ error: 'no-delta' }, 400);
+    const admin = memberstackAdmin.init(MS_SECRET);
+    const r = await admin.members.retrieve({ id: body.memberId });
+    const m = r?.data;
+    if (!m) return json({ error: 'not-found' }, 404);
+    const balance = await awardPoints(m, delta, 'adjust', body.reason || 'admin adjust');
+    return json({ ok: true, balance });
+  }
+  if (action === 'redeemForMember') {
+    if (!body.memberId || !body.rewardId) return json({ error: 'missing-params' }, 400);
+    const admin = memberstackAdmin.init(MS_SECRET);
+    const r = await admin.members.retrieve({ id: body.memberId });
+    const m = r?.data;
+    if (!m) return json({ error: 'not-found' }, 404);
+    const res = await redeemReward(m, body.rewardId);
+    if (!res.ok) return json({ error: res.reason }, 400);
+    return json({ ok: true, balance: res.balance, reward: res.reward.title });
   }
 
   // ---- Partner float top-up ----

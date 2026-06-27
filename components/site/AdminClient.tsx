@@ -31,12 +31,16 @@ import {
   adminGetFloats,
   adminTopUpFloat,
   adminGetToday,
+  adminGetMemberProfile,
+  adminAdjustPoints,
+  adminRedeemForMember,
   type AdminMember,
   type AdminBooking,
   type AdminSpace,
   type AdminReward,
   type AdminFloat,
   type AdminCheckin,
+  type MemberProfile,
   type PerkItem,
   type QuarterEvent,
 } from '@/lib/booking';
@@ -149,6 +153,7 @@ function MembersPane() {
   const [msg, setMsg] = useState<string | null>(null);
   const [q, setQ] = useState('');
   const [planFilter, setPlanFilter] = useState('All');
+  const [profileId, setProfileId] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     const r = await adminGetMembers();
@@ -244,6 +249,9 @@ function MembersPane() {
                 <td className={styles.muted}>{m.points.toLocaleString('en-GB')}</td>
                 <td className={styles.muted}>{m.renewal || '—'}</td>
                 <td>
+                  <button type="button" className={styles.smallBtn} onClick={() => setProfileId(m.id)}>
+                    Profile
+                  </button>{' '}
                   <button type="button" className={styles.smallBtn} onClick={() => checkIn(m)} disabled={busyId === m.id}>
                     Check in
                   </button>
@@ -254,6 +262,197 @@ function MembersPane() {
         </table>
       </div>
       {msg ? <p className={styles.msg}>{msg}</p> : null}
+      <MemberProfileModal id={profileId} onClose={() => setProfileId(null)} onChanged={refresh} />
+    </div>
+  );
+}
+
+function MemberProfileModal({ id, onClose, onChanged }: { id: string | null; onClose: () => void; onChanged: () => void }) {
+  const [p, setP] = useState<MemberProfile | null>(null);
+  const [rewards, setRewards] = useState<AdminReward[]>([]);
+  const [delta, setDelta] = useState('');
+  const [reason, setReason] = useState('');
+  const [rewardId, setRewardId] = useState('');
+  const [confirmAdjust, setConfirmAdjust] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    if (!id) return;
+    const [pr, rw] = await Promise.all([adminGetMemberProfile(id), adminGetRewards()]);
+    if (pr.ok) setP(pr.data);
+    if (rw.ok) setRewards(rw.data.rewards.filter((r) => r.status === 'live'));
+  }, [id]);
+  useEffect(() => {
+    if (!id) return;
+    setP(null);
+    setMsg(null);
+    setDelta('');
+    setReason('');
+    setRewardId('');
+    setConfirmAdjust(false);
+    load();
+  }, [id, load]);
+
+  if (!id) return null;
+
+  async function adjust() {
+    const d = Math.round(Number(delta) || 0);
+    if (!d || !id) return;
+    setBusy(true);
+    setMsg(null);
+    const r = await adminAdjustPoints(id, d, reason || 'admin adjust');
+    setBusy(false);
+    if (r.ok) {
+      setDelta('');
+      setReason('');
+      setConfirmAdjust(false);
+      setMsg(`Balance is now ${r.data.balance.toLocaleString('en-GB')}.`);
+      await load();
+      onChanged();
+    } else setMsg('Could not adjust points.');
+  }
+  async function redeem() {
+    if (!rewardId || !id) return;
+    setBusy(true);
+    setMsg(null);
+    const r = await adminRedeemForMember(id, rewardId);
+    setBusy(false);
+    if (r.ok) {
+      setRewardId('');
+      setMsg(`Redeemed ${r.data.reward} ✓`);
+      await load();
+      onChanged();
+    } else {
+      setMsg(r.data?.error === 'insufficient' ? 'Not enough points.' : r.data?.error === 'back-soon' ? 'That reward is back soon.' : 'Could not redeem.');
+    }
+  }
+
+  const since = p?.since ? new Date(p.since).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }) : '—';
+  const d = Math.round(Number(delta) || 0);
+
+  return (
+    <div className={styles.profOverlay} onClick={onClose} role="dialog" aria-modal="true">
+      <div className={styles.profCard} onClick={(e) => e.stopPropagation()}>
+        <div className={styles.profHead}>
+          <div>
+            <h3 className={styles.profName}>{p?.name || 'Member'}</h3>
+            <span className={styles.profSub}>
+              {p?.email}
+              {p?.company ? ` · ${p.company}` : ''}
+              {p?.plan ? ` · ${p.plan}` : ''}
+              {p?.paused ? ' · Paused' : ''}
+            </span>
+          </div>
+          <button className={styles.profClose} onClick={onClose} aria-label="Close">
+            <Icon name="x" size={18} />
+          </button>
+        </div>
+
+        {!p ? (
+          <p className={styles.state}>Loading…</p>
+        ) : (
+          <>
+            <div className={styles.statGrid}>
+              <div className={styles.stat}>
+                <strong>{p.points.toLocaleString('en-GB')}</strong>
+                <span>points</span>
+              </div>
+              <div className={styles.stat}>
+                <strong>{p.daysIn}</strong>
+                <span>days in</span>
+              </div>
+              <div className={styles.stat}>
+                <strong>{p.days ?? '—'}</strong>
+                <span>days left</span>
+              </div>
+              <div className={styles.stat}>
+                <strong>{p.rewardsRedeemed}</strong>
+                <span>rewards redeemed</span>
+              </div>
+              <div className={styles.stat}>
+                <strong>{p.pointsRedeemed.toLocaleString('en-GB')}</strong>
+                <span>pts redeemed</span>
+              </div>
+              <div className={styles.stat}>
+                <strong>{since}</strong>
+                <span>member since</span>
+              </div>
+            </div>
+
+            <div className={styles.profSection}>
+              <span className={styles.profSectionTitle}>Redeem a reward (deducts points)</span>
+              <div className={styles.formRow}>
+                <select className={styles.select} value={rewardId} onChange={(e) => setRewardId(e.target.value)} aria-label="Reward">
+                  <option value="">Choose a reward…</option>
+                  {rewards.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.title} — {r.cost} pts
+                    </option>
+                  ))}
+                </select>
+                <button type="button" className={styles.smallBtn} onClick={redeem} disabled={busy || !rewardId}>
+                  Deduct
+                </button>
+              </div>
+            </div>
+
+            <div className={styles.profSection}>
+              <span className={styles.profSectionTitle}>Adjust points</span>
+              <div className={styles.formRow}>
+                <input
+                  className={styles.dayInput}
+                  type="number"
+                  placeholder="+/−"
+                  value={delta}
+                  onChange={(e) => {
+                    setDelta(e.target.value);
+                    setConfirmAdjust(false);
+                  }}
+                />
+                <input className={styles.label} placeholder="Reason (recorded)" value={reason} onChange={(e) => setReason(e.target.value)} />
+                {confirmAdjust ? (
+                  <>
+                    <span className={styles.caution}>
+                      Apply {d > 0 ? '+' : ''}
+                      {d} to {p.name}?
+                    </span>
+                    <button type="button" className={styles.smallBtn} onClick={adjust} disabled={busy}>
+                      Confirm
+                    </button>
+                    <button type="button" className={styles.smallBtn} onClick={() => setConfirmAdjust(false)}>
+                      Cancel
+                    </button>
+                  </>
+                ) : (
+                  <button type="button" className={styles.smallBtn} onClick={() => d && setConfirmAdjust(true)} disabled={!d}>
+                    Adjust
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {p.recentLedger.length ? (
+              <div className={styles.profSection}>
+                <span className={styles.profSectionTitle}>Recent points</span>
+                <div className={styles.profHist}>
+                  {p.recentLedger.map((l, i) => (
+                    <div key={i} className={styles.profHistRow}>
+                      <span>{l.reason}</span>
+                      <span className={l.delta < 0 ? styles.histNeg : styles.histPos}>
+                        {l.delta > 0 ? '+' : ''}
+                        {l.delta}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {msg ? <p className={styles.msg}>{msg}</p> : null}
+          </>
+        )}
+      </div>
     </div>
   );
 }

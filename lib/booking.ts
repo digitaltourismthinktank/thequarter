@@ -168,6 +168,30 @@ export interface AdminCheckin {
 }
 export const adminGetToday = (date: string) =>
   call<{ date: string; checkins: AdminCheckin[]; bookings: AdminBooking[] }>(`admin?action=today&date=${date}`);
+export interface MemberProfile {
+  id: string;
+  email: string;
+  name: string;
+  plan: string | null;
+  paused: boolean;
+  since: string | null;
+  days: string | null;
+  company: string | null;
+  bday: string | null;
+  points: number;
+  daysIn: number;
+  rewardsRedeemed: number;
+  pointsRedeemed: number;
+  perksUsed: number;
+  recentRedemptions: { reward: string; cost: number; at: string | null }[];
+  recentLedger: { delta: number; reason: string; at: string | null }[];
+}
+export const adminGetMemberProfile = (id: string) =>
+  call<MemberProfile>(`admin?action=memberProfile&id=${encodeURIComponent(id)}`);
+export const adminAdjustPoints = (memberId: string, delta: number, reason: string) =>
+  call<{ ok: boolean; balance: number }>('admin', { method: 'POST', body: { action: 'adjustPoints', memberId, delta, reason } });
+export const adminRedeemForMember = (memberId: string, rewardId: string) =>
+  call<{ ok: boolean; balance: number; reward: string }>('admin', { method: 'POST', body: { action: 'redeemForMember', memberId, rewardId } });
 
 // ---- Events ----
 export interface QuarterEvent {
