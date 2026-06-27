@@ -127,6 +127,7 @@ export interface AnnualOption {
 export const ANNUAL_PLANS: Partial<Record<PlanId, AnnualOption>> = {
   citizen: { monthly: 258, annual: 2580 },
   resident: { monthly: 138, annual: 1380 },
+  visitor: { monthly: 84, annual: 840 },
 };
 
 /** Annual saving vs paying monthly for a year. */

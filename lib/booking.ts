@@ -324,6 +324,26 @@ export interface CarnetState {
 export const getCarnet = () => call<{ carnet: CarnetState }>('carnet');
 export const useCarnetPass = () =>
   call<{ ok: boolean; carnet: CarnetState; pointsAwarded: number }>('carnet', { method: 'POST', body: { action: 'use' } });
+
+// ---- Guest registration (lobby kiosk; public) ----
+export interface GuestHost {
+  id: string;
+  name: string;
+  company: string;
+  plan: string;
+}
+export interface RollGuest {
+  id: string;
+  name: string;
+  company: string | null;
+  host: string | null;
+  arrivedAt: string | null;
+}
+export const getHosts = (q: string) => call<{ hosts: GuestHost[] }>(`guests?action=hosts&q=${encodeURIComponent(q)}`, { auth: false });
+export const signInGuest = (b: { name: string; company?: string; hostId?: string; host?: string; reason?: string }) =>
+  call<{ ok: boolean; host: string | null }>('guests', { method: 'POST', body: { action: 'signin', ...b }, auth: false });
+export const getRoll = () => call<{ membersIn: number; headcount: number; guests: RollGuest[] }>('guests?action=roll', { auth: false });
+export const signOutGuest = (id: string) => call<{ ok: boolean }>('guests', { method: 'POST', body: { action: 'signout', id }, auth: false });
 export const redeemReward = (rewardId: string) =>
   call<{ ok: boolean; balance: number; reward: RewardItem; token: string }>('rewards', {
     method: 'POST',

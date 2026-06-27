@@ -43,6 +43,7 @@ export const PRICE_TO_PLAN = {
   'price_0PgRmsw5GSGOu4zJxWrmYHWg': 'pln_daily-plan-45nv0v26', // Day Pass (one-off)
   'price_0Tn4MXw5GSGOu4zJLe6oAQEu': 'pln_citizen-plan-q9oa04p9', // Citizen (annual) → same plan tag
   'price_0Tn4Nmw5GSGOu4zJwV8L1Imz': 'pln_resident-plan-mqjy0f6w', // Resident (annual) → same plan tag
+  'price_0Tn4ucw5GSGOu4zJ7UqWhlO8': 'pln_visitor-plan-blk50re2', // Visitor (annual) → same plan tag
 };
 
 /** Every Memberstack plan we manage — we only swap among these, never touching others. */

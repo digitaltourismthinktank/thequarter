@@ -22,6 +22,7 @@ export const T = {
   tokens: 'tbliuDUKJnGs9Hcgo',
   scanLog: 'tblgAY1I86JhnxCQV',
   referrals: 'tblnFOW4GKzKmXKNw',
+  guests: 'tblwCIQBuC1CuRztd',
 };
 
 export const F = {
@@ -153,6 +154,15 @@ export const F = {
     friendName: 'fld3TFFOKHaTrQ8ql',
     status: 'fldmduPn7aORgCf56',
     at: 'fld6hhxRhOpRya0jH',
+  },
+  guests: {
+    name: 'fldsvtgQedqFYi0j9',
+    company: 'fld6ScuDO5hYjFooQ',
+    host: 'fldOkx8ohkEi7Yg7e',
+    hostId: 'fldX0chagINvHoguD',
+    reason: 'fldL0CLCgpFOJMtp4',
+    arrivedAt: 'flddfiStSGap1oxYT',
+    signedOutAt: 'fldhScgCM5HCEE9L4',
   },
 };
 
