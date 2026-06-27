@@ -69,6 +69,20 @@
   background: var(--sand-100);
   color: var(--text-body);
 }
+.select {
+  width: 100%;
+  padding: 11px 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  font-size: 15px;
+  background: var(--surface-card);
+  color: var(--ink-900);
+}
+.select:focus {
+  outline: none;
+  border-color: var(--gold-500);
+  box-shadow: 0 0 0 3px var(--gold-100);
+}
 .row {
   display: grid;
   grid-template-columns: 1fr 1fr;

@@ -203,8 +203,18 @@ export interface Redemption {
   status: string;
   at: string | null;
 }
+export interface BirthdayState {
+  bday: string | null; // 'MM-DD'
+  claimed: string | null; // ISO date claimed, or null
+}
 export const getRewards = () =>
-  call<{ points: number; earnedLately: number; catalogue: RewardItem[]; redemptions: Redemption[] }>('rewards');
+  call<{ points: number; earnedLately: number; catalogue: RewardItem[]; redemptions: Redemption[]; birthday: BirthdayState }>(
+    'rewards',
+  );
+
+// ---- Member profile (birthday / company on Memberstack metaData) ----
+export const saveProfile = (body: { bday?: string | null; company?: string }) =>
+  call<{ ok: boolean; bday: string | null; company: string | null }>('member-profile', { method: 'POST', body });
 export const redeemReward = (rewardId: string) =>
   call<{ ok: boolean; balance: number; reward: RewardItem; token: string }>('rewards', {
     method: 'POST',

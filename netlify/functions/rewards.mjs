@@ -45,7 +45,9 @@ export default async function handler(req) {
     const earnedLately = ledger
       .filter((e) => e.delta > 0 && e.at && Date.parse(e.at) >= cutoff)
       .reduce((s, e) => s + e.delta, 0);
-    return json({ points: memberPoints(vm.member), earnedLately, catalogue, redemptions });
+    const meta = vm.member.metaData || {};
+    const birthday = { bday: meta.bday || null, claimed: meta.bdayClaimed || null };
+    return json({ points: memberPoints(vm.member), earnedLately, catalogue, redemptions, birthday });
   }
 
   if (req.method !== 'POST') return json({ error: 'method-not-allowed' }, 405);

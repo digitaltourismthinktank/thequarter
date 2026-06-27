@@ -6,8 +6,9 @@ import { Button } from '@/components/ds/Button';
 import { useMember, memberPlanSlug } from './useMember';
 import { PLANS } from '@/lib/plans';
 import { EARN_RULES } from '@/lib/rewards';
-import { getRewards, redeemReward, type RewardItem, type Redemption } from '@/lib/booking';
+import { getRewards, redeemReward, type RewardItem, type Redemption, type BirthdayState } from '@/lib/booking';
 import { MemberTabs } from './MemberTabs';
+import { BirthdayCard } from './BirthdayCard';
 import { RedemptionSheet, type RedemptionInfo } from './RedemptionSheet';
 import styles from './RewardsClient.module.css';
 
@@ -37,6 +38,7 @@ export function RewardsClient() {
   const [earnedLately, setEarnedLately] = useState(0);
   const [catalogue, setCatalogue] = useState<RewardItem[]>([]);
   const [redemptions, setRedemptions] = useState<Redemption[]>([]);
+  const [birthday, setBirthday] = useState<BirthdayState>({ bday: null, claimed: null });
   const [loaded, setLoaded] = useState(false);
   const [confirm, setConfirm] = useState<RewardItem | null>(null);
   const [busy, setBusy] = useState(false);
@@ -59,6 +61,7 @@ export function RewardsClient() {
       setEarnedLately(r.data.earnedLately);
       setCatalogue(r.data.catalogue);
       setRedemptions(r.data.redemptions);
+      setBirthday(r.data.birthday);
     }
     setLoaded(true);
   }, []);
@@ -143,6 +146,8 @@ export function RewardsClient() {
           </div>
         </div>
       </section>
+
+      <BirthdayCard birthday={birthday} onSaved={load} />
 
       <div className={styles.cols}>
         {/* How you earn */}

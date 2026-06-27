@@ -5,8 +5,10 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ds/Button';
 import { getMemberstack, memberstackError } from '@/lib/memberstack';
 import { PLANS, PLAN_MEMBERSTACK_ID, PLAN_DAY_ALLOWANCE, type PlanId } from '@/lib/plans';
-import { getWelcomeSession } from '@/lib/booking';
+import { getWelcomeSession, saveProfile } from '@/lib/booking';
 import styles from './WelcomeClient.module.css';
+
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 /**
  * Post-payment onboarding. Pre-fills the email the member paid with (from the
@@ -25,6 +27,8 @@ export function WelcomeClient({ plan }: { plan: string }) {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [password, setPassword] = useState('');
+  const [bdayDay, setBdayDay] = useState('');
+  const [bdayMonth, setBdayMonth] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -67,6 +71,16 @@ export function WelcomeClient({ plan }: { plan: string }) {
       if (lastName) customFields['last-name'] = lastName;
       if (allowance !== undefined) customFields['days-remaining'] = allowance === null ? 'Unlimited' : String(allowance);
       await ms.signupMemberEmailPassword({ email, password, plans: plnId ? [{ planId: plnId }] : [], customFields });
+      // Optional birthday → stored on metaData (day + month only). Best-effort.
+      if (bdayDay && bdayMonth) {
+        const mm = String(MONTHS.indexOf(bdayMonth) + 1).padStart(2, '0');
+        const dd = String(Number(bdayDay)).padStart(2, '0');
+        try {
+          await saveProfile({ bday: `${mm}-${dd}` });
+        } catch {
+          /* non-blocking — they can add it later on Rewards */
+        }
+      }
       router.push('/dashboard');
     } catch (err) {
       setError(memberstackError(err));
@@ -115,6 +129,29 @@ export function WelcomeClient({ plan }: { plan: string }) {
           <span>Password</span>
           <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" />
         </label>
+
+        <div className={styles.field}>
+          <span>Birthday (optional)</span>
+          <div className={styles.row}>
+            <select className={styles.select} value={bdayDay} onChange={(e) => setBdayDay(e.target.value)} aria-label="Birthday day">
+              <option value="">Day</option>
+              {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+            </select>
+            <select className={styles.select} value={bdayMonth} onChange={(e) => setBdayMonth(e.target.value)} aria-label="Birthday month">
+              <option value="">Month</option>
+              {MONTHS.map((mo) => (
+                <option key={mo} value={mo}>
+                  {mo}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <p className={styles.hint}>So we can spoil you a little each year — a treat from The Kentish Pantry.</p>
 
         {error ? <p className={styles.error}>{error}</p> : null}
         <Button variant="primary" onClick={submit} disabled={busy}>

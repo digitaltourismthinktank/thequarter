@@ -1,0 +1,93 @@
+.card {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 18px 20px;
+  border-radius: 20px;
+  margin-bottom: 28px;
+}
+.gold {
+  background: linear-gradient(135deg, var(--gold-300), var(--gold-500));
+  color: var(--ink-900);
+  box-shadow: var(--shadow-gold);
+}
+.soft {
+  background: var(--gold-100);
+  border: 1px solid var(--gold-300);
+}
+.muted {
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+}
+
+.chipGold,
+.chipSoft,
+.chipMuted {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border-radius: 12px;
+}
+.chipGold {
+  background: rgba(255, 255, 255, 0.4);
+}
+.chipSoft {
+  background: var(--pure-white);
+}
+.chipMuted {
+  background: var(--sand-100);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.title {
+  font-size: 16px;
+  font-weight: var(--fw-bold);
+  letter-spacing: -0.01em;
+}
+.sub {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+.subDark {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink-900);
+  opacity: 0.85;
+}
+
+.form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.select {
+  padding: 9px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-default);
+  background: var(--surface-card);
+  color: var(--ink-900);
+  font-size: 14px;
+}
+.save {
+  padding: 9px 18px;
+  border-radius: 999px;
+  border: none;
+  background: var(--gold-500);
+  color: var(--ink-900);
+  font-size: 14px;
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+}
+.save:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
