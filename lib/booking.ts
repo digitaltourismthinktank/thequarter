@@ -162,6 +162,12 @@ export const adminDeletePerk = (id: string) => call<{ ok: boolean }>('admin', { 
 export const adminGetFloats = () => call<{ floats: AdminFloat[] }>('admin?action=floats');
 export const adminTopUpFloat = (id: string, amount: number) =>
   call<{ ok: boolean; balance: number; floatTotal: number }>('admin', { method: 'POST', body: { action: 'topUpFloat', id, amount } });
+export interface AdminCheckin {
+  name: string;
+  length: string;
+}
+export const adminGetToday = (date: string) =>
+  call<{ date: string; checkins: AdminCheckin[]; bookings: AdminBooking[] }>(`admin?action=today&date=${date}`);
 
 // ---- Events ----
 export interface QuarterEvent {

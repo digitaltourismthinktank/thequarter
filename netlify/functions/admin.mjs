@@ -85,6 +85,16 @@ async function bookingsForDate(date) {
   }));
 }
 
+async function checkinsForDate(date) {
+  const recs = await listRecords(T.checkins, {
+    filterByFormula: `AND(DATETIME_FORMAT({Date}, 'YYYY-MM-DD')='${esc(date)}', {Status}='Checked-in')`,
+  });
+  return recs.map((r) => ({
+    name: r.fields[F.checkins.name] || r.fields[F.checkins.email] || 'Member',
+    length: r.fields[F.checkins.length] || 'Full',
+  }));
+}
+
 export default async function handler(req) {
   if (!airtableReady() || !MS_SECRET) return json({ error: 'not-configured' }, 503);
 
@@ -101,6 +111,11 @@ export default async function handler(req) {
       const date = new URL(req.url).searchParams.get('date');
       if (!date) return json({ error: 'missing-date' }, 400);
       return json({ date, bookings: await bookingsForDate(date) });
+    }
+    if (action === 'today') {
+      const date = new URL(req.url).searchParams.get('date') || londonNow().dateStr;
+      const [checkins, bookings] = await Promise.all([checkinsForDate(date), bookingsForDate(date)]);
+      return json({ date, checkins, bookings });
     }
     if (action === 'rewards') return json({ rewards: await listRewards({ liveOnly: false }) });
     if (action === 'perks') return json({ perks: await listPerks({ liveOnly: false }) });

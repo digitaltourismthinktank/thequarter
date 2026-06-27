@@ -7,6 +7,7 @@ import { WeekStrip } from './WeekStrip';
 import { Icon, type IconName } from '@/components/ds/Icon';
 import { Qr } from '@/components/ds/Qr';
 import { EVENT_THEMES } from '@/lib/eventThemes';
+import { busyness } from '@/lib/busyness';
 import {
   adminGetMembers,
   adminGetSpaces,
@@ -29,11 +30,13 @@ import {
   adminDeletePerk,
   adminGetFloats,
   adminTopUpFloat,
+  adminGetToday,
   type AdminMember,
   type AdminBooking,
   type AdminSpace,
   type AdminReward,
   type AdminFloat,
+  type AdminCheckin,
   type PerkItem,
   type QuarterEvent,
 } from '@/lib/booking';
@@ -65,7 +68,7 @@ const isAdminEmail = (e?: string) => !!e && e.toLowerCase().endsWith('@thinkdigi
 
 export function AdminClient() {
   const { loading, member } = useMember();
-  const [tab, setTab] = useState<'members' | 'rooms' | 'events' | 'content' | 'partners' | 'birthdays'>('members');
+  const [tab, setTab] = useState<'today' | 'members' | 'rooms' | 'events' | 'content' | 'partners' | 'birthdays'>('today');
 
   useEffect(() => {
     if (loading || member) return;
@@ -96,6 +99,9 @@ export function AdminClient() {
       </div>
 
       <div className={styles.tabs}>
+        <button type="button" className={`${styles.tab} ${tab === 'today' ? styles.tabOn : ''}`} onClick={() => setTab('today')}>
+          Today
+        </button>
         <button type="button" className={`${styles.tab} ${tab === 'members' ? styles.tabOn : ''}`} onClick={() => setTab('members')}>
           Members
         </button>
@@ -116,7 +122,9 @@ export function AdminClient() {
         </button>
       </div>
 
-      {tab === 'members' ? (
+      {tab === 'today' ? (
+        <AdminTodayPane onAllBirthdays={() => setTab('birthdays')} />
+      ) : tab === 'members' ? (
         <MembersPane />
       ) : tab === 'rooms' ? (
         <RoomsPane />
@@ -380,6 +388,122 @@ function RoomsPane() {
         </div>
       )}
       {msg ? <p className={styles.msg}>{msg}</p> : null}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- Today (admin home)
+function AdminTodayPane({ onAllBirthdays }: { onAllBirthdays: () => void }) {
+  const [offset, setOffset] = useState(0); // 0 = today, 1 = tomorrow
+  const [date, setDate] = useState('');
+  const [checkins, setCheckins] = useState<AdminCheckin[]>([]);
+  const [bookings, setBookings] = useState<AdminBooking[]>([]);
+  const [spaces, setSpaces] = useState<AdminSpace[]>([]);
+  const [members, setMembers] = useState<AdminMember[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const d = new Date();
+    if (offset === 1) {
+      d.setDate(d.getDate() + 1);
+      while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
+    }
+    setDate(toISO(d));
+  }, [offset]);
+
+  useEffect(() => {
+    (async () => {
+      const [s, m] = await Promise.all([adminGetSpaces(), adminGetMembers()]);
+      if (s.ok) setSpaces(s.data.spaces);
+      if (m.ok) setMembers(m.data.members);
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (!date) return;
+    setLoading(true);
+    (async () => {
+      const r = await adminGetToday(date);
+      if (r.ok) {
+        setCheckins(r.data.checkins);
+        setBookings(r.data.bookings);
+      }
+      setLoading(false);
+    })();
+  }, [date]);
+
+  const dObj = date ? new Date(`${date}T12:00:00`) : new Date();
+  const b = busyness(dObj);
+  const spaceName = (id: string | null) => spaces.find((s) => s.id === id)?.name ?? 'Space';
+  const roomBookings = bookings.filter((x) => x.kind !== 'Block');
+  const birthdaysThisWeek = members
+    .filter((m) => m.bday)
+    .map((m) => ({ m, s: bdayStatus(m) }))
+    .filter((x) => x.s.rank === 0 || x.s.rank === 1)
+    .sort((a, c) => a.s.rank - c.s.rank)
+    .slice(0, 5);
+  const dateLabel = dObj.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+
+  return (
+    <div>
+      <div className={styles.todayHead}>
+        <div>
+          <h2 className={styles.todayDate}>{dateLabel}</h2>
+          {b.closed ? (
+            <span className={styles.todayBand}>Closed</span>
+          ) : b.band ? (
+            <span className={`${styles.todayBand} ${styles[`band_${b.band.id}`]}`}>Today feels {b.band.label.toLowerCase()}</span>
+          ) : null}
+        </div>
+        <div className={styles.seg}>
+          <button type="button" className={`${styles.segBtn} ${offset === 0 ? styles.segOn : ''}`} onClick={() => setOffset(0)}>
+            Today
+          </button>
+          <button type="button" className={`${styles.segBtn} ${offset === 1 ? styles.segOn : ''}`} onClick={() => setOffset(1)}>
+            Tomorrow
+          </button>
+        </div>
+      </div>
+
+      {loading ? (
+        <p className={styles.state}>Loading…</p>
+      ) : (
+        <div className={styles.todayGrid}>
+          <div className={styles.todayCard}>
+            <span className={styles.todayCardLabel}>Who&rsquo;s in</span>
+            <strong className={styles.todayBig}>{checkins.length}</strong>
+            <span className={styles.todayCardSub}>{checkins.length ? checkins.map((c) => c.name).join(', ') : 'No check-ins yet.'}</span>
+          </div>
+          <div className={styles.todayCard}>
+            <span className={styles.todayCardLabel}>Rooms &amp; pods booked</span>
+            <strong className={styles.todayBig}>{roomBookings.length}</strong>
+            <span className={styles.todayCardSub}>
+              {roomBookings.length
+                ? roomBookings.map((x) => `${spaceName(x.space)} ${minToHHMM(x.startMin)}`).join(' · ')
+                : 'Nothing booked.'}
+            </span>
+          </div>
+          <div className={styles.todayCard}>
+            <span className={styles.todayCardLabel}>Birthdays this week</span>
+            {birthdaysThisWeek.length ? (
+              <div className={styles.bdayList}>
+                {birthdaysThisWeek.map(({ m, s }) => (
+                  <div key={m.id} className={styles.bdayItem}>
+                    <Icon name="cake" size={16} color="var(--gold-700)" />
+                    <span>{m.name || m.email}</span>
+                    <span className={styles.muted}>{s.label === 'This week' ? 'this week' : (s.when.split('·').pop() || '').trim()}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <span className={styles.todayCardSub}>None this week.</span>
+            )}
+            <button type="button" className={styles.allBdays} onClick={onAllBirthdays}>
+              All birthdays ›
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
