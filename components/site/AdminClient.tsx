@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ds/Button';
 import { useMember } from './useMember';
 import { WeekStrip } from './WeekStrip';
+import { Icon, type IconName } from '@/components/ds/Icon';
+import { Qr } from '@/components/ds/Qr';
 import {
   adminGetMembers,
   adminGetSpaces,
@@ -17,12 +19,33 @@ import {
   adminCreateEvent,
   adminUpdateEvent,
   adminDeleteEvent,
+  adminClaimBirthday,
+  adminGetRewards,
+  adminSaveReward,
+  adminDeleteReward,
+  adminGetPerksAll,
+  adminSavePerk,
+  adminDeletePerk,
+  adminGetFloats,
+  adminTopUpFloat,
   type AdminMember,
   type AdminBooking,
   type AdminSpace,
+  type AdminReward,
+  type AdminFloat,
+  type PerkItem,
   type QuarterEvent,
 } from '@/lib/booking';
 import styles from './AdminClient.module.css';
+
+const SITE = process.env.NEXT_PUBLIC_SITE_URL || 'https://thequarter.work';
+/** Curated glyphs for the content icon picker (all exist in components/ds/Icon). */
+const ICON_CHOICES: IconName[] = [
+  'gift', 'coffee', 'cake', 'wine', 'utensils', 'ticket', 'landmark', 'shopping-bag',
+  'music', 'film', 'book-open', 'mic', 'heart', 'sun', 'snowflake', 'party-popper',
+  'star', 'sparkles', 'award', 'percent', 'tag', 'leaf', 'camera', 'palette',
+  'activity', 'scissors', 'building', 'map-pin',
+];
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const minToHHMM = (m: number) => `${pad(Math.floor(m / 60))}:${pad(m % 60)}`;
@@ -41,7 +64,7 @@ const isAdminEmail = (e?: string) => !!e && e.toLowerCase().endsWith('@thinkdigi
 
 export function AdminClient() {
   const { loading, member } = useMember();
-  const [tab, setTab] = useState<'members' | 'rooms' | 'events'>('members');
+  const [tab, setTab] = useState<'members' | 'rooms' | 'events' | 'content' | 'partners' | 'birthdays'>('members');
 
   useEffect(() => {
     if (loading || member) return;
@@ -81,9 +104,30 @@ export function AdminClient() {
         <button type="button" className={`${styles.tab} ${tab === 'events' ? styles.tabOn : ''}`} onClick={() => setTab('events')}>
           Events
         </button>
+        <button type="button" className={`${styles.tab} ${tab === 'content' ? styles.tabOn : ''}`} onClick={() => setTab('content')}>
+          Content
+        </button>
+        <button type="button" className={`${styles.tab} ${tab === 'partners' ? styles.tabOn : ''}`} onClick={() => setTab('partners')}>
+          Partners &amp; float
+        </button>
+        <button type="button" className={`${styles.tab} ${tab === 'birthdays' ? styles.tabOn : ''}`} onClick={() => setTab('birthdays')}>
+          Birthdays
+        </button>
       </div>
 
-      {tab === 'members' ? <MembersPane /> : tab === 'rooms' ? <RoomsPane /> : <EventsPane />}
+      {tab === 'members' ? (
+        <MembersPane />
+      ) : tab === 'rooms' ? (
+        <RoomsPane />
+      ) : tab === 'events' ? (
+        <EventsPane />
+      ) : tab === 'content' ? (
+        <ContentPane />
+      ) : tab === 'partners' ? (
+        <PartnersPane />
+      ) : (
+        <BirthdaysPane />
+      )}
     </div>
   );
 }
@@ -94,6 +138,8 @@ function MembersPane() {
   const [edits, setEdits] = useState<Record<string, string>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  const [q, setQ] = useState('');
+  const [planFilter, setPlanFilter] = useState('All');
 
   const refresh = useCallback(async () => {
     const r = await adminGetMembers();
@@ -123,9 +169,30 @@ function MembersPane() {
   }
 
   if (loading) return <p className={styles.state}>Loading members…</p>;
+
+  const FILTERS = ['All', 'Day Pass', 'Visitor', 'Resident', 'Citizen', 'Hybrid Office', 'Paused'];
+  const filtered = members.filter((m) => {
+    const matchesPlan = planFilter === 'All' ? true : planFilter === 'Paused' ? m.paused : m.plan === planFilter && !m.paused;
+    if (!matchesPlan) return false;
+    if (!q) return true;
+    return `${m.name || ''} ${m.email || ''} ${m.company || ''}`.toLowerCase().includes(q.toLowerCase());
+  });
+
   return (
     <div>
-      <p className={styles.count}>{members.length} members</p>
+      <div className={styles.mFilters}>
+        <input className={styles.mSearch} placeholder="Search name, email or company" value={q} onChange={(e) => setQ(e.target.value)} />
+        <div className={styles.mChips}>
+          {FILTERS.map((f) => (
+            <button key={f} type="button" className={`${styles.mChip} ${planFilter === f ? styles.mChipOn : ''}`} onClick={() => setPlanFilter(f)}>
+              {f}
+            </button>
+          ))}
+        </div>
+      </div>
+      <p className={styles.count}>
+        {filtered.length} {planFilter === 'All' ? 'members' : planFilter}
+      </p>
       <div className={styles.tableWrap}>
         <table className={styles.table}>
           <thead>
@@ -133,16 +200,22 @@ function MembersPane() {
               <th>Member</th>
               <th>Plan</th>
               <th>Days</th>
+              <th>Points</th>
               <th>Renewal</th>
               <th aria-label="actions" />
             </tr>
           </thead>
           <tbody>
-            {members.map((m) => (
+            {filtered.map((m) => (
               <tr key={m.id}>
                 <td>
                   <div className={styles.mName}>{m.name || '—'}</div>
                   <div className={styles.mEmail}>{m.email}</div>
+                  {m.company ? (
+                    <div className={styles.mCompany}>
+                      <Icon name="building" size={12} color="var(--text-muted)" /> {m.company}
+                    </div>
+                  ) : null}
                 </td>
                 <td>
                   {m.plan || '—'}
@@ -159,6 +232,7 @@ function MembersPane() {
                     Save
                   </button>
                 </td>
+                <td className={styles.muted}>{m.points.toLocaleString('en-GB')}</td>
                 <td className={styles.muted}>{m.renewal || '—'}</td>
                 <td>
                   <button type="button" className={styles.smallBtn} onClick={() => checkIn(m)} disabled={busyId === m.id}>
@@ -305,6 +379,342 @@ function RoomsPane() {
         </div>
       )}
       {msg ? <p className={styles.msg}>{msg}</p> : null}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- Content
+const PERK_TYPES = ['Discount', 'On the house', 'Upgrade', 'Extra', 'Bundle', 'Priority', 'Welcome gift', 'Experience'];
+
+function IconPicker({ value, onPick }: { value: string; onPick: (n: IconName) => void }) {
+  return (
+    <div className={styles.iconGrid}>
+      {ICON_CHOICES.map((n) => (
+        <button key={n} type="button" className={`${styles.iconCell} ${value === n ? styles.iconCellOn : ''}`} onClick={() => onPick(n)} aria-label={n}>
+          <Icon name={n} size={20} color={value === n ? 'var(--gold-700)' : 'var(--text-muted)'} />
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+function ContentPane() {
+  const [sub, setSub] = useState<'perks' | 'rewards'>('perks');
+  const [rewards, setRewards] = useState<AdminReward[]>([]);
+  const [perks, setPerks] = useState<PerkItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [editing, setEditing] = useState<any | null>(null);
+
+  const refresh = useCallback(async () => {
+    const [r, p] = await Promise.all([adminGetRewards(), adminGetPerksAll()]);
+    if (r.ok) setRewards(r.data.rewards);
+    if (p.ok) setPerks(p.data.perks);
+    setLoading(false);
+  }, []);
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  const set = (k: string, v: any) => setEditing((e: any) => ({ ...e, [k]: v }));
+  function newItem() {
+    setEditing(
+      sub === 'rewards'
+        ? { kind: 'rewards', partner: '', title: '', cost: 300, funding: 'inventory', category: '', icon: 'gift', pos: '', hero: false, image: '', status: 'draft' }
+        : { kind: 'perks', partner: '', offer: '', category: '', type: 'Discount', days: 'Always on', pos: '', authorisedBy: 'The Quarter', ref: '', contact: '', icon: 'gift', image: '', status: 'draft' },
+    );
+  }
+  async function save() {
+    if (!editing) return;
+    setBusy(true);
+    setMsg(null);
+    const r = editing.kind === 'rewards' ? await adminSaveReward(editing) : await adminSavePerk(editing);
+    setBusy(false);
+    if (r.ok) {
+      setEditing(null);
+      await refresh();
+      setMsg('Saved ✓');
+    } else setMsg(r.data?.error || 'Save failed');
+  }
+  async function remove(id: string, kind: 'rewards' | 'perks') {
+    setBusy(true);
+    if (kind === 'rewards') await adminDeleteReward(id);
+    else await adminDeletePerk(id);
+    await refresh();
+    setBusy(false);
+  }
+  async function togglePublish(it: any, kind: 'rewards' | 'perks') {
+    const next = { ...it, status: it.status === 'live' ? 'draft' : 'live' };
+    if (kind === 'rewards') await adminSaveReward(next);
+    else await adminSavePerk(next);
+    await refresh();
+  }
+
+  if (loading) return <p className={styles.state}>Loading content…</p>;
+  const isReward = editing?.kind === 'rewards';
+
+  return (
+    <div>
+      <div className={styles.subTabs}>
+        <button type="button" className={`${styles.subTab} ${sub === 'perks' ? styles.subTabOn : ''}`} onClick={() => setSub('perks')}>
+          Perks
+        </button>
+        <button type="button" className={`${styles.subTab} ${sub === 'rewards' ? styles.subTabOn : ''}`} onClick={() => setSub('rewards')}>
+          Rewards
+        </button>
+        <button type="button" className={styles.smallBtn} onClick={newItem} style={{ marginLeft: 'auto' }}>
+          + Add {sub === 'rewards' ? 'reward' : 'perk'}
+        </button>
+      </div>
+
+      {editing ? (
+        <div className={styles.editGrid}>
+          <div className={styles.editForm}>
+            <input className={styles.label} placeholder="Partner" value={editing.partner} onChange={(e) => set('partner', e.target.value)} />
+            {isReward ? (
+              <input className={styles.label} placeholder="Title (the reward)" value={editing.title} onChange={(e) => set('title', e.target.value)} />
+            ) : (
+              <input className={styles.label} placeholder="Offer (e.g. 20% off brunch)" value={editing.offer} onChange={(e) => set('offer', e.target.value)} />
+            )}
+            <input className={styles.label} placeholder="Category" value={editing.category} onChange={(e) => set('category', e.target.value)} />
+            {isReward ? (
+              <div className={styles.formRow}>
+                <input className={styles.dayInput} type="number" placeholder="Cost (pts)" value={editing.cost} onChange={(e) => set('cost', Number(e.target.value))} />
+                <select className={styles.select} value={editing.funding} onChange={(e) => set('funding', e.target.value)} aria-label="Funding">
+                  <option value="inventory">Quarter inventory</option>
+                  <option value="partner">Partner-funded</option>
+                  <option value="quarter">Quarter-funded</option>
+                </select>
+                <label className={styles.check}>
+                  <input type="checkbox" checked={!!editing.hero} onChange={(e) => set('hero', e.target.checked)} /> Hero
+                </label>
+              </div>
+            ) : (
+              <div className={styles.formRow}>
+                <select className={styles.select} value={editing.type} onChange={(e) => set('type', e.target.value)} aria-label="Perk type">
+                  {PERK_TYPES.map((t) => (
+                    <option key={t}>{t}</option>
+                  ))}
+                </select>
+                <input className={styles.label} placeholder="Days (e.g. Mon–Fri / Always on)" value={editing.days} onChange={(e) => set('days', e.target.value)} />
+              </div>
+            )}
+            <textarea className={styles.textarea} placeholder="How staff apply it (POS instruction)" value={editing.pos} onChange={(e) => set('pos', e.target.value)} />
+            {!isReward ? (
+              <div className={styles.formRow}>
+                <input className={styles.label} placeholder="Authorised by" value={editing.authorisedBy} onChange={(e) => set('authorisedBy', e.target.value)} />
+                <input className={styles.dayInput} placeholder="Ref" value={editing.ref} onChange={(e) => set('ref', e.target.value)} />
+                <input className={styles.label} placeholder="Contact" value={editing.contact} onChange={(e) => set('contact', e.target.value)} />
+              </div>
+            ) : null}
+            <input className={styles.label} placeholder="Image URL (optional)" value={editing.image} onChange={(e) => set('image', e.target.value)} />
+            <div className={styles.pickerLabel}>Icon</div>
+            <IconPicker value={editing.icon} onPick={(n) => set('icon', n)} />
+            <div className={styles.formRow}>
+              <label className={styles.check}>
+                <input type="checkbox" checked={editing.status === 'live'} onChange={(e) => set('status', e.target.checked ? 'live' : 'draft')} /> Live
+              </label>
+              <Button variant="primary" size="sm" onClick={save} disabled={busy}>
+                Save
+              </Button>
+              <button type="button" className={styles.smallBtn} onClick={() => setEditing(null)}>
+                Cancel
+              </button>
+            </div>
+          </div>
+
+          <div className={styles.previewWrap}>
+            <span className={styles.pickerLabel}>Preview</span>
+            <div className={styles.previewCard}>
+              {editing.image ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img className={styles.previewImg} src={editing.image} alt="" />
+              ) : null}
+              <span className={styles.previewChip}>
+                <Icon name={editing.icon as IconName} size={22} color="var(--gold-700)" />
+              </span>
+              <span className={styles.previewPartner}>{editing.partner || 'Partner'}</span>
+              <strong className={styles.previewTitle}>{isReward ? editing.title || 'Reward title' : editing.offer || 'The offer'}</strong>
+              <span className={styles.previewMeta}>{isReward ? `${editing.cost || 0} pts` : editing.type}</span>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      <div className={styles.list}>
+        {(sub === 'rewards' ? rewards : perks).map((it: any) => (
+          <div key={it.id} className={styles.bRow}>
+            <span className={styles.listChip}>
+              <Icon name={(it.icon || 'gift') as IconName} size={18} color="var(--gold-700)" />
+            </span>
+            <span className={styles.bSpace}>{sub === 'rewards' ? it.title : it.offer}</span>
+            <span className={`${styles.statusTag} ${it.status === 'live' ? styles.statusLive : ''}`}>{it.status === 'live' ? 'Live' : 'Draft'}</span>
+            <span className={styles.bWho}>
+              {it.partner} · {it.category}
+              {sub === 'rewards' ? ` · ${it.cost} pts` : ` · ${it.type}`}
+            </span>
+            <button type="button" className={styles.smallBtn} onClick={() => togglePublish(it, sub)}>
+              {it.status === 'live' ? 'Unpublish' : 'Publish'}
+            </button>
+            <button type="button" className={styles.smallBtn} onClick={() => setEditing({ ...it, kind: sub })}>
+              Edit
+            </button>
+            <button type="button" className={styles.smallBtn} onClick={() => remove(it.id, sub)} disabled={busy}>
+              Remove
+            </button>
+          </div>
+        ))}
+      </div>
+      {msg ? <p className={styles.msg}>{msg}</p> : null}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- Partners & float
+function PartnersPane() {
+  const [floats, setFloats] = useState<AdminFloat[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+
+  const refresh = useCallback(async () => {
+    const r = await adminGetFloats();
+    if (r.ok) setFloats(r.data.floats);
+    setLoading(false);
+  }, []);
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  async function topUp(id: string) {
+    const amount = Number(window.prompt('Top up by how much (£)?', '50'));
+    if (!amount || amount <= 0) return;
+    setBusy(true);
+    await adminTopUpFloat(id, amount);
+    await refresh();
+    setBusy(false);
+  }
+
+  if (loading) return <p className={styles.state}>Loading floats…</p>;
+
+  return (
+    <div>
+      <div className={styles.floatGrid}>
+        {floats.map((f) => {
+          const pct = f.floatTotal > 0 ? Math.round((f.balance / f.floatTotal) * 100) : 0;
+          return (
+            <div key={f.id} className={styles.floatCard}>
+              <span className={styles.floatPartner}>{f.partner}</span>
+              <span className={styles.floatReward}>{f.reward}</span>
+              <div className={styles.floatBalance}>
+                £{f.balance.toFixed(2)} <span>of £{f.floatTotal.toFixed(2)}</span>
+              </div>
+              <div className={styles.floatBar}>
+                <span style={{ width: `${pct}%` }} className={f.balance <= 0 ? styles.floatBarSpent : ''} />
+              </div>
+              <div className={styles.floatMeta}>
+                <span className={`${styles.statusTag} ${f.status === 'Healthy' ? styles.statusLive : ''}`}>{f.status}</span>
+                <span>
+                  {f.usesThisMonth} this month{f.lastUsed ? ` · last ${f.lastUsed}` : ''}
+                </span>
+              </div>
+              <button type="button" className={styles.smallBtn} onClick={() => topUp(f.id)} disabled={busy}>
+                Top up
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className={styles.counterWrap}>
+        <span className={styles.panelTitle}>Counter card (print &amp; keep at the till)</span>
+        <div className={styles.counterCard} id="counter-card">
+          <span className={styles.counterArc} aria-hidden="true" />
+          <span className={styles.counterEyebrow}>The Quarter</span>
+          <strong className={styles.counterTitle}>We love Quarter members</strong>
+          <span className={styles.counterSub}>When a member shows their pass, scan it to verify and see how to honour their perk.</span>
+          <div className={styles.counterQr}>
+            <Qr value={`${SITE}/perks`} size={120} />
+          </div>
+          <span className={styles.counterFoot}>thequarter.work</span>
+        </div>
+        <button type="button" className={styles.smallBtn} onClick={() => window.print()}>
+          Print
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- Birthdays
+function bdayStatus(m: AdminMember): { rank: number; label: string; when: string } {
+  if (!m.bday || !/^\d{2}-\d{2}$/.test(m.bday)) return { rank: 9, label: '', when: '' };
+  const now = new Date();
+  const year = now.getFullYear();
+  const [mm, dd] = m.bday.split('-').map(Number);
+  const bd = new Date(year, mm - 1, dd);
+  const weekEnd = new Date(year, mm - 1, dd + 6);
+  const today = new Date(year, now.getMonth(), now.getDate());
+  const claimedThisYear = m.bdayClaimed ? new Date(m.bdayClaimed).getFullYear() === year : false;
+  const whenStr = bd.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
+  if (claimedThisYear) return { rank: 3, label: 'Claimed', when: `Claimed ${new Date(m.bdayClaimed as string).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}` };
+  if (today >= bd && today <= weekEnd) return { rank: 0, label: 'This week', when: whenStr };
+  if (today < bd) {
+    const days = Math.ceil((bd.getTime() - today.getTime()) / 86400000);
+    return { rank: 1, label: 'Upcoming', when: `${whenStr} · in ${days} day${days === 1 ? '' : 's'}` };
+  }
+  return { rank: 2, label: 'Passed', when: whenStr };
+}
+
+function BirthdaysPane() {
+  const [members, setMembers] = useState<AdminMember[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+
+  const refresh = useCallback(async () => {
+    const r = await adminGetMembers();
+    if (r.ok) setMembers(r.data.members);
+    setLoading(false);
+  }, []);
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  async function claim(m: AdminMember, claimed: boolean) {
+    setBusy(true);
+    await adminClaimBirthday(m.id, claimed);
+    await refresh();
+    setBusy(false);
+  }
+
+  if (loading) return <p className={styles.state}>Loading birthdays…</p>;
+  const withBday = members.filter((m) => m.bday).map((m) => ({ m, s: bdayStatus(m) })).sort((a, b) => a.s.rank - b.s.rank);
+
+  if (withBday.length === 0) return <p className={styles.muted}>No birthdays on record yet — members add theirs at signup or on Rewards.</p>;
+
+  return (
+    <div className={styles.list}>
+      {withBday.map(({ m, s }) => (
+        <div key={m.id} className={styles.bRow}>
+          <span className={styles.bSpace}>{m.name || m.email}</span>
+          <span className={`${styles.statusTag} ${s.rank === 0 ? styles.statusLive : ''}`}>{s.label}</span>
+          <span className={styles.bWho}>
+            {m.plan || '—'} · {s.when}
+          </span>
+          {s.label === 'Claimed' ? (
+            <button type="button" className={styles.smallBtn} onClick={() => claim(m, false)} disabled={busy}>
+              Undo
+            </button>
+          ) : s.label === 'Upcoming' ? (
+            <span className={styles.muted}>Not due yet</span>
+          ) : (
+            <button type="button" className={styles.smallBtn} onClick={() => claim(m, true)} disabled={busy}>
+              {s.label === 'Passed' ? 'Mark claimed (late)' : 'Mark claimed'}
+            </button>
+          )}
+        </div>
+      ))}
     </div>
   );
 }

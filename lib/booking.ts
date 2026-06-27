@@ -93,6 +93,33 @@ export interface AdminMember {
   renewal: string | null;
   doorCode: string | null;
   paused: boolean;
+  bday: string | null;
+  bdayClaimed: string | null;
+  points: number;
+  company: string | null;
+}
+export interface AdminReward {
+  id: string;
+  partner: string;
+  title: string;
+  cost: number;
+  funding: string;
+  category: string;
+  icon: string;
+  pos: string;
+  hero: boolean;
+  status: string;
+  image: string | null;
+}
+export interface AdminFloat {
+  id: string;
+  partner: string;
+  reward: string;
+  balance: number;
+  floatTotal: number;
+  usesThisMonth: number;
+  lastUsed: string | null;
+  status: string;
 }
 export interface AdminBooking {
   id: string;
@@ -122,6 +149,19 @@ export const adminAdjustDays = (memberId: string, days: string) =>
   call<{ ok: boolean }>('admin', { method: 'POST', body: { action: 'adjustDays', memberId, days } });
 export const adminCheckinMember = (memberId: string, length: 'Full' | 'Half') =>
   call<{ ok: boolean }>('admin', { method: 'POST', body: { action: 'checkinMember', memberId, length } });
+export const adminClaimBirthday = (memberId: string, claimed: boolean, date?: string) =>
+  call<{ ok: boolean; bdayClaimed: string | null }>('admin', { method: 'POST', body: { action: 'claimBirthday', memberId, claimed, date } });
+export const adminGetRewards = () => call<{ rewards: AdminReward[] }>('admin?action=rewards');
+export const adminSaveReward = (r: Partial<AdminReward> & { id?: string }) =>
+  call<{ ok: boolean; id: string }>('admin', { method: 'POST', body: { action: 'saveReward', ...r } });
+export const adminDeleteReward = (id: string) => call<{ ok: boolean }>('admin', { method: 'POST', body: { action: 'deleteReward', id } });
+export const adminGetPerksAll = () => call<{ perks: PerkItem[] }>('admin?action=perks');
+export const adminSavePerk = (p: Partial<PerkItem> & { id?: string }) =>
+  call<{ ok: boolean; id: string }>('admin', { method: 'POST', body: { action: 'savePerk', ...p } });
+export const adminDeletePerk = (id: string) => call<{ ok: boolean }>('admin', { method: 'POST', body: { action: 'deletePerk', id } });
+export const adminGetFloats = () => call<{ floats: AdminFloat[] }>('admin?action=floats');
+export const adminTopUpFloat = (id: string, amount: number) =>
+  call<{ ok: boolean; balance: number; floatTotal: number }>('admin', { method: 'POST', body: { action: 'topUpFloat', id, amount } });
 
 // ---- Events ----
 export interface QuarterEvent {
