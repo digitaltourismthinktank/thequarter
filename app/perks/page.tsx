@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Section, SectionHead, Eyebrow } from '@/components/site/primitives';
 import { Button } from '@/components/ds/Button';
 import { PerksGrid } from '@/components/site/PerksGrid';
+import { PerksClient } from '@/components/site/PerksClient';
 import styles from './perks.module.css';
 
 export const metadata: Metadata = {
@@ -12,7 +13,9 @@ export const metadata: Metadata = {
 };
 
 export default function PerksPage() {
-  return (
+  // Server-rendered marketing page (crawlable). PerksClient shows it to logged-out
+  // visitors and swaps in the member browse + redemption for signed-in members.
+  const marketing = (
     <>
       <Section tone="gold">
         <div className={styles.header}>
@@ -47,4 +50,6 @@ export default function PerksPage() {
       </Section>
     </>
   );
+
+  return <PerksClient marketing={marketing} />;
 }
