@@ -20,3 +20,16 @@
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"
+
+# Verification + invite are dynamic, link-only pages. Static export can't pre-render
+# arbitrary tokens, so serve a single shell for any /v/<token> (and /i/<code>) and let
+# it read the token from the path client-side. 200 = rewrite (keeps the pretty URL).
+[[redirects]]
+  from = "/v/*"
+  to = "/v/"
+  status = 200
+
+[[redirects]]
+  from = "/i/*"
+  to = "/i/"
+  status = 200
