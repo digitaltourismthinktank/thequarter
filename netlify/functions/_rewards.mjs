@@ -36,11 +36,11 @@ export function memberPoints(m) {
  * Append a ledger row and move the member's running balance by `delta`.
  * `reason` must be one of the Points-ledger Reason options. Returns the new balance.
  */
-export async function awardPoints(member, delta, reason, ref = '') {
+/** Append a points-ledger row only (no member write). Use when the caller owns the
+ *  member's metaData write — e.g. the Stripe webhook folds points into its stampSync. */
+export async function appendLedger(email, delta, reason, ref = '') {
   const d = Math.round(Number(delta) || 0);
-  if (!member || !d) return memberPoints(member);
-  const admin = memberstackAdmin.init(MS_SECRET);
-  const email = member.auth?.email || member.email || '';
+  if (!email || !d) return;
   await createRecord(T.pointsLedger, {
     [F.pointsLedger.entry]: `${reason}-${Date.now()}`,
     [F.pointsLedger.email]: email,
@@ -49,7 +49,15 @@ export async function awardPoints(member, delta, reason, ref = '') {
     [F.pointsLedger.ref]: ref,
     [F.pointsLedger.at]: new Date().toISOString(),
   });
+}
+
+export async function awardPoints(member, delta, reason, ref = '') {
+  const d = Math.round(Number(delta) || 0);
+  if (!member || !d) return memberPoints(member);
+  const email = member.auth?.email || member.email || '';
+  await appendLedger(email, d, reason, ref);
   const next = Math.max(0, memberPoints(member) + d);
+  const admin = memberstackAdmin.init(MS_SECRET);
   await admin.members.update({ id: member.id, data: { metaData: { ...(member.metaData || {}), points: next } } });
   return next;
 }

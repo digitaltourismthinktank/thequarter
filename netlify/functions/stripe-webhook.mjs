@@ -22,6 +22,7 @@ import {
   getMemberSync,
   stampSync,
 } from './_quarter-sync.mjs';
+import { pointsForGBP, appendLedger, WELCOME_BONUS } from './_rewards.mjs';
 
 const MS_SECRET = process.env.MEMBERSTACK_SECRET_KEY;
 const STRIPE_SECRET = process.env.STRIPE_SECRET_KEY;
@@ -104,6 +105,9 @@ async function handleEvent(event) {
   if (created < lastSyncAt) return { ...base, email, skipped: 'stale', lastSyncAt };
 
   let applied = {};
+  // metaData we'll stamp at the end; the invoice branch folds earned points into it so
+  // we never do two competing metaData writes (which would clobber each other).
+  let earnMeta = metaData;
   if (type === 'customer.subscription.deleted') {
     await renewMember(MS_SECRET, email, { renewalDate: '', lapse: true });
     applied = { lapsed: true };
@@ -117,7 +121,19 @@ async function handleEvent(event) {
       renewalDate: formatDate(line?.period?.end || obj.period_end),
       resetDays: isRenewal,
     });
-    applied = { billingReason: obj.billing_reason, resetDays: isRenewal };
+    // Quarter Rewards: spend points on every real paid invoice (2% give-back), plus a
+    // one-off welcome bonus on the first subscription invoice. Folded into earnMeta so
+    // the stampSync below writes points + sync stamp in one go.
+    const amount = (obj.amount_paid ?? obj.total ?? 0) / 100;
+    const spend = pointsForGBP(amount);
+    const welcome = obj.billing_reason === 'subscription_create' ? WELCOME_BONUS : 0;
+    if (spend > 0) await appendLedger(email, spend, 'spend', obj.id || '');
+    if (welcome > 0) await appendLedger(email, welcome, 'welcome', obj.id || '');
+    if (spend > 0 || welcome > 0) {
+      const cur = Math.max(0, Math.round(Number(metaData?.points) || 0));
+      earnMeta = { ...(metaData || {}), points: cur + spend + welcome };
+    }
+    applied = { billingReason: obj.billing_reason, resetDays: isRenewal, spend, welcome };
   } else {
     // customer.subscription.created / updated
     const price = obj.items?.data?.[0]?.price;
@@ -146,7 +162,7 @@ async function handleEvent(event) {
     }
   }
 
-  await stampSync(MS_SECRET, member.id, metaData, created, eventId);
+  await stampSync(MS_SECRET, member.id, earnMeta, created, eventId);
   return { ...base, email, ...applied };
 }
 
