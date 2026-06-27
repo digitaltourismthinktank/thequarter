@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ds/Button';
 import { useMember } from './useMember';
 import { WeekStrip } from './WeekStrip';
+import { CompanyInput } from './CompanyInput';
 import { Icon, type IconName } from '@/components/ds/Icon';
 import { Qr } from '@/components/ds/Qr';
 import { EVENT_THEMES } from '@/lib/eventThemes';
@@ -569,12 +570,16 @@ function RoomsPane() {
               </option>
             ))}
           </select>
-          <input
-            className={styles.label}
-            placeholder={kind === 'block' ? 'Reason (optional)' : kind === 'company' ? 'Company name' : 'Who for'}
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-          />
+          {kind === 'company' ? (
+            <CompanyInput className={styles.label} value={label} onChange={setLabel} placeholder="Company name" />
+          ) : (
+            <input
+              className={styles.label}
+              placeholder={kind === 'block' ? 'Reason (optional)' : 'Who for'}
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+            />
+          )}
           {kind === 'company' ? (
             <>
               <label className={styles.field}>

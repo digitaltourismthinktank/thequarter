@@ -6,6 +6,7 @@ import { Button } from '@/components/ds/Button';
 import { getMemberstack, memberstackError } from '@/lib/memberstack';
 import { PLANS, PLAN_MEMBERSTACK_ID, PLAN_DAY_ALLOWANCE, type PlanId } from '@/lib/plans';
 import { getWelcomeSession, saveProfile, registerReferral } from '@/lib/booking';
+import { CompanyInput } from './CompanyInput';
 import styles from './WelcomeClient.module.css';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -171,7 +172,7 @@ export function WelcomeClient({ plan }: { plan: string }) {
 
         <label className={styles.field}>
           <span>Company (optional)</span>
-          <input value={company} onChange={(e) => setCompany(e.target.value)} autoComplete="organization" />
+          <CompanyInput value={company} onChange={setCompany} placeholder="" />
         </label>
         <p className={styles.hint}>Leave blank if you&rsquo;re here on your own — most members do. It just links colleagues who work together.</p>
 

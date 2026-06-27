@@ -340,6 +340,8 @@ export interface RollGuest {
   arrivedAt: string | null;
 }
 export const getHosts = (q: string) => call<{ hosts: GuestHost[] }>(`guests?action=hosts&q=${encodeURIComponent(q)}`, { auth: false });
+export const getCompanies = (q = '') =>
+  call<{ companies: string[] }>(`guests?action=companies${q ? `&q=${encodeURIComponent(q)}` : ''}`, { auth: false });
 export const signInGuest = (b: { name: string; company?: string; hostId?: string; host?: string; reason?: string }) =>
   call<{ ok: boolean; host: string | null }>('guests', { method: 'POST', body: { action: 'signin', ...b }, auth: false });
 // Roll-call + sign-out are staff-only (admin token); host lookup + sign-in stay public.

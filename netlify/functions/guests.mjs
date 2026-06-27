@@ -44,6 +44,29 @@ async function searchHosts(q) {
   return out;
 }
 
+/** Distinct company names across members (for the type-or-pick autocomplete — avoids
+ *  duplicate spellings). Business names only; no member data. */
+async function listCompanies(q) {
+  if (!MS_SECRET) return [];
+  const needle = String(q || '').trim().toLowerCase();
+  const admin = memberstackAdmin.init(MS_SECRET);
+  const set = new Set();
+  let after;
+  for (let i = 0; i < 20; i += 1) {
+    const res = await admin.members.list({ limit: 100, after });
+    const data = res?.data || [];
+    for (const m of data) {
+      const c = (m.metaData?.company || '').trim();
+      if (c && (!needle || c.toLowerCase().includes(needle))) set.add(c);
+    }
+    if (!res?.hasNextPage || data.length === 0) break;
+    after = res?.endCursor;
+  }
+  return Array.from(set)
+    .sort((a, b) => a.localeCompare(b))
+    .slice(0, 50);
+}
+
 async function rollCall() {
   const today = londonNow().dateStr;
   const [checkins, guestRecs] = await Promise.all([
@@ -72,6 +95,7 @@ export default async function handler(req) {
     // Host lookup stays public (needed by the guest sign-in); the roll-call ("who's in")
     // is staff-only and lives on the admin page.
     if (action === 'hosts') return json({ hosts: await searchHosts(url.searchParams.get('q')) });
+    if (action === 'companies') return json({ companies: await listCompanies(url.searchParams.get('q')) });
     if (action === 'roll') {
       const vm = await verifyMember(tokenFromRequest(req, null));
       if (!vm.ok || !isAdmin(vm.member)) return json({ error: 'forbidden' }, 403);
