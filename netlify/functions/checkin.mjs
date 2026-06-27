@@ -15,6 +15,8 @@ import { verifyMember, memberEmail, memberName, tokenFromRequest } from './_memb
 import { listRecords, createRecord, updateRecord, T, F, airtableReady, esc } from './_airtable.mjs';
 import { londonNow, isWeekday, addDays } from './_time.mjs';
 import { allowanceForMember } from './_quarter-sync.mjs';
+import { awardPoints, checkinBonusesThisMonth, CHECKIN_BONUS, CHECKIN_QUIET_BONUS, CHECKIN_BONUS_CAP } from './_rewards.mjs';
+import { isQuietDay } from './_busyness.mjs';
 
 const MS_SECRET = process.env.MEMBERSTACK_SECRET_KEY;
 const json = (b, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { 'content-type': 'application/json' } });
@@ -129,7 +131,19 @@ export default async function handler(req) {
         [F.checkins.source]: 'Self',
       });
     }
-    return json({ ok: true, balance: newBalance });
+    // Award Quarter Rewards points for being in (quiet days earn double; monthly cap).
+    let pointsAwarded = 0;
+    try {
+      const used = await checkinBonusesThisMonth(email, today.slice(0, 7));
+      if (used < CHECKIN_BONUS_CAP) {
+        const quiet = isQuietDay(today);
+        pointsAwarded = quiet ? CHECKIN_QUIET_BONUS : CHECKIN_BONUS;
+        await awardPoints(me, pointsAwarded, quiet ? 'checkin-quiet' : 'checkin', today);
+      }
+    } catch {
+      /* points are best-effort; never block a check-in */
+    }
+    return json({ ok: true, balance: newBalance, pointsAwarded });
   }
 
   // Reserve a future weekday ("Tomorrow"). No deduction until they actually check in.
