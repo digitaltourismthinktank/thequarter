@@ -156,7 +156,7 @@
 }
 .formRow {
   display: flex;
-  align-items: center;
+  align-items: flex-end; /* bottom-align so labelled (Start/End) + unlabelled controls line up */
   gap: 8px;
   flex-wrap: wrap;
 }

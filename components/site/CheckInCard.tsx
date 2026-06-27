@@ -10,6 +10,7 @@ import {
   type CheckinStatus,
 } from '@/lib/booking';
 import { WeekStrip } from './WeekStrip';
+import { DatePickerModal } from './DatePickerModal';
 import styles from './CheckInCard.module.css';
 
 /** Format a YYYY-MM-DD as e.g. "Mon 29 Jun" (treat as a calendar date, UTC). */
@@ -36,6 +37,7 @@ export function CheckInCard() {
   const [half, setHalf] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   async function refresh() {
     const r = await getCheckinToday();
@@ -114,7 +116,12 @@ export function CheckInCard() {
               I&rsquo;ll be in tomorrow
             </Button>
           </div>
-          <WeekStrip label="Plan ahead" onSelect={doReserveDate} />
+          <div className={styles.planAhead}>
+            <WeekStrip label="Plan ahead" onSelect={doReserveDate} />
+            <button type="button" className={styles.dateBtn} onClick={() => setPickerOpen(true)}>
+              + Pick a date
+            </button>
+          </div>
         </>
       )}
 
@@ -134,6 +141,13 @@ export function CheckInCard() {
       ) : null}
 
       {error ? <p className={styles.error}>{error}</p> : null}
+
+      <DatePickerModal
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        onPick={doReserveDate}
+        planned={status?.planned?.map((p) => p.date) || []}
+      />
     </div>
   );
 }
