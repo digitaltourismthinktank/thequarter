@@ -97,6 +97,22 @@
   font-size: 14px;
   color: var(--danger);
 }
+.agree {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-body);
+}
+.agree input {
+  margin-top: 3px;
+  flex: none;
+}
+.agree a {
+  color: var(--gold-700);
+  font-weight: var(--fw-semibold);
+}
 .alt {
   margin-top: 18px;
   font-size: 14px;

@@ -14,7 +14,7 @@ import memberstackAdmin from '@memberstack/admin';
 import { verifyMember, isAdmin, tokenFromRequest } from './_member.mjs';
 import { listRecords, createRecord, updateRecord, deleteRecord, T, F, airtableReady, esc } from './_airtable.mjs';
 import { londonWallClockToISO, isoToLondonMin, hhmmToMin, londonNow, holdReleased } from './_time.mjs';
-import { PLAN_NAMES, allowanceForMember } from './_quarter-sync.mjs';
+import { PLAN_NAMES, allowanceForMember, setMemberPlan, renewMember } from './_quarter-sync.mjs';
 import { listRewards, listPerks, listFloats, floatStatus, awardPoints, redeemReward } from './_rewards.mjs';
 
 const PERK_TYPES = ['Discount', 'On the house', 'Upgrade', 'Extra', 'Bundle', 'Priority', 'Welcome gift', 'Experience'];
@@ -381,6 +381,21 @@ export default async function handler(req) {
     const res = await redeemReward(m, body.rewardId);
     if (!res.ok) return json({ error: res.reason }, 400);
     return json({ ok: true, balance: res.balance, reward: res.reward.title });
+  }
+
+  // Assign / change a member's plan (e.g. company-paid staff who registered without one).
+  // Tags the Memberstack plan + sets the day balance to that plan's allowance.
+  if (action === 'assignPlan') {
+    if (!body.memberId || !body.planId) return json({ error: 'missing-params' }, 400);
+    const admin = memberstackAdmin.init(MS_SECRET);
+    const r = await admin.members.retrieve({ id: body.memberId });
+    const m = r?.data;
+    if (!m) return json({ error: 'not-found' }, 404);
+    const email = m.auth?.email || m.email || null;
+    if (!email) return json({ error: 'no-email' }, 400);
+    await setMemberPlan(MS_SECRET, email, body.planId);
+    await renewMember(MS_SECRET, email, { resetDays: true, flat: true });
+    return json({ ok: true });
   }
 
   // ---- Partner float top-up ----

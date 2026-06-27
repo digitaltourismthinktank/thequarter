@@ -9,6 +9,7 @@ import { Icon, type IconName } from '@/components/ds/Icon';
 import { Qr } from '@/components/ds/Qr';
 import { EVENT_THEMES } from '@/lib/eventThemes';
 import { busyness } from '@/lib/busyness';
+import { PLANS, PLAN_MEMBERSTACK_ID } from '@/lib/plans';
 import {
   adminGetMembers,
   adminGetSpaces,
@@ -38,6 +39,7 @@ import {
   adminGetMemberProfile,
   adminAdjustPoints,
   adminRedeemForMember,
+  adminAssignPlan,
   type AdminMember,
   type AdminBooking,
   type AdminSpace,
@@ -280,6 +282,7 @@ function MemberProfileModal({ id, onClose, onChanged }: { id: string | null; onC
   const [delta, setDelta] = useState('');
   const [reason, setReason] = useState('');
   const [rewardId, setRewardId] = useState('');
+  const [planSel, setPlanSel] = useState('');
   const [confirmAdjust, setConfirmAdjust] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -298,6 +301,7 @@ function MemberProfileModal({ id, onClose, onChanged }: { id: string | null; onC
     setReason('');
     setRewardId('');
     setConfirmAdjust(false);
+    setPlanSel('');
     load();
   }, [id, load]);
 
@@ -333,6 +337,20 @@ function MemberProfileModal({ id, onClose, onChanged }: { id: string | null; onC
     } else {
       setMsg(r.data?.error === 'insufficient' ? 'Not enough points.' : r.data?.error === 'back-soon' ? 'That reward is back soon.' : 'Could not redeem.');
     }
+  }
+
+  async function assignPlan() {
+    if (!planSel || !id) return;
+    setBusy(true);
+    setMsg(null);
+    const r = await adminAssignPlan(id, planSel);
+    setBusy(false);
+    if (r.ok) {
+      setPlanSel('');
+      setMsg('Plan assigned ✓');
+      await load();
+      onChanged();
+    } else setMsg('Could not assign plan.');
   }
 
   const since = p?.since ? new Date(p.since).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }) : '—';
@@ -384,6 +402,23 @@ function MemberProfileModal({ id, onClose, onChanged }: { id: string | null; onC
               <div className={styles.stat}>
                 <strong>{since}</strong>
                 <span>member since</span>
+              </div>
+            </div>
+
+            <div className={styles.profSection}>
+              <span className={styles.profSectionTitle}>Assign / change plan</span>
+              <div className={styles.formRow}>
+                <select className={styles.select} value={planSel} onChange={(e) => setPlanSel(e.target.value)} aria-label="Plan">
+                  <option value="">Choose a plan…</option>
+                  {PLANS.filter((pl) => pl.id !== 'day-pass').map((pl) => (
+                    <option key={pl.id} value={PLAN_MEMBERSTACK_ID[pl.id]}>
+                      {pl.name}
+                    </option>
+                  ))}
+                </select>
+                <button type="button" className={styles.smallBtn} onClick={assignPlan} disabled={busy || !planSel}>
+                  Assign
+                </button>
               </div>
             </div>
 

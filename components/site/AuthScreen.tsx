@@ -26,9 +26,15 @@ export function AuthScreen({ mode }: { mode: 'login' | 'signup' }) {
   const [name, setName] = useState('');
   const [status, setStatus] = useState<Status>('idle');
   const [error, setError] = useState('');
+  const [agree, setAgree] = useState(false);
 
   async function handleAuth(e: FormEvent) {
     e.preventDefault();
+    if (!isLogin && !agree) {
+      setStatus('error');
+      setError('Please accept the Terms & Code of Conduct to continue.');
+      return;
+    }
     setStatus('submitting');
     setError('');
     const ms = await getMemberstack();
@@ -44,7 +50,7 @@ export function AuthScreen({ mode }: { mode: 'login' | 'signup' }) {
         await ms.signupMemberEmailPassword({
           email,
           password,
-          metaData: name ? { name } : undefined,
+          metaData: { ...(name ? { name } : {}), termsAcceptedAt: new Date().toISOString() },
         });
       }
       // Client-side navigation keeps the just-authenticated Memberstack instance
@@ -178,8 +184,24 @@ export function AuthScreen({ mode }: { mode: 'login' | 'signup' }) {
                     </button>
                   </div>
                 ) : null}
+                {!isLogin ? (
+                  <label className={styles.agree}>
+                    <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
+                    <span>
+                      I agree to the{' '}
+                      <a href="/terms" target="_blank" rel="noreferrer">
+                        Terms of Membership
+                      </a>{' '}
+                      &amp;{' '}
+                      <a href="/code-of-conduct" target="_blank" rel="noreferrer">
+                        Code of Conduct
+                      </a>
+                      .
+                    </span>
+                  </label>
+                ) : null}
                 {status === 'error' ? <p className={styles.error}>{error}</p> : null}
-                <Button type="submit" variant="primary" fullWidth disabled={status === 'submitting'} iconAfter="arrow-right">
+                <Button type="submit" variant="primary" fullWidth disabled={status === 'submitting' || (!isLogin && !agree)} iconAfter="arrow-right">
                   {status === 'submitting'
                     ? isLogin
                       ? 'Signing in…'

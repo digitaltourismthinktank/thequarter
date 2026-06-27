@@ -33,6 +33,7 @@ export function WelcomeClient({ plan }: { plan: string }) {
   const [company, setCompany] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [agree, setAgree] = useState(false);
 
   useEffect(() => {
     const sid = new URLSearchParams(window.location.search).get('session_id');
@@ -59,6 +60,10 @@ export function WelcomeClient({ plan }: { plan: string }) {
       setError('Use at least 8 characters for your password.');
       return;
     }
+    if (!agree) {
+      setError('Please accept the Terms & Code of Conduct to continue.');
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -72,7 +77,13 @@ export function WelcomeClient({ plan }: { plan: string }) {
       if (firstName) customFields['first-name'] = firstName;
       if (lastName) customFields['last-name'] = lastName;
       if (allowance !== undefined) customFields['days-remaining'] = allowance === null ? 'Unlimited' : String(allowance);
-      await ms.signupMemberEmailPassword({ email, password, plans: plnId ? [{ planId: plnId }] : [], customFields });
+      await ms.signupMemberEmailPassword({
+        email,
+        password,
+        plans: plnId ? [{ planId: plnId }] : [],
+        customFields,
+        metaData: { termsAcceptedAt: new Date().toISOString() },
+      });
       // Optional birthday + company → stored on metaData. Best-effort.
       const profile: { bday?: string; company?: string } = {};
       if (bdayDay && bdayMonth) {
@@ -176,8 +187,22 @@ export function WelcomeClient({ plan }: { plan: string }) {
         </label>
         <p className={styles.hint}>Leave blank if you&rsquo;re here on your own — most members do. It just links colleagues who work together.</p>
 
+        <label className={styles.agree}>
+          <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
+          <span>
+            I agree to the{' '}
+            <a href="/terms" target="_blank" rel="noreferrer">
+              Terms of Membership
+            </a>{' '}
+            &amp;{' '}
+            <a href="/code-of-conduct" target="_blank" rel="noreferrer">
+              Code of Conduct
+            </a>
+            .
+          </span>
+        </label>
         {error ? <p className={styles.error}>{error}</p> : null}
-        <Button variant="primary" onClick={submit} disabled={busy}>
+        <Button variant="primary" onClick={submit} disabled={busy || !agree}>
           {busy ? 'Creating your account…' : 'Create my account'}
         </Button>
       </div>

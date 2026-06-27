@@ -48,6 +48,22 @@
   color: var(--gold-700);
   font-weight: var(--fw-semibold);
 }
+.agree {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-body);
+}
+.agree input {
+  margin-top: 2px;
+  flex: none;
+}
+.agree a {
+  color: var(--gold-700);
+  font-weight: var(--fw-semibold);
+}
 .note {
   display: flex;
   gap: 8px;

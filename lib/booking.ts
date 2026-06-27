@@ -209,6 +209,8 @@ export const adminAdjustPoints = (memberId: string, delta: number, reason: strin
   call<{ ok: boolean; balance: number }>('admin', { method: 'POST', body: { action: 'adjustPoints', memberId, delta, reason } });
 export const adminRedeemForMember = (memberId: string, rewardId: string) =>
   call<{ ok: boolean; balance: number; reward: string }>('admin', { method: 'POST', body: { action: 'redeemForMember', memberId, rewardId } });
+export const adminAssignPlan = (memberId: string, planId: string) =>
+  call<{ ok: boolean }>('admin', { method: 'POST', body: { action: 'assignPlan', memberId, planId } });
 
 // ---- Events ----
 export interface QuarterEvent {
