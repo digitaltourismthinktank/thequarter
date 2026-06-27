@@ -1,0 +1,157 @@
+.state {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 60px 0;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 16px;
+}
+.state a {
+  color: var(--gold-700);
+  font-weight: var(--fw-semibold);
+}
+
+.wrap {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+.header {
+  margin-bottom: 20px;
+}
+.eyebrow {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  color: var(--gold-700);
+  font-weight: var(--fw-semibold);
+}
+.h1 {
+  font-size: clamp(28px, 4vw, 36px);
+  font-weight: var(--fw-bold);
+  letter-spacing: -0.03em;
+  margin: 8px 0 8px;
+}
+.sub {
+  color: var(--text-body);
+  font-size: 15px;
+}
+
+.card {
+  max-width: 720px;
+  border-radius: 24px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-card);
+  box-shadow: var(--shadow-card);
+  padding: 28px;
+}
+
+.planChips {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+.planChip {
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-card);
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+}
+.planChipActive {
+  background: var(--gold-100);
+  border-color: var(--gold-300);
+  color: var(--gold-700);
+}
+
+.toggle {
+  display: inline-flex;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--surface-sunken);
+  margin-bottom: 22px;
+}
+.seg {
+  padding: 9px 22px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+  transition: all var(--duration-base) var(--ease-out);
+}
+.segOn {
+  background: var(--ink-900);
+  color: var(--sand-50);
+}
+
+.priceBlock {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.price {
+  font-size: 48px;
+  font-weight: var(--fw-bold);
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+.unit {
+  font-size: 16px;
+  color: var(--text-muted);
+}
+.priceCaption {
+  margin-top: 8px;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.savePill {
+  display: inline-block;
+  margin-top: 16px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--gold-500);
+  color: var(--ink-900);
+  font-size: 14px;
+  font-weight: var(--fw-semibold);
+}
+.sweetener {
+  margin-top: 14px;
+  padding: 18px 20px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, var(--gold-100), var(--gold-200));
+  border: 1px solid var(--gold-300);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sweetener strong {
+  font-size: 17px;
+  font-weight: var(--fw-bold);
+  color: var(--ink-900);
+}
+.sweetener span {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--gold-700);
+}
+
+.actions {
+  margin-top: 24px;
+}
+.err {
+  margin-top: 16px;
+  font-size: 14px;
+  color: var(--danger);
+}
+.note {
+  margin-top: 14px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
