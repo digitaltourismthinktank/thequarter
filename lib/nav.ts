@@ -50,7 +50,8 @@ export const FOOTER_COLUMNS: FooterColumn[] = [
 
 /** Small print links in the footer's bottom row. */
 export const LEGAL_LINKS: NavLink[] = [
-  { label: 'Privacy', href: '/location#contact' },
-  { label: 'House rules', href: '/location#contact' },
+  { label: 'Privacy', href: '/privacy' },
+  { label: 'Terms', href: '/terms' },
+  { label: 'House rules', href: '/code-of-conduct' },
   { label: 'Contact', href: '/location' },
 ];

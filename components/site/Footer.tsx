@@ -43,7 +43,9 @@ export function Footer() {
         </div>
 
         <div className={styles.bottom}>
-          <span>© {year} The Quarter, run by the Digital Tourism Think Tank.</span>
+          <span>
+            © {year} The Quarter — operated by {SITE.legalName} (company {SITE.company}, VAT {SITE.vat}).
+          </span>
           <span className={styles.legal}>
             {LEGAL_LINKS.map((l) => (
               <Link key={l.label} href={l.href} className={styles.legalLink}>
