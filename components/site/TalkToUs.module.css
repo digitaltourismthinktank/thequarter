@@ -1,0 +1,31 @@
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard);
+}
+.ghost {
+  border: 1px solid var(--gold-500);
+  background: transparent;
+  color: var(--gold-700);
+}
+.ghost:hover {
+  background: var(--gold-100);
+}
+.solid {
+  border: 1px solid var(--gold-500);
+  background: var(--gold-500);
+  color: var(--ink-900);
+}
+.solid:hover {
+  background: var(--gold-600);
+  border-color: var(--gold-600);
+}

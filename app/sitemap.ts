@@ -16,8 +16,9 @@ export default function sitemap(): MetadataRoute.Sitemap {
     '/events',
     '/location',
     '/day-pass',
-    '/login',
-    '/signup',
+    '/privacy',
+    '/terms',
+    '/code-of-conduct',
   ];
   const pages: MetadataRoute.Sitemap = routes.map((r) => ({
     url: `${base}${r}/`,

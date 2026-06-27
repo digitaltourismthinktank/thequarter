@@ -86,8 +86,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           strategy="beforeInteractive"
         />
         {/* Cookiescript — GDPR consent banner (gates non-essential cookies). The
-            cookie-policy report script lives on the cookie policy page (Pass D). */}
+            cookie-policy report script lives on the privacy page. */}
         <Script src="https://cdn.cookie-script.com/s/064e38604f7ba35680d8f547f21c404a.js" strategy="afterInteractive" />
+        {/* Intercom (DTTT messenger, ink-recoloured, launcher hidden — we use our own
+            "Talk to us" buttons). */}
+        <Script id="intercom" strategy="afterInteractive">{`
+          window.intercomSettings={app_id:"o3cs3sqo",api_base:"https://api-iam.intercom.io",hide_default_launcher:true,action_color:"#1E1A15",background_color:"#1E1A15",source:"the_quarter_site"};
+          (function(){var w=window;var ic=w.Intercom;if(typeof ic==="function"){ic('reattach_activator');ic('update',w.intercomSettings);}else{var d=document;var i=function(){i.c(arguments);};i.q=[];i.c=function(args){i.q.push(args);};w.Intercom=i;var l=function(){var s=d.createElement('script');s.type='text/javascript';s.async=true;s.src='https://widget.intercom.io/widget/o3cs3sqo';var x=d.getElementsByTagName('script')[0];x.parentNode.insertBefore(s,x);};if(document.readyState==='complete'){l();}else if(w.attachEvent){w.attachEvent('onload',l);}else{w.addEventListener('load',l,false);}}})();
+        `}</Script>
         <JsonLd data={LOCAL_BUSINESS} />
         <a href="#main" className="q-skip-link">
           Skip to content

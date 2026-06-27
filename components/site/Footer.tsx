@@ -3,6 +3,7 @@ import Image from 'next/image';
 import { Icon } from '@/components/ds/Icon';
 import { FOOTER_COLUMNS, LEGAL_LINKS } from '@/lib/nav';
 import { SITE } from '@/lib/site';
+import { TalkToUs } from './TalkToUs';
 import styles from './Footer.module.css';
 
 export function Footer() {
@@ -25,6 +26,9 @@ export function Footer() {
             <div className={styles.address}>
               <Icon name="map-pin" size={16} color="var(--gold-400)" />
               <span>{SITE.address}</span>
+            </div>
+            <div style={{ marginTop: 16 }}>
+              <TalkToUs variant="solid" />
             </div>
           </div>
 

@@ -5,6 +5,7 @@ import { Button } from '@/components/ds/Button';
 import { Icon } from '@/components/ds/Icon';
 import { useMember } from './useMember';
 import { MemberTabs } from './MemberTabs';
+import { TalkToUs } from './TalkToUs';
 import { CheckInCard } from './CheckInCard';
 import { MyBookingsCard } from './MyBookingsCard';
 import { EventsCard } from './EventsCard';
@@ -152,9 +153,12 @@ export function DashboardClient() {
           <h1 className={styles.title}>Welcome back</h1>
           <p className={styles.email}>{email}</p>
         </div>
-        <Button variant="secondary" size="sm" icon="log-out" onClick={handleLogout}>
-          Log out
-        </Button>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <TalkToUs />
+          <Button variant="secondary" size="sm" icon="log-out" onClick={handleLogout}>
+            Log out
+          </Button>
+        </div>
       </div>
 
       {doorCode ? (

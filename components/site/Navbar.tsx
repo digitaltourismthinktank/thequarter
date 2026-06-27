@@ -9,6 +9,7 @@ import { IconButton } from '@/components/ds/IconButton';
 import { NAV_LINKS } from '@/lib/nav';
 import { cn } from '@/lib/cn';
 import { useMember } from './useMember';
+import { TalkToUs } from './TalkToUs';
 import styles from './Navbar.module.css';
 
 export function Navbar() {
@@ -52,6 +53,9 @@ export function Navbar() {
             {accountLabel}
           </Link>
           <span className={styles.cta}>
+            <TalkToUs variant="ghost" />
+          </span>
+          <span className={styles.cta}>
             <Button size="sm" variant="primary" href="/day-pass" iconAfter="arrow-right">
               Book a Day Pass
             </Button>
@@ -83,6 +87,7 @@ export function Navbar() {
             </Link>
           ))}
           <div className={styles.mobileActions}>
+            <TalkToUs variant="ghost" />
             <Button variant="secondary" href={accountHref} fullWidth onClick={() => setOpen(false)}>
               {accountLabel}
             </Button>
