@@ -95,3 +95,36 @@
   opacity: 0.55;
   font-size: 18px;
 }
+
+.holdBox {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: clamp(20px, 3vw, 32px);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.1);
+  text-align: center;
+  max-width: 600px;
+}
+.holdLine {
+  font-size: clamp(20px, 2.6vw, 30px);
+  font-weight: var(--fw-bold);
+}
+.holdSub {
+  font-size: clamp(15px, 1.8vw, 20px);
+  opacity: 0.85;
+}
+.holdBtn {
+  padding: 16px 40px;
+  border: none;
+  border-radius: 999px;
+  background: var(--gold-500);
+  color: var(--ink-900);
+  font-size: clamp(18px, 2.2vw, 26px);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+}
+.holdBtn:disabled {
+  opacity: 0.6;
+}

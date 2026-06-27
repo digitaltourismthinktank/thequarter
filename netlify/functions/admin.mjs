@@ -13,7 +13,7 @@
 import memberstackAdmin from '@memberstack/admin';
 import { verifyMember, isAdmin, tokenFromRequest } from './_member.mjs';
 import { listRecords, createRecord, updateRecord, deleteRecord, T, F, airtableReady, esc } from './_airtable.mjs';
-import { londonWallClockToISO, isoToLondonMin, hhmmToMin, londonNow } from './_time.mjs';
+import { londonWallClockToISO, isoToLondonMin, hhmmToMin, londonNow, holdReleased } from './_time.mjs';
 import { PLAN_NAMES, allowanceForMember } from './_quarter-sync.mjs';
 import { listRewards, listPerks, listFloats, floatStatus, awardPoints, redeemReward } from './_rewards.mjs';
 
@@ -123,15 +123,26 @@ async function bookingsForDate(date) {
     filterByFormula: `AND(DATETIME_FORMAT({Date}, 'YYYY-MM-DD')='${esc(date)}', {Status}='Confirmed')`,
     sort: [{ field: 'Start' }],
   });
-  return recs.map((r) => ({
-    id: r.id,
-    space: Array.isArray(r.fields[F.bookings.space]) ? r.fields[F.bookings.space][0] : null,
-    startMin: isoToLondonMin(r.fields[F.bookings.start]),
-    endMin: isoToLondonMin(r.fields[F.bookings.end]),
-    kind: r.fields[F.bookings.kind],
-    name: r.fields[F.bookings.name] || null,
-    email: r.fields[F.bookings.email] || null,
-  }));
+  const now = londonNow();
+  return recs.map((r) => {
+    const f = r.fields;
+    const hold = { holdUntil: f[F.bookings.holdUntil], checkedIn: !!f[F.bookings.checkedIn], releasable: !!f[F.bookings.releasable] };
+    return {
+      id: r.id,
+      space: Array.isArray(f[F.bookings.space]) ? f[F.bookings.space][0] : null,
+      startMin: isoToLondonMin(f[F.bookings.start]),
+      endMin: isoToLondonMin(f[F.bookings.end]),
+      kind: f[F.bookings.kind],
+      name: f[F.bookings.name] || null,
+      email: f[F.bookings.email] || null,
+      company: f[F.bookings.company] || null,
+      holdUntil: f[F.bookings.holdUntil] || null,
+      checkedIn: hold.checkedIn,
+      releasable: hold.releasable,
+      recurring: f[F.bookings.recurring] || null,
+      released: holdReleased(hold, date, now.min, now.dateStr),
+    };
+  });
 }
 
 async function checkinsForDate(date) {
@@ -196,6 +207,32 @@ export default async function handler(req) {
       [F.bookings.end]: londonWallClockToISO(date, end),
       [F.bookings.kind]: action === 'block' ? 'Block' : 'External',
       [F.bookings.name]: name || '',
+      [F.bookings.notes]: notes || '',
+      [F.bookings.status]: 'Confirmed',
+      [F.bookings.source]: 'Admin',
+    });
+    return json({ ok: true, id: rec.id });
+  }
+
+  if (action === 'company') {
+    const { spaceId, date, start, end, company, holdUntil, releasable, recurring, notes } = body;
+    if (!spaceId || !/^\d{4}-\d{2}-\d{2}$/.test(date || '') || !/^\d{2}:\d{2}$/.test(start || '') || !/^\d{2}:\d{2}$/.test(end || '')) {
+      return json({ error: 'missing-or-bad-params' }, 400);
+    }
+    if (hhmmToMin(start) >= hhmmToMin(end)) return json({ error: 'bad-range' }, 400);
+    if (holdUntil && !/^\d{2}:\d{2}$/.test(holdUntil)) return json({ error: 'bad-hold' }, 400);
+    const rec = await createRecord(T.bookings, {
+      [F.bookings.title]: `${start}–${end} · ${company || 'Company'}`,
+      [F.bookings.space]: [spaceId],
+      [F.bookings.date]: date,
+      [F.bookings.start]: londonWallClockToISO(date, start),
+      [F.bookings.end]: londonWallClockToISO(date, end),
+      [F.bookings.kind]: 'External',
+      [F.bookings.name]: company || 'Company booking',
+      [F.bookings.company]: company || '',
+      [F.bookings.holdUntil]: holdUntil || '',
+      [F.bookings.releasable]: !!releasable,
+      [F.bookings.recurring]: recurring || '',
       [F.bookings.notes]: notes || '',
       [F.bookings.status]: 'Confirmed',
       [F.bookings.source]: 'Admin',

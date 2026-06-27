@@ -14,6 +14,7 @@ import {
   adminGetCalendar,
   adminBlock,
   adminExternal,
+  adminCompanyBooking,
   adminCancel,
   adminAdjustDays,
   adminCheckinMember,
@@ -464,11 +465,13 @@ function RoomsPane() {
   const [spaces, setSpaces] = useState<AdminSpace[]>([]);
   const [bookings, setBookings] = useState<AdminBooking[]>([]);
   const [loading, setLoading] = useState(true);
-  const [kind, setKind] = useState<'block' | 'external'>('block');
+  const [kind, setKind] = useState<'block' | 'external' | 'company'>('block');
   const [spaceId, setSpaceId] = useState<string>('');
   const [start, setStart] = useState<string>('09:00');
   const [end, setEnd] = useState<string>('17:00');
   const [label, setLabel] = useState<string>('');
+  const [holdUntil, setHoldUntil] = useState<string>('11:00');
+  const [releasable, setReleasable] = useState(true);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
@@ -498,8 +501,13 @@ function RoomsPane() {
     if (!spaceId) return;
     setBusy(true);
     setMsg(null);
-    const payload = { spaceId, date, start, end, name: label };
-    const r = kind === 'block' ? await adminBlock(payload) : await adminExternal(payload);
+    let r;
+    if (kind === 'company') {
+      r = await adminCompanyBooking({ spaceId, date, start, end, company: label, holdUntil, releasable });
+    } else {
+      const payload = { spaceId, date, start, end, name: label };
+      r = kind === 'block' ? await adminBlock(payload) : await adminExternal(payload);
+    }
     if (r.ok) {
       setLabel('');
       await loadCalendar();
@@ -523,7 +531,7 @@ function RoomsPane() {
       <WeekStrip value={date} onSelect={setDate} />
 
       <div className={styles.panel}>
-        <span className={styles.panelTitle}>Add a block or external booking</span>
+        <span className={styles.panelTitle}>Add a block, external or company booking</span>
         <div className={styles.formRow}>
           <div className={styles.seg}>
             <button type="button" className={`${styles.segBtn} ${kind === 'block' ? styles.segOn : ''}`} onClick={() => setKind('block')}>
@@ -531,6 +539,9 @@ function RoomsPane() {
             </button>
             <button type="button" className={`${styles.segBtn} ${kind === 'external' ? styles.segOn : ''}`} onClick={() => setKind('external')}>
               External
+            </button>
+            <button type="button" className={`${styles.segBtn} ${kind === 'company' ? styles.segOn : ''}`} onClick={() => setKind('company')}>
+              Company
             </button>
           </div>
           <select className={styles.select} value={spaceId} onChange={(e) => setSpaceId(e.target.value)} aria-label="Space">
@@ -557,10 +568,27 @@ function RoomsPane() {
           </select>
           <input
             className={styles.label}
-            placeholder={kind === 'block' ? 'Reason (optional)' : 'Who for'}
+            placeholder={kind === 'block' ? 'Reason (optional)' : kind === 'company' ? 'Company name' : 'Who for'}
             value={label}
             onChange={(e) => setLabel(e.target.value)}
           />
+          {kind === 'company' ? (
+            <>
+              <label className={styles.field}>
+                <span>Hold until</span>
+                <select className={styles.select} value={holdUntil} onChange={(e) => setHoldUntil(e.target.value)} aria-label="Hold until">
+                  {TIMES.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className={styles.check}>
+                <input type="checkbox" checked={releasable} onChange={(e) => setReleasable(e.target.checked)} /> Release if no-show
+              </label>
+            </>
+          ) : null}
           <Button variant="primary" size="sm" onClick={add} disabled={busy}>
             Add
           </Button>
@@ -579,8 +607,13 @@ function RoomsPane() {
               <span className={styles.bTime}>
                 {minToHHMM(b.startMin)}–{minToHHMM(b.endMin)}
               </span>
-              <span className={`${styles.bKind} ${b.kind === 'Block' ? styles.kindBlock : ''}`}>{b.kind}</span>
-              <span className={styles.bWho}>{b.name || b.email || ''}</span>
+              <span className={`${styles.bKind} ${b.kind === 'Block' ? styles.kindBlock : ''}`}>{b.company ? 'Company' : b.kind}</span>
+              <span className={styles.bWho}>{b.company || b.name || b.email || ''}</span>
+              {b.company ? (
+                <span className={styles.statusTag}>
+                  {b.released ? 'Released' : b.checkedIn ? 'Checked in' : b.holdUntil ? `Held to ${b.holdUntil}` : 'Booked'}
+                </span>
+              ) : null}
               <button type="button" className={styles.smallBtn} onClick={() => cancel(b.id)} disabled={busy}>
                 Cancel
               </button>

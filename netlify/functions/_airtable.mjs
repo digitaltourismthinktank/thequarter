@@ -46,6 +46,11 @@ export const F = {
     notes: 'fld16rAImRC4Lzvo6',
     space: 'fld0GMbz9mCaGGGPY',
     date: 'fldA013Yzj8tUIolk',
+    company: 'fldEtQLTNXieUev5B',
+    holdUntil: 'fldrfwRQedgOCMr0w',
+    checkedIn: 'flduC1nIUz1SyaxOz',
+    releasable: 'fldpaTy1L33woon5G',
+    recurring: 'fldDaYzJe0rBdHcGA',
   },
   checkins: {
     ref: 'fldT6Vluubvd6BpQr',

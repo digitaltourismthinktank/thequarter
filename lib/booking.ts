@@ -129,6 +129,12 @@ export interface AdminBooking {
   kind: string;
   name: string | null;
   email: string | null;
+  company?: string | null;
+  holdUntil?: string | null;
+  checkedIn?: boolean;
+  releasable?: boolean;
+  recurring?: string | null;
+  released?: boolean;
 }
 export interface AdminSpace {
   id: string;
@@ -144,6 +150,17 @@ export const adminBlock = (b: { spaceId: string; date: string; start: string; en
   call<{ ok: boolean }>('admin', { method: 'POST', body: { action: 'block', ...b } });
 export const adminExternal = (b: { spaceId: string; date: string; start: string; end: string; name?: string; notes?: string }) =>
   call<{ ok: boolean }>('admin', { method: 'POST', body: { action: 'external', ...b } });
+export const adminCompanyBooking = (b: {
+  spaceId: string;
+  date: string;
+  start: string;
+  end: string;
+  company: string;
+  holdUntil?: string;
+  releasable?: boolean;
+  recurring?: string;
+  notes?: string;
+}) => call<{ ok: boolean; id: string }>('admin', { method: 'POST', body: { action: 'company', ...b } });
 export const adminCancel = (id: string) => call<{ ok: boolean }>('admin', { method: 'POST', body: { action: 'cancelBooking', id } });
 export const adminAdjustDays = (memberId: string, days: string) =>
   call<{ ok: boolean }>('admin', { method: 'POST', body: { action: 'adjustDays', memberId, days } });
@@ -241,11 +258,23 @@ export interface KioskRoom {
   openMin: number;
   closeMin: number;
   space: { id: string; name: string; type: string; capacityLabel: string | null; bookable: boolean };
-  bookings: { startMin: number; endMin: number; kind: string }[];
+  bookings: {
+    id: string;
+    startMin: number;
+    endMin: number;
+    kind: string;
+    company: string | null;
+    holdUntil: string | null;
+    checkedIn: boolean;
+    releasable: boolean;
+    released: boolean;
+  }[];
 }
 export const kioskRoom = (id: string) => call<KioskRoom>(`kiosk?action=room&id=${encodeURIComponent(id)}`, { auth: false });
 export const kioskBook = (b: { spaceId: string; date: string; start: string; end: string; pin: string }) =>
   call<{ ok: boolean; member?: string }>('kiosk', { method: 'POST', body: { action: 'book', ...b }, auth: false });
+export const kioskCheckinBooking = (bookingId: string) =>
+  call<{ ok: boolean }>('kiosk', { method: 'POST', body: { action: 'checkinBooking', bookingId }, auth: false });
 
 // ---- Welcome (post-payment) ----
 export const getWelcomeSession = (sessionId: string) =>

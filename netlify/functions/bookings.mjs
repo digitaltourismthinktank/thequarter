@@ -12,8 +12,17 @@
  */
 import { verifyMember, memberEmail, memberName, isAdmin, tokenFromRequest } from './_member.mjs';
 import { listRecords, createRecord, updateRecord, T, F, airtableReady, esc } from './_airtable.mjs';
-import { BUSINESS, hhmmToMin, isWeekday, londonWallClockToISO, isoToLondonMin, londonNow } from './_time.mjs';
+import { BUSINESS, hhmmToMin, isWeekday, londonWallClockToISO, isoToLondonMin, londonNow, holdReleased } from './_time.mjs';
 import { isClosedDay } from './_holidays.mjs';
+
+/** A released company hold no longer blocks the room. */
+const isReleased = (r, dateStr, nowMin, todayStr) =>
+  holdReleased(
+    { holdUntil: r.fields[F.bookings.holdUntil], checkedIn: !!r.fields[F.bookings.checkedIn], releasable: !!r.fields[F.bookings.releasable] },
+    dateStr,
+    nowMin,
+    todayStr,
+  );
 
 const json = (b, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { 'content-type': 'application/json' } });
 
@@ -90,12 +99,14 @@ export default async function handler(req) {
       const recs = await listRecords(T.bookings, {
         filterByFormula: `AND(DATETIME_FORMAT({Date}, 'YYYY-MM-DD')='${today.dateStr}', {Status}='Confirmed')`,
       });
-      const bookings = recs.map((r) => ({
-        space: Array.isArray(r.fields[F.bookings.space]) ? r.fields[F.bookings.space][0] : null,
-        startMin: isoToLondonMin(r.fields[F.bookings.start]),
-        endMin: isoToLondonMin(r.fields[F.bookings.end]),
-        kind: r.fields[F.bookings.kind],
-      }));
+      const bookings = recs
+        .filter((r) => !isReleased(r, today.dateStr, today.min, today.dateStr))
+        .map((r) => ({
+          space: Array.isArray(r.fields[F.bookings.space]) ? r.fields[F.bookings.space][0] : null,
+          startMin: isoToLondonMin(r.fields[F.bookings.start]),
+          endMin: isoToLondonMin(r.fields[F.bookings.end]),
+          kind: r.fields[F.bookings.kind],
+        }));
       return json({ date: today.dateStr, nowMin: today.min, spaces, bookings });
     }
 
@@ -139,8 +150,10 @@ export default async function handler(req) {
 
     const s = hhmmToMin(start);
     const e = hhmmToMin(end);
+    const nowC = londonNow();
     const existing = await bookingsForSpaceDate(spaceId, date);
     const clash = existing.some((r) => {
+      if (isReleased(r, date, nowC.min, nowC.dateStr)) return false; // a released no-show hold frees the slot
       const rs = isoToLondonMin(r.fields[F.bookings.start]);
       const re = isoToLondonMin(r.fields[F.bookings.end]);
       return s < re && e > rs;

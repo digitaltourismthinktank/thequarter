@@ -9,8 +9,8 @@
  * fine for a small trusted space. Revisit with signed QR if needed.
  */
 import memberstackAdmin from '@memberstack/admin';
-import { listRecords, createRecord, T, F, airtableReady, esc } from './_airtable.mjs';
-import { londonNow, isoToLondonMin, londonWallClockToISO, hhmmToMin, BUSINESS, isWeekday } from './_time.mjs';
+import { listRecords, createRecord, updateRecord, T, F, airtableReady, esc } from './_airtable.mjs';
+import { londonNow, isoToLondonMin, londonWallClockToISO, hhmmToMin, BUSINESS, isWeekday, holdReleased } from './_time.mjs';
 
 const MS_SECRET = process.env.MEMBERSTACK_SECRET_KEY;
 const json = (b, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { 'content-type': 'application/json' } });
@@ -49,7 +49,21 @@ export default async function handler(req) {
     if (!sp) return json({ error: 'not-found' }, 404);
     const recs = await bookingsForSpaceDate(id, today.dateStr);
     const bookings = recs
-      .map((r) => ({ startMin: isoToLondonMin(r.fields[F.bookings.start]), endMin: isoToLondonMin(r.fields[F.bookings.end]), kind: r.fields[F.bookings.kind] }))
+      .map((r) => {
+        const f = r.fields;
+        const hold = { holdUntil: f[F.bookings.holdUntil], checkedIn: !!f[F.bookings.checkedIn], releasable: !!f[F.bookings.releasable] };
+        return {
+          id: r.id,
+          startMin: isoToLondonMin(f[F.bookings.start]),
+          endMin: isoToLondonMin(f[F.bookings.end]),
+          kind: f[F.bookings.kind],
+          company: f[F.bookings.company] || null,
+          holdUntil: f[F.bookings.holdUntil] || null,
+          checkedIn: hold.checkedIn,
+          releasable: hold.releasable,
+          released: holdReleased(hold, today.dateStr, today.min, today.dateStr),
+        };
+      })
       .sort((a, b) => a.startMin - b.startMin);
     return json({
       date: today.dateStr,
@@ -71,6 +85,14 @@ export default async function handler(req) {
   if (req.method !== 'POST') return json({ error: 'method-not-allowed' }, 405);
 
   const body = await req.json().catch(() => ({}));
+
+  // Door check-in for a company hold — a warm tap to keep the room (no login).
+  if (body.action === 'checkinBooking') {
+    if (!body.bookingId) return json({ error: 'missing-id' }, 400);
+    await updateRecord(T.bookings, body.bookingId, { [F.bookings.checkedIn]: true });
+    return json({ ok: true });
+  }
+
   if (body.action === 'book') {
     const { spaceId, date, start, end, pin } = body;
     if (!spaceId || !/^\d{4}-\d{2}-\d{2}$/.test(date || '') || !/^\d{2}:\d{2}$/.test(start || '') || !/^\d{2}:\d{2}$/.test(end || '') || !pin) {

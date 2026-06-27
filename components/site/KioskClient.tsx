@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { kioskRoom, type KioskRoom } from '@/lib/booking';
+import { kioskRoom, kioskCheckinBooking, type KioskRoom } from '@/lib/booking';
+import { Qr } from '@/components/ds/Qr';
 import styles from './KioskClient.module.css';
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -27,6 +28,7 @@ export function KioskClient() {
   const [data, setData] = useState<KioskRoom | null>(null);
   const [nowMin, setNowMin] = useState<number>(() => londonNowMin());
   const [loaded, setLoaded] = useState(false);
+  const [holdBusy, setHoldBusy] = useState(false);
 
   useEffect(() => {
     setRoomId(new URLSearchParams(window.location.search).get('room'));
@@ -65,19 +67,33 @@ export function KioskClient() {
   }
 
   const { space, bookings, closeMin, weekday } = data;
-  const current = bookings.find((b) => b.startMin <= nowMin && nowMin < b.endMin);
+  // Released no-show holds no longer block the room.
+  const active = bookings.filter((b) => !b.released);
+  const current = active.find((b) => b.startMin <= nowMin && nowMin < b.endMin);
+  // Today's company hold (if any), and whether it still needs a check-in.
+  const hold = active.find((b) => b.company && b.holdUntil);
+  const heldHold = hold && !hold.checkedIn ? hold : null;
   const free = !current && weekday && nowMin < closeMin;
+
+  async function checkInHold() {
+    if (!heldHold) return;
+    setHoldBusy(true);
+    await kioskCheckinBooking(heldHold.id);
+    await load();
+    setHoldBusy(false);
+  }
 
   const statusText = !weekday
     ? 'Closed today'
-    : current
-      ? `Busy until ${minToHHMM(current.endMin)}`
-      : nowMin >= closeMin
-        ? 'Closed for today'
-        : 'Available now';
+    : heldHold
+      ? `Held until ${heldHold.holdUntil}`
+      : current
+        ? `Busy until ${minToHHMM(current.endMin)}`
+        : nowMin >= closeMin
+          ? 'Closed for today'
+          : 'Available now';
 
   const bookUrl = typeof window !== 'undefined' ? `${window.location.origin}/book?room=${encodeURIComponent(roomId)}` : '';
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=360x360&margin=10&data=${encodeURIComponent(bookUrl)}`;
 
   return (
     <div className={`${styles.kiosk} ${free ? styles.kFree : styles.kBusy}`}>
@@ -90,10 +106,21 @@ export function KioskClient() {
 
       <div className={styles.statusBig}>{statusText}</div>
 
-      {space.bookable ? (
+      {heldHold ? (
+        <div className={styles.holdBox}>
+          <span className={styles.holdLine}>Team booking{heldHold.company ? ` · ${heldHold.company}` : ''}</span>
+          <span className={styles.holdSub}>Held until {heldHold.holdUntil} — check in to keep the room today.</span>
+          <button className={styles.holdBtn} onClick={checkInHold} disabled={holdBusy}>
+            {holdBusy ? 'One moment…' : 'Check in'}
+          </button>
+        </div>
+      ) : hold && hold.checkedIn ? (
+        <div className={styles.holdBox}>
+          <span className={styles.holdLine}>Checked in — the room is yours today.</span>
+        </div>
+      ) : space.bookable ? (
         <div className={styles.qrBox}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img className={styles.qr} src={qrUrl} alt="Scan to book" width={200} height={200} />
+          <Qr value={bookUrl} size={200} />
           <span className={styles.qrLabel}>Scan to book on your phone</span>
         </div>
       ) : null}
@@ -101,12 +128,14 @@ export function KioskClient() {
       {bookings.length ? (
         <div className={styles.schedule}>
           <span className={styles.schedTitle}>Today</span>
-          {bookings.map((b, i) => (
-            <div key={i} className={styles.schedRow}>
+          {bookings.map((b) => (
+            <div key={b.id} className={styles.schedRow}>
               <span>
                 {minToHHMM(b.startMin)}–{minToHHMM(b.endMin)}
               </span>
-              <span className={styles.schedKind}>{b.kind === 'Block' ? 'Reserved' : 'Booked'}</span>
+              <span className={styles.schedKind}>
+                {b.released ? 'Released' : b.company ? (b.checkedIn ? 'Checked in' : 'Held') : b.kind === 'Block' ? 'Reserved' : 'Booked'}
+              </span>
             </div>
           ))}
         </div>

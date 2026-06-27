@@ -74,3 +74,15 @@ export function addDays(dateStr, n) {
   const [Y, M, D] = String(dateStr).split('-').map(Number);
   return new Date(Date.UTC(Y, M - 1, D + n)).toISOString().slice(0, 10);
 }
+
+/**
+ * Is a company hold "released" (so the room is free to all)? True when a releasable
+ * hold wasn't checked in by its cut-off: today past the cut-off, or any past day.
+ * Future days are still held; contracted (non-releasable) holds never auto-release.
+ */
+export function holdReleased({ holdUntil, checkedIn, releasable }, dateStr, nowMin, todayStr) {
+  if (!holdUntil || checkedIn || !releasable) return false;
+  if (dateStr < todayStr) return true;
+  if (dateStr > todayStr) return false;
+  return nowMin >= hhmmToMin(holdUntil);
+}
