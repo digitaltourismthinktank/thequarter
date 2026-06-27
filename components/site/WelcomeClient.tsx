@@ -29,6 +29,7 @@ export function WelcomeClient({ plan }: { plan: string }) {
   const [password, setPassword] = useState('');
   const [bdayDay, setBdayDay] = useState('');
   const [bdayMonth, setBdayMonth] = useState('');
+  const [company, setCompany] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -71,14 +72,19 @@ export function WelcomeClient({ plan }: { plan: string }) {
       if (lastName) customFields['last-name'] = lastName;
       if (allowance !== undefined) customFields['days-remaining'] = allowance === null ? 'Unlimited' : String(allowance);
       await ms.signupMemberEmailPassword({ email, password, plans: plnId ? [{ planId: plnId }] : [], customFields });
-      // Optional birthday → stored on metaData (day + month only). Best-effort.
+      // Optional birthday + company → stored on metaData. Best-effort.
+      const profile: { bday?: string; company?: string } = {};
       if (bdayDay && bdayMonth) {
         const mm = String(MONTHS.indexOf(bdayMonth) + 1).padStart(2, '0');
         const dd = String(Number(bdayDay)).padStart(2, '0');
+        profile.bday = `${mm}-${dd}`;
+      }
+      if (company.trim()) profile.company = company.trim();
+      if (profile.bday || profile.company) {
         try {
-          await saveProfile({ bday: `${mm}-${dd}` });
+          await saveProfile(profile);
         } catch {
-          /* non-blocking — they can add it later on Rewards */
+          /* non-blocking — they can add these later */
         }
       }
       // If they arrived via a friend's invite link, register the referral (best-effort).
@@ -162,6 +168,12 @@ export function WelcomeClient({ plan }: { plan: string }) {
           </div>
         </div>
         <p className={styles.hint}>So we can spoil you a little each year — a treat from The Kentish Pantry.</p>
+
+        <label className={styles.field}>
+          <span>Company (optional)</span>
+          <input value={company} onChange={(e) => setCompany(e.target.value)} autoComplete="organization" />
+        </label>
+        <p className={styles.hint}>Leave blank if you&rsquo;re here on your own — most members do. It just links colleagues who work together.</p>
 
         {error ? <p className={styles.error}>{error}</p> : null}
         <Button variant="primary" onClick={submit} disabled={busy}>

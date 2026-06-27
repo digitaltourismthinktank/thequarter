@@ -185,6 +185,7 @@ function MembersPane() {
   if (loading) return <p className={styles.state}>Loading members…</p>;
 
   const FILTERS = ['All', 'Day Pass', 'Visitor', 'Resident', 'Citizen', 'Hybrid Office', 'Paused'];
+  const companyCount = (c: string) => members.filter((x) => x.company === c).length;
   const filtered = members.filter((m) => {
     const matchesPlan = planFilter === 'All' ? true : planFilter === 'Paused' ? m.paused : m.plan === planFilter && !m.paused;
     if (!matchesPlan) return false;
@@ -228,6 +229,7 @@ function MembersPane() {
                   {m.company ? (
                     <div className={styles.mCompany}>
                       <Icon name="building" size={12} color="var(--text-muted)" /> {m.company}
+                      {companyCount(m.company) > 1 ? <span className={styles.teamBadge}>+{companyCount(m.company) - 1} here</span> : null}
                     </div>
                   ) : null}
                 </td>
