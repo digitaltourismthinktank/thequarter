@@ -342,8 +342,9 @@ export interface RollGuest {
 export const getHosts = (q: string) => call<{ hosts: GuestHost[] }>(`guests?action=hosts&q=${encodeURIComponent(q)}`, { auth: false });
 export const signInGuest = (b: { name: string; company?: string; hostId?: string; host?: string; reason?: string }) =>
   call<{ ok: boolean; host: string | null }>('guests', { method: 'POST', body: { action: 'signin', ...b }, auth: false });
-export const getRoll = () => call<{ membersIn: number; headcount: number; guests: RollGuest[] }>('guests?action=roll', { auth: false });
-export const signOutGuest = (id: string) => call<{ ok: boolean }>('guests', { method: 'POST', body: { action: 'signout', id }, auth: false });
+// Roll-call + sign-out are staff-only (admin token); host lookup + sign-in stay public.
+export const getRoll = () => call<{ membersIn: number; headcount: number; guests: RollGuest[] }>('guests?action=roll');
+export const signOutGuest = (id: string) => call<{ ok: boolean }>('guests', { method: 'POST', body: { action: 'signout', id } });
 export const redeemReward = (rewardId: string) =>
   call<{ ok: boolean; balance: number; reward: RewardItem; token: string }>('rewards', {
     method: 'POST',

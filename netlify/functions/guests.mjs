@@ -11,6 +11,7 @@
  */
 import memberstackAdmin from '@memberstack/admin';
 import { listRecords, createRecord, updateRecord, T, F, airtableReady, esc } from './_airtable.mjs';
+import { verifyMember, isAdmin, tokenFromRequest } from './_member.mjs';
 import { londonNow } from './_time.mjs';
 import { PLAN_NAMES } from './_quarter-sync.mjs';
 
@@ -68,8 +69,14 @@ export default async function handler(req) {
 
   if (req.method === 'GET') {
     const action = url.searchParams.get('action');
+    // Host lookup stays public (needed by the guest sign-in); the roll-call ("who's in")
+    // is staff-only and lives on the admin page.
     if (action === 'hosts') return json({ hosts: await searchHosts(url.searchParams.get('q')) });
-    if (action === 'roll') return json(await rollCall());
+    if (action === 'roll') {
+      const vm = await verifyMember(tokenFromRequest(req, null));
+      if (!vm.ok || !isAdmin(vm.member)) return json({ error: 'forbidden' }, 403);
+      return json(await rollCall());
+    }
     return json({ error: 'unknown-action' }, 400);
   }
 
@@ -92,6 +99,8 @@ export default async function handler(req) {
   }
 
   if (body.action === 'signout') {
+    const vm = await verifyMember(tokenFromRequest(req, body));
+    if (!vm.ok || !isAdmin(vm.member)) return json({ error: 'forbidden' }, 403);
     if (!body.id) return json({ error: 'missing-id' }, 400);
     await updateRecord(T.guests, body.id, { [F.guests.signedOutAt]: new Date().toISOString() });
     return json({ ok: true });

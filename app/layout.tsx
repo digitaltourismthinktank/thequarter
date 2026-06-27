@@ -82,6 +82,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           data-memberstack-app={MEMBERSTACK_APP_ID}
           strategy="beforeInteractive"
         />
+        {/* Cookiescript — GDPR consent banner (gates non-essential cookies). The
+            cookie-policy report script lives on the cookie policy page (Pass D). */}
+        <Script src="https://cdn.cookie-script.com/s/064e38604f7ba35680d8f547f21c404a.js" strategy="afterInteractive" />
         <JsonLd data={LOCAL_BUSINESS} />
         <a href="#main" className="q-skip-link">
           Skip to content

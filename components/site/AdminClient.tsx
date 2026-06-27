@@ -32,6 +32,8 @@ import {
   adminGetFloats,
   adminTopUpFloat,
   adminGetToday,
+  getRoll,
+  signOutGuest,
   adminGetMemberProfile,
   adminAdjustPoints,
   adminRedeemForMember,
@@ -41,6 +43,7 @@ import {
   type AdminReward,
   type AdminFloat,
   type AdminCheckin,
+  type RollGuest,
   type MemberProfile,
   type PerkItem,
   type QuarterEvent,
@@ -634,6 +637,7 @@ function AdminTodayPane({ onAllBirthdays }: { onAllBirthdays: () => void }) {
   const [bookings, setBookings] = useState<AdminBooking[]>([]);
   const [spaces, setSpaces] = useState<AdminSpace[]>([]);
   const [members, setMembers] = useState<AdminMember[]>([]);
+  const [roll, setRoll] = useState<{ membersIn: number; headcount: number; guests: RollGuest[] }>({ membersIn: 0, headcount: 0, guests: [] });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -652,6 +656,18 @@ function AdminTodayPane({ onAllBirthdays }: { onAllBirthdays: () => void }) {
       if (m.ok) setMembers(m.data.members);
     })();
   }, []);
+
+  const loadRoll = useCallback(async () => {
+    const r = await getRoll();
+    if (r.ok) setRoll(r.data);
+  }, []);
+  useEffect(() => {
+    loadRoll();
+  }, [loadRoll]);
+  async function signOut(id: string) {
+    await signOutGuest(id);
+    loadRoll();
+  }
 
   useEffect(() => {
     if (!date) return;
@@ -705,9 +721,36 @@ function AdminTodayPane({ onAllBirthdays }: { onAllBirthdays: () => void }) {
         <div className={styles.todayGrid}>
           <div className={styles.todayCard}>
             <span className={styles.todayCardLabel}>Who&rsquo;s in</span>
-            <strong className={styles.todayBig}>{checkins.length}</strong>
-            <span className={styles.todayCardSub}>{checkins.length ? checkins.map((c) => c.name).join(', ') : 'No check-ins yet.'}</span>
+            <strong className={styles.todayBig}>{offset === 0 ? roll.headcount : checkins.length}</strong>
+            <span className={styles.todayCardSub}>
+              {offset === 0 ? `${roll.membersIn} member${roll.membersIn === 1 ? '' : 's'} · ${roll.guests.length} guest${roll.guests.length === 1 ? '' : 's'} on site` : 'Planned ahead — check-ins land on the day.'}
+            </span>
+            {checkins.length ? <span className={styles.todayCardSub}>{checkins.map((c) => c.name).join(', ')}</span> : null}
           </div>
+          {offset === 0 ? (
+            <div className={styles.todayCard}>
+              <span className={styles.todayCardLabel}>Guests today</span>
+              <strong className={styles.todayBig}>{roll.guests.length}</strong>
+              {roll.guests.length ? (
+                <div className={styles.bdayList}>
+                  {roll.guests.map((g) => (
+                    <div key={g.id} className={styles.bdayItem}>
+                      <Icon name="user" size={15} color="var(--gold-700)" />
+                      <span>
+                        {g.name}
+                        {g.host ? ` → ${g.host}` : ''}
+                      </span>
+                      <button type="button" className={styles.smallBtn} style={{ marginLeft: 'auto' }} onClick={() => signOut(g.id)}>
+                        Sign out
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <span className={styles.todayCardSub}>No guests signed in.</span>
+              )}
+            </div>
+          ) : null}
           <div className={styles.todayCard}>
             <span className={styles.todayCardLabel}>Rooms &amp; pods booked</span>
             <strong className={styles.todayBig}>{roomBookings.length}</strong>
@@ -738,6 +781,28 @@ function AdminTodayPane({ onAllBirthdays }: { onAllBirthdays: () => void }) {
           </div>
         </div>
       )}
+
+      <div className={styles.panel} style={{ marginTop: 18 }}>
+        <span className={styles.panelTitle}>Screens &amp; links</span>
+        <div className={styles.shortcuts}>
+          <a className={styles.shortcut} href="/screen" target="_blank" rel="noreferrer">
+            <Icon name="monitor" size={16} color="var(--gold-700)" /> Entrance screen
+          </a>
+          <a className={styles.shortcut} href="/guest" target="_blank" rel="noreferrer">
+            <Icon name="users" size={16} color="var(--gold-700)" /> Guest sign-in
+          </a>
+          <a className={styles.shortcut} href="/dashboard">
+            <Icon name="user" size={16} color="var(--gold-700)" /> My member view
+          </a>
+          {spaces
+            .filter((s) => s.bookable)
+            .map((s) => (
+              <a key={s.id} className={styles.shortcut} href={`/kiosk?room=${s.id}`} target="_blank" rel="noreferrer">
+                <Icon name="door-open" size={16} color="var(--gold-700)" /> {s.name} door
+              </a>
+            ))}
+        </div>
+      </div>
     </div>
   );
 }

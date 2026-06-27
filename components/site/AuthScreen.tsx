@@ -49,7 +49,9 @@ export function AuthScreen({ mode }: { mode: 'login' | 'signup' }) {
       }
       // Client-side navigation keeps the just-authenticated Memberstack instance
       // in memory; a full page reload raced session restore and bounced to /login.
-      router.push('/dashboard');
+      // Staff land straight on the admin page (they can switch to the member/guest views).
+      const dest = email.trim().toLowerCase().endsWith('@thinkdigital.travel') ? '/admin' : '/dashboard';
+      router.push(dest);
     } catch (err) {
       setStatus('error');
       setError(memberstackError(err));

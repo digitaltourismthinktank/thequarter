@@ -825,3 +825,27 @@
   color: var(--gold-700);
   font-weight: var(--fw-semibold);
 }
+
+/* ---- Admin screen shortcuts ---- */
+.shortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.shortcut {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-card);
+  color: var(--ink-900);
+  font-size: 13px;
+  font-weight: var(--fw-semibold);
+  text-decoration: none;
+}
+.shortcut:hover {
+  border-color: var(--gold-500);
+  background: var(--sand-100);
+}
