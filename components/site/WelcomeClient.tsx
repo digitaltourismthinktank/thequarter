@@ -31,6 +31,7 @@ export function WelcomeClient({ plan }: { plan: string }) {
   const [bdayDay, setBdayDay] = useState('');
   const [bdayMonth, setBdayMonth] = useState('');
   const [company, setCompany] = useState('');
+  const [phone, setPhone] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [agree, setAgree] = useState(false);
@@ -60,6 +61,10 @@ export function WelcomeClient({ plan }: { plan: string }) {
       setError('Use at least 8 characters for your password.');
       return;
     }
+    if (!phone.trim()) {
+      setError('Please add a phone number so we can reach you.');
+      return;
+    }
     if (!agree) {
       setError('Please accept the Terms & Code of Conduct to continue.');
       return;
@@ -82,7 +87,7 @@ export function WelcomeClient({ plan }: { plan: string }) {
         password,
         plans: plnId ? [{ planId: plnId }] : [],
         customFields,
-        metaData: { termsAcceptedAt: new Date().toISOString() },
+        metaData: { termsAcceptedAt: new Date().toISOString(), phone: phone.trim() },
       });
       // Optional birthday + company → stored on metaData. Best-effort.
       const profile: { bday?: string; company?: string } = {};
@@ -152,6 +157,11 @@ export function WelcomeClient({ plan }: { plan: string }) {
             <input value={lastName} onChange={(e) => setLastName(e.target.value)} autoComplete="family-name" />
           </label>
         </div>
+
+        <label className={styles.field}>
+          <span>Phone</span>
+          <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="tel" placeholder="07700 900000" />
+        </label>
 
         <label className={styles.field}>
           <span>Password</span>

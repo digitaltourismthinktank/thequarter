@@ -233,6 +233,7 @@ function MembersPane() {
                 <td>
                   <div className={styles.mName}>{m.name || '—'}</div>
                   <div className={styles.mEmail}>{m.email}</div>
+                  {m.phone ? <div className={styles.mEmail}>{m.phone}</div> : null}
                   {m.company ? (
                     <div className={styles.mCompany}>
                       <Icon name="building" size={12} color="var(--text-muted)" /> {m.company}
@@ -364,6 +365,7 @@ function MemberProfileModal({ id, onClose, onChanged }: { id: string | null; onC
             <h3 className={styles.profName}>{p?.name || 'Member'}</h3>
             <span className={styles.profSub}>
               {p?.email}
+              {p?.phone ? ` · ${p.phone}` : ''}
               {p?.company ? ` · ${p.company}` : ''}
               {p?.plan ? ` · ${p.plan}` : ''}
               {p?.paused ? ' · Paused' : ''}

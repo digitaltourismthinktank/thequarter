@@ -50,6 +50,7 @@ async function listAllMembers() {
         bdayClaimed: md.bdayClaimed || null,
         points: Math.max(0, Math.round(Number(md.points) || 0)),
         company: md.company || null,
+        phone: md.phone || null,
       });
     }
     if (!res?.hasNextPage || data.length === 0) break;
@@ -89,6 +90,7 @@ async function memberProfile(id) {
     since: m.createdAt || null,
     days: cf['days-remaining'] ?? null,
     company: md.company || null,
+    phone: md.phone || null,
     bday: md.bday || null,
     points: Math.max(0, Math.round(Number(md.points) || 0)),
     daysIn: checkins.length,

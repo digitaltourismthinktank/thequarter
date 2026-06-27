@@ -24,12 +24,18 @@ export function AuthScreen({ mode }: { mode: 'login' | 'signup' }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
   const [status, setStatus] = useState<Status>('idle');
   const [error, setError] = useState('');
   const [agree, setAgree] = useState(false);
 
   async function handleAuth(e: FormEvent) {
     e.preventDefault();
+    if (!isLogin && !phone.trim()) {
+      setStatus('error');
+      setError('Please add a phone number so we can reach you.');
+      return;
+    }
     if (!isLogin && !agree) {
       setStatus('error');
       setError('Please accept the Terms & Code of Conduct to continue.');
@@ -50,7 +56,7 @@ export function AuthScreen({ mode }: { mode: 'login' | 'signup' }) {
         await ms.signupMemberEmailPassword({
           email,
           password,
-          metaData: { ...(name ? { name } : {}), termsAcceptedAt: new Date().toISOString() },
+          metaData: { ...(name ? { name } : {}), phone: phone.trim(), termsAcceptedAt: new Date().toISOString() },
         });
       }
       // Client-side navigation keeps the just-authenticated Memberstack instance
@@ -149,6 +155,18 @@ export function AuthScreen({ mode }: { mode: 'login' | 'signup' }) {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     autoComplete="name"
+                  />
+                ) : null}
+                {!isLogin ? (
+                  <Input
+                    label="Phone"
+                    type="tel"
+                    icon="phone"
+                    placeholder="07700 900000"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    autoComplete="tel"
+                    required
                   />
                 ) : null}
                 <Input

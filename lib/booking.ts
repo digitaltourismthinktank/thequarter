@@ -97,6 +97,7 @@ export interface AdminMember {
   bdayClaimed: string | null;
   points: number;
   company: string | null;
+  phone: string | null;
 }
 export interface AdminReward {
   id: string;
@@ -194,6 +195,7 @@ export interface MemberProfile {
   since: string | null;
   days: string | null;
   company: string | null;
+  phone: string | null;
   bday: string | null;
   points: number;
   daysIn: number;
