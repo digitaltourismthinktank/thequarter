@@ -1,0 +1,216 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(20, 17, 13, 0.6);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.sheet {
+  width: 100%;
+  max-width: 440px;
+  max-height: 92vh;
+  overflow-y: auto;
+  background: var(--surface-card);
+  border-radius: 28px 28px 0 0;
+  padding: 22px 24px 28px;
+  animation: qSheet 0.42s var(--ease-out);
+}
+@media (min-width: 540px) {
+  .sheet {
+    margin-bottom: 24px;
+    border-radius: 28px;
+  }
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  color: var(--text-muted);
+  font-weight: var(--fw-semibold);
+}
+.close {
+  display: inline-flex;
+  border: none;
+  background: var(--sand-100);
+  color: var(--ink-900);
+  border-radius: 999px;
+  padding: 7px;
+  cursor: pointer;
+}
+
+.offer {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 18px 0;
+}
+.offerChip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 50px;
+  height: 50px;
+  flex: none;
+  border-radius: 14px;
+  background: var(--gold-100);
+}
+.partner {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  color: var(--gold-700);
+  font-weight: var(--fw-semibold);
+}
+.title {
+  font-size: 19px;
+  font-weight: var(--fw-bold);
+  letter-spacing: -0.02em;
+  margin-top: 2px;
+}
+
+.identity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+}
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  flex: none;
+  border-radius: 999px;
+  background: var(--ink-900);
+  color: var(--gold-400);
+  font-weight: var(--fw-bold);
+  font-size: 15px;
+}
+.idText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.idText strong {
+  font-size: 15px;
+  color: var(--ink-900);
+}
+.idText span {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* Live freshness cue — sweeping gold ring + breathing dot */
+.live {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  margin-left: auto;
+  flex: none;
+}
+.sweep {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, var(--gold-400), rgba(210, 181, 118, 0) 70%);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px));
+  animation: qSweep 2.2s linear infinite;
+}
+.dot {
+  position: absolute;
+  inset: 13px;
+  border-radius: 50%;
+  background: var(--gold-500);
+  animation: qBreathe 1.6s var(--ease-in-out) infinite;
+}
+
+.qrWrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin: 20px 0;
+  text-align: center;
+}
+.qrHint {
+  font-size: 13px;
+  color: var(--text-muted);
+  max-width: 260px;
+}
+.qrClock {
+  font-size: 12px;
+  font-weight: var(--fw-semibold);
+  color: var(--gold-700);
+  letter-spacing: 0.04em;
+}
+
+.staff {
+  background: var(--ink-900);
+  color: var(--sand-50);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+}
+.staffLabel {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  color: var(--gold-400);
+  font-weight: var(--fw-semibold);
+}
+.staffPos {
+  font-size: 14px;
+  line-height: 1.5;
+  margin-top: 6px;
+}
+.auth {
+  font-size: 12px;
+  color: var(--stone-300);
+  margin-top: 8px;
+}
+
+.seeWhat {
+  display: block;
+  text-align: center;
+  margin-top: 16px;
+  font-size: 14px;
+  font-weight: var(--fw-semibold);
+  color: var(--gold-700);
+}
+
+@keyframes qSheet {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+@keyframes qSweep {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes qBreathe {
+  0%,
+  100% {
+    opacity: 0.5;
+    transform: scale(0.85);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}

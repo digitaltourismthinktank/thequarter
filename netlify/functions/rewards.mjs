@@ -8,7 +8,7 @@
  */
 import { verifyMember, memberEmail, tokenFromRequest } from './_member.mjs';
 import { airtableReady } from './_airtable.mjs';
-import { listRewards, listFloats, rewardAvailability, memberPoints, redeemReward, memberRedemptions } from './_rewards.mjs';
+import { listRewards, listFloats, rewardAvailability, memberPoints, redeemReward, memberRedemptions, memberLedger } from './_rewards.mjs';
 import { mintToken } from './_tokens.mjs';
 
 const MS_SECRET = process.env.MEMBERSTACK_SECRET_KEY;
@@ -34,9 +34,18 @@ export default async function handler(req) {
     const vm = await verifyMember(tokenFromRequest(req, null));
     if (!vm.ok) return json({ error: vm.reason }, 401);
     const email = memberEmail(vm.member);
-    const [rewards, floats, redemptions] = await Promise.all([listRewards(), listFloats(), memberRedemptions(email)]);
+    const [rewards, floats, redemptions, ledger] = await Promise.all([
+      listRewards(),
+      listFloats(),
+      memberRedemptions(email),
+      memberLedger(email, 100),
+    ]);
     const catalogue = rewards.map((r) => ({ ...publicReward(r), avail: rewardAvailability(r, floats) }));
-    return json({ points: memberPoints(vm.member), catalogue, redemptions });
+    const cutoff = Date.now() - 30 * 86400000;
+    const earnedLately = ledger
+      .filter((e) => e.delta > 0 && e.at && Date.parse(e.at) >= cutoff)
+      .reduce((s, e) => s + e.delta, 0);
+    return json({ points: memberPoints(vm.member), earnedLately, catalogue, redemptions });
   }
 
   if (req.method !== 'POST') return json({ error: 'method-not-allowed' }, 405);

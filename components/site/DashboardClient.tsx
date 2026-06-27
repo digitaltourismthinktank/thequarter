@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/ds/Button';
 import { Icon } from '@/components/ds/Icon';
 import { useMember } from './useMember';
+import { MemberTabs } from './MemberTabs';
 import { CheckInCard } from './CheckInCard';
 import { MyBookingsCard } from './MyBookingsCard';
 import { EventsCard } from './EventsCard';
@@ -145,6 +146,7 @@ export function DashboardClient() {
 
   return (
     <div>
+      <MemberTabs />
       <div className={styles.head}>
         <div>
           <h1 className={styles.title}>Welcome back</h1>

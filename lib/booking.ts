@@ -204,7 +204,7 @@ export interface Redemption {
   at: string | null;
 }
 export const getRewards = () =>
-  call<{ points: number; catalogue: RewardItem[]; redemptions: Redemption[] }>('rewards');
+  call<{ points: number; earnedLately: number; catalogue: RewardItem[]; redemptions: Redemption[] }>('rewards');
 export const redeemReward = (rewardId: string) =>
   call<{ ok: boolean; balance: number; reward: RewardItem; token: string }>('rewards', {
     method: 'POST',
