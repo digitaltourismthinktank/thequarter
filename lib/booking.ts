@@ -255,6 +255,16 @@ export const getRewards = () =>
 // ---- Member profile (birthday / company on Memberstack metaData) ----
 export const saveProfile = (body: { bday?: string | null; company?: string }) =>
   call<{ ok: boolean; bday: string | null; company: string | null }>('member-profile', { method: 'POST', body });
+
+// ---- Day-pass carnet ----
+export interface CarnetState {
+  remaining: number;
+  total: number;
+  expires: string | null;
+}
+export const getCarnet = () => call<{ carnet: CarnetState }>('carnet');
+export const useCarnetPass = () =>
+  call<{ ok: boolean; carnet: CarnetState; pointsAwarded: number }>('carnet', { method: 'POST', body: { action: 'use' } });
 export const redeemReward = (rewardId: string) =>
   call<{ ok: boolean; balance: number; reward: RewardItem; token: string }>('rewards', {
     method: 'POST',

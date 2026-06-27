@@ -22,7 +22,7 @@ import {
   getMemberSync,
   stampSync,
 } from './_quarter-sync.mjs';
-import { pointsForGBP, appendLedger, WELCOME_BONUS, creditReferral } from './_rewards.mjs';
+import { pointsForGBP, appendLedger, WELCOME_BONUS, creditReferral, CARNET_AMOUNT_TO_PASSES } from './_rewards.mjs';
 
 const MS_SECRET = process.env.MEMBERSTACK_SECRET_KEY;
 const STRIPE_SECRET = process.env.STRIPE_SECRET_KEY;
@@ -93,6 +93,8 @@ async function handleEvent(event) {
     email = obj.customer_email || (await emailFromCustomer(obj.customer));
   } else if (type === 'customer.subscription.created' || type === 'customer.subscription.updated' || type === 'customer.subscription.deleted') {
     email = await emailFromCustomer(obj.customer);
+  } else if (type === 'checkout.session.completed') {
+    email = obj.customer_details?.email || obj.customer_email || (await emailFromCustomer(obj.customer));
   } else {
     return { ...base, ignored: true };
   }
@@ -136,6 +138,24 @@ async function handleEvent(event) {
       earnMeta = { ...(metaData || {}), points: cur + spend + welcome };
     }
     applied = { billingReason: obj.billing_reason, resetDays: isRenewal, spend, welcome };
+  } else if (type === 'checkout.session.completed') {
+    // Day-pass carnet purchase (one-off). Top up balance, reset the 12-month expiry,
+    // and earn spend points. amount_total maps to a bundle via config (provisional).
+    const amount = obj.amount_total ?? 0;
+    const passes = CARNET_AMOUNT_TO_PASSES[amount] || 0;
+    if (passes > 0) {
+      const c = member.metaData?.carnet || {};
+      const remaining = (Number(c.remaining) || 0) + passes;
+      const total = (Number(c.total) || 0) + passes;
+      const expires = new Date(Date.now() + 365 * 86400000).toISOString().slice(0, 10);
+      const spend = pointsForGBP(amount / 100);
+      if (spend > 0) await appendLedger(email, spend, 'spend', obj.id || '');
+      const cur = Math.max(0, Math.round(Number(metaData?.points) || 0));
+      earnMeta = { ...(metaData || {}), carnet: { remaining, total, expires }, points: cur + spend };
+      applied = { carnet: passes, spend };
+    } else {
+      applied = { checkout: 'no-carnet-match', amount };
+    }
   } else {
     // customer.subscription.created / updated
     const price = obj.items?.data?.[0]?.price;

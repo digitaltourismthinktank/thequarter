@@ -1,0 +1,139 @@
+.card {
+  max-width: 720px;
+  margin-top: 18px;
+  border-radius: 24px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-card);
+  box-shadow: var(--shadow-card);
+  padding: 28px;
+}
+.eyebrow {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  color: var(--gold-700);
+  font-weight: var(--fw-semibold);
+}
+.title {
+  font-size: 22px;
+  font-weight: var(--fw-bold);
+  letter-spacing: -0.02em;
+  margin: 6px 0;
+}
+.body {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-body);
+  margin-bottom: 16px;
+}
+
+.balanceRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.balance strong {
+  font-size: 34px;
+  font-weight: var(--fw-bold);
+  letter-spacing: -0.03em;
+}
+.balance span {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+.valid {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.meter {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--sand-200);
+  overflow: hidden;
+  margin: 10px 0 4px;
+}
+.meter span {
+  display: block;
+  height: 100%;
+  background: var(--gold-500);
+}
+.useRow {
+  margin: 14px 0 4px;
+}
+
+.bundles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+.bundle {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-page);
+}
+.best {
+  border-color: var(--gold-300);
+  background: var(--gold-100);
+}
+.bestTag {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: var(--fw-semibold);
+  color: var(--gold-700);
+}
+.bundlePasses {
+  font-size: 17px;
+  font-weight: var(--fw-bold);
+  color: var(--ink-900);
+}
+.bundlePrice {
+  font-size: 15px;
+  color: var(--ink-900);
+}
+.bundlePer {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.buy,
+.buyOff {
+  margin-top: 10px;
+  padding: 8px 18px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: var(--fw-semibold);
+  text-align: center;
+}
+.buy {
+  background: var(--gold-500);
+  color: var(--ink-900);
+  cursor: pointer;
+}
+.buy:hover {
+  background: var(--gold-600);
+}
+.buyOff {
+  background: var(--sand-100);
+  color: var(--text-muted);
+}
+.single {
+  margin-top: 14px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.msg {
+  margin-top: 12px;
+  font-size: 14px;
+  color: var(--gold-700);
+}

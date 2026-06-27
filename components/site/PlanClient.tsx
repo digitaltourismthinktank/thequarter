@@ -7,6 +7,7 @@ import { PLANS } from '@/lib/plans';
 import { ANNUAL_PLANS, annualSaving } from '@/lib/rewards';
 import { getMemberToken } from '@/lib/memberstack';
 import { MemberTabs } from './MemberTabs';
+import { CarnetCard } from './CarnetCard';
 import styles from './PlanClient.module.css';
 
 const ANNUAL_SLUGS = Object.keys(ANNUAL_PLANS);
@@ -128,6 +129,8 @@ export function PlanClient() {
             : 'Change plan, update your card or cancel any time in the billing portal.'}
         </p>
       </div>
+
+      <CarnetCard />
     </div>
   );
 }

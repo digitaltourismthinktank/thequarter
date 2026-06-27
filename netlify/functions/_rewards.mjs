@@ -23,6 +23,11 @@ export const CHECKIN_BONUS_CAP = 12; // counted check-ins per calendar month
 export const REFERRAL_BONUS = 500;
 export const WELCOME_BONUS = 150;
 
+/** Carnet purchase: Stripe checkout amount (pence) → passes. Provisional — mirrors
+ *  lib/rewards CARNET_BUNDLES (10 @ £194.40, 30 @ £550.80). Confirm + wire real Stripe
+ *  products with Riva; update these amounts if the prices change. */
+export const CARNET_AMOUNT_TO_PASSES = { 19440: 10, 55080: 30 };
+
 export const pointsForGBP = (gbp) => Math.round(POINTS_PER_GBP * Math.max(0, Number(gbp) || 0));
 export const poundsValue = (points) => Math.max(0, Number(points) || 0) / POINTS_PER_POUND_VALUE;
 
