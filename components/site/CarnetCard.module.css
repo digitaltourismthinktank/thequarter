@@ -137,3 +137,12 @@
   font-size: 14px;
   color: var(--gold-700);
 }
+.thanks {
+  margin: 4px 0 14px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  background: var(--gold-100);
+  border: 1px solid var(--gold-300);
+  color: var(--gold-700);
+  font-size: 14px;
+}

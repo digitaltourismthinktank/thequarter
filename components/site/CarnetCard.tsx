@@ -4,11 +4,18 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/ds/Button';
 import { getCarnet, useCarnetPass, type CarnetState } from '@/lib/booking';
 import { CARNET_BUNDLES, DAY_PASS_PRICE, carnetPerPass } from '@/lib/rewards';
+import { useMember } from './useMember';
 import styles from './CarnetCard.module.css';
 
-const BUY_URL: Record<number, string | undefined> = {
-  10: process.env.NEXT_PUBLIC_STRIPE_CARNET_10_URL,
-  30: process.env.NEXT_PUBLIC_STRIPE_CARNET_30_URL,
+/** Stripe Payment Links per bundle (env overrides the live defaults). */
+const CARNET_LINKS: Record<number, string | undefined> = {
+  10: process.env.NEXT_PUBLIC_STRIPE_CARNET_10_URL || 'https://buy.stripe.com/dRm006aGyb8QcbUfwl2B21u',
+  30: process.env.NEXT_PUBLIC_STRIPE_CARNET_30_URL || 'https://buy.stripe.com/bJeaEKg0Sb8Q1xg4RH2B21v',
+};
+const buyUrl = (passes: number, email?: string | null) => {
+  const base = CARNET_LINKS[passes];
+  if (!base) return undefined;
+  return email ? `${base}?prefilled_email=${encodeURIComponent(email)}` : base;
 };
 const gbp = (n: number) => `£${n.toFixed(2)}`;
 
@@ -29,9 +36,12 @@ function friendly(code?: string): string {
 }
 
 export function CarnetCard() {
+  const { member } = useMember();
+  const email = member?.auth?.email || null;
   const [carnet, setCarnet] = useState<CarnetState>({ remaining: 0, total: 0, expires: null });
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [thanks, setThanks] = useState(false);
 
   async function refresh() {
     const r = await getCarnet();
@@ -39,6 +49,18 @@ export function CarnetCard() {
   }
   useEffect(() => {
     refresh();
+  }, []);
+  // Returning from a carnet purchase — the webhook top-up can lag a moment, so poll briefly.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('carnet') !== 'thanks') return;
+    setThanks(true);
+    let n = 0;
+    const t = setInterval(async () => {
+      const r = await getCarnet();
+      if (r.ok) setCarnet(r.data.carnet);
+      if ((n += 1) >= 4) clearInterval(t);
+    }, 2500);
+    return () => clearInterval(t);
   }, []);
 
   async function useOne() {
@@ -64,6 +86,7 @@ export function CarnetCard() {
       <span className={styles.eyebrow}>Day passes</span>
       <h2 className={styles.title}>A book of day passes</h2>
       <p className={styles.body}>For days your plan doesn&rsquo;t cover, or to sign a friend in. Valid 12 months, use as you like.</p>
+      {thanks ? <p className={styles.thanks}>Thanks — your passes are being added. This can take a moment to show.</p> : null}
 
       <div className={styles.balanceRow}>
         <div className={styles.balance}>
@@ -88,7 +111,7 @@ export function CarnetCard() {
 
       <div className={styles.bundles}>
         {CARNET_BUNDLES.map((b) => {
-          const url = BUY_URL[b.passes];
+          const url = buyUrl(b.passes, email);
           return (
             <div key={b.passes} className={`${styles.bundle} ${b.bestValue ? styles.best : ''}`}>
               {b.bestValue ? <span className={styles.bestTag}>Best value</span> : null}
