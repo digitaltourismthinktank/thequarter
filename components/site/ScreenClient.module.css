@@ -163,6 +163,50 @@
   font-size: 15px;
   color: var(--text-muted);
 }
+.eventFeature {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 20px 22px;
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+.evIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 84px;
+  height: 84px;
+  flex: none;
+  border-radius: 18px;
+  background: var(--gold-100);
+}
+.evBody {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.evDesc {
+  font-size: 14px;
+  color: var(--text-body);
+  margin-top: 2px;
+}
+.dots {
+  display: flex;
+  justify-content: center;
+  gap: 7px;
+  margin-top: 14px;
+}
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--sand-300);
+}
+.dotOn {
+  background: var(--gold-500);
+}
 .loading {
   text-align: center;
   color: var(--text-muted);

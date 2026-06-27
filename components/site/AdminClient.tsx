@@ -6,6 +6,7 @@ import { useMember } from './useMember';
 import { WeekStrip } from './WeekStrip';
 import { Icon, type IconName } from '@/components/ds/Icon';
 import { Qr } from '@/components/ds/Qr';
+import { EVENT_THEMES } from '@/lib/eventThemes';
 import {
   adminGetMembers,
   adminGetSpaces,
@@ -758,7 +759,7 @@ function EventsPane() {
   const [start, setStart] = useState('');
   const [end, setEnd] = useState('');
   const [location, setLocation] = useState('The Kentish Pantry');
-  const [category, setCategory] = useState('Social');
+  const [category, setCategory] = useState('Social & drinks');
   const [published, setPublished] = useState(true);
 
   const refresh = useCallback(async () => {
@@ -776,7 +777,7 @@ function EventsPane() {
     setStart('');
     setEnd('');
     setLocation('The Kentish Pantry');
-    setCategory('Social');
+    setCategory('Social & drinks');
     setPublished(true);
   }
   function edit(e: QuarterEvent) {
@@ -835,11 +836,10 @@ function EventsPane() {
             <input type="datetime-local" className={styles.select} value={end} onChange={(e) => setEnd(e.target.value)} />
           </label>
           <input className={styles.label} placeholder="Location" value={location} onChange={(e) => setLocation(e.target.value)} />
-          <select className={styles.select} value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Category">
-            <option>Social</option>
-            <option>Business briefing</option>
-            <option>Charity Friday</option>
-            <option>Other</option>
+          <select className={styles.select} value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Theme">
+            {EVENT_THEMES.map((t) => (
+              <option key={t.name}>{t.name}</option>
+            ))}
           </select>
           <label className={styles.check}>
             <input type="checkbox" checked={published} onChange={(e) => setPublished(e.target.checked)} /> Published

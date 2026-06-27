@@ -17,6 +17,7 @@ import { londonNow, isWeekday, addDays } from './_time.mjs';
 import { allowanceForMember } from './_quarter-sync.mjs';
 import { awardPoints, checkinBonusesThisMonth, CHECKIN_BONUS, CHECKIN_QUIET_BONUS, CHECKIN_BONUS_CAP } from './_rewards.mjs';
 import { isQuietDay } from './_busyness.mjs';
+import { isClosedDay } from './_holidays.mjs';
 
 const MS_SECRET = process.env.MEMBERSTACK_SECRET_KEY;
 const json = (b, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { 'content-type': 'application/json' } });
@@ -93,6 +94,7 @@ export default async function handler(req) {
   if (body.action === 'checkin') {
     const today = londonNow().dateStr;
     if (!isWeekday(today)) return json({ error: 'closed-weekend' }, 400);
+    if (await isClosedDay(today)) return json({ error: 'closed-day' }, 400);
     const recs = await checkinsFor(email, today);
     const already = recs.find((r) => r.fields[F.checkins.status] === 'Checked-in');
     if (already) {
@@ -151,6 +153,7 @@ export default async function handler(req) {
     const date = body.date || addDays(londonNow().dateStr, 1);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return json({ error: 'bad-date' }, 400);
     if (!isWeekday(date)) return json({ error: 'closed-weekend' }, 400);
+    if (await isClosedDay(date)) return json({ error: 'closed-day' }, 400);
     const existing = await checkinsFor(email, date);
     if (existing.some((r) => r.fields[F.checkins.status] !== 'Cancelled')) {
       return json({ ok: true, alreadyReserved: true });

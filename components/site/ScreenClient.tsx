@@ -9,6 +9,8 @@ import {
   type QuarterEvent,
 } from '@/lib/booking';
 import { busyness, meetingRoomLine, type Band } from '@/lib/busyness';
+import { Icon } from '@/components/ds/Icon';
+import { eventThemeIcon } from '@/lib/eventThemes';
 import styles from './ScreenClient.module.css';
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -50,6 +52,7 @@ export function ScreenClient() {
   const [now, setNow] = useState<Date>(() => new Date());
   const [bankHoliday, setBankHoliday] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [page, setPage] = useState(0);
 
   const load = useCallback(async () => {
     const [s, e] = await Promise.all([getTodayScreen(), getUpcomingEvents()]);
@@ -69,6 +72,13 @@ export function ScreenClient() {
     return () => clearInterval(t);
   }, []);
 
+  // "What's on" auto-rotates one event per page every 6s.
+  useEffect(() => {
+    if (events.length <= 1) return;
+    const t = setInterval(() => setPage((p) => (p + 1) % events.length), 6000);
+    return () => clearInterval(t);
+  }, [events.length]);
+
   useEffect(() => {
     (async () => {
       try {
@@ -84,9 +94,14 @@ export function ScreenClient() {
   }, []);
 
   const b = busyness(now);
-  const closed = b.closed || bankHoliday;
+  // Christmas/New Year shutdown (24 Dec – 1 Jan) layered on weekends + bank holidays.
+  const cm = now.getMonth() + 1;
+  const cd = now.getDate();
+  const shutdown = (cm === 12 && cd >= 24) || (cm === 1 && cd === 1);
+  const closed = b.closed || bankHoliday || shutdown;
   const band: Band | undefined = b.band;
   const nowMin = now.getHours() * 60 + now.getMinutes();
+  const featured = events.length ? events[page % events.length] : null;
 
   const spaces = data?.spaces || [];
   const bookings = data?.bookings || [];
@@ -160,20 +175,29 @@ export function ScreenClient() {
         </>
       ) : null}
 
-      {events.length ? (
+      {featured ? (
         <section className={styles.block}>
-          <h2 className={styles.h2}>What&rsquo;s on</h2>
-          <div className={styles.events}>
-            {events.slice(0, 4).map((ev) => (
-              <div key={ev.id} className={styles.event}>
-                <span className={styles.evTitle}>{ev.title}</span>
-                <span className={styles.evMeta}>
-                  {ev.start ? eventWhen(ev.start) : ''}
-                  {ev.location ? ` · ${ev.location}` : ''}
-                </span>
-              </div>
-            ))}
+          <h2 className={styles.h2}>What&rsquo;s on{events[0]?.location ? ` in ${events[0].location}` : ''}</h2>
+          <div className={styles.eventFeature}>
+            <span className={styles.evIcon}>
+              <Icon name={eventThemeIcon(featured.category)} size={56} color="var(--gold-700)" />
+            </span>
+            <div className={styles.evBody}>
+              <span className={styles.evTitle}>{featured.title}</span>
+              <span className={styles.evMeta}>
+                {featured.start ? eventWhen(featured.start) : ''}
+                {featured.location ? ` · ${featured.location}` : ''}
+              </span>
+              {featured.description ? <span className={styles.evDesc}>{featured.description}</span> : null}
+            </div>
           </div>
+          {events.length > 1 ? (
+            <div className={styles.dots}>
+              {events.map((_, i) => (
+                <span key={i} className={`${styles.dot} ${i === page % events.length ? styles.dotOn : ''}`} aria-hidden="true" />
+              ))}
+            </div>
+          ) : null}
         </section>
       ) : null}
 

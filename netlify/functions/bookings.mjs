@@ -13,6 +13,7 @@
 import { verifyMember, memberEmail, memberName, isAdmin, tokenFromRequest } from './_member.mjs';
 import { listRecords, createRecord, updateRecord, T, F, airtableReady, esc } from './_airtable.mjs';
 import { BUSINESS, hhmmToMin, isWeekday, londonWallClockToISO, isoToLondonMin, londonNow } from './_time.mjs';
+import { isClosedDay } from './_holidays.mjs';
 
 const json = (b, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { 'content-type': 'application/json' } });
 
@@ -134,6 +135,7 @@ export default async function handler(req) {
     if (!spaceId) return json({ error: 'missing-space' }, 400);
     const err = validateSlot(date, start, end);
     if (err) return json({ error: err }, 400);
+    if (await isClosedDay(date)) return json({ error: 'closed-day' }, 400);
 
     const s = hhmmToMin(start);
     const e = hhmmToMin(end);
