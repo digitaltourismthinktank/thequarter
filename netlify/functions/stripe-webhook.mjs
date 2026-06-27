@@ -22,7 +22,7 @@ import {
   getMemberSync,
   stampSync,
 } from './_quarter-sync.mjs';
-import { pointsForGBP, appendLedger, WELCOME_BONUS } from './_rewards.mjs';
+import { pointsForGBP, appendLedger, WELCOME_BONUS, creditReferral } from './_rewards.mjs';
 
 const MS_SECRET = process.env.MEMBERSTACK_SECRET_KEY;
 const STRIPE_SECRET = process.env.STRIPE_SECRET_KEY;
@@ -129,6 +129,8 @@ async function handleEvent(event) {
     const welcome = obj.billing_reason === 'subscription_create' ? WELCOME_BONUS : 0;
     if (spend > 0) await appendLedger(email, spend, 'spend', obj.id || '');
     if (welcome > 0) await appendLedger(email, welcome, 'welcome', obj.id || '');
+    // First paid plan → credit whoever referred this member (no-op if not referred).
+    if (welcome > 0) await creditReferral(email);
     if (spend > 0 || welcome > 0) {
       const cur = Math.max(0, Math.round(Number(metaData?.points) || 0));
       earnMeta = { ...(metaData || {}), points: cur + spend + welcome };

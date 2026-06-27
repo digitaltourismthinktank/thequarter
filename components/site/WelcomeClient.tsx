@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ds/Button';
 import { getMemberstack, memberstackError } from '@/lib/memberstack';
 import { PLANS, PLAN_MEMBERSTACK_ID, PLAN_DAY_ALLOWANCE, type PlanId } from '@/lib/plans';
-import { getWelcomeSession, saveProfile } from '@/lib/booking';
+import { getWelcomeSession, saveProfile, registerReferral } from '@/lib/booking';
 import styles from './WelcomeClient.module.css';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -80,6 +80,16 @@ export function WelcomeClient({ plan }: { plan: string }) {
         } catch {
           /* non-blocking — they can add it later on Rewards */
         }
+      }
+      // If they arrived via a friend's invite link, register the referral (best-effort).
+      try {
+        const ref = window.localStorage.getItem('q_ref');
+        if (ref) {
+          await registerReferral(ref);
+          window.localStorage.removeItem('q_ref');
+        }
+      } catch {
+        /* non-blocking */
       }
       router.push('/dashboard');
     } catch (err) {

@@ -21,6 +21,7 @@ export const T = {
   redemptions: 'tblmX1UzLoms8smxe',
   tokens: 'tbliuDUKJnGs9Hcgo',
   scanLog: 'tblgAY1I86JhnxCQV',
+  referrals: 'tblnFOW4GKzKmXKNw',
 };
 
 export const F = {
@@ -139,6 +140,14 @@ export const F = {
     perkId: 'fldy5EtMxvcAlrwE6',
     result: 'fldYxPUz98JUFfZZo',
     at: 'fldKWZasG8TVCQ1XP',
+  },
+  referrals: {
+    entry: 'fldIyR8sOeYUe25ly',
+    referrerId: 'fldSfVBnxX53UQJfo',
+    friendEmail: 'fldssXXeG8VHA7Iep',
+    friendName: 'fld3TFFOKHaTrQ8ql',
+    status: 'fldmduPn7aORgCf56',
+    at: 'fld6hhxRhOpRya0jH',
   },
 };
 

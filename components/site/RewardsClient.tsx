@@ -9,6 +9,7 @@ import { EARN_RULES } from '@/lib/rewards';
 import { getRewards, redeemReward, type RewardItem, type Redemption, type BirthdayState } from '@/lib/booking';
 import { MemberTabs } from './MemberTabs';
 import { BirthdayCard } from './BirthdayCard';
+import { ReferFriendCard } from './ReferFriendCard';
 import { RedemptionSheet, type RedemptionInfo } from './RedemptionSheet';
 import styles from './RewardsClient.module.css';
 
@@ -170,13 +171,7 @@ export function RewardsClient() {
         </section>
 
         <aside className={styles.side}>
-          <div className={styles.sideCard}>
-            <span className={styles.eyebrow}>How it works</span>
-            <p className={styles.sideBody}>
-              100 points is worth about £1 of treats. Points appear automatically when you check in, spend at The Quarter, or
-              bring a friend who joins.
-            </p>
-          </div>
+          <ReferFriendCard />
         </aside>
       </div>
 

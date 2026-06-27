@@ -300,3 +300,14 @@ export interface VerifyResult {
 }
 export const verifyToken = (token: string) =>
   call<VerifyResult>(`verify?token=${encodeURIComponent(token)}`, { auth: false });
+
+// ---- Refer a friend ----
+export interface ReferralFriend {
+  name: string;
+  status: string;
+  at: string | null;
+}
+export const getReferrals = () =>
+  call<{ code: string; joined: number; pending: number; friends: ReferralFriend[] }>('referrals');
+export const registerReferral = (referrerId: string) =>
+  call<{ ok: boolean }>('referrals', { method: 'POST', body: { action: 'register', referrerId } });

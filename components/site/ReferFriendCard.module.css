@@ -1,0 +1,134 @@
+.card {
+  border-radius: 20px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-card);
+  padding: 20px;
+}
+.eyebrow {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  color: var(--gold-700);
+  font-weight: var(--fw-semibold);
+}
+.title {
+  font-size: 20px;
+  font-weight: var(--fw-bold);
+  letter-spacing: -0.02em;
+  margin: 6px 0;
+}
+.body {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-body);
+}
+.body strong {
+  color: var(--gold-700);
+}
+
+.inviteBlock {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 14px 0 10px;
+  padding: 10px 12px;
+  border: 1px dashed var(--sand-300);
+  border-radius: var(--radius-md);
+  background: var(--sand-50);
+}
+.link {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text-body);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.copyBtn {
+  display: inline-flex;
+  flex: none;
+  padding: 7px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--surface-card);
+  cursor: pointer;
+}
+.copyBtn:disabled {
+  opacity: 0.5;
+}
+
+.wa {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 11px 16px;
+  border-radius: 999px;
+  background: var(--ink-900);
+  color: var(--sand-50);
+  font-size: 14px;
+  font-weight: var(--fw-semibold);
+  text-decoration: none;
+}
+.wa:hover {
+  background: var(--ink-800);
+}
+
+.tracker {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-subtle);
+}
+.trackerLine {
+  font-size: 13px;
+  font-weight: var(--fw-semibold);
+  color: var(--text-muted);
+}
+.friends {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+.friend {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border-radius: 999px;
+  background: var(--sand-100);
+  color: var(--ink-900);
+  font-size: 13px;
+  font-weight: var(--fw-semibold);
+}
+.fName {
+  flex: 1;
+  font-size: 14px;
+  color: var(--ink-900);
+}
+.pill {
+  font-size: 11px;
+  font-weight: var(--fw-semibold);
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--sand-100);
+  color: var(--text-muted);
+}
+.pillJoined {
+  background: var(--gold-100);
+  color: var(--gold-700);
+}
+.empty {
+  display: block;
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--text-muted);
+}

@@ -217,6 +217,37 @@ export async function redeemReward(member, rewardId) {
   return { ok: true, balance, reward };
 }
 
+/**
+ * On a referred friend's first paid plan: flip their pending referral to "joined" and
+ * credit the referrer REFERRAL_BONUS. Safe to call on every first invoice (no-op if the
+ * friend wasn't referred or was already credited). Credits a DIFFERENT member than the
+ * one being synced, so it won't collide with the webhook's friend metaData write.
+ */
+export async function creditReferral(friendEmail) {
+  if (!friendEmail) return { credited: false };
+  const rows = await listRecords(T.referrals, {
+    filterByFormula: `AND({Friend email}='${esc(friendEmail)}', {Status}='pending')`,
+    maxRecords: 1,
+  });
+  const row = rows[0];
+  if (!row) return { credited: false };
+  await updateRecord(T.referrals, row.id, { [F.referrals.status]: 'joined' });
+  const referrerId = row.fields[F.referrals.referrerId];
+  if (!referrerId) return { credited: false };
+  try {
+    const admin = memberstackAdmin.init(MS_SECRET);
+    const r = await admin.members.retrieve({ id: referrerId });
+    const referrer = r?.data;
+    if (referrer) {
+      await awardPoints(referrer, REFERRAL_BONUS, 'referral', friendEmail);
+      return { credited: true, referrerId };
+    }
+  } catch {
+    /* ignore */
+  }
+  return { credited: false };
+}
+
 /** A member's redemptions (most recent first). */
 export async function memberRedemptions(email, max = 20) {
   const rows = await listRecords(T.redemptions, {
