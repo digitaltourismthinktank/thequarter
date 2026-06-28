@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Section } from '@/components/site/primitives';
+import { MemberShell } from '@/components/site/MemberShell';
 import { DashboardClient } from '@/components/site/DashboardClient';
 
 export const metadata: Metadata = {
@@ -11,8 +11,8 @@ export const metadata: Metadata = {
 /* PHASE-2 SEAM, now live: a Memberstack-gated member area. */
 export default function DashboardPage() {
   return (
-    <Section tone="page">
+    <MemberShell>
       <DashboardClient />
-    </Section>
+    </MemberShell>
   );
 }

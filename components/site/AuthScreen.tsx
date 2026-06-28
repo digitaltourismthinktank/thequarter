@@ -10,6 +10,7 @@ import { Badge } from '@/components/ds/Badge';
 import { Icon } from '@/components/ds/Icon';
 import { PHOTOS } from '@/lib/media';
 import { getMemberstack, memberstackError } from '@/lib/memberstack';
+import { isAdminEmail } from '@/lib/admin';
 import styles from './AuthScreen.module.css';
 
 /* The Quarter — member auth (login / sign up / password reset) via Memberstack.
@@ -61,8 +62,8 @@ export function AuthScreen({ mode }: { mode: 'login' | 'signup' }) {
       }
       // Client-side navigation keeps the just-authenticated Memberstack instance
       // in memory; a full page reload raced session restore and bounced to /login.
-      // Staff land straight on the admin page (they can switch to the member/guest views).
-      const dest = email.trim().toLowerCase().endsWith('@thinkdigital.travel') ? '/admin' : '/dashboard';
+      // Staff land straight on the admin page (they can switch to the member view).
+      const dest = isAdminEmail(email) ? '/admin' : '/dashboard';
       router.push(dest);
     } catch (err) {
       setStatus('error');

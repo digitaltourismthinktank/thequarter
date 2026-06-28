@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Section } from '@/components/site/primitives';
+import { MemberShell } from '@/components/site/MemberShell';
 import { PlanClient } from '@/components/site/PlanClient';
 
 export const metadata: Metadata = {
@@ -10,8 +10,8 @@ export const metadata: Metadata = {
 
 export default function PlanPage() {
   return (
-    <Section tone="page">
+    <MemberShell>
       <PlanClient />
-    </Section>
+    </MemberShell>
   );
 }

@@ -3,9 +3,7 @@ import Script from 'next/script';
 import { DM_Sans } from 'next/font/google';
 import { SITE } from '@/lib/site';
 import { MEMBERSTACK_APP_ID } from '@/lib/memberstack';
-import { AnnouncementBar } from '@/components/site/AnnouncementBar';
-import { Navbar } from '@/components/site/Navbar';
-import { Footer } from '@/components/site/Footer';
+import { SiteHeader, SiteFooter } from '@/components/site/SiteChrome';
 import { JsonLd } from '@/components/site/JsonLd';
 import '@/styles/globals.css';
 
@@ -98,14 +96,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <a href="#main" className="q-skip-link">
           Skip to content
         </a>
-        <AnnouncementBar
-          message="New here? The Day Pass is our way in — a full day, breakfast included."
-          href="/day-pass"
-          linkLabel="Book a Day Pass"
-        />
-        <Navbar />
+        <SiteHeader />
         <main id="main">{children}</main>
-        <Footer />
+        <SiteFooter />
       </body>
     </html>
   );

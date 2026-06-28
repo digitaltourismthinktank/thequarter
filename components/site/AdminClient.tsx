@@ -51,6 +51,7 @@ import {
   type PerkItem,
   type QuarterEvent,
 } from '@/lib/booking';
+import { isAdminEmail } from '@/lib/admin';
 import styles from './AdminClient.module.css';
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || 'https://thequarter.work';
@@ -75,8 +76,6 @@ const TIMES: string[] = (() => {
   for (let m = 8 * 60; m <= 18 * 60; m += 30) a.push(minToHHMM(m));
   return a;
 })();
-const isAdminEmail = (e?: string) => !!e && e.toLowerCase().endsWith('@thinkdigital.travel');
-
 export function AdminClient() {
   const { loading, member } = useMember();
   const [tab, setTab] = useState<'today' | 'members' | 'rooms' | 'events' | 'content' | 'partners' | 'birthdays'>('today');
@@ -104,9 +103,6 @@ export function AdminClient() {
           <h1 className={styles.title}>Admin</h1>
           <p className={styles.sub}>Members, rooms &amp; overrides</p>
         </div>
-        <a className={styles.back} href="/dashboard">
-          ← Dashboard
-        </a>
       </div>
 
       <div className={styles.tabs}>

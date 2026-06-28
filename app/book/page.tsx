@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Section } from '@/components/site/primitives';
+import { MemberShell } from '@/components/site/MemberShell';
 import { BookingClient } from '@/components/site/BookingClient';
 
 export const metadata: Metadata = {
@@ -11,8 +11,8 @@ export const metadata: Metadata = {
 /* PHASE-3: member booking for meeting rooms + phone pods (Memberstack-gated). */
 export default function BookPage() {
   return (
-    <Section tone="page">
+    <MemberShell>
       <BookingClient />
-    </Section>
+    </MemberShell>
   );
 }

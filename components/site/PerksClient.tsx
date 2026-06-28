@@ -5,7 +5,7 @@ import { Icon, type IconName } from '@/components/ds/Icon';
 import { useMember, memberPlanSlug } from './useMember';
 import { PLANS } from '@/lib/plans';
 import { getMemberPerks, usePerk, type PerkItem } from '@/lib/booking';
-import { MemberTabs } from './MemberTabs';
+import { MemberShell } from './MemberShell';
 import { RedemptionSheet, type RedemptionInfo } from './RedemptionSheet';
 import styles from './PerksClient.module.css';
 
@@ -64,10 +64,8 @@ export function PerksClient({ marketing }: { marketing: ReactNode }) {
   if (loading || !member) return <>{marketing}</>;
 
   return (
-    <section className={styles.section}>
+    <MemberShell>
       <div className={styles.wrap}>
-        <MemberTabs />
-
         {active ? (
           <div className={styles.detailWrap}>
             <button className={styles.back} onClick={() => setActive(null)}>
@@ -136,6 +134,6 @@ export function PerksClient({ marketing }: { marketing: ReactNode }) {
       </div>
 
       <RedemptionSheet info={sheet} memberName={memberName} memberPlan={planName} onClose={() => setSheet(null)} />
-    </section>
+    </MemberShell>
   );
 }

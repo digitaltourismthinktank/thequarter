@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ds/Button';
+import { cn } from '@/lib/cn';
 import { getMyBookings, getSpaces, cancelBooking, type MyBooking } from '@/lib/booking';
 import styles from './MyBookingsCard.module.css';
 
@@ -18,7 +19,7 @@ function dayLabel(iso: string): string {
 }
 
 /** Dashboard card: the member's upcoming room/pod bookings, with cancel. */
-export function MyBookingsCard() {
+export function MyBookingsCard({ className }: { className?: string }) {
   const [loading, setLoading] = useState(true);
   const [bookings, setBookings] = useState<MyBooking[]>([]);
   const [spaceNames, setSpaceNames] = useState<Record<string, string>>({});
@@ -47,7 +48,7 @@ export function MyBookingsCard() {
   }
 
   return (
-    <div className={styles.card}>
+    <div className={cn(styles.card, className)}>
       <span className={styles.eyebrow}>Your bookings</span>
       {loading ? (
         <p className={styles.meta}>Loading…</p>

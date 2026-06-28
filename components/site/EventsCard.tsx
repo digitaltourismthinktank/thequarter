@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { cn } from '@/lib/cn';
 import { getUpcomingEvents, type QuarterEvent } from '@/lib/booking';
 import styles from './EventsCard.module.css';
 
@@ -17,7 +18,7 @@ function fmtWhen(start: string, end: string | null): string {
 }
 
 /** Dashboard card: upcoming published events (mostly in The Kentish Pantry). */
-export function EventsCard() {
+export function EventsCard({ className }: { className?: string }) {
   const [loading, setLoading] = useState(true);
   const [events, setEvents] = useState<QuarterEvent[]>([]);
 
@@ -30,7 +31,7 @@ export function EventsCard() {
   }, []);
 
   return (
-    <div className={styles.card}>
+    <div className={cn(styles.card, className)}>
       <span className={styles.eyebrow}>What&rsquo;s on</span>
       {loading ? (
         <p className={styles.meta}>Loading…</p>

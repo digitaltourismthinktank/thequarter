@@ -8,6 +8,7 @@ import { Button } from '@/components/ds/Button';
 import { IconButton } from '@/components/ds/IconButton';
 import { NAV_LINKS } from '@/lib/nav';
 import { cn } from '@/lib/cn';
+import { isAdminEmail } from '@/lib/admin';
 import { useMember } from './useMember';
 import { TalkToUs } from './TalkToUs';
 import styles from './Navbar.module.css';
@@ -16,8 +17,9 @@ export function Navbar() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const { member } = useMember();
-  const accountHref = member ? '/dashboard' : '/login';
-  const accountLabel = member ? 'Dashboard' : 'Member login';
+  const admin = isAdminEmail(member?.auth?.email);
+  const accountHref = member ? (admin ? '/admin' : '/dashboard') : '/login';
+  const accountLabel = member ? (admin ? 'Admin' : 'Dashboard') : 'Member login';
 
   const isActive = (href: string) => (href === '/' ? pathname === '/' : pathname.startsWith(href));
 

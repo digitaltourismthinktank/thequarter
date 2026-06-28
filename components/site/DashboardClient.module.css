@@ -7,31 +7,140 @@
   font-size: 16px;
 }
 
-.head {
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* ---- Hero ---- */
+.hero {
   display: flex;
   justify-content: space-between;
-  align-items: flex-end;
-  gap: 16px;
+  align-items: flex-start;
+  gap: 20px;
   flex-wrap: wrap;
-  margin-bottom: 32px;
+}
+.heroEyebrow {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  color: var(--gold-700);
+  font-weight: var(--fw-semibold);
 }
 .title {
-  font-size: clamp(28px, 4vw, 40px);
+  font-size: clamp(30px, 4.4vw, 44px);
   font-weight: var(--fw-bold);
   letter-spacing: -0.03em;
-  line-height: 1.05;
+  line-height: 1.04;
+  margin-top: 8px;
 }
 .email {
   color: var(--text-muted);
   font-size: 15px;
+  margin-top: 8px;
+}
+.doorPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  background: var(--ink-900);
+  color: var(--sand-50);
+  border-radius: var(--radius-pill);
+  padding: 11px 18px;
   margin-top: 6px;
 }
-
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 22px;
+.doorPillLabel {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  color: var(--gold-400);
+  font-weight: var(--fw-semibold);
 }
+.doorPillValue {
+  font-size: 18px;
+  letter-spacing: 0.12em;
+  font-weight: var(--fw-bold);
+}
+
+/* ---- Busyness strip ---- */
+.busy {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-card);
+  padding: 18px 24px;
+}
+.busyEyebrow {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  color: var(--gold-700);
+  font-weight: var(--fw-semibold);
+}
+.busyLine {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+.busyBand {
+  font-size: 20px;
+  font-weight: var(--fw-bold);
+  letter-spacing: -0.02em;
+  color: var(--ink-900);
+}
+.busyDesc {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+.busyMeter {
+  display: flex;
+  gap: 6px;
+  flex: none;
+}
+.busyDot {
+  width: 34px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--sand-200);
+}
+.busyDotOn {
+  background: var(--gold-500);
+}
+
+/* ---- Card grid (mobile-first → masonry-ish 3-up) ---- */
+.grid {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+@media (min-width: 680px) {
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    align-items: start;
+  }
+}
+@media (min-width: 1000px) {
+  .grid {
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 22px;
+  }
+  /* Check-in is the tall right rail spanning both card rows. */
+  .gVisits {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+  }
+}
+
 .card {
   background: var(--surface-card);
   border: 1px solid var(--border-subtle);
@@ -52,7 +161,7 @@
   font-size: 24px;
   font-weight: var(--fw-bold);
   letter-spacing: -0.02em;
-  margin: 8px 0 4px;
+  margin: 10px 0 4px;
 }
 .planMeta {
   color: var(--text-muted);
@@ -62,7 +171,7 @@
   font-size: 14px;
   color: var(--text-body);
   line-height: 1.6;
-  margin: 8px 0 18px;
+  margin: 10px 0 20px;
 }
 .actions {
   display: flex;
@@ -74,7 +183,7 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  margin-top: 4px;
+  margin-top: 14px;
 }
 .quickLink {
   display: flex;
@@ -87,17 +196,70 @@
   font-weight: var(--fw-medium);
   color: var(--ink-900);
   font-size: 15px;
+  transition: background var(--duration-fast) var(--ease-standard);
 }
 .quickLink:hover {
   background: var(--sand-100);
 }
-.soon {
-  font-size: var(--text-xs);
-  color: var(--text-muted);
-  font-weight: var(--fw-regular);
+.quickTalk {
+  margin-top: 12px;
 }
-.logout {
-  margin-top: 28px;
+
+/* ---- Days card (dark, with a soft gold glow) ---- */
+.cardDark {
+  background:
+    radial-gradient(120% 90% at 100% 0%, rgba(190, 155, 83, 0.32), rgba(190, 155, 83, 0) 60%),
+    var(--ink-900);
+  border-color: transparent;
+  color: var(--sand-50);
+}
+.cardDark .cardEyebrow {
+  color: var(--gold-400);
+}
+.cardDark .planName,
+.cardDark .daysBig {
+  color: var(--sand-50);
+}
+.cardDark .planMeta,
+.cardDark .daysUnit,
+.cardDark .cardText {
+  color: var(--stone-300);
+}
+
+.daysBig {
+  font-size: 56px;
+  font-weight: var(--fw-bold);
+  letter-spacing: -0.03em;
+  color: var(--ink-900);
+  margin: 12px 0 4px;
+  line-height: 1;
+}
+.daysUnit {
+  font-size: 16px;
+  font-weight: var(--fw-medium);
+  color: var(--text-muted);
+  letter-spacing: 0;
+}
+.rolled {
+  align-self: flex-start;
+  margin-top: 14px;
+  font-size: 12.5px;
+  font-weight: var(--fw-semibold);
+  color: var(--gold-300);
+  background: rgba(210, 181, 118, 0.18);
+  padding: 5px 11px;
+  border-radius: 999px;
+}
+
+.billingError {
+  margin-top: 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--danger);
+}
+.billingError a {
+  color: var(--gold-700);
+  font-weight: var(--fw-semibold);
 }
 
 .debug {
@@ -112,65 +274,4 @@
   white-space: pre-wrap;
   word-break: break-word;
   color: var(--text-body);
-}
-
-.chips {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin-bottom: 24px;
-}
-.doorCode {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  background: var(--gold-100);
-  border-radius: var(--radius-md);
-  padding: 12px 16px;
-  font-size: 14px;
-  color: var(--text-strong);
-}
-.doorCodeLabel {
-  color: var(--text-muted);
-}
-.doorCodeValue {
-  font-size: 18px;
-  letter-spacing: 0.04em;
-}
-
-.daysBig {
-  font-size: 44px;
-  font-weight: var(--fw-bold);
-  letter-spacing: -0.03em;
-  color: var(--ink-900);
-  margin: 6px 0 4px;
-  line-height: 1;
-}
-.daysUnit {
-  font-size: 16px;
-  font-weight: var(--fw-medium);
-  color: var(--text-muted);
-  letter-spacing: 0;
-}
-
-.rolled {
-  align-self: flex-start;
-  margin-top: 10px;
-  font-size: 12.5px;
-  font-weight: var(--fw-semibold);
-  color: var(--gold-700);
-  background: var(--gold-100);
-  padding: 4px 10px;
-  border-radius: 999px;
-}
-
-.billingError {
-  margin-top: 12px;
-  font-size: 13px;
-  line-height: 1.5;
-  color: var(--danger);
-}
-.billingError a {
-  color: var(--gold-700);
-  font-weight: var(--fw-semibold);
 }

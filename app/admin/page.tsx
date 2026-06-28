@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Section } from '@/components/site/primitives';
+import { MemberShell } from '@/components/site/MemberShell';
 import { AdminClient } from '@/components/site/AdminClient';
 
 export const metadata: Metadata = {
@@ -11,8 +11,8 @@ export const metadata: Metadata = {
 /* PHASE-3: staff admin (gated to @thinkdigital.travel, enforced server-side too). */
 export default function AdminPage() {
   return (
-    <Section tone="page">
+    <MemberShell wide>
       <AdminClient />
-    </Section>
+    </MemberShell>
   );
 }

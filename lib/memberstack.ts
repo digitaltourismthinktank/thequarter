@@ -44,6 +44,7 @@ export interface Member {
   auth?: { email?: string };
   planConnections?: MemberPlanConnection[];
   customFields?: Record<string, unknown>;
+  metaData?: Record<string, unknown>;
 }
 
 /** The subset of the Memberstack DOM SDK we call. */
@@ -135,4 +136,24 @@ export function memberRenewalDate(member: Member | null): string | null {
 /** The member's door entry code (custom field), or null if not set. */
 export function memberDoorCode(member: Member | null): string | null {
   return findCustomField(member, (k) => k.includes('door'));
+}
+
+/** The member's display name. Stored in metaData.name at signup; falls back to a
+    name-ish custom field, then the local part of their email. */
+export function memberName(member: Member | null): string | null {
+  const md = member?.metaData;
+  const fromMeta = md && typeof md.name === 'string' && md.name.trim() ? md.name.trim() : null;
+  const fromCf = findCustomField(member, (k) => k === 'name' || k === 'full-name' || k === 'fullname' || k === 'first-name');
+  const email = member?.auth?.email;
+  const fromEmail = email ? email.split('@')[0].replace(/[._]+/g, ' ') : null;
+  return fromMeta || fromCf || fromEmail || null;
+}
+
+/** Up-to-two-letter initials for an avatar, from a name (or email). */
+export function memberInitials(member: Member | null): string {
+  const name = memberName(member) || '';
+  const parts = name.split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return 'Q';
 }

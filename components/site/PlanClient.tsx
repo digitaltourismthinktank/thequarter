@@ -6,7 +6,6 @@ import { useMember, memberPlanSlug } from './useMember';
 import { PLANS } from '@/lib/plans';
 import { ANNUAL_PLANS, annualSaving } from '@/lib/rewards';
 import { getMemberToken } from '@/lib/memberstack';
-import { MemberTabs } from './MemberTabs';
 import { CarnetCard } from './CarnetCard';
 import styles from './PlanClient.module.css';
 
@@ -68,7 +67,6 @@ export function PlanClient() {
 
   return (
     <div className={styles.wrap}>
-      <MemberTabs />
       <header className={styles.header}>
         <span className={styles.eyebrow}>Your plan</span>
         <h1 className={styles.h1}>Plan &amp; billing</h1>

@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Section } from '@/components/site/primitives';
+import { MemberShell } from '@/components/site/MemberShell';
 import { RewardsClient } from '@/components/site/RewardsClient';
 
 export const metadata: Metadata = {
@@ -10,8 +10,8 @@ export const metadata: Metadata = {
 
 export default function RewardsPage() {
   return (
-    <Section tone="page">
+    <MemberShell>
       <RewardsClient />
-    </Section>
+    </MemberShell>
   );
 }

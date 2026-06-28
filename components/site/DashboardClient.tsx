@@ -3,27 +3,39 @@
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ds/Button';
 import { Icon } from '@/components/ds/Icon';
+import { cn } from '@/lib/cn';
+import { busyness } from '@/lib/busyness';
 import { useMember } from './useMember';
-import { MemberTabs } from './MemberTabs';
 import { TalkToUs } from './TalkToUs';
 import { CheckInCard } from './CheckInCard';
 import { MyBookingsCard } from './MyBookingsCard';
 import { EventsCard } from './EventsCard';
-import { getMemberstack, memberDaysRemaining, memberRenewalDate, memberDoorCode } from '@/lib/memberstack';
+import {
+  getMemberstack,
+  memberName,
+  memberDaysRemaining,
+  memberRenewalDate,
+  memberDoorCode,
+} from '@/lib/memberstack';
 import { PLANS, PLAN_DAY_ALLOWANCE } from '@/lib/plans';
 import { STRIPE_BILLING_PORTAL_URL } from '@/lib/commerce';
 import styles from './DashboardClient.module.css';
 
-/* PHASE-2 member dashboard. Client-gated. Reads the member's plan name straight
-   from Memberstack (getPlan) so it shows correctly without a local pln_ map.
-   "Manage plan" uses the Stripe billing portal (one-click Netlify Function
-   swaps in once STRIPE_SECRET_KEY + MEMBERSTACK_SECRET_KEY are set). */
+/* PHASE-2 member dashboard. Client-gated, rendered inside <MemberShell> (which
+   provides the constant member nav). Reads the plan name straight from
+   Memberstack so it shows correctly without a local pln_ map. */
 export function DashboardClient() {
   const { loading, member } = useMember();
   const [planName, setPlanName] = useState<string | null>(null);
   const [billingBusy, setBillingBusy] = useState(false);
   const [billingError, setBillingError] = useState<string | null>(null);
   const [allPlans, setAllPlans] = useState<unknown>(null);
+  // Computed on the client only (avoids an SSR/client time mismatch).
+  const [today, setToday] = useState<ReturnType<typeof busyness> | null>(null);
+
+  useEffect(() => {
+    setToday(busyness(new Date()));
+  }, []);
 
   // Patient redirect: only send to /login once we're sure there's no member.
   useEffect(() => {
@@ -92,6 +104,8 @@ export function DashboardClient() {
         ? 'Active membership'
         : 'Choose a plan to unlock the space.';
   const email = member.auth?.email ?? 'your account';
+  const display = memberName(member);
+  const first = display ? display.split(' ')[0] : null;
   const isUnlimited = matched?.id === 'citizen' || (planName?.toLowerCase().includes('citizen') ?? false);
   const days = memberDaysRemaining(member);
   const renewal = memberRenewalDate(member);
@@ -104,12 +118,8 @@ export function DashboardClient() {
     planAllowance != null && Number.isFinite(daysNum) && daysNum > planAllowance ? daysNum - planAllowance : 0;
   const debug =
     typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === '1';
-
-  async function handleLogout() {
-    const ms = await getMemberstack();
-    await ms?.logout();
-    window.location.assign('/');
-  }
+  // Today's atmosphere band (client-only; null on weekends/until resolved).
+  const band = today && !today.closed ? today.band ?? null : null;
 
   // One-click billing portal via the Netlify Function; falls back to the generic
   // Stripe portal link if the function isn't configured yet or has no match.
@@ -146,27 +156,37 @@ export function DashboardClient() {
   }
 
   return (
-    <div>
-      <MemberTabs />
-      <div className={styles.head}>
+    <div className={styles.page}>
+      {/* Hero */}
+      <header className={styles.hero}>
         <div>
-          <h1 className={styles.title}>Welcome back</h1>
+          <span className={styles.heroEyebrow}>Your home</span>
+          <h1 className={styles.title}>Welcome back{first ? `, ${first}` : ''}</h1>
           <p className={styles.email}>{email}</p>
         </div>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <TalkToUs />
-          <Button variant="secondary" size="sm" icon="log-out" onClick={handleLogout}>
-            Log out
-          </Button>
-        </div>
-      </div>
+        {doorCode ? (
+          <div className={styles.doorPill}>
+            <Icon name="door-open" size={16} color="var(--gold-400)" />
+            <span className={styles.doorPillLabel}>Door</span>
+            <strong className={styles.doorPillValue}>{doorCode}</strong>
+          </div>
+        ) : null}
+      </header>
 
-      {doorCode ? (
-        <div className={styles.chips}>
-          <div className={styles.doorCode}>
-            <Icon name="door-open" size={18} color="var(--gold-700)" />
-            <span className={styles.doorCodeLabel}>Door code</span>
-            <strong className={styles.doorCodeValue}>{doorCode}</strong>
+      {/* Today at The Quarter — atmosphere, never capacity */}
+      {band ? (
+        <div className={styles.busy}>
+          <div>
+            <span className={styles.busyEyebrow}>Today at The Quarter</span>
+            <div className={styles.busyLine}>
+              <strong className={styles.busyBand}>{band.label}</strong>
+              <span className={styles.busyDesc}>{band.line}</span>
+            </div>
+          </div>
+          <div className={styles.busyMeter} aria-hidden="true">
+            {(['quiet', 'steady', 'busy', 'buzzing'] as const).map((b) => (
+              <span key={b} className={cn(styles.busyDot, band.id === b && styles.busyDotOn)} />
+            ))}
           </div>
         </div>
       ) : null}
@@ -201,27 +221,8 @@ export function DashboardClient() {
           ) : null}
         </div>
 
-        {/* Check-in */}
-        <CheckInCard />
-
-        {/* Quick links */}
-        <div className={styles.card}>
-          <span className={styles.cardEyebrow}>Quick links</span>
-          <div className={styles.quick} style={{ marginTop: 12 }}>
-            <a className={styles.quickLink} href="/book">
-              Book a room or pod <Icon name="arrow-right" size={16} color="var(--gold-600)" />
-            </a>
-            <a className={styles.quickLink} href="/perks">
-              Member perks <Icon name="arrow-right" size={16} color="var(--gold-600)" />
-            </a>
-            <a className={styles.quickLink} href="/events">
-              What&rsquo;s on <Icon name="arrow-right" size={16} color="var(--gold-600)" />
-            </a>
-          </div>
-        </div>
-
-        {/* Days remaining */}
-        <div className={styles.card}>
+        {/* Days remaining (dark feature card) */}
+        <div className={cn(styles.card, styles.cardDark)}>
           <span className={styles.cardEyebrow}>Your days</span>
           {isPaused ? (
             <>
@@ -255,11 +256,33 @@ export function DashboardClient() {
           )}
         </div>
 
-        {/* Upcoming room/pod bookings */}
-        <MyBookingsCard />
+        {/* Check-in — the tall right rail */}
+        <CheckInCard className={styles.gVisits} />
+
+        {/* Quick links */}
+        <div className={styles.card}>
+          <span className={styles.cardEyebrow}>Quick links</span>
+          <div className={styles.quick}>
+            <a className={styles.quickLink} href="/book">
+              Book a room or pod <Icon name="arrow-right" size={16} color="var(--gold-600)" />
+            </a>
+            <a className={styles.quickLink} href="/perks">
+              Member perks <Icon name="arrow-right" size={16} color="var(--gold-600)" />
+            </a>
+            <a className={styles.quickLink} href="/events">
+              What&rsquo;s on this month <Icon name="arrow-right" size={16} color="var(--gold-600)" />
+            </a>
+          </div>
+          <div className={styles.quickTalk}>
+            <TalkToUs variant="ghost" />
+          </div>
+        </div>
 
         {/* What's on */}
         <EventsCard />
+
+        {/* Upcoming room/pod bookings */}
+        <MyBookingsCard />
       </div>
 
       {debug ? (

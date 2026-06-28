@@ -7,7 +7,6 @@ import { useMember, memberPlanSlug } from './useMember';
 import { PLANS } from '@/lib/plans';
 import { EARN_RULES } from '@/lib/rewards';
 import { getRewards, redeemReward, type RewardItem, type Redemption, type BirthdayState } from '@/lib/booking';
-import { MemberTabs } from './MemberTabs';
 import { BirthdayCard } from './BirthdayCard';
 import { ReferFriendCard } from './ReferFriendCard';
 import { RedemptionSheet, type RedemptionInfo } from './RedemptionSheet';
@@ -117,8 +116,6 @@ export function RewardsClient() {
 
   return (
     <div className={styles.wrap}>
-      <MemberTabs />
-
       <header className={styles.header}>
         <span className={styles.eyebrow}>Quarter Rewards</span>
         <h1 className={styles.h1}>A little back, for being a regular</h1>

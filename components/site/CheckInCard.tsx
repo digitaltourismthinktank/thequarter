@@ -9,6 +9,7 @@ import {
   cancelReservation,
   type CheckinStatus,
 } from '@/lib/booking';
+import { cn } from '@/lib/cn';
 import { WeekStrip } from './WeekStrip';
 import { DatePickerModal } from './DatePickerModal';
 import styles from './CheckInCard.module.css';
@@ -31,7 +32,7 @@ function nextDay(iso: string): string {
 }
 
 /** Dashboard card: self check-in (Today), reserve (Tomorrow), full/half day. */
-export function CheckInCard() {
+export function CheckInCard({ className }: { className?: string }) {
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<CheckinStatus | null>(null);
   const [half, setHalf] = useState(false);
@@ -87,7 +88,7 @@ export function CheckInCard() {
   }
 
   return (
-    <div className={styles.card}>
+    <div className={cn(styles.card, className)}>
       <span className={styles.eyebrow}>Your visits</span>
 
       {loading ? (
