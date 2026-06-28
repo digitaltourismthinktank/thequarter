@@ -70,11 +70,18 @@ export function RewardsClient() {
     if (member) load();
   }, [member, load]);
 
-  // Cooling-down = redeemed but not yet collected.
-  const cooling = useMemo(
-    () => new Set(redemptions.filter((r) => r.status === 'redeemed').map((r) => r.rewardId)),
-    [redemptions],
-  );
+  // Cooling-down = redeemed in the last COOLDOWN_HOURS (anti double-tap). Time-boxed
+  // so a reward never stays locked forever — members can redeem it again afterwards.
+  // (Riva to confirm the window / whether collection should clear it instead.)
+  const COOLDOWN_HOURS = 12;
+  const cooling = useMemo(() => {
+    const cutoff = Date.now() - COOLDOWN_HOURS * 3600_000;
+    return new Set(
+      redemptions
+        .filter((r) => r.status === 'redeemed' && r.at && new Date(r.at).getTime() >= cutoff)
+        .map((r) => r.rewardId),
+    );
+  }, [redemptions]);
 
   // Progress to the next reward the member can't yet afford.
   const nextReward = useMemo(

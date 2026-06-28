@@ -18,6 +18,12 @@ function mondayOf(d: Date): Date {
   return x;
 }
 const monthDay = (d: Date) => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+/** Parse a YYYY-MM-DD as a LOCAL calendar date (new Date('YYYY-MM-DD') is UTC,
+    which lands on the wrong day/week for clocks behind UTC). */
+function parseLocalDate(iso: string): Date {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
 
 /**
  * A designed Mon–Fri week picker with prev/next-week navigation. Past days and
@@ -36,7 +42,7 @@ export function WeekStrip({
   today.setHours(0, 0, 0, 0);
   const todayISO = toISO(today);
   // Start on the week of the selected value, or — at weekends — next week.
-  const initial = value ? new Date(value) : today.getDay() === 0 || today.getDay() === 6 ? addDays(today, 7) : today;
+  const initial = value ? parseLocalDate(value) : today.getDay() === 0 || today.getDay() === 6 ? addDays(today, 7) : today;
   const [weekStart, setWeekStart] = useState<Date>(() => mondayOf(initial));
 
   const week = Array.from({ length: 5 }, (_, i) => addDays(weekStart, i)); // Mon–Fri

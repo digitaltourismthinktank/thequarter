@@ -13,7 +13,7 @@
 import memberstackAdmin from '@memberstack/admin';
 import { verifyMember, memberEmail, memberName, tokenFromRequest } from './_member.mjs';
 import { listRecords, createRecord, updateRecord, T, F, airtableReady, esc } from './_airtable.mjs';
-import { londonNow, isWeekday, addDays } from './_time.mjs';
+import { londonNow, isWeekday, addDays, isoToLondonDate } from './_time.mjs';
 import { allowanceForMember } from './_quarter-sync.mjs';
 import { awardPoints, checkinBonusesThisMonth, CHECKIN_BONUS, CHECKIN_QUIET_BONUS, CHECKIN_BONUS_CAP } from './_rewards.mjs';
 import { isQuietDay } from './_busyness.mjs';
@@ -74,7 +74,7 @@ export default async function handler(req) {
       checkedIn: !!active,
       length: active ? active.fields[F.checkins.length] : null,
       balance: vm.member.customFields?.['days-remaining'] ?? null,
-      planned: planned.map((r) => ({ id: r.id, date: r.fields[F.checkins.date], length: r.fields[F.checkins.length] })),
+      planned: planned.map((r) => ({ id: r.id, date: isoToLondonDate(r.fields[F.checkins.date]), length: r.fields[F.checkins.length] })),
     });
   }
 

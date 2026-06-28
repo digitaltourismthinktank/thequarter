@@ -25,10 +25,15 @@ function fmtDate(iso: string): string {
   });
 }
 
-/** The day after a YYYY-MM-DD (calendar maths, UTC). */
-function nextDay(iso: string): string {
+/** The next OPEN day after a YYYY-MM-DD — skips Sat/Sun so "I'll be in tomorrow"
+    on a Friday reserves Monday rather than being rejected as a closed day. */
+function nextOpenDay(iso: string): string {
   const [y, m, d] = iso.split('-').map(Number);
-  return new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  do {
+    dt.setUTCDate(dt.getUTCDate() + 1);
+  } while (dt.getUTCDay() === 0 || dt.getUTCDay() === 6);
+  return dt.toISOString().slice(0, 10);
 }
 
 /** Dashboard card: self check-in (Today), reserve (Tomorrow), full/half day. */
@@ -63,7 +68,7 @@ export function CheckInCard({ className }: { className?: string }) {
   async function doTomorrow() {
     setBusy(true);
     setError(null);
-    const date = nextDay(status?.date ?? new Date().toISOString().slice(0, 10));
+    const date = nextOpenDay(status?.date ?? new Date().toISOString().slice(0, 10));
     const r = await reserveDay(date, half ? 'Half' : 'Full');
     if (!r.ok) setError(friendly(r.data?.error));
     await refresh();
@@ -157,6 +162,8 @@ function friendly(code?: string): string {
   switch (code) {
     case 'closed-weekend':
       return 'The Quarter is open Monday to Friday.';
+    case 'closed-day':
+      return 'The Quarter is closed that day (bank holiday or seasonal closure).';
     case 'not-configured':
       return 'Check-in isn’t available just yet.';
     case 'network':

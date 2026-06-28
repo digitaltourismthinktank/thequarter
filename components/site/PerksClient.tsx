@@ -21,6 +21,7 @@ export function PerksClient({ marketing }: { marketing: ReactNode }) {
   const [active, setActive] = useState<PerkItem | null>(null);
   const [busy, setBusy] = useState(false);
   const [sheet, setSheet] = useState<RedemptionInfo | null>(null);
+  const [perkErr, setPerkErr] = useState<string | null>(null);
 
   const memberName = useMemo(() => {
     const cf = (member?.customFields || {}) as Record<string, unknown>;
@@ -45,6 +46,7 @@ export function PerksClient({ marketing }: { marketing: ReactNode }) {
 
   async function openPerk(p: PerkItem) {
     setBusy(true);
+    setPerkErr(null);
     const r = await usePerk(p.id);
     setBusy(false);
     if (r.ok) {
@@ -57,6 +59,12 @@ export function PerksClient({ marketing }: { marketing: ReactNode }) {
         auth: p.authorisedBy,
         token: r.data.token,
       });
+    } else {
+      setPerkErr(
+        r.data?.error === 'not-found'
+          ? 'This perk isn’t available right now.'
+          : 'Couldn’t open this perk just now — please try again.',
+      );
     }
   }
 
@@ -91,6 +99,7 @@ export function PerksClient({ marketing }: { marketing: ReactNode }) {
               <button className={styles.use} onClick={() => openPerk(active)} disabled={busy}>
                 {busy ? 'Opening…' : 'Use this perk'}
               </button>
+              {perkErr ? <p className={styles.perkErr}>{perkErr}</p> : null}
             </article>
           </div>
         ) : (

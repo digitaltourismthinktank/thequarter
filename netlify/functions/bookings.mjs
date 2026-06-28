@@ -12,7 +12,7 @@
  */
 import { verifyMember, memberEmail, memberName, isAdmin, tokenFromRequest } from './_member.mjs';
 import { listRecords, createRecord, updateRecord, T, F, airtableReady, esc } from './_airtable.mjs';
-import { BUSINESS, hhmmToMin, isWeekday, londonWallClockToISO, isoToLondonMin, londonNow, holdReleased } from './_time.mjs';
+import { BUSINESS, hhmmToMin, isWeekday, londonWallClockToISO, isoToLondonMin, isoToLondonDate, londonNow, holdReleased } from './_time.mjs';
 import { isClosedDay } from './_holidays.mjs';
 
 /** A released company hold no longer blocks the room. */
@@ -121,7 +121,7 @@ export default async function handler(req) {
       });
       const mine = recs.map((r) => ({
         id: r.id,
-        date: r.fields[F.bookings.date],
+        date: isoToLondonDate(r.fields[F.bookings.date]),
         startMin: isoToLondonMin(r.fields[F.bookings.start]),
         endMin: isoToLondonMin(r.fields[F.bookings.end]),
         space: Array.isArray(r.fields[F.bookings.space]) ? r.fields[F.bookings.space][0] : null,

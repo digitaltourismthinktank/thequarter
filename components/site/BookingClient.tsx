@@ -300,6 +300,8 @@ function friendly(code?: string): string {
       return 'Bookings are Monday–Friday, 08:00–18:00.';
     case 'closed-weekend':
       return 'The Quarter is open Monday to Friday.';
+    case 'closed-day':
+      return 'The Quarter is closed that day (bank holiday or seasonal closure).';
     case 'bad-increment':
       return 'Please use 30-minute increments.';
     case 'network':

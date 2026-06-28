@@ -218,6 +218,44 @@
   color: var(--text-body);
 }
 
+/* Tidy labelled grid for the event form (every control captioned + aligned). */
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 14px 12px;
+  align-items: end;
+}
+.fieldWide {
+  grid-column: 1 / -1;
+}
+.input {
+  width: 100%;
+  box-sizing: border-box;
+  height: 40px;
+  padding: 0 11px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+  font-size: 14px;
+  color: var(--ink-900);
+  font-family: inherit;
+}
+.checkInline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  font-size: 14px;
+  color: var(--text-body);
+}
+.formActions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+}
+
 .list {
   display: flex;
   flex-direction: column;

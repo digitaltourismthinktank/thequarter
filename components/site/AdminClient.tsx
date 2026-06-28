@@ -1247,7 +1247,7 @@ function EventsPane() {
     setStart(e.start ? toLocalInput(e.start) : '');
     setEnd(e.end ? toLocalInput(e.end) : '');
     setLocation(e.location || 'The Kentish Pantry');
-    setCategory(e.category || 'Social');
+    setCategory(e.category || 'Social & drinks');
     setPublished(e.published !== false);
   }
   async function save() {
@@ -1286,27 +1286,41 @@ function EventsPane() {
     <div>
       <div className={styles.panel}>
         <span className={styles.panelTitle}>{editingId ? 'Edit event' : 'Add an event'}</span>
-        <div className={styles.formRow}>
-          <input className={styles.label} placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
-          <label className={styles.field}>
-            <span>Start</span>
-            <input type="datetime-local" className={styles.select} value={start} onChange={(e) => setStart(e.target.value)} />
+        <div className={styles.formGrid}>
+          <label className={`${styles.field} ${styles.fieldWide}`}>
+            <span>Title</span>
+            <input className={styles.input} placeholder="e.g. Summer Friday social" value={title} onChange={(e) => setTitle(e.target.value)} />
           </label>
           <label className={styles.field}>
-            <span>End</span>
-            <input type="datetime-local" className={styles.select} value={end} onChange={(e) => setEnd(e.target.value)} />
+            <span>Starts</span>
+            <input type="datetime-local" className={styles.input} value={start} onChange={(e) => setStart(e.target.value)} />
           </label>
-          <input className={styles.label} placeholder="Location" value={location} onChange={(e) => setLocation(e.target.value)} />
-          <select className={styles.select} value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Theme">
-            {EVENT_THEMES.map((t) => (
-              <option key={t.name}>{t.name}</option>
-            ))}
-          </select>
-          <label className={styles.check}>
-            <input type="checkbox" checked={published} onChange={(e) => setPublished(e.target.checked)} /> Published
+          <label className={styles.field}>
+            <span>Ends (optional)</span>
+            <input type="datetime-local" className={styles.input} value={end} onChange={(e) => setEnd(e.target.value)} />
           </label>
+          <label className={styles.field}>
+            <span>Location</span>
+            <input className={styles.input} value={location} onChange={(e) => setLocation(e.target.value)} />
+          </label>
+          <label className={styles.field}>
+            <span>Theme</span>
+            <select className={styles.input} value={category} onChange={(e) => setCategory(e.target.value)}>
+              {EVENT_THEMES.map((t) => (
+                <option key={t.name}>{t.name}</option>
+              ))}
+            </select>
+          </label>
+          <div className={styles.field}>
+            <span>Visibility</span>
+            <label className={styles.checkInline}>
+              <input type="checkbox" checked={published} onChange={(e) => setPublished(e.target.checked)} /> Published
+            </label>
+          </div>
+        </div>
+        <div className={styles.formActions}>
           <Button variant="primary" size="sm" onClick={save} disabled={busy}>
-            {editingId ? 'Update' : 'Add'}
+            {editingId ? 'Update event' : 'Add event'}
           </Button>
           {editingId ? (
             <button type="button" className={styles.smallBtn} onClick={resetForm}>
