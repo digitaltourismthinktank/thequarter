@@ -32,21 +32,21 @@
   justify-content: center;
 }
 .phTitle {
-  font-size: 18px;
+  font-size: var(--text-md);
   font-weight: var(--fw-bold);
 }
 .phText {
-  font-size: 14px;
+  font-size: var(--text-sm);
   color: var(--text-muted);
   max-width: 400px;
   line-height: 1.7;
 }
 .phCode {
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: var(--text-sm);
   background: var(--sand-100);
   padding: 2px 7px;
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
   color: var(--ink-900);
   white-space: nowrap;
 }

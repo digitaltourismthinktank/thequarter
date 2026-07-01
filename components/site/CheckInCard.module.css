@@ -1,11 +1,18 @@
 .card {
   background: var(--surface-card);
   border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow-card);
   padding: 26px;
   display: flex;
   flex-direction: column;
+  transition:
+    transform var(--duration-base) var(--ease-out),
+    box-shadow var(--duration-base) var(--ease-out);
+}
+.card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-card-hover);
 }
 .eyebrow {
   font-size: var(--text-xs);
@@ -15,20 +22,20 @@
   font-weight: var(--fw-semibold);
 }
 .title {
-  font-size: 24px;
+  font-size: var(--text-lg);
   font-weight: var(--fw-bold);
   letter-spacing: -0.02em;
   margin: 8px 0 4px;
 }
 .meta {
   color: var(--text-muted);
-  font-size: 14px;
+  font-size: var(--text-sm);
 }
 .toggle {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: 14px;
+  font-size: var(--text-sm);
   color: var(--text-body);
   margin: 10px 0 16px;
   cursor: pointer;
@@ -41,7 +48,7 @@
 .seg {
   display: inline-flex;
   border: 1px solid var(--border-subtle);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   overflow: hidden;
   margin: 10px 0 16px;
 }
@@ -50,7 +57,7 @@
   border: none;
   background: var(--surface-card);
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--text-sm);
   color: var(--text-body);
 }
 .segBtn + .segBtn {
@@ -58,7 +65,7 @@
 }
 .segOn {
   background: var(--gold-600);
-  color: #fff;
+  color: var(--pure-white);
 }
 
 .actions {
@@ -72,7 +79,7 @@
   flex-direction: column;
   gap: 4px;
   margin-top: 14px;
-  font-size: 11px;
+  font-size: var(--text-2xs);
   color: var(--text-muted);
 }
 .datePick span {
@@ -85,7 +92,7 @@
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   background: var(--surface-card);
-  font-size: 14px;
+  font-size: var(--text-sm);
   color: var(--ink-900);
 }
 
@@ -99,10 +106,10 @@
   align-self: flex-start;
   padding: 8px 16px;
   border: 1px dashed var(--sand-300);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--sand-50);
   color: var(--gold-700);
-  font-size: 13px;
+  font-size: var(--text-sm);
   font-weight: var(--fw-semibold);
   cursor: pointer;
 }
@@ -130,16 +137,16 @@
   align-items: center;
   gap: 4px;
   background: var(--sand-100);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 4px 6px 4px 12px;
-  font-size: 13px;
+  font-size: var(--text-sm);
   color: var(--text-strong);
 }
 .chipX {
   border: none;
   background: none;
   cursor: pointer;
-  font-size: 17px;
+  font-size: var(--text-md);
   line-height: 1;
   color: var(--text-muted);
   padding: 0 4px;
@@ -149,6 +156,6 @@
 }
 .error {
   margin-top: 12px;
-  font-size: 13px;
+  font-size: var(--text-sm);
   color: var(--danger);
 }

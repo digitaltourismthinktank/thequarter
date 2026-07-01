@@ -17,7 +17,7 @@
   }
 }
 .enquireText {
-  font-size: 16px;
+  font-size: var(--text-base);
   line-height: 1.6;
   color: var(--text-body);
   margin-top: 16px;
@@ -32,7 +32,7 @@
   display: flex;
   gap: 10px;
   align-items: flex-start;
-  font-size: 15px;
+  font-size: var(--text-base);
   color: var(--text-strong);
   line-height: 1.45;
 }

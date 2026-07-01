@@ -24,7 +24,7 @@
   margin-left: auto;
 }
 .range {
-  font-size: 12.5px;
+  font-size: var(--text-xs);
   color: var(--text-muted);
   min-width: 0;
   text-align: center;
@@ -34,10 +34,10 @@
   width: 30px;
   height: 30px;
   border: 1px solid var(--border-subtle);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--surface-card);
   cursor: pointer;
-  font-size: 18px;
+  font-size: var(--text-md);
   line-height: 1;
   color: var(--ink-900);
   display: flex;
@@ -72,13 +72,13 @@
   border-color: var(--gold-600);
 }
 .dow {
-  font-size: 11px;
+  font-size: var(--text-2xs);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--text-muted);
 }
 .num {
-  font-size: 18px;
+  font-size: var(--text-md);
   font-weight: var(--fw-semibold);
   color: var(--ink-900);
 }
@@ -88,7 +88,7 @@
 }
 .on .dow,
 .on .num {
-  color: #fff;
+  color: var(--pure-white);
 }
 .past {
   opacity: 0.35;
@@ -103,5 +103,5 @@
   background: var(--gold-600);
 }
 .on .todayDot {
-  background: #fff;
+  background: var(--pure-white);
 }

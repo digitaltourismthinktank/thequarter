@@ -4,7 +4,7 @@
   padding: 60px 0;
   text-align: center;
   color: var(--text-muted);
-  font-size: 16px;
+  font-size: var(--text-base);
 }
 
 .head {
@@ -23,7 +23,7 @@
 .back {
   color: var(--gold-700);
   font-weight: var(--fw-semibold);
-  font-size: 14px;
+  font-size: var(--text-sm);
 }
 
 .spaces {
@@ -53,11 +53,11 @@
 }
 .spaceName {
   font-weight: var(--fw-semibold);
-  font-size: 15px;
+  font-size: var(--text-base);
   color: var(--ink-900);
 }
 .spaceMeta {
-  font-size: 13px;
+  font-size: var(--text-sm);
   color: var(--text-muted);
 }
 
@@ -70,10 +70,10 @@
 .day {
   padding: 8px 14px;
   border: 1px solid var(--border-subtle);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--surface-card);
   cursor: pointer;
-  font-size: 14px;
+  font-size: var(--text-sm);
   color: var(--text-body);
 }
 .day:hover {
@@ -81,7 +81,7 @@
 }
 .dayOn {
   background: var(--gold-600);
-  color: #fff;
+  color: var(--pure-white);
   border-color: var(--gold-600);
   font-weight: var(--fw-semibold);
 }
@@ -101,7 +101,7 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  font-size: 11px;
+  font-size: var(--text-2xs);
   color: var(--text-muted);
 }
 .datePick span {
@@ -114,7 +114,7 @@
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   background: var(--surface-card);
-  font-size: 14px;
+  font-size: var(--text-sm);
   color: var(--ink-900);
 }
 .hintRow {
@@ -125,7 +125,7 @@
   margin-bottom: 10px;
 }
 .hint {
-  font-size: 14px;
+  font-size: var(--text-sm);
   color: var(--text-body);
 }
 .clear {
@@ -134,7 +134,7 @@
   color: var(--gold-700);
   font-weight: var(--fw-semibold);
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--text-sm);
   flex: none;
 }
 
@@ -150,7 +150,7 @@
   border-radius: var(--radius-md);
   background: var(--surface-card);
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--text-sm);
   color: var(--text-body);
 }
 .preset:hover {
@@ -169,7 +169,7 @@
   border-radius: var(--radius-md);
   background: var(--surface-card);
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--text-sm);
   color: var(--ink-900);
   text-align: center;
 }
@@ -185,7 +185,7 @@
 }
 .slotSel {
   background: var(--gold-600);
-  color: #fff;
+  color: var(--pure-white);
   border-color: var(--gold-600);
   font-weight: var(--fw-semibold);
 }
@@ -209,12 +209,12 @@
   box-shadow: var(--shadow-card);
 }
 .selLabel {
-  font-size: 14px;
+  font-size: var(--text-sm);
   color: var(--text-body);
 }
 .msg {
   margin-top: 12px;
-  font-size: 14px;
+  font-size: var(--text-sm);
   color: var(--gold-700);
 }
 
@@ -222,7 +222,7 @@
   margin-top: 32px;
 }
 .mineTitle {
-  font-size: 18px;
+  font-size: var(--text-md);
   font-weight: var(--fw-bold);
   margin-bottom: 12px;
 }
@@ -235,7 +235,7 @@
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   margin-bottom: 8px;
-  font-size: 14px;
+  font-size: var(--text-sm);
   color: var(--text-body);
 }
 .cancel {
@@ -244,5 +244,5 @@
   color: var(--danger);
   font-weight: var(--fw-semibold);
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--text-sm);
 }

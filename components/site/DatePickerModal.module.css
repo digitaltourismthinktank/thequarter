@@ -13,7 +13,7 @@
   width: 100%;
   max-width: 360px;
   background: var(--surface-card);
-  border-radius: 22px;
+  border-radius: var(--radius-lg);
   padding: 20px;
   animation: dpIn var(--duration-base) var(--ease-out);
 }
@@ -24,7 +24,7 @@
   margin-bottom: 14px;
 }
 .month {
-  font-size: 16px;
+  font-size: var(--text-base);
   font-weight: var(--fw-bold);
   color: var(--ink-900);
 }
@@ -32,7 +32,7 @@
   display: inline-flex;
   padding: 7px;
   border: 1px solid var(--border-subtle);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--surface-card);
   color: var(--ink-900);
   cursor: pointer;
@@ -48,7 +48,7 @@
 }
 .dow {
   text-align: center;
-  font-size: 11px;
+  font-size: var(--text-2xs);
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--text-muted);
@@ -61,10 +61,10 @@
   align-items: center;
   justify-content: center;
   border: none;
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   background: var(--sand-50);
   color: var(--ink-900);
-  font-size: 14px;
+  font-size: var(--text-sm);
   cursor: pointer;
   transition:
     background var(--duration-fast) var(--ease-standard),
@@ -91,7 +91,7 @@
 }
 .note {
   margin-top: 14px;
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--text-muted);
   text-align: center;
 }

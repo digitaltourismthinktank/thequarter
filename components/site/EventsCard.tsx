@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { cn } from '@/lib/cn';
+import { Icon } from '@/components/ds/Icon';
 import { getUpcomingEvents, type QuarterEvent } from '@/lib/booking';
 import styles from './EventsCard.module.css';
 
@@ -51,7 +52,7 @@ export function EventsCard({ className }: { className?: string }) {
         </ul>
       )}
       <a className={styles.link} href="/events">
-        See all events <span aria-hidden="true">→</span>
+        See all events <Icon name="arrow-right" size={16} />
       </a>
     </div>
   );

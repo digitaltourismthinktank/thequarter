@@ -9,7 +9,7 @@
   margin: 14px 0 0;
 }
 .lead {
-  font-size: 19px;
+  font-size: var(--text-md);
   line-height: 1.6;
   color: var(--stone-700);
   margin-top: 16px;

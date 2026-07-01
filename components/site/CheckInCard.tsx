@@ -100,7 +100,7 @@ export function CheckInCard({ className }: { className?: string }) {
         <p className={styles.meta}>Loading…</p>
       ) : status?.checkedIn ? (
         <>
-          <h2 className={styles.title}>You&rsquo;re in today ✓</h2>
+          <h2 className={styles.title}>You&rsquo;re in today</h2>
           <p className={styles.meta}>{status.length === 'Half' ? 'Half day' : 'Full day'} — enjoy The Quarter.</p>
         </>
       ) : (

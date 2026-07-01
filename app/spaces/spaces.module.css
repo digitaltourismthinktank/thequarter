@@ -10,7 +10,7 @@
   margin: 18px 0 0;
 }
 .lead {
-  font-size: 19px;
+  font-size: var(--text-md);
   line-height: 1.6;
   color: rgba(251, 248, 242, 0.82);
   margin-top: 18px;
@@ -43,7 +43,7 @@
   margin-top: 14px;
 }
 .featureText {
-  font-size: 17px;
+  font-size: var(--text-md);
   line-height: 1.65;
   color: var(--text-body);
   margin-top: 16px;
@@ -58,7 +58,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 14px;
+  font-size: var(--text-sm);
   font-weight: var(--fw-medium);
   color: var(--text-strong);
 }
@@ -70,7 +70,7 @@
 }
 
 .includedTitle {
-  font-size: 30px;
+  font-size: var(--text-xl);
   font-weight: var(--fw-bold);
   letter-spacing: -0.03em;
   margin: 12px 0 32px;

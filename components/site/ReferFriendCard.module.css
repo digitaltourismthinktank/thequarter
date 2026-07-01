@@ -1,8 +1,16 @@
 .card {
-  border-radius: 20px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--border-subtle);
   background: var(--surface-card);
+  box-shadow: var(--shadow-card);
   padding: 20px;
+  transition:
+    transform var(--duration-base) var(--ease-out),
+    box-shadow var(--duration-base) var(--ease-out);
+}
+.card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-card-hover);
 }
 .eyebrow {
   font-size: var(--text-xs);
@@ -12,13 +20,13 @@
   font-weight: var(--fw-semibold);
 }
 .title {
-  font-size: 20px;
+  font-size: var(--text-lg);
   font-weight: var(--fw-bold);
   letter-spacing: -0.02em;
   margin: 6px 0;
 }
 .body {
-  font-size: 14px;
+  font-size: var(--text-sm);
   line-height: 1.5;
   color: var(--text-body);
 }
@@ -38,7 +46,7 @@
 }
 .link {
   flex: 1;
-  font-size: 13px;
+  font-size: var(--text-sm);
   color: var(--text-body);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -49,7 +57,7 @@
   flex: none;
   padding: 7px;
   border: 1px solid var(--border-subtle);
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   background: var(--surface-card);
   cursor: pointer;
 }
@@ -64,10 +72,10 @@
   gap: 8px;
   width: 100%;
   padding: 11px 16px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--ink-900);
   color: var(--sand-50);
-  font-size: 14px;
+  font-size: var(--text-sm);
   font-weight: var(--fw-semibold);
   text-decoration: none;
 }
@@ -81,7 +89,7 @@
   border-top: 1px solid var(--border-subtle);
 }
 .trackerLine {
-  font-size: 13px;
+  font-size: var(--text-sm);
   font-weight: var(--fw-semibold);
   color: var(--text-muted);
 }
@@ -103,22 +111,22 @@
   width: 30px;
   height: 30px;
   flex: none;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--sand-100);
   color: var(--ink-900);
-  font-size: 13px;
+  font-size: var(--text-sm);
   font-weight: var(--fw-semibold);
 }
 .fName {
   flex: 1;
-  font-size: 14px;
+  font-size: var(--text-sm);
   color: var(--ink-900);
 }
 .pill {
-  font-size: 11px;
+  font-size: var(--text-2xs);
   font-weight: var(--fw-semibold);
   padding: 3px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--sand-100);
   color: var(--text-muted);
 }
@@ -129,6 +137,6 @@
 .empty {
   display: block;
   margin-top: 10px;
-  font-size: 13px;
+  font-size: var(--text-sm);
   color: var(--text-muted);
 }

@@ -1,11 +1,18 @@
 .card {
   background: var(--surface-card);
   border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow-card);
   padding: 26px;
   display: flex;
   flex-direction: column;
+  transition:
+    transform var(--duration-base) var(--ease-out),
+    box-shadow var(--duration-base) var(--ease-out);
+}
+.card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-card-hover);
 }
 .eyebrow {
   font-size: var(--text-xs);
@@ -16,7 +23,7 @@
 }
 .meta {
   color: var(--text-muted);
-  font-size: 14px;
+  font-size: var(--text-sm);
   margin-top: 8px;
 }
 .list {
@@ -44,11 +51,11 @@
 }
 .rowMain {
   font-weight: var(--fw-semibold);
-  font-size: 15px;
+  font-size: var(--text-base);
   color: var(--ink-900);
 }
 .rowSub {
-  font-size: 13px;
+  font-size: var(--text-sm);
   color: var(--text-muted);
 }
 .cancel {
@@ -57,7 +64,7 @@
   color: var(--danger);
   font-weight: var(--fw-semibold);
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--text-sm);
   flex: none;
 }
 .actions {

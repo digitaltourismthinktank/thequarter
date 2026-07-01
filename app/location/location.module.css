@@ -9,7 +9,7 @@
   margin: 14px 0 0;
 }
 .lead {
-  font-size: 19px;
+  font-size: var(--text-md);
   line-height: 1.6;
   color: var(--text-body);
   margin-top: 16px;
@@ -57,7 +57,7 @@
   font-weight: var(--fw-semibold);
 }
 .infoText {
-  font-size: 15px;
+  font-size: var(--text-base);
   color: var(--text-strong);
   margin-top: 3px;
   line-height: 1.5;
@@ -81,12 +81,12 @@
 }
 
 .formTitle {
-  font-size: 24px;
+  font-size: var(--text-lg);
   font-weight: var(--fw-bold);
   letter-spacing: -0.02em;
 }
 .formIntro {
-  font-size: 16px;
+  font-size: var(--text-base);
   color: var(--text-body);
   line-height: 1.6;
   margin: 8px 0 22px;

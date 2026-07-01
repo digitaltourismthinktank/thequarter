@@ -4,7 +4,7 @@
   padding: 60px 0;
   text-align: center;
   color: var(--text-muted);
-  font-size: 16px;
+  font-size: var(--text-base);
 }
 .state a {
   color: var(--gold-700);
@@ -35,12 +35,12 @@
 }
 .sub {
   color: var(--text-body);
-  font-size: 15px;
+  font-size: var(--text-base);
   line-height: 1.6;
   max-width: 60ch;
 }
 .h2 {
-  font-size: 20px;
+  font-size: var(--text-lg);
   font-weight: var(--fw-bold);
   letter-spacing: -0.02em;
   margin-bottom: 14px;
@@ -54,9 +54,9 @@
   align-items: center;
   justify-content: space-between;
   gap: 20px;
-  border-radius: 28px;
+  border-radius: var(--radius-xl);
   padding: 30px 32px;
-  background: linear-gradient(150deg, #2a251e, #1e1a15 56%, #14110d);
+  background: linear-gradient(150deg, var(--ink-800), var(--ink-900) 56%, #14110d);
   color: var(--sand-50);
   box-shadow: var(--shadow-gold);
   margin-bottom: 28px;
@@ -79,14 +79,14 @@
   gap: 6px;
 }
 .pcOver {
-  font-size: 12px;
+  font-size: var(--text-xs);
   text-transform: uppercase;
   letter-spacing: var(--tracking-caps);
   color: var(--gold-400);
   font-weight: var(--fw-semibold);
 }
 .pcName {
-  font-size: 14px;
+  font-size: var(--text-sm);
   color: var(--sand-200);
 }
 .pcBalance {
@@ -96,22 +96,22 @@
   margin-top: 4px;
 }
 .pcBalance strong {
-  font-size: 58px;
+  font-size: var(--text-4xl);
   font-weight: var(--fw-bold);
   line-height: 1;
   letter-spacing: -0.03em;
 }
 .pcBalance span {
-  font-size: 18px;
+  font-size: var(--text-md);
   color: var(--gold-300);
 }
 .pcPill {
   align-self: flex-start;
   margin-top: 10px;
   padding: 5px 12px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(255, 255, 255, 0.06);
-  font-size: 13px;
+  font-size: var(--text-sm);
   color: var(--gold-200);
 }
 .ring {
@@ -136,13 +136,13 @@
   line-height: 1.1;
 }
 .ringHole strong {
-  font-size: 22px;
+  font-size: var(--text-lg);
   font-weight: var(--fw-bold);
   color: var(--sand-50);
 }
 .ringHole span {
   display: block;
-  font-size: 11px;
+  font-size: var(--text-2xs);
   color: var(--gold-300);
 }
 
@@ -168,7 +168,7 @@
   align-items: center;
   gap: 14px;
   padding: 14px 16px;
-  border-radius: 16px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--border-subtle);
   background: var(--surface-card);
 }
@@ -183,7 +183,7 @@
   width: 42px;
   height: 42px;
   flex: none;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   background: var(--sand-100);
 }
 .earnChipLead {
@@ -195,16 +195,16 @@
   gap: 2px;
 }
 .earnText strong {
-  font-size: 15px;
+  font-size: var(--text-base);
   color: var(--ink-900);
 }
 .earnText span {
-  font-size: 13px;
+  font-size: var(--text-sm);
   color: var(--text-muted);
 }
 .earnVal {
   margin-left: auto;
-  font-size: 15px;
+  font-size: var(--text-base);
   font-weight: var(--fw-bold);
   color: var(--ink-900);
   white-space: nowrap;
@@ -218,14 +218,14 @@
   gap: 14px;
 }
 .sideCard {
-  border-radius: 20px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--border-subtle);
   background: var(--surface-sunken);
   padding: 20px;
 }
 .sideBody {
   margin-top: 8px;
-  font-size: 14px;
+  font-size: var(--text-sm);
   line-height: 1.6;
   color: var(--text-body);
 }
@@ -245,7 +245,7 @@
   align-items: flex-start;
   gap: 8px;
   padding: 18px;
-  border-radius: 20px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--border-subtle);
   background: var(--surface-card);
   box-shadow: var(--shadow-card);
@@ -254,7 +254,7 @@
     box-shadow var(--duration-base) var(--ease-out);
 }
 .reward:hover {
-  transform: translateY(-3px);
+  transform: translateY(-4px);
   box-shadow: var(--shadow-card-hover);
 }
 .rewardSoon {
@@ -269,33 +269,33 @@
   justify-content: center;
   width: 46px;
   height: 46px;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   background: var(--gold-100);
 }
 .rewardPartner {
-  font-size: 12px;
+  font-size: var(--text-xs);
   text-transform: uppercase;
   letter-spacing: var(--tracking-caps);
   color: var(--gold-700);
   font-weight: var(--fw-semibold);
 }
 .rewardTitle {
-  font-size: 16px;
+  font-size: var(--text-base);
   font-weight: var(--fw-bold);
   letter-spacing: -0.01em;
 }
 .rewardCost {
-  font-size: 18px;
+  font-size: var(--text-md);
   font-weight: var(--fw-bold);
   color: var(--ink-900);
 }
 .rewardCost span {
-  font-size: 13px;
+  font-size: var(--text-sm);
   font-weight: var(--fw-medium);
   color: var(--text-muted);
 }
 .rewardNote {
-  font-size: 13px;
+  font-size: var(--text-sm);
   color: var(--text-muted);
 }
 .btnGold,
@@ -304,8 +304,8 @@
   width: 100%;
   margin-top: 4px;
   padding: 10px 16px;
-  border-radius: 999px;
-  font-size: 14px;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-sm);
   font-weight: var(--fw-semibold);
   cursor: pointer;
   border: 1px solid transparent;
@@ -334,7 +334,7 @@
   margin-bottom: 28px;
 }
 .historyCard {
-  border-radius: 18px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--border-subtle);
   background: var(--surface-card);
   padding: 6px 18px;
@@ -356,7 +356,7 @@
   width: 38px;
   height: 38px;
   flex: none;
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   background: var(--sand-100);
 }
 .histText {
@@ -365,11 +365,11 @@
   gap: 1px;
 }
 .histText strong {
-  font-size: 14px;
+  font-size: var(--text-sm);
   color: var(--ink-900);
 }
 .histText span {
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--text-muted);
 }
 .histPts {
@@ -393,7 +393,7 @@
 .confirmCard {
   width: 100%;
   max-width: 380px;
-  border-radius: 24px;
+  border-radius: var(--radius-lg);
   background: var(--surface-card);
   padding: 28px;
   text-align: center;
@@ -409,26 +409,26 @@
   justify-content: center;
   width: 56px;
   height: 56px;
-  border-radius: 16px;
+  border-radius: var(--radius-md);
   background: var(--gold-100);
   margin-bottom: 4px;
 }
 .confirmTitle {
-  font-size: 22px;
+  font-size: var(--text-lg);
   font-weight: var(--fw-bold);
   letter-spacing: -0.02em;
 }
 .confirmLine {
-  font-size: 15px;
+  font-size: var(--text-base);
   color: var(--text-body);
   margin-top: 4px;
 }
 .confirmLeft {
-  font-size: 13px;
+  font-size: var(--text-sm);
   color: var(--text-muted);
 }
 .error {
-  font-size: 14px;
+  font-size: var(--text-sm);
   color: var(--danger);
 }
 .confirmBtns {

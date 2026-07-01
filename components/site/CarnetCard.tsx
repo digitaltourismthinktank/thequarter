@@ -69,7 +69,7 @@ export function CarnetCard() {
     const r = await useCarnetPass();
     if (r.ok) {
       setCarnet(r.data.carnet);
-      setMsg('Checked in with a day pass ✓');
+      setMsg('Checked in with a day pass');
     } else {
       setMsg(friendly(r.data?.error));
     }

@@ -4,7 +4,7 @@
   padding: 60px 0;
   text-align: center;
   color: var(--text-muted);
-  font-size: 16px;
+  font-size: var(--text-base);
 }
 .state a {
   color: var(--gold-700);
@@ -31,7 +31,7 @@
 }
 .sub {
   color: var(--text-body);
-  font-size: 16px;
+  font-size: var(--text-base);
   line-height: 1.6;
   margin-bottom: 28px;
 }
@@ -56,7 +56,7 @@
   padding: 11px 14px;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
-  font-size: 15px;
+  font-size: var(--text-base);
   background: var(--surface-card);
   color: var(--ink-900);
 }
@@ -74,7 +74,7 @@
   padding: 11px 14px;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
-  font-size: 15px;
+  font-size: var(--text-base);
   background: var(--surface-card);
   color: var(--ink-900);
 }
@@ -89,19 +89,19 @@
   gap: 14px;
 }
 .hint {
-  font-size: 13px;
+  font-size: var(--text-sm);
   color: var(--text-muted);
   margin-top: -6px;
 }
 .error {
-  font-size: 14px;
+  font-size: var(--text-sm);
   color: var(--danger);
 }
 .agree {
   display: flex;
   align-items: flex-start;
   gap: 9px;
-  font-size: 13px;
+  font-size: var(--text-sm);
   line-height: 1.45;
   color: var(--text-body);
 }
@@ -115,7 +115,7 @@
 }
 .alt {
   margin-top: 18px;
-  font-size: 14px;
+  font-size: var(--text-sm);
   color: var(--text-muted);
 }
 .alt a {

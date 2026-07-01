@@ -16,7 +16,7 @@
   align-items: center;
   gap: 7px;
   color: var(--stone-600);
-  font-size: 14px;
+  font-size: var(--text-sm);
   font-weight: var(--fw-semibold);
   margin-bottom: 24px;
 }
@@ -32,7 +32,7 @@
   margin: 14px 0 8px;
 }
 .lead {
-  font-size: 17px;
+  font-size: var(--text-md);
   color: var(--text-body);
   line-height: 1.55;
   max-width: 480px;
@@ -50,7 +50,7 @@
   display: flex;
   gap: 10px;
   align-items: flex-start;
-  font-size: 15px;
+  font-size: var(--text-base);
   color: var(--text-strong);
 }
 
@@ -61,11 +61,11 @@
   margin-top: 28px;
 }
 .price {
-  font-size: 36px;
+  font-size: var(--text-2xl);
   font-weight: var(--fw-bold);
   letter-spacing: -0.02em;
 }
 .priceNote {
-  font-size: 14px;
+  font-size: var(--text-sm);
   color: var(--text-muted);
 }

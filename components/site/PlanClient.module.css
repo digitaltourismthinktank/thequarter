@@ -4,7 +4,7 @@
   padding: 60px 0;
   text-align: center;
   color: var(--text-muted);
-  font-size: 16px;
+  font-size: var(--text-base);
 }
 .state a {
   color: var(--gold-700);
@@ -33,12 +33,12 @@
 }
 .sub {
   color: var(--text-body);
-  font-size: 15px;
+  font-size: var(--text-base);
 }
 
 .card {
   max-width: 720px;
-  border-radius: 24px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--border-subtle);
   background: var(--surface-card);
   box-shadow: var(--shadow-card);
@@ -52,11 +52,11 @@
 }
 .planChip {
   padding: 8px 16px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: 1px solid var(--border-subtle);
   background: var(--surface-card);
   color: var(--text-muted);
-  font-size: 14px;
+  font-size: var(--text-sm);
   font-weight: var(--fw-semibold);
   cursor: pointer;
 }
@@ -69,17 +69,17 @@
 .toggle {
   display: inline-flex;
   padding: 4px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--surface-sunken);
   margin-bottom: 22px;
 }
 .seg {
   padding: 9px 22px;
   border: none;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: transparent;
   color: var(--text-muted);
-  font-size: 14px;
+  font-size: var(--text-sm);
   font-weight: var(--fw-semibold);
   cursor: pointer;
   transition: all var(--duration-base) var(--ease-out);
@@ -95,18 +95,18 @@
   gap: 8px;
 }
 .price {
-  font-size: 48px;
+  font-size: var(--text-3xl);
   font-weight: var(--fw-bold);
   letter-spacing: -0.03em;
   line-height: 1;
 }
 .unit {
-  font-size: 16px;
+  font-size: var(--text-base);
   color: var(--text-muted);
 }
 .priceCaption {
   margin-top: 8px;
-  font-size: 14px;
+  font-size: var(--text-sm);
   color: var(--text-muted);
 }
 
@@ -114,16 +114,16 @@
   display: inline-block;
   margin-top: 16px;
   padding: 6px 14px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--gold-500);
   color: var(--ink-900);
-  font-size: 14px;
+  font-size: var(--text-sm);
   font-weight: var(--fw-semibold);
 }
 .sweetener {
   margin-top: 14px;
   padding: 18px 20px;
-  border-radius: 18px;
+  border-radius: var(--radius-lg);
   background: linear-gradient(135deg, var(--gold-100), var(--gold-200));
   border: 1px solid var(--gold-300);
   display: flex;
@@ -131,12 +131,12 @@
   gap: 6px;
 }
 .sweetener strong {
-  font-size: 17px;
+  font-size: var(--text-md);
   font-weight: var(--fw-bold);
   color: var(--ink-900);
 }
 .sweetener span {
-  font-size: 14px;
+  font-size: var(--text-sm);
   line-height: 1.5;
   color: var(--gold-700);
 }
@@ -146,12 +146,12 @@
 }
 .err {
   margin-top: 16px;
-  font-size: 14px;
+  font-size: var(--text-sm);
   color: var(--danger);
 }
 .note {
   margin-top: 14px;
-  font-size: 13px;
+  font-size: var(--text-sm);
   line-height: 1.5;
   color: var(--text-muted);
 }

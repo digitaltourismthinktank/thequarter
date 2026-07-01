@@ -16,7 +16,7 @@
   max-height: calc(100vh - 40px);
   overflow-y: auto;
   background: var(--surface-card);
-  border-radius: 28px;
+  border-radius: var(--radius-xl);
   padding: 24px;
   box-shadow: var(--shadow-xl);
   animation: qSheet var(--duration-base) var(--ease-out);
@@ -26,7 +26,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 12px;
+  font-size: var(--text-xs);
   text-transform: uppercase;
   letter-spacing: var(--tracking-caps);
   color: var(--text-muted);
@@ -37,7 +37,7 @@
   border: none;
   background: var(--sand-100);
   color: var(--ink-900);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 7px;
   cursor: pointer;
 }
@@ -55,18 +55,18 @@
   width: 50px;
   height: 50px;
   flex: none;
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   background: var(--gold-100);
 }
 .partner {
-  font-size: 12px;
+  font-size: var(--text-xs);
   text-transform: uppercase;
   letter-spacing: var(--tracking-caps);
   color: var(--gold-700);
   font-weight: var(--fw-semibold);
 }
 .title {
-  font-size: 19px;
+  font-size: var(--text-md);
   font-weight: var(--fw-bold);
   letter-spacing: -0.02em;
   margin-top: 2px;
@@ -88,11 +88,11 @@
   width: 42px;
   height: 42px;
   flex: none;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--ink-900);
   color: var(--gold-400);
   font-weight: var(--fw-bold);
-  font-size: 15px;
+  font-size: var(--text-base);
 }
 .idText {
   display: flex;
@@ -100,11 +100,11 @@
   gap: 2px;
 }
 .idText strong {
-  font-size: 15px;
+  font-size: var(--text-base);
   color: var(--ink-900);
 }
 .idText span {
-  font-size: 13px;
+  font-size: var(--text-sm);
   color: var(--text-muted);
 }
 
@@ -142,12 +142,12 @@
   text-align: center;
 }
 .qrHint {
-  font-size: 13px;
+  font-size: var(--text-sm);
   color: var(--text-muted);
   max-width: 260px;
 }
 .qrClock {
-  font-size: 12px;
+  font-size: var(--text-xs);
   font-weight: var(--fw-semibold);
   color: var(--gold-700);
   letter-spacing: 0.04em;
@@ -160,19 +160,19 @@
   padding: 14px 16px;
 }
 .staffLabel {
-  font-size: 11px;
+  font-size: var(--text-2xs);
   text-transform: uppercase;
   letter-spacing: var(--tracking-caps);
   color: var(--gold-400);
   font-weight: var(--fw-semibold);
 }
 .staffPos {
-  font-size: 14px;
+  font-size: var(--text-sm);
   line-height: 1.5;
   margin-top: 6px;
 }
 .auth {
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--stone-300);
   margin-top: 8px;
 }
@@ -181,7 +181,7 @@
   display: block;
   text-align: center;
   margin-top: 16px;
-  font-size: 14px;
+  font-size: var(--text-sm);
   font-weight: var(--fw-semibold);
   color: var(--gold-700);
 }

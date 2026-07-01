@@ -2,7 +2,7 @@
   max-width: 760px;
   margin: 0 auto;
   color: var(--text-body);
-  font-size: 16px;
+  font-size: var(--text-base);
   line-height: 1.7;
 }
 .eyebrow {
@@ -20,24 +20,24 @@
   margin: 8px 0 8px;
 }
 .updated {
-  font-size: 14px;
+  font-size: var(--text-sm);
   color: var(--text-muted);
   margin-bottom: 22px;
 }
 .intro {
-  font-size: 17px;
+  font-size: var(--text-md);
   color: var(--text-body);
   margin-bottom: 8px;
 }
 .legal h2 {
-  font-size: 22px;
+  font-size: var(--text-lg);
   font-weight: var(--fw-bold);
   color: var(--ink-900);
   letter-spacing: -0.02em;
   margin: 30px 0 10px;
 }
 .legal h3 {
-  font-size: 17px;
+  font-size: var(--text-md);
   font-weight: var(--fw-semibold);
   color: var(--ink-900);
   margin: 20px 0 6px;
@@ -63,7 +63,7 @@
   width: 100%;
   border-collapse: collapse;
   margin: 12px 0 18px;
-  font-size: 15px;
+  font-size: var(--text-base);
 }
 .legal th,
 .legal td {
@@ -77,7 +77,7 @@
   color: var(--ink-900);
 }
 .note {
-  font-size: 13px;
+  font-size: var(--text-sm);
   color: var(--text-muted);
   font-style: italic;
   margin-bottom: 20px;

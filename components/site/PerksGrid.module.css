@@ -6,12 +6,12 @@
 }
 .pill {
   padding: 9px 17px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: 1.5px solid var(--border-default);
   background: transparent;
   color: var(--stone-600);
   font-family: var(--font-sans);
-  font-size: 14px;
+  font-size: var(--text-sm);
   font-weight: var(--fw-semibold);
   cursor: pointer;
   transition: background var(--duration-fast), color var(--duration-fast), border-color var(--duration-fast);

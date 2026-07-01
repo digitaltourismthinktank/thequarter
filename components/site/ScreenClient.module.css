@@ -80,7 +80,7 @@
 }
 .band_buzzing {
   background: var(--gold-600);
-  color: #fff;
+  color: var(--pure-white);
 }
 .bandClosed {
   background: var(--ink-900);
@@ -120,7 +120,7 @@
   color: var(--ink-900);
 }
 .spaceType {
-  font-size: 14px;
+  font-size: var(--text-sm);
   color: var(--text-muted);
 }
 .spaceStatus {
@@ -135,7 +135,7 @@
   color: var(--ink-900);
 }
 .note {
-  font-size: 15px;
+  font-size: var(--text-base);
   color: var(--text-muted);
   margin-top: 14px;
 }
@@ -160,7 +160,7 @@
   color: var(--ink-900);
 }
 .evMeta {
-  font-size: 15px;
+  font-size: var(--text-base);
   color: var(--text-muted);
 }
 .eventFeature {
@@ -179,7 +179,7 @@
   width: 84px;
   height: 84px;
   flex: none;
-  border-radius: 18px;
+  border-radius: var(--radius-lg);
   background: var(--gold-100);
 }
 .evBody {
@@ -188,7 +188,7 @@
   gap: 4px;
 }
 .evDesc {
-  font-size: 14px;
+  font-size: var(--text-sm);
   color: var(--text-body);
   margin-top: 2px;
 }

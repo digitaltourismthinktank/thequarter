@@ -26,7 +26,7 @@
 }
 .sub {
   color: var(--text-body);
-  font-size: 15px;
+  font-size: var(--text-base);
 }
 
 .chips {
@@ -37,11 +37,11 @@
 }
 .chip {
   padding: 8px 15px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: 1px solid var(--border-subtle);
   background: var(--surface-card);
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: var(--text-sm);
   font-weight: var(--fw-semibold);
   cursor: pointer;
   transition:
@@ -71,7 +71,7 @@
   gap: 7px;
   text-align: left;
   padding: 18px;
-  border-radius: 20px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--border-subtle);
   background: var(--surface-card);
   box-shadow: var(--shadow-card);
@@ -81,7 +81,7 @@
     box-shadow var(--duration-base) var(--ease-out);
 }
 .card:hover {
-  transform: translateY(-3px);
+  transform: translateY(-4px);
   box-shadow: var(--shadow-card-hover);
 }
 .cardChip {
@@ -90,23 +90,23 @@
   justify-content: center;
   width: 46px;
   height: 46px;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   background: var(--sand-100);
 }
 .cardPartner {
-  font-size: 15px;
+  font-size: var(--text-base);
   font-weight: var(--fw-bold);
   color: var(--ink-900);
 }
 .cat {
-  font-size: 12px;
+  font-size: var(--text-xs);
   text-transform: uppercase;
   letter-spacing: var(--tracking-caps);
   color: var(--gold-700);
   font-weight: var(--fw-semibold);
 }
 .cardOffer {
-  font-size: 15px;
+  font-size: var(--text-base);
   font-weight: var(--fw-semibold);
   color: var(--text-body);
   line-height: 1.4;
@@ -117,7 +117,7 @@
   justify-content: space-between;
   width: 100%;
   margin-top: 4px;
-  font-size: 13px;
+  font-size: var(--text-sm);
   color: var(--text-muted);
 }
 .view {
@@ -141,7 +141,7 @@
   border: none;
   background: none;
   color: var(--gold-700);
-  font-size: 14px;
+  font-size: var(--text-sm);
   font-weight: var(--fw-semibold);
   cursor: pointer;
   margin-bottom: 16px;
@@ -149,7 +149,7 @@
 .detail {
   width: 100%;
   max-width: 640px;
-  border-radius: 24px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--border-subtle);
   background: var(--surface-card);
   box-shadow: var(--shadow-card);
@@ -166,17 +166,17 @@
   justify-content: center;
   width: 60px;
   height: 60px;
-  border-radius: 16px;
+  border-radius: var(--radius-md);
   background: var(--gold-100);
   margin-bottom: 4px;
 }
 .detailPartner {
-  font-size: 22px;
+  font-size: var(--text-lg);
   font-weight: var(--fw-bold);
   letter-spacing: -0.02em;
 }
 .detailOffer {
-  font-size: 24px;
+  font-size: var(--text-lg);
   font-weight: var(--fw-bold);
   letter-spacing: -0.02em;
   line-height: 1.2;
@@ -191,11 +191,11 @@
 }
 .metaChip {
   padding: 6px 13px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--gold-100);
   border: 1px solid var(--gold-300);
   color: var(--gold-700);
-  font-size: 13px;
+  font-size: var(--text-sm);
   font-weight: var(--fw-semibold);
 }
 .how {
@@ -207,7 +207,7 @@
   margin: 8px 0;
 }
 .howLabel {
-  font-size: 11px;
+  font-size: var(--text-2xs);
   text-transform: uppercase;
   letter-spacing: var(--tracking-caps);
   color: var(--text-muted);
@@ -215,7 +215,7 @@
 }
 .how p {
   margin-top: 6px;
-  font-size: 14px;
+  font-size: var(--text-sm);
   line-height: 1.55;
   color: var(--text-body);
 }
@@ -223,11 +223,11 @@
   width: 100%;
   margin-top: 6px;
   padding: 13px 20px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: none;
   background: var(--gold-500);
   color: var(--ink-900);
-  font-size: 15px;
+  font-size: var(--text-base);
   font-weight: var(--fw-semibold);
   cursor: pointer;
 }
@@ -240,7 +240,7 @@
 }
 .perkErr {
   margin-top: 10px;
-  font-size: 13px;
+  font-size: var(--text-sm);
   line-height: 1.5;
   color: var(--danger);
   text-align: center;

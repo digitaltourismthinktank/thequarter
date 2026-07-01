@@ -90,7 +90,7 @@
   background: rgba(251, 248, 242, 0.08);
 }
 .includedLabel {
-  font-size: 15px;
+  font-size: var(--text-base);
   font-weight: var(--fw-medium);
   color: var(--text-strong);
 }

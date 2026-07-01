@@ -3,7 +3,7 @@
   align-items: flex-start;
   gap: 14px;
   padding: 18px 20px;
-  border-radius: 20px;
+  border-radius: var(--radius-lg);
   margin-bottom: 28px;
 }
 .gold {
@@ -29,7 +29,7 @@
   width: 44px;
   height: 44px;
   flex: none;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
 }
 .chipGold {
   background: rgba(255, 255, 255, 0.4);
@@ -47,17 +47,17 @@
   gap: 4px;
 }
 .title {
-  font-size: 16px;
+  font-size: var(--text-base);
   font-weight: var(--fw-bold);
   letter-spacing: -0.01em;
 }
 .sub {
-  font-size: 14px;
+  font-size: var(--text-sm);
   line-height: 1.5;
   color: var(--text-muted);
 }
 .subDark {
-  font-size: 14px;
+  font-size: var(--text-sm);
   line-height: 1.5;
   color: var(--ink-900);
   opacity: 0.85;
@@ -75,15 +75,15 @@
   border: 1px solid var(--border-default);
   background: var(--surface-card);
   color: var(--ink-900);
-  font-size: 14px;
+  font-size: var(--text-sm);
 }
 .save {
   padding: 9px 18px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: none;
   background: var(--gold-500);
   color: var(--ink-900);
-  font-size: 14px;
+  font-size: var(--text-sm);
   font-weight: var(--fw-semibold);
   cursor: pointer;
 }

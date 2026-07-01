@@ -19,7 +19,7 @@
 }
 
 .includedTitle {
-  font-size: 32px;
+  font-size: var(--text-2xl);
   font-weight: var(--fw-bold);
   letter-spacing: -0.03em;
   margin: 12px 0 22px;
@@ -32,14 +32,14 @@
   color: var(--sand-50);
 }
 .teamsTitle {
-  font-size: 26px;
+  font-size: var(--text-xl);
   font-weight: var(--fw-bold);
   letter-spacing: -0.02em;
   color: var(--sand-50);
   margin: 16px 0 12px;
 }
 .teamsText {
-  font-size: 16px;
+  font-size: var(--text-base);
   line-height: 1.6;
   color: rgba(251, 248, 242, 0.78);
 }
@@ -62,7 +62,7 @@
   padding: 18px 4px;
 }
 .faqItem summary {
-  font-size: 17px;
+  font-size: var(--text-md);
   font-weight: var(--fw-semibold);
   color: var(--ink-900);
   cursor: pointer;
@@ -83,7 +83,7 @@
   transform: rotate(180deg);
 }
 .faqAnswer {
-  font-size: 15px;
+  font-size: var(--text-base);
   line-height: 1.6;
   color: var(--text-body);
   margin-top: 10px;

@@ -21,7 +21,7 @@
   line-height: 1.06;
 }
 .text {
-  font-size: 17px;
+  font-size: var(--text-md);
   line-height: 1.65;
   color: var(--text-body);
   margin-top: 16px;

@@ -10,7 +10,7 @@
   margin: 18px 0 0;
 }
 .lead {
-  font-size: 19px;
+  font-size: var(--text-md);
   line-height: 1.6;
   color: rgba(251, 248, 242, 0.82);
   margin-top: 18px;
@@ -37,7 +37,7 @@
   margin-top: 14px;
 }
 .featureText {
-  font-size: 17px;
+  font-size: var(--text-md);
   line-height: 1.65;
   color: var(--text-body);
   margin-top: 16px;
@@ -70,12 +70,12 @@
   margin-bottom: 16px;
 }
 .valueTitle {
-  font-size: 19px;
+  font-size: var(--text-md);
   font-weight: var(--fw-semibold);
   margin-bottom: 8px;
 }
 .valueText {
-  font-size: 15px;
+  font-size: var(--text-base);
   line-height: 1.6;
   color: var(--text-body);
 }

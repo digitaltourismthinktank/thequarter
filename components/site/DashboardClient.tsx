@@ -3,48 +3,42 @@
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ds/Button';
 import { Icon } from '@/components/ds/Icon';
+import { StatTile } from '@/components/ds/StatTile';
+import { QuarterCard } from '@/components/ds/QuarterCard';
 import { cn } from '@/lib/cn';
 import { busyness } from '@/lib/busyness';
-import { useMember } from './useMember';
+import { useMember, memberPlanSlug } from './useMember';
 import { TalkToUs } from './TalkToUs';
 import { CheckInCard } from './CheckInCard';
 import { MyBookingsCard } from './MyBookingsCard';
 import { EventsCard } from './EventsCard';
-import {
-  getMemberstack,
-  memberName,
-  memberDaysRemaining,
-  memberRenewalDate,
-  memberDoorCode,
-} from '@/lib/memberstack';
+import { getMemberstack, memberName, memberDaysRemaining, memberRenewalDate, memberDoorCode } from '@/lib/memberstack';
 import { PLANS, PLAN_DAY_ALLOWANCE } from '@/lib/plans';
 import { STRIPE_BILLING_PORTAL_URL } from '@/lib/commerce';
 import styles from './DashboardClient.module.css';
 
-/* PHASE-2 member dashboard. Client-gated, rendered inside <MemberShell> (which
-   provides the constant member nav). Reads the plan name straight from
-   Memberstack so it shows correctly without a local pln_ map. */
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/* PHASE-2 member dashboard, rebuilt on the design system: StatTile metrics +
+   the QuarterCard membership hero, inside <MemberShell>'s constant nav. */
 export function DashboardClient() {
   const { loading, member } = useMember();
   const [planName, setPlanName] = useState<string | null>(null);
   const [billingBusy, setBillingBusy] = useState(false);
   const [billingError, setBillingError] = useState<string | null>(null);
   const [allPlans, setAllPlans] = useState<unknown>(null);
-  // Computed on the client only (avoids an SSR/client time mismatch).
   const [today, setToday] = useState<ReturnType<typeof busyness> | null>(null);
 
   useEffect(() => {
     setToday(busyness(new Date()));
   }, []);
 
-  // Patient redirect: only send to /login once we're sure there's no member.
   useEffect(() => {
     if (loading || member) return;
     const t = setTimeout(() => window.location.assign('/login'), 2500);
     return () => clearTimeout(t);
   }, [loading, member]);
 
-  // Resolve the plan name from Memberstack itself (no local mapping required).
   useEffect(() => {
     let active = true;
     (async () => {
@@ -64,7 +58,6 @@ export function DashboardClient() {
     };
   }, [member]);
 
-  // Debug only (?debug=1): list all Memberstack plans to capture their pln_ ids.
   useEffect(() => {
     const isDebug = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === '1';
     if (!isDebug) return;
@@ -87,22 +80,21 @@ export function DashboardClient() {
   if (!member) return <p className={styles.state}>Please sign in — taking you to the login page…</p>;
 
   const hasPlan = (member.planConnections?.length ?? 0) > 0;
+  const slug = memberPlanSlug(member);
   const matched = planName
-    ? PLANS.find(
-        (p) =>
-          planName.toLowerCase().includes(p.name.toLowerCase()) ||
-          p.name.toLowerCase().includes(planName.toLowerCase()),
-      )
-    : undefined;
+    ? PLANS.find((p) => planName.toLowerCase().includes(p.name.toLowerCase()) || p.name.toLowerCase().includes(planName.toLowerCase()))
+    : slug
+      ? PLANS.find((p) => p.id === slug)
+      : undefined;
   const isPaused = planName ? planName.toLowerCase().includes('paus') : false;
-  const planLabel = isPaused ? 'Plan paused' : (planName ?? (hasPlan ? 'Active plan' : 'No active plan'));
+  const planLabel = isPaused ? 'Paused' : (matched?.name ?? planName ?? (hasPlan ? 'Active plan' : 'No plan'));
   const planMeta = isPaused
-    ? 'Your membership is paused — your days are held. Resume any time.'
+    ? 'Days held while paused'
     : matched
       ? `${matched.price} · ${matched.period}`
       : hasPlan
         ? 'Active membership'
-        : 'Choose a plan to unlock the space.';
+        : 'Choose a plan to start';
   const email = member.auth?.email ?? 'your account';
   const display = memberName(member);
   const first = display ? display.split(' ')[0] : null;
@@ -110,19 +102,37 @@ export function DashboardClient() {
   const days = memberDaysRemaining(member);
   const renewal = memberRenewalDate(member);
   const doorCode = memberDoorCode(member);
-  // How many of the remaining days are rolled over from last month (days above
-  // this plan's monthly allowance). Mirrors the webhook's rollover rule.
   const planAllowance = matched ? PLAN_DAY_ALLOWANCE[matched.id] : undefined;
   const daysNum = days !== null ? parseInt(days, 10) : NaN;
-  const rolledOver =
-    planAllowance != null && Number.isFinite(daysNum) && daysNum > planAllowance ? daysNum - planAllowance : 0;
-  const debug =
-    typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === '1';
-  // Today's atmosphere band (client-only; null on weekends/until resolved).
+  const daysProgress =
+    planAllowance != null && planAllowance > 0 && Number.isFinite(daysNum)
+      ? Math.max(0, Math.min(100, Math.round((daysNum / planAllowance) * 100)))
+      : undefined;
+  const debug = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === '1';
   const band = today && !today.closed ? today.band ?? null : null;
 
-  // One-click billing portal via the Netlify Function; falls back to the generic
-  // Stripe portal link if the function isn't configured yet or has no match.
+  // "Your days" StatTile content (paused / unlimited / metered / unset).
+  let daysValue: string = '—';
+  let daysUnit: string | undefined;
+  let daysHint: string | undefined;
+  let daysProg: number | undefined;
+  if (isPaused) {
+    daysValue = days ?? '0';
+    daysHint = 'Held while paused';
+  } else if (isUnlimited) {
+    daysValue = 'Unlimited';
+    daysHint = 'Citizen access';
+  } else if (days !== null) {
+    daysValue = days;
+    daysUnit = 'days left';
+    daysHint = renewal ? `Resets ${renewal}` : undefined;
+    daysProg = daysProgress;
+  } else {
+    daysHint = 'Set up soon';
+  }
+
+  const cardId = (member.id || '').replace(/[^a-zA-Z0-9]/g, '').slice(-4).toUpperCase() || '0001';
+
   async function handleManageBilling() {
     setBillingBusy(true);
     setBillingError(null);
@@ -157,147 +167,82 @@ export function DashboardClient() {
 
   return (
     <div className={styles.page}>
-      {/* Hero */}
       <header className={styles.hero}>
-        <div>
-          <span className={styles.heroEyebrow}>Your home</span>
-          <h1 className={styles.title}>Welcome back{first ? `, ${first}` : ''}</h1>
-          <p className={styles.email}>{email}</p>
-        </div>
-        {doorCode ? (
-          <div className={styles.doorPill}>
-            <Icon name="door-open" size={16} color="var(--gold-400)" />
-            <span className={styles.doorPillLabel}>Door</span>
-            <strong className={styles.doorPillValue}>{doorCode}</strong>
-          </div>
-        ) : null}
+        <span className={styles.heroEyebrow}>Your home</span>
+        <h1 className={styles.title}>Welcome back{first ? `, ${first}` : ''}</h1>
+        <p className={styles.email}>{email}</p>
       </header>
 
-      {/* Today at The Quarter — atmosphere, never capacity */}
-      {band ? (
-        <div className={styles.busy}>
-          <div>
-            <span className={styles.busyEyebrow}>Today at The Quarter</span>
-            <div className={styles.busyLine}>
-              <strong className={styles.busyBand}>{band.label}</strong>
-              <span className={styles.busyDesc}>{band.line}</span>
-            </div>
+      <div className={styles.layout}>
+        <div className={styles.mainCol}>
+          <div className={styles.statRow}>
+            <StatTile label="Your days" tone="ink" icon="calendar" value={daysValue} unit={daysUnit} hint={daysHint} progress={daysProg} />
+            <StatTile label="Your plan" tone="gold" icon="user" value={planLabel} hint={planMeta} />
+            <StatTile label="Door code" icon="door-open" value={doorCode ?? '—'} hint={doorCode ? 'Keep it to yourself' : 'Ask the team'} />
           </div>
-          <div className={styles.busyMeter} aria-hidden="true">
-            {(['quiet', 'steady', 'busy', 'buzzing'] as const).map((b) => (
-              <span key={b} className={cn(styles.busyDot, band.id === b && styles.busyDotOn)} />
-            ))}
-          </div>
-        </div>
-      ) : null}
 
-      <div className={styles.grid}>
-        {/* Plan */}
-        <div className={styles.card}>
-          <span className={styles.cardEyebrow}>Your plan</span>
-          <h2 className={styles.planName}>{planLabel}</h2>
-          <p className={styles.planMeta}>{planMeta}</p>
-          <p className={styles.cardText}>
-            {hasPlan
-              ? 'Manage your subscription, switch plans or update your card in the billing portal.'
-              : 'Pick the plan that fits your week and you’ll be all set.'}
-          </p>
-          <div className={styles.actions}>
-            {hasPlan ? (
-              <Button variant="primary" onClick={handleManageBilling} disabled={billingBusy} iconAfter="arrow-right">
-                {billingBusy ? 'Opening…' : 'Manage plan & billing'}
-              </Button>
-            ) : (
-              <Button variant="primary" href="/plans" iconAfter="arrow-right">
-                See plans
-              </Button>
-            )}
-          </div>
+          {band ? (
+            <div className={styles.busy}>
+              <div>
+                <span className={styles.busyEyebrow}>Today at The Quarter</span>
+                <div className={styles.busyLine}>
+                  <strong className={styles.busyBand}>{band.label}</strong>
+                  <span className={styles.busyDesc}>{band.line}</span>
+                </div>
+              </div>
+              <div className={styles.busyMeter} aria-hidden="true">
+                {(['quiet', 'steady', 'busy', 'buzzing'] as const).map((b) => (
+                  <span key={b} className={cn(styles.busyDot, band.id === b && styles.busyDotOn)} />
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          <CheckInCard />
+          <MyBookingsCard />
+          <EventsCard />
+        </div>
+
+        <aside className={styles.rail}>
+          <QuarterCard
+            memberName={display ?? email}
+            plan={isPaused ? 'Paused' : slug ? cap(slug) : hasPlan ? 'Member' : 'Guest'}
+            cardId={cardId}
+            logoSrc="/brand/logo-wordmark-black.png"
+          />
+          <Button variant="primary" fullWidth onClick={handleManageBilling} disabled={billingBusy} iconAfter="arrow-right">
+            {billingBusy ? 'Opening…' : hasPlan ? 'Manage plan & billing' : 'Choose a plan'}
+          </Button>
           {billingError ? (
             <p className={styles.billingError}>
               Couldn&rsquo;t open one-click billing ({billingError}).{' '}
               <a href={STRIPE_BILLING_PORTAL_URL}>Open the standard portal</a>.
             </p>
           ) : null}
-        </div>
 
-        {/* Days remaining (dark feature card) */}
-        <div className={cn(styles.card, styles.cardDark)}>
-          <span className={styles.cardEyebrow}>Your days</span>
-          {isPaused ? (
-            <>
-              <h2 className={styles.planName}>On hold</h2>
-              <p className={styles.planMeta}>
-                {days ?? '0'} day{days === '1' ? '' : 's'} held while your plan is paused.
-              </p>
-            </>
-          ) : isUnlimited ? (
-            <>
-              <h2 className={styles.planName}>Unlimited</h2>
-              <p className={styles.planMeta}>Citizen members have unrestricted access.</p>
-            </>
-          ) : days !== null ? (
-            <>
-              <div className={styles.daysBig}>
-                {days} <span className={styles.daysUnit}>days left</span>
-              </div>
-              {renewal ? <p className={styles.planMeta}>Resets on {renewal}</p> : null}
-              {rolledOver > 0 ? (
-                <p className={styles.rolled}>
-                  Includes {rolledOver} day{rolledOver === 1 ? '' : 's'} rolled over
-                </p>
-              ) : null}
-            </>
-          ) : (
-            <>
-              <h2 className={styles.planName}>—</h2>
-              <p className={styles.cardText}>Your day balance will show here once it&rsquo;s set.</p>
-            </>
-          )}
-        </div>
-
-        {/* Check-in — the tall right rail */}
-        <CheckInCard className={styles.gVisits} />
-
-        {/* Quick links */}
-        <div className={styles.card}>
-          <span className={styles.cardEyebrow}>Quick links</span>
-          <div className={styles.quick}>
-            <a className={styles.quickLink} href="/book">
-              Book a room or pod <Icon name="arrow-right" size={16} color="var(--gold-600)" />
-            </a>
-            <a className={styles.quickLink} href="/perks">
-              Member perks <Icon name="arrow-right" size={16} color="var(--gold-600)" />
-            </a>
-            <a className={styles.quickLink} href="/events">
-              What&rsquo;s on this month <Icon name="arrow-right" size={16} color="var(--gold-600)" />
-            </a>
+          <div className={styles.linksCard}>
+            <span className={styles.cardEyebrow}>Quick links</span>
+            <div className={styles.quick}>
+              <a className={styles.quickLink} href="/book">
+                Book a room or pod <Icon name="arrow-right" size={16} color="var(--gold-600)" />
+              </a>
+              <a className={styles.quickLink} href="/perks">
+                Member perks <Icon name="arrow-right" size={16} color="var(--gold-600)" />
+              </a>
+              <a className={styles.quickLink} href="/events">
+                What&rsquo;s on this month <Icon name="arrow-right" size={16} color="var(--gold-600)" />
+              </a>
+            </div>
+            <div className={styles.quickTalk}>
+              <TalkToUs variant="ghost" />
+            </div>
           </div>
-          <div className={styles.quickTalk}>
-            <TalkToUs variant="ghost" />
-          </div>
-        </div>
-
-        {/* What's on */}
-        <EventsCard />
-
-        {/* Upcoming room/pod bookings */}
-        <MyBookingsCard />
+        </aside>
       </div>
 
       {debug ? (
         <pre className={styles.debug}>
-          {JSON.stringify(
-            {
-              id: member.id,
-              email: member.auth?.email,
-              planConnections: member.planConnections,
-              customFields: member.customFields,
-              allPlans,
-            },
-            null,
-            2,
-          )}
+          {JSON.stringify({ id: member.id, email: member.auth?.email, planConnections: member.planConnections, customFields: member.customFields, allPlans }, null, 2)}
         </pre>
       ) : null}
     </div>
