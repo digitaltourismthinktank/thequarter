@@ -29,7 +29,8 @@ const json = (b, s = 200) => new Response(JSON.stringify(b), { status: s, header
 function validateSlot(dateStr, start, end) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr || '')) return 'bad-date';
   if (!/^\d{2}:\d{2}$/.test(start || '') || !/^\d{2}:\d{2}$/.test(end || '')) return 'bad-time';
-  if (!isWeekday(dateStr)) return 'closed-weekend';
+  // Weekends are allowed for members (outside regular hours) — the member app asks
+  // them to confirm. Bank holidays / seasonal closures are still blocked (isClosedDay).
   const s = hhmmToMin(start);
   const e = hhmmToMin(end);
   if (!(s >= BUSINESS.openMin && e <= BUSINESS.closeMin && s < e)) return 'outside-hours';
@@ -159,6 +160,18 @@ export default async function handler(req) {
       return s < re && e > rs;
     });
     if (clash) return json({ error: 'slot-taken' }, 409);
+
+    // A member can't hold two rooms at the same time — check their other confirmed
+    // bookings that day (any room) for an overlap.
+    const mineThatDay = await listRecords(T.bookings, {
+      filterByFormula: `AND(DATETIME_FORMAT({Date}, 'YYYY-MM-DD')='${esc(date)}', {Member email}='${esc(email)}', {Status}='Confirmed')`,
+    });
+    const selfClash = mineThatDay.some((r) => {
+      const rs = isoToLondonMin(r.fields[F.bookings.start]);
+      const re = isoToLondonMin(r.fields[F.bookings.end]);
+      return s < re && e > rs;
+    });
+    if (selfClash) return json({ error: 'double-book' }, 409);
 
     const rec = await createRecord(T.bookings, {
       [F.bookings.title]: `${start}–${end} · ${memberName(me)}`,

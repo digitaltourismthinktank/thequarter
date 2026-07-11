@@ -197,12 +197,14 @@ export async function listRecords(tableId, { filterByFormula, fields, sort, maxR
   return json.records || [];
 }
 
-export async function createRecord(tableId, fields) {
-  return req(`${API}/${BASE}/${tableId}`, { method: 'POST', body: JSON.stringify({ fields }) });
+export async function createRecord(tableId, fields, opts = {}) {
+  const body = opts.typecast ? { fields, typecast: true } : { fields };
+  return req(`${API}/${BASE}/${tableId}`, { method: 'POST', body: JSON.stringify(body) });
 }
 
-export async function updateRecord(tableId, id, fields) {
-  return req(`${API}/${BASE}/${tableId}/${id}`, { method: 'PATCH', body: JSON.stringify({ fields }) });
+export async function updateRecord(tableId, id, fields, opts = {}) {
+  const body = opts.typecast ? { fields, typecast: true } : { fields };
+  return req(`${API}/${BASE}/${tableId}/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
 }
 
 export async function deleteRecord(tableId, id) {

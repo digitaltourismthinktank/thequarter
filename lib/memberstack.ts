@@ -31,6 +31,11 @@ export const PLAN_ID_TO_SLUG: Record<string, string> = Object.fromEntries(
     .map(([slug, id]) => [id, slug]),
 );
 
+// Local preview only: resolve the mock member's plan to "resident".
+if (process.env.NODE_ENV !== 'production') {
+  PLAN_ID_TO_SLUG['pln_preview_resident'] = 'resident';
+}
+
 /** Minimal shape of the member object we read. */
 export interface MemberPlanConnection {
   id?: string;

@@ -84,7 +84,7 @@ export function MemberShell({ children, wide = false }: { children: ReactNode; w
               </Link>
             ) : admin ? (
               <Link href="/admin" className={styles.switch}>
-                <Icon name="settings" size={15} />
+                <Icon name="settings" size={17} />
                 <span>Admin</span>
               </Link>
             ) : null}

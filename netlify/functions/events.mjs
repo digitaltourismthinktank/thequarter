@@ -72,7 +72,8 @@ export default async function handler(req) {
     if (body.end) fields[F.events.end] = body.end;
     if (body.description) fields[F.events.description] = body.description;
     if (body.category) fields[F.events.category] = body.category;
-    const rec = await createRecord(T.events, fields);
+    // typecast so a new Category (singleSelect) option is accepted, not rejected.
+    const rec = await createRecord(T.events, fields, { typecast: true });
     return json({ ok: true, id: rec.id });
   }
 
@@ -86,7 +87,7 @@ export default async function handler(req) {
     if (body.description !== undefined) fields[F.events.description] = body.description;
     if (body.category !== undefined) fields[F.events.category] = body.category;
     if (body.published !== undefined) fields[F.events.published] = body.published;
-    await updateRecord(T.events, body.id, fields);
+    await updateRecord(T.events, body.id, fields, { typecast: true });
     return json({ ok: true });
   }
 

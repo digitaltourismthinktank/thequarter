@@ -13,6 +13,7 @@ import {
   type MyBooking,
 } from '@/lib/booking';
 import { WeekStrip } from './WeekStrip';
+import { DatePickerModal } from './DatePickerModal';
 import styles from './BookingClient.module.css';
 
 const SLOT = 30;
@@ -45,6 +46,11 @@ function dayLabel(iso: string): string {
   const [y, m, d] = iso.split('-').map(Number);
   return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', timeZone: 'UTC' });
 }
+function isWeekendISO(iso: string): boolean {
+  const [y, m, d] = iso.split('-').map(Number);
+  const day = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+  return day === 0 || day === 6;
+}
 
 export function BookingClient() {
   const { loading, member } = useMember();
@@ -54,10 +60,12 @@ export function BookingClient() {
   const [avail, setAvail] = useState<Avail | null>(null);
   const [loadingAvail, setLoadingAvail] = useState(false);
   const [start, setStart] = useState<number | null>(null); // pending start tap
+  const [hover, setHover] = useState<number | null>(null); // slot under the cursor (block preview)
   const [sel, setSel] = useState<{ start: number; end: number } | null>(null); // committed range
   const [mine, setMine] = useState<MyBooking[]>([]);
   const [busyAction, setBusyAction] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   useEffect(() => {
     if (loading || member) return;
@@ -75,9 +83,10 @@ export function BookingClient() {
       const s = await getSpaces();
       if (s.ok) {
         setSpaces(s.data.spaces);
-        // Preselect a room from ?room= (e.g. scanned from a kiosk QR), else the first.
+        // Preselect a room only from ?room= (e.g. a kiosk QR). Otherwise no room is
+        // chosen by default — members pick the room that fits before booking.
         const wanted = new URLSearchParams(window.location.search).get('room');
-        const pre = (wanted && s.data.spaces.find((x) => x.id === wanted)?.id) || s.data.spaces[0]?.id;
+        const pre = wanted ? s.data.spaces.find((x) => x.id === wanted)?.id : null;
         if (pre) setSpaceId(pre);
       }
       await loadMine();
@@ -192,6 +201,17 @@ export function BookingClient() {
       ? `Start ${minToHHMM(start)} — now tap your end time`
       : 'Tap a start time, then an end time (or use a preset)';
 
+  // While choosing an end time, preview the whole block from the start to the
+  // hovered slot, so it's obvious you're booking the range (not a single slot).
+  const previewRange =
+    start !== null && !sel && hover !== null && hover !== start
+      ? (() => {
+          const lo = Math.min(start, hover);
+          const hi = Math.max(start, hover) + SLOT;
+          return rangeFree(lo, hi) ? { lo, hi } : null;
+        })()
+      : null;
+
   return (
     <div>
       <div className={styles.head}>
@@ -217,61 +237,81 @@ export function BookingClient() {
         ))}
       </div>
 
-      <WeekStrip value={date} onSelect={setDate} />
-
-      <div className={styles.presets}>
-        <button type="button" className={styles.preset} onClick={() => preset(8 * 60, 13 * 60)}>
-          Morning · 08–13
-        </button>
-        <button type="button" className={styles.preset} onClick={() => preset(13 * 60, 18 * 60)}>
-          Afternoon · 13–18
-        </button>
-        <button type="button" className={styles.preset} onClick={() => preset(8 * 60, 18 * 60)}>
-          Full day
-        </button>
-      </div>
-
-      <div className={styles.hintRow}>
-        <span className={styles.hint}>{hint}</span>
-        {start !== null || sel ? (
-          <button type="button" className={styles.clear} onClick={clearSel}>
-            Clear
-          </button>
-        ) : null}
-      </div>
-
-      {loadingAvail ? (
-        <p className={styles.state}>Checking availability…</p>
+      {!spaceId ? (
+        <p className={styles.state}>Choose a room or pod above to see its availability.</p>
       ) : (
-        <div className={styles.grid}>
-          {slots.map((s) => {
-            const isBusy = slotBusy(s);
-            const isSel = !!sel && s >= sel.start && s < sel.end;
-            const isStart = start === s && !sel;
-            return (
-              <button
-                key={s}
-                type="button"
-                disabled={isBusy}
-                onClick={() => clickSlot(s)}
-                className={`${styles.slot} ${isBusy ? styles.slotBusy : ''} ${isSel ? styles.slotSel : ''} ${isStart ? styles.slotStart : ''}`}
-              >
-                {minToHHMM(s)}
-              </button>
-            );
-          })}
-        </div>
-      )}
+        <>
+          <div className={styles.bookDate}>
+            <WeekStrip value={date} onSelect={setDate} />
+            <button type="button" className={styles.dateBtn} onClick={() => setPickerOpen(true)}>
+              + Pick a date
+            </button>
+          </div>
 
-      <div className={styles.confirm}>
-        <span className={styles.selLabel}>
-          {sel ? `${spaceName(spaceId)} · ${dayLabel(date)} · ${fmtRange(sel.start, sel.end)}` : 'Choose a time above.'}
-        </span>
-        <Button variant="primary" onClick={confirm} disabled={!sel || busyAction}>
-          {busyAction ? 'Booking…' : 'Confirm booking'}
-        </Button>
-      </div>
-      {msg ? <p className={styles.msg}>{msg}</p> : null}
+          <div className={styles.presets}>
+            <button type="button" className={styles.preset} onClick={() => preset(8 * 60, 13 * 60)}>
+              Morning · 08–13
+            </button>
+            <button type="button" className={styles.preset} onClick={() => preset(13 * 60, 18 * 60)}>
+              Afternoon · 13–18
+            </button>
+            <button type="button" className={styles.preset} onClick={() => preset(8 * 60, 18 * 60)}>
+              Full day
+            </button>
+          </div>
+
+          <div className={styles.hintRow}>
+            <span className={styles.hint}>{hint}</span>
+            {start !== null || sel ? (
+              <button type="button" className={styles.clear} onClick={clearSel}>
+                Clear
+              </button>
+            ) : null}
+          </div>
+
+          {loadingAvail ? (
+            <p className={styles.state}>Checking availability…</p>
+          ) : (
+            <div className={styles.grid} onMouseLeave={() => setHover(null)}>
+              {slots.map((s) => {
+                const isBusy = slotBusy(s);
+                const isSel = !!sel && s >= sel.start && s < sel.end;
+                const isStart = start === s && !sel;
+                const isPreview = !!previewRange && s >= previewRange.lo && s < previewRange.hi;
+                return (
+                  <button
+                    key={s}
+                    type="button"
+                    disabled={isBusy}
+                    onClick={() => clickSlot(s)}
+                    onMouseEnter={() => setHover(s)}
+                    className={`${styles.slot} ${isBusy ? styles.slotBusy : ''} ${isSel ? styles.slotSel : ''} ${isStart ? styles.slotStart : ''} ${isPreview ? styles.slotPreview : ''}`}
+                  >
+                    {minToHHMM(s)}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {isWeekendISO(date) ? (
+            <p className={styles.weekendNote}>
+              {dayLabel(date)} is a weekend — outside our regular Monday–Friday hours, but the space is yours to book as a
+              member.
+            </p>
+          ) : null}
+
+          <div className={styles.confirm}>
+            <span className={styles.selLabel}>
+              {sel ? `${spaceName(spaceId)} · ${dayLabel(date)} · ${fmtRange(sel.start, sel.end)}` : 'Choose a time above.'}
+            </span>
+            <Button variant="primary" onClick={confirm} disabled={!sel || busyAction}>
+              {busyAction ? 'Booking…' : isWeekendISO(date) ? 'Book the weekend' : 'Confirm booking'}
+            </Button>
+          </div>
+          {msg ? <p className={styles.msg}>{msg}</p> : null}
+        </>
+      )}
 
       {mine.length ? (
         <div className={styles.mine}>
@@ -288,6 +328,8 @@ export function BookingClient() {
           ))}
         </div>
       ) : null}
+
+      <DatePickerModal open={pickerOpen} onClose={() => setPickerOpen(false)} onPick={setDate} single allowWeekend planned={[date]} />
     </div>
   );
 }
@@ -296,6 +338,8 @@ function friendly(code?: string): string {
   switch (code) {
     case 'slot-taken':
       return 'Sorry, that slot was just taken — pick another.';
+    case 'double-book':
+      return 'You already have a booking at that time — cancel it first to book another room.';
     case 'outside-hours':
       return 'Bookings are Monday–Friday, 08:00–18:00.';
     case 'closed-weekend':

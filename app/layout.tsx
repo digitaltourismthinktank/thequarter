@@ -78,11 +78,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en-GB" className={dmSans.variable}>
       <body>
-        <Script
-          src="https://static.memberstack.com/scripts/v1/memberstack.js"
-          data-memberstack-app={MEMBERSTACK_APP_ID}
-          strategy="beforeInteractive"
-        />
+        {/* Memberstack runs in production only. In local dev it would gate the
+            member pages (test mode → bounce to /login); the dev preview mock
+            (lib/devMock) stands in for it instead. */}
+        {process.env.NODE_ENV === 'production' ? (
+          <Script
+            src="https://static.memberstack.com/scripts/v1/memberstack.js"
+            data-memberstack-app={MEMBERSTACK_APP_ID}
+            strategy="beforeInteractive"
+          />
+        ) : null}
         {/* Cookiescript — GDPR consent banner (gates non-essential cookies). The
             cookie-policy report script lives on the privacy page. */}
         <Script src="https://cdn.cookie-script.com/s/064e38604f7ba35680d8f547f21c404a.js" strategy="afterInteractive" />

@@ -49,7 +49,7 @@ export function MyBookingsCard({ className }: { className?: string }) {
 
   return (
     <div className={cn(styles.card, className)}>
-      <span className={styles.eyebrow}>Your bookings</span>
+      <span className={styles.eyebrow}>Meeting Room &amp; Pod Bookings</span>
       {loading ? (
         <p className={styles.meta}>Loading…</p>
       ) : bookings.length === 0 ? (

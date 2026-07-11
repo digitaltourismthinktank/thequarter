@@ -3,6 +3,7 @@
  * Attaches the member's Memberstack JWT for authenticated calls. Client-only.
  */
 import { getMemberToken } from './memberstack';
+import { PREVIEW, previewCall } from './devMock';
 
 const FN = '/.netlify/functions';
 
@@ -17,6 +18,11 @@ async function call<T = unknown>(
   opts: { method?: string; body?: unknown; auth?: boolean } = {},
 ): Promise<ApiResult<T>> {
   const { method = 'GET', body, auth = true } = opts;
+  // Local preview: serve canned data instead of the (absent) Netlify Functions.
+  if (PREVIEW) {
+    const mocked = previewCall(path, method);
+    if (mocked) return mocked as ApiResult<T>;
+  }
   const headers: Record<string, string> = { 'content-type': 'application/json' };
   if (auth) {
     const t = await getMemberToken();

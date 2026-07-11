@@ -16,11 +16,17 @@ export function DatePickerModal({
   onClose,
   onPick,
   planned = [],
+  single = false,
+  allowWeekend = false,
 }: {
   open: boolean;
   onClose: () => void;
   onPick: (date: string) => void;
   planned?: string[];
+  /** Pick one date and close (e.g. jumping the booking calendar to a date). */
+  single?: boolean;
+  /** Let members pick weekends too (outside regular hours, but open to members). */
+  allowWeekend?: boolean;
 }) {
   const today = new Date();
   const [ym, setYm] = useState<{ y: number; m: number }>({ y: today.getFullYear(), m: today.getMonth() });
@@ -101,7 +107,7 @@ export function DatePickerModal({
             if (d === null) return <span key={`e${i}`} />;
             const ds = iso(ym.y, ym.m, d);
             const dow = new Date(ym.y, ym.m, d).getDay();
-            const closed = dow === 0 || dow === 6 || ds < todayStr || holidays.has(ds) || shutdown(ds);
+            const closed = (!allowWeekend && (dow === 0 || dow === 6)) || ds < todayStr || holidays.has(ds) || shutdown(ds);
             const isToday = ds === todayStr;
             const isPlanned = plannedSet.has(ds) || justPicked.has(ds);
             return (
@@ -111,7 +117,8 @@ export function DatePickerModal({
                 disabled={closed || isPlanned}
                 onClick={() => {
                   onPick(ds);
-                  setJustPicked((s) => new Set(s).add(ds));
+                  if (single) onClose();
+                  else setJustPicked((s) => new Set(s).add(ds));
                 }}
               >
                 {d}
@@ -121,9 +128,13 @@ export function DatePickerModal({
         </div>
         <div className={styles.footer}>
           <span className={styles.note}>
-            {justPicked.size > 0
-              ? `${justPicked.size} day${justPicked.size === 1 ? '' : 's'} added — pick more or close.`
-              : 'Pick as many days as you like.'}
+            {allowWeekend
+              ? 'Weekends are outside our regular hours, but open to you as a member.'
+              : single
+                ? 'Pick a date to jump to that week.'
+                : justPicked.size > 0
+                  ? `${justPicked.size} day${justPicked.size === 1 ? '' : 's'} added — pick more or close.`
+                  : 'Pick as many days as you like.'}
           </span>
           <Button size="sm" variant="primary" onClick={onClose}>
             Done

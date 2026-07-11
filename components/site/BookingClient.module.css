@@ -195,6 +195,44 @@
   color: var(--ink-900);
   font-weight: var(--fw-semibold);
 }
+/* Hover preview of the whole block from start → hovered slot. */
+.slotPreview {
+  background: var(--gold-100);
+  border-color: var(--gold-400);
+  color: var(--ink-900);
+}
+
+.bookDate {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.dateBtn {
+  align-self: flex-start;
+  padding: 8px 16px;
+  border: 1px dashed var(--sand-300);
+  border-radius: var(--radius-pill);
+  background: var(--sand-50);
+  color: var(--gold-700);
+  font-size: var(--text-sm);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+}
+.dateBtn:hover {
+  border-color: var(--gold-500);
+  background: var(--gold-100);
+}
+.weekendNote {
+  margin: 12px 0;
+  padding: 10px 14px;
+  background: var(--gold-100);
+  border: 1px solid var(--gold-300);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  color: var(--gold-700);
+  line-height: 1.5;
+}
 
 .confirm {
   display: flex;

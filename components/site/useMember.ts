@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { getMemberstack, PLAN_ID_TO_SLUG, type Member } from '@/lib/memberstack';
+import { PREVIEW, previewMember } from '@/lib/devMock';
 
 export interface MemberState {
   loading: boolean;
@@ -13,9 +14,14 @@ export interface MemberState {
    immediately after a fresh page load post-login (which otherwise bounced the
    dashboard back to /login). */
 export function useMember(): MemberState {
-  const [state, setState] = useState<MemberState>({ loading: true, member: null });
+  // Local preview seeds the mock member synchronously so it's present from the
+  // first client render (no redirect race). Never runs in production.
+  const [state, setState] = useState<MemberState>(
+    PREVIEW ? { loading: false, member: previewMember } : { loading: true, member: null },
+  );
 
   useEffect(() => {
+    if (PREVIEW) return;
     let cancelled = false;
     let unsubscribe: (() => boolean) | undefined;
 

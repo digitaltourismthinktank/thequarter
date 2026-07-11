@@ -148,11 +148,11 @@ export default async function handler(req) {
     return json({ ok: true, balance: newBalance, pointsAwarded });
   }
 
-  // Reserve a future weekday ("Tomorrow"). No deduction until they actually check in.
+  // Reserve a future day. No deduction until they actually check in. Weekends are
+  // allowed for members (the app asks them to confirm); bank holidays are not.
   if (body.action === 'reserve') {
     const date = body.date || addDays(londonNow().dateStr, 1);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return json({ error: 'bad-date' }, 400);
-    if (!isWeekday(date)) return json({ error: 'closed-weekend' }, 400);
     if (await isClosedDay(date)) return json({ error: 'closed-day' }, 400);
     const existing = await checkinsFor(email, date);
     if (existing.some((r) => r.fields[F.checkins.status] !== 'Cancelled')) {

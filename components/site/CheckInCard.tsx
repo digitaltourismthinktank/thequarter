@@ -93,20 +93,22 @@ export function CheckInCard({ className }: { className?: string }) {
 
   return (
     <div className={cn(styles.card, className)}>
-      <span className={styles.eyebrow}>Your visits</span>
+      <span className={styles.eyebrow}>Book a visit</span>
 
       {loading ? (
         <p className={styles.meta}>Loading…</p>
-      ) : status?.checkedIn ? (
-        <>
-          <h2 className={styles.title}>You&rsquo;re in today</h2>
-          <p className={styles.meta}>{status.length === 'Half' ? 'Half day' : 'Full day'} — enjoy The Quarter.</p>
-        </>
       ) : (
         <>
-          <h2 className={styles.title}>Coming in?</h2>
+          {status?.checkedIn ? (
+            <>
+              <h2 className={styles.title}>You&rsquo;re in today</h2>
+              <p className={styles.meta}>{status.length === 'Half' ? 'Half day' : 'Full day'} — enjoy The Quarter.</p>
+            </>
+          ) : (
+            <h2 className={styles.title}>Coming in?</h2>
+          )}
 
-          {/* Full / Half day — a proper segmented toggle, defaults to Full. */}
+          {/* Full / Half — applies to checking in today and to any days you plan. */}
           <div className={styles.seg} role="tablist" aria-label="Day length">
             <button type="button" role="tab" aria-selected={!half} className={cn(styles.segBtn, !half && styles.segOn)} onClick={() => setHalf(false)}>
               Full day
@@ -116,19 +118,22 @@ export function CheckInCard({ className }: { className?: string }) {
             </button>
           </div>
 
-          <div className={styles.actions}>
-            {openToday ? (
-              <Button variant="primary" size="sm" onClick={doCheckIn} disabled={busy}>
-                I&rsquo;m in today
+          {!status?.checkedIn ? (
+            <div className={styles.actions}>
+              {openToday ? (
+                <Button variant="primary" size="sm" onClick={doCheckIn} disabled={busy}>
+                  I&rsquo;m in today
+                </Button>
+              ) : null}
+              <Button variant={openToday ? 'secondary' : 'primary'} size="sm" onClick={() => doReserveDate(nextOpen)} disabled={busy}>
+                I&rsquo;ll be in {nextLabel}
               </Button>
-            ) : null}
-            <Button variant={openToday ? 'secondary' : 'primary'} size="sm" onClick={() => doReserveDate(nextOpen)} disabled={busy}>
-              I&rsquo;ll be in {nextLabel}
-            </Button>
-          </div>
+            </div>
+          ) : null}
 
+          {/* Plan-ahead stays available even once you're checked in today. */}
           <div className={styles.planAhead}>
-            <WeekStrip label="Plan ahead" onSelect={doReserveDate} />
+            <WeekStrip label={status?.checkedIn ? 'Book another day' : 'Book for the coming week'} onSelect={doReserveDate} />
             <button type="button" className={styles.dateBtn} onClick={() => setPickerOpen(true)}>
               + Pick a date
             </button>
@@ -138,7 +143,7 @@ export function CheckInCard({ className }: { className?: string }) {
 
       {showPlanned ? (
         <div className={styles.planned}>
-          <span className={styles.plannedLabel}>Planned</span>
+          <span className={styles.plannedLabel}>Your upcoming check-ins</span>
           {status?.planned?.map((p) => (
             <span key={p.id} className={styles.chip}>
               {fmtDate(p.date)}
@@ -162,6 +167,7 @@ export function CheckInCard({ className }: { className?: string }) {
         open={pickerOpen}
         onClose={() => setPickerOpen(false)}
         onPick={doReserveDate}
+        allowWeekend
         planned={[...plannedDates, ...pending]}
       />
     </div>

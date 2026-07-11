@@ -62,6 +62,10 @@ const ICON_CHOICES: IconName[] = [
   'star', 'sparkles', 'award', 'percent', 'tag', 'leaf', 'camera', 'palette',
   'activity', 'scissors', 'building', 'map-pin',
 ];
+/** Where events happen — a dropdown so venues stay consistent. */
+const EVENT_LOCATIONS = ['The Kentish Pantry', 'The Board Room', 'The Hop Yard', 'The Chapter House', 'The whole Quarter', 'Off-site'];
+/** Content categories for rewards + perks — a picker to avoid typos. */
+const CONTENT_CATEGORIES = ['Food & drink', 'Coffee & cake', 'Culture', 'Wellbeing', 'Getting here', 'Shopping', 'Services', 'Treats', 'Experiences'];
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const minToHHMM = (m: number) => `${pad(Math.floor(m / 60))}:${pad(m % 60)}`;
@@ -268,12 +272,17 @@ function MembersPane() {
         </table>
       </div>
       {msg ? <p className={styles.msg}>{msg}</p> : null}
-      <MemberProfileModal id={profileId} onClose={() => setProfileId(null)} onChanged={refresh} />
+      <MemberProfileModal
+        id={profileId}
+        bday={members.find((m) => m.id === profileId)?.bday ?? null}
+        onClose={() => setProfileId(null)}
+        onChanged={refresh}
+      />
     </div>
   );
 }
 
-function MemberProfileModal({ id, onClose, onChanged }: { id: string | null; onClose: () => void; onChanged: () => void }) {
+function MemberProfileModal({ id, bday, onClose, onChanged }: { id: string | null; bday?: string | null; onClose: () => void; onChanged: () => void }) {
   const [p, setP] = useState<MemberProfile | null>(null);
   const [rewards, setRewards] = useState<AdminReward[]>([]);
   const [delta, setDelta] = useState('');
@@ -351,6 +360,13 @@ function MemberProfileModal({ id, onClose, onChanged }: { id: string | null; onC
   }
 
   const since = p?.since ? new Date(p.since).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }) : '—';
+  const bdayLabel =
+    bday && /^\d{2}-\d{2}$/.test(bday)
+      ? (() => {
+          const [mm, dd] = bday.split('-').map(Number);
+          return new Date(2000, mm - 1, dd).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
+        })()
+      : null;
   const d = Math.round(Number(delta) || 0);
 
   return (
@@ -364,6 +380,7 @@ function MemberProfileModal({ id, onClose, onChanged }: { id: string | null; onC
               {p?.phone ? ` · ${p.phone}` : ''}
               {p?.company ? ` · ${p.company}` : ''}
               {p?.plan ? ` · ${p.plan}` : ''}
+              {bdayLabel ? ` · Birthday ${bdayLabel}` : ''}
               {p?.paused ? ' · Paused' : ''}
             </span>
           </div>
@@ -727,10 +744,21 @@ function AdminTodayPane({ onAllBirthdays }: { onAllBirthdays: () => void }) {
   const birthdaysThisWeek = members
     .filter((m) => m.bday)
     .map((m) => ({ m, s: bdayStatus(m) }))
-    .filter((x) => x.s.rank === 0 || x.s.rank === 1)
+    .filter((x) => (x.s.rank === 0 || x.s.rank === 1) && x.s.days <= 30)
     .sort((a, c) => a.s.rank - c.s.rank)
     .slice(0, 5);
   const dateLabel = dObj.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+  // Second "day" button: literal Tomorrow on Mon–Thu, else the next open weekday.
+  const todayDow = new Date().getDay();
+  const nextDayLabel =
+    todayDow === 5 || todayDow === 6 || todayDow === 0
+      ? (() => {
+          const n = new Date();
+          n.setDate(n.getDate() + 1);
+          while (n.getDay() === 0 || n.getDay() === 6) n.setDate(n.getDate() + 1);
+          return n.toLocaleDateString('en-GB', { weekday: 'long' });
+        })()
+      : 'Tomorrow';
 
   return (
     <div>
@@ -748,7 +776,7 @@ function AdminTodayPane({ onAllBirthdays }: { onAllBirthdays: () => void }) {
             Today
           </button>
           <button type="button" className={`${styles.segBtn} ${offset === 1 ? styles.segOn : ''}`} onClick={() => setOffset(1)}>
-            Tomorrow
+            {nextDayLabel}
           </button>
         </div>
       </div>
@@ -799,7 +827,7 @@ function AdminTodayPane({ onAllBirthdays }: { onAllBirthdays: () => void }) {
             </span>
           </div>
           <div className={styles.todayCard}>
-            <span className={styles.todayCardLabel}>Birthdays this week</span>
+            <span className={styles.todayCardLabel}>Birthdays in the next 30 days</span>
             {birthdaysThisWeek.length ? (
               <div className={styles.bdayList}>
                 {birthdaysThisWeek.map(({ m, s }) => (
@@ -940,7 +968,12 @@ function ContentPane() {
             ) : (
               <input className={styles.label} placeholder="Offer (e.g. 20% off brunch)" value={editing.offer} onChange={(e) => set('offer', e.target.value)} />
             )}
-            <input className={styles.label} placeholder="Category" value={editing.category} onChange={(e) => set('category', e.target.value)} />
+            <select className={styles.select} value={editing.category} onChange={(e) => set('category', e.target.value)} aria-label="Category">
+              <option value="">Category…</option>
+              {CONTENT_CATEGORIES.map((c) => (
+                <option key={c}>{c}</option>
+              ))}
+            </select>
             {isReward ? (
               <div className={styles.formRow}>
                 <input className={styles.dayInput} type="number" placeholder="Cost (pts)" value={editing.cost} onChange={(e) => set('cost', Number(e.target.value))} />
@@ -1110,8 +1143,8 @@ function PartnersPane() {
 }
 
 // ---------------------------------------------------------------- Birthdays
-function bdayStatus(m: AdminMember): { rank: number; label: string; when: string } {
-  if (!m.bday || !/^\d{2}-\d{2}$/.test(m.bday)) return { rank: 9, label: '', when: '' };
+function bdayStatus(m: AdminMember): { rank: number; label: string; when: string; days: number } {
+  if (!m.bday || !/^\d{2}-\d{2}$/.test(m.bday)) return { rank: 9, label: '', when: '', days: 999 };
   const now = new Date();
   const year = now.getFullYear();
   const [mm, dd] = m.bday.split('-').map(Number);
@@ -1120,13 +1153,13 @@ function bdayStatus(m: AdminMember): { rank: number; label: string; when: string
   const today = new Date(year, now.getMonth(), now.getDate());
   const claimedThisYear = m.bdayClaimed ? new Date(m.bdayClaimed).getFullYear() === year : false;
   const whenStr = bd.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
-  if (claimedThisYear) return { rank: 3, label: 'Claimed', when: `Claimed ${new Date(m.bdayClaimed as string).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}` };
-  if (today >= bd && today <= weekEnd) return { rank: 0, label: 'This week', when: whenStr };
+  if (claimedThisYear) return { rank: 3, label: 'Claimed', when: `Claimed ${new Date(m.bdayClaimed as string).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`, days: 999 };
+  if (today >= bd && today <= weekEnd) return { rank: 0, label: 'This week', when: whenStr, days: 0 };
   if (today < bd) {
     const days = Math.ceil((bd.getTime() - today.getTime()) / 86400000);
-    return { rank: 1, label: 'Upcoming', when: `${whenStr} · in ${days} day${days === 1 ? '' : 's'}` };
+    return { rank: 1, label: 'Upcoming', when: `${whenStr} · in ${days} day${days === 1 ? '' : 's'}`, days };
   }
-  return { rank: 2, label: 'Passed', when: whenStr };
+  return { rank: 2, label: 'Passed', when: whenStr, days: 999 };
 }
 
 function BirthdaysPane() {
@@ -1301,7 +1334,11 @@ function EventsPane() {
           </label>
           <label className={styles.field}>
             <span>Location</span>
-            <input className={styles.input} value={location} onChange={(e) => setLocation(e.target.value)} />
+            <select className={styles.input} value={location} onChange={(e) => setLocation(e.target.value)}>
+              {EVENT_LOCATIONS.map((l) => (
+                <option key={l}>{l}</option>
+              ))}
+            </select>
           </label>
           <label className={styles.field}>
             <span>Theme</span>

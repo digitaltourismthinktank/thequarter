@@ -168,7 +168,7 @@ export function DashboardClient() {
   return (
     <div className={styles.page}>
       <header className={styles.hero}>
-        <span className={styles.heroEyebrow}>Your home</span>
+        <span className={styles.heroEyebrow}>Quarter Dashboard</span>
         <h1 className={styles.title}>Welcome back{first ? `, ${first}` : ''}</h1>
         <p className={styles.email}>{email}</p>
       </header>
