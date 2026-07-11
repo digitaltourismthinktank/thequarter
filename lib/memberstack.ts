@@ -138,6 +138,14 @@ export function memberRenewalDate(member: Member | null): string | null {
   return findCustomField(member, (k) => k.includes('renew'));
 }
 
+/** The dedicated "Paused" Memberstack plan (mirrors PAUSED_PLAN_ID server-side). */
+export const PAUSED_PLAN_ID = 'pln_paused-fns0m38';
+
+/** True when the member is on the Paused plan (billing paused, days frozen). */
+export function memberIsPaused(member: Member | null): boolean {
+  return !!member?.planConnections?.some((c) => c.planId === PAUSED_PLAN_ID && (c.active ?? true));
+}
+
 /** The member's door entry code (custom field), or null if not set. */
 export function memberDoorCode(member: Member | null): string | null {
   return findCustomField(member, (k) => k.includes('door'));

@@ -5,7 +5,7 @@ import { Icon, type IconName } from '@/components/ds/Icon';
 import { Button } from '@/components/ds/Button';
 import { useMember, memberPlanSlug } from './useMember';
 import { PLANS } from '@/lib/plans';
-import { EARN_RULES } from '@/lib/rewards';
+import { EARN_RULES, LEVELS, levelForPlan } from '@/lib/rewards';
 import { getRewards, redeemReward, type RewardItem, type Redemption, type BirthdayState } from '@/lib/booking';
 import { BirthdayCard } from './BirthdayCard';
 import { ReferFriendCard } from './ReferFriendCard';
@@ -53,6 +53,7 @@ export function RewardsClient() {
     const slug = memberPlanSlug(member);
     return slug ? PLANS.find((p) => p.id === slug)?.name ?? null : null;
   }, [member]);
+  const level = useMemo(() => levelForPlan(memberPlanSlug(member)), [member]);
 
   const load = useCallback(async () => {
     const r = await getRewards();
@@ -150,6 +151,27 @@ export function RewardsClient() {
             <span>{nextReward ? 'to go' : 'all set'}</span>
           </div>
         </div>
+      </section>
+
+      {/* Levels — the more of a regular you are, the faster you earn. */}
+      <section className={styles.levels} aria-label="Your level">
+        {LEVELS.map((lv) => {
+          const on = lv.slug === level;
+          return (
+            <div key={lv.slug} className={`${styles.level} ${on ? styles.levelOn : ''}`}>
+              <div className={styles.levelHead}>
+                <span className={styles.levelName}>{lv.name}</span>
+                {on ? <span className={styles.levelYou}>Your level</span> : null}
+              </div>
+              <span className={styles.levelRate}>{lv.rate}× points</span>
+              <ul className={styles.levelPerks}>
+                {lv.perks.map((p) => (
+                  <li key={p}>{p}</li>
+                ))}
+              </ul>
+            </div>
+          );
+        })}
       </section>
 
       <BirthdayCard birthday={birthday} onSaved={load} />

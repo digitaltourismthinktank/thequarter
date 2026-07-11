@@ -69,6 +69,20 @@ export function previewCall(path: string, method: string): Result | null {
         { id: 'e2', title: 'Founders’ breakfast briefing', start: `${addDays(t, 9)}T08:30:00.000Z`, end: null, location: 'The Kentish Pantry', published: true },
       ],
     });
-  if (method === 'POST') return ok({ ok: true, balance: '10' }); // check-in / reserve / cancel / book all succeed
+  if (path === 'rewards' && method === 'GET')
+    return ok({
+      points: 720,
+      earnedLately: 40,
+      catalogue: [
+        { id: 'treat', partner: 'A.T. Patisserie', title: 'A treat on us', cost: 300, category: 'Bakery & treats', icon: 'cake', hero: false, image: null, pos: '', avail: 'ok' },
+        { id: 'coffee', partner: 'Burgate Coffee', title: 'A coffee, our treat', cost: 350, category: 'Coffee & café', icon: 'coffee', hero: false, image: null, pos: '', avail: 'ok' },
+        { id: 'corkk-glass', partner: 'Corkk', title: 'A glass at Corkk', cost: 700, category: 'Drinks & wine', icon: 'wine', hero: false, image: null, pos: '', avail: 'ok' },
+        { id: 'corkk-evening', partner: 'Corkk', title: 'An evening at Corkk', cost: 2000, category: 'Drinks & wine', icon: 'sparkles', hero: true, image: null, pos: '', avail: 'ok' },
+      ],
+      redemptions: [],
+      birthday: { bday: '05-14', claimed: null },
+    });
+  if (path === 'carnet' && method === 'GET') return ok({ carnet: { remaining: 6, total: 10, expires: addDays(t, 300) } });
+  if (method === 'POST') return ok({ ok: true, balance: '10' }); // check-in / reserve / cancel / book / plan-change all succeed
   return null;
 }

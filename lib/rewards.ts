@@ -19,16 +19,47 @@ import type { PlanId } from './plans';
 /** Redemption anchor: 100 points = £1 of reward value. */
 export const POINTS_PER_POUND_VALUE = 100;
 
-/** 2% give-back, applied to every real PAID transaction (membership, day pass,
+/** 1% spend give-back, applied to every real PAID transaction (membership, day pass,
  *  carnet, external/company room hire + lunch add-ons). Member room bookings are
- *  free (fair use) → they earn NO spend points. */
-export const POINTS_PER_GBP = 2;
+ *  free (fair use) → they earn NO spend points. Kept a flat % (not level-multiplied)
+ *  so total give-back never breaches the brief's ~2–3% of revenue cap. */
+export const POINTS_PER_GBP = 1;
 
-export const CHECKIN_BONUS = 15; // per check-in, any plan
-export const CHECKIN_QUIET_BONUS = 30; // per check-in on a busyness 'quiet' day
+export const CHECKIN_BONUS = 10; // base per check-in (× the member's level)
+export const CHECKIN_QUIET_BONUS = 20; // base per check-in on a busyness 'quiet' day
 export const CHECKIN_BONUS_CAP = 12; // counted check-ins per calendar month
 export const REFERRAL_BONUS = 500; // one-off, when the referred friend starts a paid plan/carnet
 export const WELCOME_BONUS = 150; // one-off, on first paid plan/carnet
+
+// --- Levels — regulars earn faster (mirror of _rewards.mjs EARN_MULTIPLIER) ------
+
+export type LevelSlug = 'visitor' | 'resident' | 'citizen';
+
+/** The check-in bonuses are multiplied by the member's level. */
+export const EARN_MULTIPLIER: Record<LevelSlug, number> = { visitor: 1, resident: 1.5, citizen: 2 };
+
+export interface Level {
+  slug: LevelSlug;
+  name: string;
+  /** Check-in earn multiplier (×). */
+  rate: number;
+  /** What the level enjoys — real, wired benefits only. */
+  perks: string[];
+}
+
+/** Presentation of the three levels for the Rewards page (current level highlighted). */
+export const LEVELS: Level[] = [
+  { slug: 'visitor', name: 'Visitor', rate: 1, perks: ['Earn points on every visit', '5 days a month'] },
+  { slug: 'resident', name: 'Resident', rate: 1.5, perks: ['Points earn 1.5× faster', '10 days a month'] },
+  { slug: 'citizen', name: 'Citizen', rate: 2, perks: ['Points earn 2× faster', 'Unlimited days', 'A treat on your birthday'] },
+];
+
+/** Map a plan slug (from Memberstack) to a rewards level; defaults to Visitor. */
+export function levelForPlan(slug?: string | null): LevelSlug {
+  if (slug === 'citizen') return 'citizen';
+  if (slug === 'resident' || slug === 'hybrid') return 'resident';
+  return 'visitor';
+}
 
 /** Points for a real GBP payment (rounded). The canonical spend-earn. */
 export const pointsForGBP = (gbp: number) => Math.round(POINTS_PER_GBP * Math.max(0, gbp));
@@ -51,11 +82,11 @@ export const EARN_RULES: EarnRule[] = [
   {
     icon: 'sparkles',
     title: 'Check in on a quiet day',
-    note: 'Our gentle nudge to spread the week out — worth double.',
+    note: 'Our gentle nudge to spread the week out — worth double, then times your level.',
     value: `+${CHECKIN_QUIET_BONUS}`,
     lead: true,
   },
-  { icon: 'door-open', title: 'Check in any day', note: 'Just for being here.', value: `+${CHECKIN_BONUS}` },
+  { icon: 'door-open', title: 'Check in any day', note: 'Just for being here — times your level.', value: `+${CHECKIN_BONUS}` },
   {
     icon: 'pound-sterling',
     title: 'Spend at The Quarter',
@@ -63,12 +94,6 @@ export const EARN_RULES: EarnRule[] = [
     value: `${POINTS_PER_GBP} per £1`,
   },
   { icon: 'users', title: 'Refer a friend', note: 'When they start their first paid plan.', value: `+${REFERRAL_BONUS}` },
-  {
-    icon: 'star',
-    title: 'Join annually',
-    note: `Earn ${POINTS_PER_GBP} points per £1 on the year, up front — a big boost.`,
-    value: 'Big boost',
-  },
   { icon: 'gift', title: 'Welcome bonus', note: 'A warm hello on your first paid plan.', value: `+${WELCOME_BONUS}` },
 ];
 

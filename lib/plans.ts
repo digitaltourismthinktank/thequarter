@@ -130,3 +130,15 @@ export const PLAN_MEMBERSTACK_ID: Record<PlanId, string> = {
   citizen: 'pln_citizen-plan-q9oa04p9',
   'hybrid-office': 'pln_hybrid-plan-r4k60rjp',
 };
+
+/**
+ * Stripe recurring price ids per plan + term, for the native in-dashboard plan
+ * switch (see /plan and netlify/functions/plan-change.mjs). The server keeps the
+ * matching allow-list — keep the two in sync. Hybrid Office is annual-only.
+ */
+export const PLAN_STRIPE_PRICE: Partial<Record<PlanId, { monthly?: string; annual?: string }>> = {
+  visitor: { monthly: 'price_0PgRo1w5GSGOu4zJdycNlCpy', annual: 'price_0Tn4ucw5GSGOu4zJ7UqWhlO8' },
+  resident: { monthly: 'price_0PgRphw5GSGOu4zJ0dnCFwjp', annual: 'price_0Tn4Nmw5GSGOu4zJwV8L1Imz' },
+  citizen: { monthly: 'price_0PgS1pw5GSGOu4zJQpVlN6Gm', annual: 'price_0Tn4MXw5GSGOu4zJLe6oAQEu' },
+  'hybrid-office': { annual: 'price_0OtrBRw5GSGOu4zJC3vsROvC' },
+};

@@ -337,7 +337,7 @@ function MemberProfileModal({ id, bday, onClose, onChanged }: { id: string | nul
     setBusy(false);
     if (r.ok) {
       setRewardId('');
-      setMsg(`Redeemed ${r.data.reward} ✓`);
+      setMsg(`Redeemed ${r.data.reward}`);
       await load();
       onChanged();
     } else {
@@ -353,7 +353,7 @@ function MemberProfileModal({ id, bday, onClose, onChanged }: { id: string | nul
     setBusy(false);
     if (r.ok) {
       setPlanSel('');
-      setMsg('Plan assigned ✓');
+      setMsg('Plan assigned');
       await load();
       onChanged();
     } else setMsg('Could not assign plan.');
@@ -565,7 +565,7 @@ function RoomsPane() {
     if (r.ok) {
       setLabel('');
       await loadCalendar();
-      setMsg('Added ✓');
+      setMsg('Added');
     } else {
       setMsg(r.data?.error || 'Could not add');
     }
@@ -925,7 +925,7 @@ function ContentPane() {
     if (r.ok) {
       setEditing(null);
       await refresh();
-      setMsg('Saved ✓');
+      setMsg('Saved');
     } else setMsg(r.data?.error || 'Save failed');
   }
   async function remove(id: string, kind: 'rewards' | 'perks') {
@@ -1302,7 +1302,7 @@ function EventsPane() {
     if (r.ok) {
       resetForm();
       await refresh();
-      setMsg('Saved ✓');
+      setMsg('Saved');
     } else {
       setMsg(r.data?.error || 'Save failed');
     }

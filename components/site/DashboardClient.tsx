@@ -12,6 +12,7 @@ import { TalkToUs } from './TalkToUs';
 import { CheckInCard } from './CheckInCard';
 import { MyBookingsCard } from './MyBookingsCard';
 import { EventsCard } from './EventsCard';
+import { CarnetMini } from './CarnetMini';
 import { getMemberstack, memberName, memberDaysRemaining, memberRenewalDate, memberDoorCode } from '@/lib/memberstack';
 import { PLANS, PLAN_DAY_ALLOWANCE } from '@/lib/plans';
 import { STRIPE_BILLING_PORTAL_URL } from '@/lib/commerce';
@@ -220,6 +221,8 @@ export function DashboardClient() {
               <a href={STRIPE_BILLING_PORTAL_URL}>Open the standard portal</a>.
             </p>
           ) : null}
+
+          <CarnetMini />
 
           <div className={styles.linksCard}>
             <span className={styles.cardEyebrow}>Quick links</span>

@@ -13,9 +13,9 @@
 import memberstackAdmin from '@memberstack/admin';
 import { verifyMember, memberEmail, memberName, tokenFromRequest } from './_member.mjs';
 import { listRecords, createRecord, updateRecord, T, F, airtableReady, esc } from './_airtable.mjs';
-import { londonNow, isWeekday, addDays, isoToLondonDate } from './_time.mjs';
+import { londonNow, addDays, isoToLondonDate } from './_time.mjs';
 import { allowanceForMember } from './_quarter-sync.mjs';
-import { awardPoints, checkinBonusesThisMonth, CHECKIN_BONUS, CHECKIN_QUIET_BONUS, CHECKIN_BONUS_CAP } from './_rewards.mjs';
+import { awardPoints, checkinBonusesThisMonth, earnMultiplierForMember, CHECKIN_BONUS, CHECKIN_QUIET_BONUS, CHECKIN_BONUS_CAP } from './_rewards.mjs';
 import { isQuietDay } from './_busyness.mjs';
 import { isClosedDay } from './_holidays.mjs';
 
@@ -93,7 +93,8 @@ export default async function handler(req) {
   // Check in for TODAY (deducts unless unlimited). Idempotent per day.
   if (body.action === 'checkin') {
     const today = londonNow().dateStr;
-    if (!isWeekday(today)) return json({ error: 'closed-weekend' }, 400);
+    // Weekends are allowed (members can use the space out of hours); bank-holiday
+    // and seasonal closures still block a check-in.
     if (await isClosedDay(today)) return json({ error: 'closed-day' }, 400);
     const recs = await checkinsFor(email, today);
     const already = recs.find((r) => r.fields[F.checkins.status] === 'Checked-in');
@@ -139,7 +140,9 @@ export default async function handler(req) {
       const used = await checkinBonusesThisMonth(email, today.slice(0, 7));
       if (used < CHECKIN_BONUS_CAP) {
         const quiet = isQuietDay(today);
-        pointsAwarded = quiet ? CHECKIN_QUIET_BONUS : CHECKIN_BONUS;
+        // The member's level multiplies the base bonus (regulars earn faster).
+        const mult = earnMultiplierForMember(me);
+        pointsAwarded = Math.round((quiet ? CHECKIN_QUIET_BONUS : CHECKIN_BONUS) * mult);
         await awardPoints(me, pointsAwarded, quiet ? 'checkin-quiet' : 'checkin', today);
       }
     } catch {

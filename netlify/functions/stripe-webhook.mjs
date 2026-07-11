@@ -159,7 +159,10 @@ async function handleEvent(event) {
   } else {
     // customer.subscription.created / updated
     const price = obj.items?.data?.[0]?.price;
-    const target = targetPlanForPrice(price?.id, price?.unit_amount);
+    // Native Stripe pause (pause_collection) OR the legacy £0 "Pause" price both
+    // map to the frozen Paused plan; clearing pause_collection resumes the real plan.
+    const nativePaused = !!obj.pause_collection;
+    const target = nativePaused ? PAUSED_PLAN_ID : targetPlanForPrice(price?.id, price?.unit_amount);
     if (target === PAUSED_PLAN_ID) {
       await setMemberPlan(MS_SECRET, email, PAUSED_PLAN_ID); // pause: freeze days
       applied = { target, paused: true };

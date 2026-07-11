@@ -11,17 +11,26 @@
  */
 import memberstackAdmin from '@memberstack/admin';
 import { listRecords, createRecord, updateRecord, T, F, esc } from './_airtable.mjs';
+import { tierForMember } from './_quarter-sync.mjs';
 
 const MS_SECRET = process.env.MEMBERSTACK_SECRET_KEY;
 
 // --- Economy (mirror of lib/rewards.ts — keep in sync) --------------------------
 export const POINTS_PER_POUND_VALUE = 100; // 100 points = £1 of reward value
-export const POINTS_PER_GBP = 2; // 2% give-back on real paid transactions
-export const CHECKIN_BONUS = 15;
-export const CHECKIN_QUIET_BONUS = 30;
+export const POINTS_PER_GBP = 1; // 1% spend give-back on real paid transactions
+export const CHECKIN_BONUS = 10; // base per check-in (× the member's level)
+export const CHECKIN_QUIET_BONUS = 20; // base per check-in on a busyness 'quiet' day
 export const CHECKIN_BONUS_CAP = 12; // counted check-ins per calendar month
 export const REFERRAL_BONUS = 500;
 export const WELCOME_BONUS = 150;
+
+/**
+ * Levels — the higher a member's commitment, the faster they earn. Multiplies the
+ * check-in bonuses (the frequent, visible earn). Spend give-back stays a flat % so
+ * the total give-back never breaches the brief's ~2–3% of revenue cap.
+ */
+export const EARN_MULTIPLIER = { visitor: 1, resident: 1.5, citizen: 2 };
+export const earnMultiplierForMember = (m) => EARN_MULTIPLIER[tierForMember(m)] || 1;
 
 /** Carnet purchase: Stripe checkout amount (pence) → passes. Provisional — mirrors
  *  lib/rewards CARNET_BUNDLES (10 @ £194.40, 30 @ £550.80). Confirm + wire real Stripe

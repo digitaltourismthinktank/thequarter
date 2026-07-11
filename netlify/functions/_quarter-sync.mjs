@@ -27,6 +27,31 @@ export const PLAN_NAMES = {
   'pln_paused-fns0m38': 'Paused',
 };
 
+/**
+ * Quarter Rewards earn-tier per plan. The higher a member's commitment, the faster
+ * they earn (see EARN_MULTIPLIER in _rewards.mjs). Hybrid earns at Resident level;
+ * the one-off Day Pass earns at the base (Visitor) level.
+ */
+export const PLAN_TIER = {
+  'pln_citizen-plan-q9oa04p9': 'citizen',
+  'pln_resident-plan-mqjy0f6w': 'resident',
+  'pln_visitor-plan-blk50re2': 'visitor',
+  'pln_hybrid-plan-r4k60rjp': 'resident',
+  'pln_daily-plan-45nv0v26': 'visitor',
+};
+
+const TIER_RANK = { visitor: 1, resident: 2, citizen: 3 };
+
+/** A member's earn tier from their Memberstack plan(s) — the highest tier wins. */
+export function tierForMember(member) {
+  let best = 'visitor';
+  for (const c of member?.planConnections || []) {
+    const t = PLAN_TIER[c.planId];
+    if (t && (TIER_RANK[t] || 0) > (TIER_RANK[best] || 0)) best = t;
+  }
+  return best;
+}
+
 /** The dedicated "Paused" Memberstack plan + the Stripe £0 "Pause my Plan" price. */
 export const PAUSED_PLAN_ID = 'pln_paused-fns0m38';
 export const PAUSE_PRICE_ID = 'price_0PoNQ6w5GSGOu4zJbBJkYlBT';

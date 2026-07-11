@@ -413,3 +413,9 @@ export const getReferrals = () =>
   call<{ code: string; joined: number; pending: number; friends: ReferralFriend[] }>('referrals');
 export const registerReferral = (referrerId: string) =>
   call<{ ok: boolean }>('referrals', { method: 'POST', body: { action: 'register', referrerId } });
+
+// ---- Native plan change (switch / pause / resume via Stripe) ----
+export const switchPlan = (priceId: string) =>
+  call<{ ok: boolean }>('plan-change', { method: 'POST', body: { action: 'switch', priceId } });
+export const pausePlan = () => call<{ ok: boolean; paused: boolean }>('plan-change', { method: 'POST', body: { action: 'pause' } });
+export const resumePlan = () => call<{ ok: boolean; paused: boolean }>('plan-change', { method: 'POST', body: { action: 'resume' } });
