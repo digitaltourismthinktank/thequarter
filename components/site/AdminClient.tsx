@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ds/Button';
 import { useMember } from './useMember';
 import { WeekStrip } from './WeekStrip';
+import { DatePickerModal } from './DatePickerModal';
 import { CompanyInput } from './CompanyInput';
 import { Icon, type IconName } from '@/components/ds/Icon';
 import { Qr } from '@/components/ds/Qr';
@@ -69,7 +70,37 @@ const CONTENT_CATEGORIES = ['Food & drink', 'Coffee & cake', 'Culture', 'Wellbei
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const minToHHMM = (m: number) => `${pad(Math.floor(m / 60))}:${pad(m % 60)}`;
+const hhmmToMin = (t: string) => {
+  const [h, m] = t.split(':').map(Number);
+  return (h || 0) * 60 + (m || 0);
+};
 const toISO = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+function addDaysISO(iso: string, n: number): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  return toISO(new Date(y, m - 1, d + n));
+}
+/** Do two [start,end) minute ranges overlap? */
+const overlaps = (aStart: number, aEnd: number, bStart: number, bEnd: number) => aStart < bEnd && aEnd > bStart;
+
+/** Serialise rows to CSV (quotes values containing commas/quotes/newlines). */
+function toCSV(rows: (string | number)[][]): string {
+  return rows
+    .map((r) => r.map((c) => {
+      const s = String(c ?? '');
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    }).join(','))
+    .join('\n');
+}
+/** Trigger a client-side CSV download (admin's own data — no server round-trip). */
+function downloadCSV(filename: string, rows: (string | number)[][]) {
+  const blob = new Blob([toCSV(rows)], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 function firstWeekday(): string {
   const d = new Date();
   while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
@@ -80,9 +111,15 @@ const TIMES: string[] = (() => {
   for (let m = 8 * 60; m <= 18 * 60; m += 30) a.push(minToHHMM(m));
   return a;
 })();
+// Events run into the evening — a wider, finer list than the room-booking TIMES.
+const EVENT_TIMES: string[] = (() => {
+  const a: string[] = [];
+  for (let m = 7 * 60; m <= 22 * 60; m += 15) a.push(minToHHMM(m));
+  return a;
+})();
 export function AdminClient() {
   const { loading, member } = useMember();
-  const [tab, setTab] = useState<'today' | 'members' | 'rooms' | 'events' | 'content' | 'partners' | 'birthdays'>('today');
+  const [tab, setTab] = useState<'today' | 'members' | 'rooms' | 'events' | 'content' | 'partners' | 'birthdays' | 'screens'>('today');
 
   useEffect(() => {
     if (loading || member) return;
@@ -131,6 +168,9 @@ export function AdminClient() {
         <button type="button" className={`${styles.tab} ${tab === 'birthdays' ? styles.tabOn : ''}`} onClick={() => setTab('birthdays')}>
           Birthdays
         </button>
+        <button type="button" className={`${styles.tab} ${tab === 'screens' ? styles.tabOn : ''}`} onClick={() => setTab('screens')}>
+          Screens &amp; resources
+        </button>
       </div>
 
       {tab === 'today' ? (
@@ -145,6 +185,8 @@ export function AdminClient() {
         <ContentPane />
       ) : tab === 'partners' ? (
         <PartnersPane />
+      ) : tab === 'screens' ? (
+        <ScreensPane />
       ) : (
         <BirthdaysPane />
       )}
@@ -526,6 +568,8 @@ function RoomsPane() {
   const [label, setLabel] = useState<string>('');
   const [holdUntil, setHoldUntil] = useState<string>('11:00');
   const [releasable, setReleasable] = useState(true);
+  const [repeat, setRepeat] = useState<'none' | 'weekly'>('none');
+  const [until, setUntil] = useState<string>('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
@@ -551,23 +595,59 @@ function RoomsPane() {
 
   const spaceName = (id: string | null) => spaces.find((s) => s.id === id)?.name ?? 'Space';
 
+  async function createOne(dateStr: string) {
+    if (kind === 'company') {
+      return adminCompanyBooking({ spaceId, date: dateStr, start, end, company: label, holdUntil, releasable });
+    }
+    const payload = { spaceId, date: dateStr, start, end, name: label };
+    return kind === 'block' ? adminBlock(payload) : adminExternal(payload);
+  }
+
   async function add() {
     if (!spaceId) return;
+    const sMin = hhmmToMin(start);
+    const eMin = hhmmToMin(end);
+    if (eMin <= sMin) {
+      setMsg('End time must be after the start time.');
+      return;
+    }
     setBusy(true);
     setMsg(null);
-    let r;
-    if (kind === 'company') {
-      r = await adminCompanyBooking({ spaceId, date, start, end, company: label, holdUntil, releasable });
-    } else {
-      const payload = { spaceId, date, start, end, name: label };
-      r = kind === 'block' ? await adminBlock(payload) : await adminExternal(payload);
+
+    // The dates to create: just this day, or a weekly series up to the "until" date.
+    const dates: string[] = [date];
+    if (repeat === 'weekly' && until && until >= date) {
+      let d = addDaysISO(date, 7);
+      while (d <= until && dates.length < 60) {
+        dates.push(d);
+        d = addDaysISO(d, 7);
+      }
     }
-    if (r.ok) {
+
+    let added = 0;
+    const skipped: string[] = [];
+    for (const dt of dates) {
+      // Conflict detection — never double-book a room. Re-use the loaded list for the
+      // current day; fetch the calendar for each future recurrence date.
+      const dayBookings = dt === date ? bookings : (await adminGetCalendar(dt)).data?.bookings || [];
+      const clash = dayBookings.some((b) => b.space === spaceId && overlaps(sMin, eMin, b.startMin, b.endMin));
+      if (clash) {
+        skipped.push(dt);
+        continue;
+      }
+      const r = await createOne(dt);
+      if (r.ok) added += 1;
+      else skipped.push(dt);
+    }
+
+    if (added > 0) {
       setLabel('');
       await loadCalendar();
-      setMsg('Added');
+    }
+    if (dates.length === 1) {
+      setMsg(added ? 'Added' : `That room is already booked ${start}–${end} that day — cancel the existing booking first.`);
     } else {
-      setMsg(r.data?.error || 'Could not add');
+      setMsg(`Added ${added} of ${dates.length} weekly bookings${skipped.length ? ` — ${skipped.length} skipped (already booked)` : ''}.`);
     }
     setBusy(false);
   }
@@ -651,6 +731,22 @@ function RoomsPane() {
             Add
           </Button>
         </div>
+        <div className={styles.formRow}>
+          <label className={styles.field}>
+            <span>Repeat</span>
+            <select className={styles.select} value={repeat} onChange={(e) => setRepeat(e.target.value as 'none' | 'weekly')} aria-label="Repeat">
+              <option value="none">Doesn’t repeat</option>
+              <option value="weekly">Weekly</option>
+            </select>
+          </label>
+          {repeat === 'weekly' ? (
+            <label className={styles.field}>
+              <span>Until</span>
+              <input type="date" className={styles.select} value={until} min={date} onChange={(e) => setUntil(e.target.value)} aria-label="Repeat until" />
+            </label>
+          ) : null}
+          {repeat === 'weekly' ? <span className={styles.muted}>Creates a weekly booking on this weekday, skipping any clashes.</span> : null}
+        </div>
       </div>
 
       {loading ? (
@@ -686,7 +782,9 @@ function RoomsPane() {
 
 // ---------------------------------------------------------------- Today (admin home)
 function AdminTodayPane({ onAllBirthdays }: { onAllBirthdays: () => void }) {
-  const [offset, setOffset] = useState(0); // 0 = today, 1 = tomorrow
+  const [offset, setOffset] = useState(0); // 0 = today, 1 = next open day
+  const [custom, setCustom] = useState<string>(''); // a hand-picked day (overrides offset)
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [date, setDate] = useState('');
   const [checkins, setCheckins] = useState<AdminCheckin[]>([]);
   const [bookings, setBookings] = useState<AdminBooking[]>([]);
@@ -696,13 +794,17 @@ function AdminTodayPane({ onAllBirthdays }: { onAllBirthdays: () => void }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (custom) {
+      setDate(custom);
+      return;
+    }
     const d = new Date();
     if (offset === 1) {
       d.setDate(d.getDate() + 1);
       while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
     }
     setDate(toISO(d));
-  }, [offset]);
+  }, [offset, custom]);
 
   useEffect(() => {
     (async () => {
@@ -741,6 +843,10 @@ function AdminTodayPane({ onAllBirthdays }: { onAllBirthdays: () => void }) {
   const b = busyness(dObj);
   const spaceName = (id: string | null) => spaces.find((s) => s.id === id)?.name ?? 'Space';
   const roomBookings = bookings.filter((x) => x.kind !== 'Block');
+  // The live headcount roll only means anything for the actual current day.
+  const isLiveToday = !custom && offset === 0;
+  const bookedSpaceIds = new Set(roomBookings.map((x) => x.space));
+  const freeRooms = spaces.filter((s) => s.bookable && !bookedSpaceIds.has(s.id));
   const birthdaysThisWeek = members
     .filter((m) => m.bday)
     .map((m) => ({ m, s: bdayStatus(m) }))
@@ -772,11 +878,28 @@ function AdminTodayPane({ onAllBirthdays }: { onAllBirthdays: () => void }) {
           ) : null}
         </div>
         <div className={styles.seg}>
-          <button type="button" className={`${styles.segBtn} ${offset === 0 ? styles.segOn : ''}`} onClick={() => setOffset(0)}>
+          <button
+            type="button"
+            className={`${styles.segBtn} ${!custom && offset === 0 ? styles.segOn : ''}`}
+            onClick={() => {
+              setCustom('');
+              setOffset(0);
+            }}
+          >
             Today
           </button>
-          <button type="button" className={`${styles.segBtn} ${offset === 1 ? styles.segOn : ''}`} onClick={() => setOffset(1)}>
+          <button
+            type="button"
+            className={`${styles.segBtn} ${!custom && offset === 1 ? styles.segOn : ''}`}
+            onClick={() => {
+              setCustom('');
+              setOffset(1);
+            }}
+          >
             {nextDayLabel}
+          </button>
+          <button type="button" className={`${styles.segBtn} ${custom ? styles.segOn : ''}`} onClick={() => setPickerOpen(true)}>
+            {custom ? new Date(`${custom}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : 'Pick a day'}
           </button>
         </div>
       </div>
@@ -787,13 +910,13 @@ function AdminTodayPane({ onAllBirthdays }: { onAllBirthdays: () => void }) {
         <div className={styles.todayGrid}>
           <div className={styles.todayCard}>
             <span className={styles.todayCardLabel}>Who&rsquo;s in</span>
-            <strong className={styles.todayBig}>{offset === 0 ? roll.headcount : checkins.length}</strong>
+            <strong className={styles.todayBig}>{isLiveToday ? roll.headcount : checkins.length}</strong>
             <span className={styles.todayCardSub}>
-              {offset === 0 ? `${roll.membersIn} member${roll.membersIn === 1 ? '' : 's'} · ${roll.guests.length} guest${roll.guests.length === 1 ? '' : 's'} on site` : 'Planned ahead — check-ins land on the day.'}
+              {isLiveToday ? `${roll.membersIn} member${roll.membersIn === 1 ? '' : 's'} · ${roll.guests.length} guest${roll.guests.length === 1 ? '' : 's'} on site` : 'Planned ahead — check-ins land on the day.'}
             </span>
             {checkins.length ? <span className={styles.todayCardSub}>{checkins.map((c) => c.name).join(', ')}</span> : null}
           </div>
-          {offset === 0 ? (
+          {isLiveToday ? (
             <div className={styles.todayCard}>
               <span className={styles.todayCardLabel}>Guests today</span>
               <strong className={styles.todayBig}>{roll.guests.length}</strong>
@@ -825,6 +948,9 @@ function AdminTodayPane({ onAllBirthdays }: { onAllBirthdays: () => void }) {
                 ? roomBookings.map((x) => `${spaceName(x.space)} ${minToHHMM(x.startMin)}`).join(' · ')
                 : 'Nothing booked.'}
             </span>
+            {freeRooms.length ? (
+              <span className={styles.todayCardSub}>Free all day: {freeRooms.map((s) => s.name).join(', ')}</span>
+            ) : null}
           </div>
           <div className={styles.todayCard}>
             <span className={styles.todayCardLabel}>Birthdays in the next 30 days</span>
@@ -848,7 +974,34 @@ function AdminTodayPane({ onAllBirthdays }: { onAllBirthdays: () => void }) {
         </div>
       )}
 
-      <div className={styles.panel} style={{ marginTop: 18 }}>
+      <DatePickerModal
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        onPick={(d) => {
+          setCustom(d);
+          setPickerOpen(false);
+        }}
+        single
+        allowWeekend
+        planned={custom ? [custom] : []}
+      />
+    </div>
+  );
+}
+
+// ------------------------------------------------------- Screens, links & resources
+function ScreensPane() {
+  const [spaces, setSpaces] = useState<AdminSpace[]>([]);
+
+  useEffect(() => {
+    adminGetSpaces().then((s) => {
+      if (s.ok) setSpaces(s.data.spaces);
+    });
+  }, []);
+
+  return (
+    <div>
+      <div className={styles.panel}>
         <span className={styles.panelTitle}>Screens &amp; links</span>
         <div className={styles.shortcuts}>
           <a className={styles.shortcut} href="/screen" target="_blank" rel="noreferrer">
@@ -868,6 +1021,40 @@ function AdminTodayPane({ onAllBirthdays }: { onAllBirthdays: () => void }) {
               </a>
             ))}
         </div>
+      </div>
+
+      <div className={styles.counterWrap}>
+        <span className={styles.panelTitle}>Counter card (print &amp; keep at the till)</span>
+        <div className={styles.counterCard} id="counter-card">
+          <span className={styles.counterArc} aria-hidden="true" />
+          <span className={styles.counterEyebrow}>The Quarter</span>
+          <strong className={styles.counterTitle}>We love Quarter members</strong>
+          <span className={styles.counterSub}>When a member shows their pass, scan it to verify and see how to honour their perk.</span>
+          <div className={styles.counterQr}>
+            <Qr value={`${SITE}/perks`} size={120} />
+          </div>
+          <span className={styles.counterFoot}>thequarter.work</span>
+        </div>
+        <button type="button" className={styles.smallBtn} onClick={() => window.print()}>
+          Print
+        </button>
+      </div>
+
+      <div className={styles.counterWrap}>
+        <span className={styles.panelTitle}>Arrival QR (display at the entrance)</span>
+        <div className={styles.counterCard} id="arrive-card">
+          <span className={styles.counterArc} aria-hidden="true" />
+          <span className={styles.counterEyebrow}>The Quarter</span>
+          <strong className={styles.counterTitle}>Scan to check in</strong>
+          <span className={styles.counterSub}>Point your phone camera here to check in for the day.</span>
+          <div className={styles.counterQr}>
+            <Qr value={`${SITE}/arrive`} size={120} />
+          </div>
+          <span className={styles.counterFoot}>thequarter.work/arrive</span>
+        </div>
+        <button type="button" className={styles.smallBtn} onClick={() => window.print()}>
+          Print
+        </button>
       </div>
     </div>
   );
@@ -1091,10 +1278,39 @@ function PartnersPane() {
     setBusy(false);
   }
 
+  function exportReconciliation() {
+    const monthLabel = new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+    const rows: (string | number)[][] = [
+      ['The Quarter — partner reconciliation', monthLabel],
+      [],
+      ['Partner', 'Reward', 'Float total (£)', 'Remaining (£)', 'Drawn (£)', 'Uses this month', 'Status', 'Last used'],
+      ...floats.map((f) => [
+        f.partner,
+        f.reward,
+        f.floatTotal.toFixed(2),
+        f.balance.toFixed(2),
+        Math.max(0, f.floatTotal - f.balance).toFixed(2),
+        f.usesThisMonth,
+        f.status,
+        f.lastUsed || '',
+      ]),
+    ];
+    downloadCSV(`quarter-reconciliation-${new Date().toISOString().slice(0, 10)}.csv`, rows);
+  }
+
   if (loading) return <p className={styles.state}>Loading floats…</p>;
 
   return (
     <div>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, marginBottom: 16, flexWrap: 'wrap' }}>
+        <div>
+          <span className={styles.panelTitle}>Partner floats</span>
+          <p className={styles.muted}>Top up prepaid floats, and export the month&rsquo;s payout summary — one row per partner reward, with the amount drawn to settle.</p>
+        </div>
+        <Button variant="secondary" size="sm" onClick={exportReconciliation} disabled={!floats.length}>
+          Export reconciliation (CSV)
+        </Button>
+      </div>
       <div className={styles.floatGrid}>
         {floats.map((f) => {
           const pct = f.floatTotal > 0 ? Math.round((f.balance / f.floatTotal) * 100) : 0;
@@ -1122,22 +1338,6 @@ function PartnersPane() {
         })}
       </div>
 
-      <div className={styles.counterWrap}>
-        <span className={styles.panelTitle}>Counter card (print &amp; keep at the till)</span>
-        <div className={styles.counterCard} id="counter-card">
-          <span className={styles.counterArc} aria-hidden="true" />
-          <span className={styles.counterEyebrow}>The Quarter</span>
-          <strong className={styles.counterTitle}>We love Quarter members</strong>
-          <span className={styles.counterSub}>When a member shows their pass, scan it to verify and see how to honour their perk.</span>
-          <div className={styles.counterQr}>
-            <Qr value={`${SITE}/perks`} size={120} />
-          </div>
-          <span className={styles.counterFoot}>thequarter.work</span>
-        </div>
-        <button type="button" className={styles.smallBtn} onClick={() => window.print()}>
-          Print
-        </button>
-      </div>
     </div>
   );
 }
@@ -1250,8 +1450,10 @@ function EventsPane() {
   const [msg, setMsg] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [title, setTitle] = useState('');
-  const [start, setStart] = useState('');
-  const [end, setEnd] = useState('');
+  const [date, setDate] = useState('');
+  const [startTime, setStartTime] = useState('18:00');
+  const [endTime, setEndTime] = useState('');
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [location, setLocation] = useState('The Kentish Pantry');
   const [category, setCategory] = useState('Social & drinks');
   const [published, setPublished] = useState(true);
@@ -1268,8 +1470,9 @@ function EventsPane() {
   function resetForm() {
     setEditingId(null);
     setTitle('');
-    setStart('');
-    setEnd('');
+    setDate('');
+    setStartTime('18:00');
+    setEndTime('');
     setLocation('The Kentish Pantry');
     setCategory('Social & drinks');
     setPublished(true);
@@ -1277,23 +1480,25 @@ function EventsPane() {
   function edit(e: QuarterEvent) {
     setEditingId(e.id);
     setTitle(e.title);
-    setStart(e.start ? toLocalInput(e.start) : '');
-    setEnd(e.end ? toLocalInput(e.end) : '');
+    const s = e.start ? toLocalInput(e.start) : '';
+    setDate(s ? s.split('T')[0] : '');
+    setStartTime(s ? s.split('T')[1] : '18:00');
+    setEndTime(e.end ? toLocalInput(e.end).split('T')[1] : '');
     setLocation(e.location || 'The Kentish Pantry');
     setCategory(e.category || 'Social & drinks');
     setPublished(e.published !== false);
   }
   async function save() {
-    if (!title || !start) {
-      setMsg('Title and start are required.');
+    if (!title || !date) {
+      setMsg('Title and date are required.');
       return;
     }
     setBusy(true);
     setMsg(null);
     const payload = {
       title,
-      start: new Date(start).toISOString(),
-      end: end ? new Date(end).toISOString() : undefined,
+      start: new Date(`${date}T${startTime}`).toISOString(),
+      end: endTime ? new Date(`${date}T${endTime}`).toISOString() : undefined,
       location,
       category,
       published,
@@ -1325,12 +1530,27 @@ function EventsPane() {
             <input className={styles.input} placeholder="e.g. Summer Friday social" value={title} onChange={(e) => setTitle(e.target.value)} />
           </label>
           <label className={styles.field}>
+            <span>Date</span>
+            <button type="button" className={styles.input} style={{ textAlign: 'left', cursor: 'pointer' }} onClick={() => setPickerOpen(true)}>
+              {date ? new Date(`${date}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }) : 'Pick a date'}
+            </button>
+          </label>
+          <label className={styles.field}>
             <span>Starts</span>
-            <input type="datetime-local" className={styles.input} value={start} onChange={(e) => setStart(e.target.value)} />
+            <select className={styles.input} value={startTime} onChange={(e) => setStartTime(e.target.value)}>
+              {EVENT_TIMES.map((t) => (
+                <option key={t}>{t}</option>
+              ))}
+            </select>
           </label>
           <label className={styles.field}>
             <span>Ends (optional)</span>
-            <input type="datetime-local" className={styles.input} value={end} onChange={(e) => setEnd(e.target.value)} />
+            <select className={styles.input} value={endTime} onChange={(e) => setEndTime(e.target.value)}>
+              <option value="">—</option>
+              {EVENT_TIMES.map((t) => (
+                <option key={t}>{t}</option>
+              ))}
+            </select>
           </label>
           <label className={styles.field}>
             <span>Location</span>
@@ -1366,6 +1586,18 @@ function EventsPane() {
           ) : null}
         </div>
       </div>
+
+      <DatePickerModal
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        onPick={(d) => {
+          setDate(d);
+          setPickerOpen(false);
+        }}
+        single
+        allowWeekend
+        planned={date ? [date] : []}
+      />
 
       {loading ? (
         <p className={styles.state}>Loading…</p>

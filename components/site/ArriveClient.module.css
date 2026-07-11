@@ -1,0 +1,115 @@
+.screen {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 24px;
+  background: var(--surface-page, var(--sand-50));
+}
+.inner {
+  width: 100%;
+  max-width: 440px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 18px;
+}
+.logo {
+  height: auto;
+  width: 150px;
+  margin-bottom: 8px;
+}
+.h1 {
+  font-size: clamp(30px, 8vw, 44px);
+  font-weight: var(--fw-bold);
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  color: var(--ink-900);
+}
+.lead {
+  font-size: var(--text-lg);
+  color: var(--text-muted);
+  margin-top: -4px;
+}
+.muted {
+  font-size: var(--text-lg);
+  color: var(--text-muted);
+}
+
+/* Full/Half toggle — large, thumb-friendly. */
+.seg {
+  display: inline-flex;
+  padding: 5px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-sunken);
+  margin-top: 6px;
+}
+.segBtn {
+  padding: 14px 30px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: var(--text-base);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+  transition: all var(--duration-base) var(--ease-out);
+}
+.segOn {
+  background: var(--gold-500);
+  color: var(--ink-900);
+}
+
+/* The one big action. */
+.bigBtn {
+  width: 100%;
+  margin-top: 6px;
+  padding: 22px 24px;
+  border: none;
+  border-radius: var(--radius-lg);
+  background: var(--ink-900);
+  color: var(--sand-50);
+  font-size: var(--text-xl);
+  font-weight: var(--fw-bold);
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  text-decoration: none;
+  transition: transform var(--duration-base) var(--ease-out);
+}
+.bigBtn:hover {
+  transform: translateY(-2px);
+}
+.bigBtn:disabled {
+  opacity: 0.6;
+  cursor: default;
+  transform: none;
+}
+
+.doneWrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+.tick {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  background: var(--gold-500);
+  margin-bottom: 4px;
+}
+.textLink {
+  color: var(--gold-700);
+  font-size: var(--text-base);
+  font-weight: var(--fw-semibold);
+  text-decoration: none;
+}
+.error {
+  font-size: var(--text-base);
+  color: var(--danger);
+}
