@@ -73,7 +73,7 @@ export function MyBookingsCard({ className }: { className?: string }) {
                   </span>
                 </span>
                 <button type="button" className={styles.cancel} onClick={() => cancel(b.id)} disabled={busy}>
-                  Cancel
+                  Cancel booking
                 </button>
               </li>
             ))}

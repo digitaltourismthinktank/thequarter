@@ -45,27 +45,41 @@
   width: 16px;
   height: 16px;
 }
+/* Segmented Full/Half toggle — sized to its two options, active pill = gold. */
 .seg {
   display: inline-flex;
+  width: fit-content;
+  gap: 4px;
+  padding: 3px;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-pill);
-  overflow: hidden;
-  margin: 10px 0 16px;
+  background: var(--sand-100);
+  margin: 12px 0 16px;
 }
 .segBtn {
   padding: 7px 16px;
   border: none;
-  background: var(--surface-card);
+  border-radius: var(--radius-pill);
+  background: transparent;
   cursor: pointer;
   font-size: var(--text-sm);
-  color: var(--text-body);
+  font-weight: var(--fw-semibold);
+  color: var(--text-muted);
+  transition:
+    background var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard);
 }
-.segBtn + .segBtn {
-  border-left: 1px solid var(--border-subtle);
+.segBtn:hover {
+  color: var(--ink-900);
 }
-.segOn {
-  background: var(--gold-600);
-  color: var(--pure-white);
+.segOn,
+.segOn:hover {
+  background: var(--gold-500);
+  color: var(--ink-900);
+}
+.chipPending {
+  opacity: 0.6;
+  font-style: italic;
 }
 
 .actions {

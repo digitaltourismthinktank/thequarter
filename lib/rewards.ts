@@ -146,8 +146,8 @@ export interface CarnetBundle {
 
 /** Two bundles only (CODE_BRIEF §5): 10 (10% off) and 30 (15% off). */
 export const CARNET_BUNDLES: CarnetBundle[] = [
-  { passes: 10, price: 194.4, bestValue: true },
-  { passes: 30, price: 550.8 },
+  { passes: 10, price: 194.4 },
+  { passes: 30, price: 550.8, bestValue: true },
 ];
 
 export const carnetPerPass = (b: CarnetBundle) => b.price / b.passes;

@@ -209,6 +209,7 @@ export function DashboardClient() {
             plan={isPaused ? 'Paused' : slug ? cap(slug) : hasPlan ? 'Member' : 'Guest'}
             cardId={cardId}
             logoSrc="/brand/logo-wordmark-black.png"
+            style={{ maxWidth: '100%' }}
           />
           <Button variant="primary" fullWidth onClick={handleManageBilling} disabled={billingBusy} iconAfter="arrow-right">
             {billingBusy ? 'Opening…' : hasPlan ? 'Manage plan & billing' : 'Choose a plan'}

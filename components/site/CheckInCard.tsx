@@ -2,13 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ds/Button';
-import {
-  getCheckinToday,
-  checkInToday,
-  reserveDay,
-  cancelReservation,
-  type CheckinStatus,
-} from '@/lib/booking';
+import { getCheckinToday, checkInToday, reserveDay, cancelReservation, type CheckinStatus } from '@/lib/booking';
 import { cn } from '@/lib/cn';
 import { WeekStrip } from './WeekStrip';
 import { DatePickerModal } from './DatePickerModal';
@@ -17,26 +11,29 @@ import styles from './CheckInCard.module.css';
 /** Format a YYYY-MM-DD as e.g. "Mon 29 Jun" (treat as a calendar date, UTC). */
 function fmtDate(iso: string): string {
   const [y, m, d] = iso.split('-').map(Number);
-  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-GB', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-    timeZone: 'UTC',
-  });
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
 }
-
-/** The next OPEN day after a YYYY-MM-DD — skips Sat/Sun so "I'll be in tomorrow"
-    on a Friday reserves Monday rather than being rejected as a closed day. */
-function nextOpenDay(iso: string): string {
+/** Weekday index (0 Sun … 6 Sat) of a YYYY-MM-DD. */
+function dowOf(iso: string): number {
   const [y, m, d] = iso.split('-').map(Number);
-  const dt = new Date(Date.UTC(y, m - 1, d));
-  do {
-    dt.setUTCDate(dt.getUTCDate() + 1);
-  } while (dt.getUTCDay() === 0 || dt.getUTCDay() === 6);
-  return dt.toISOString().slice(0, 10);
+  return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+}
+function addDaysIso(iso: string, n: number): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
+}
+function weekdayLong(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-GB', { weekday: 'long', timeZone: 'UTC' });
+}
+/** The next OPEN day after a YYYY-MM-DD — skips Sat/Sun. */
+function nextOpenDay(iso: string): string {
+  let out = addDaysIso(iso, 1);
+  while (dowOf(out) === 0 || dowOf(out) === 6) out = addDaysIso(out, 1);
+  return out;
 }
 
-/** Dashboard card: self check-in (Today), reserve (Tomorrow), full/half day. */
+/** Dashboard card: self check-in (Today), reserve a future day, full/half. */
 export function CheckInCard({ className }: { className?: string }) {
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<CheckinStatus | null>(null);
@@ -44,6 +41,7 @@ export function CheckInCard({ className }: { className?: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [pending, setPending] = useState<string[]>([]); // optimistic reservations in flight
 
   async function refresh() {
     const r = await getCheckinToday();
@@ -65,23 +63,15 @@ export function CheckInCard({ className }: { className?: string }) {
     setBusy(false);
   }
 
-  async function doTomorrow() {
-    setBusy(true);
-    setError(null);
-    const date = nextOpenDay(status?.date ?? new Date().toISOString().slice(0, 10));
-    const r = await reserveDay(date, half ? 'Half' : 'Full');
-    if (!r.ok) setError(friendly(r.data?.error));
-    await refresh();
-    setBusy(false);
-  }
-
   async function doReserveDate(v: string) {
     if (!v) return;
     setBusy(true);
     setError(null);
+    setPending((p) => (p.includes(v) ? p : [...p, v])); // instant feedback
     const r = await reserveDay(v, half ? 'Half' : 'Full');
     if (!r.ok) setError(friendly(r.data?.error));
     await refresh();
+    setPending((p) => p.filter((x) => x !== v));
     setBusy(false);
   }
 
@@ -91,6 +81,15 @@ export function CheckInCard({ className }: { className?: string }) {
     await refresh();
     setBusy(false);
   }
+
+  const todayIso = status?.date ?? new Date().toISOString().slice(0, 10);
+  const openToday = dowOf(todayIso) >= 1 && dowOf(todayIso) <= 5;
+  const nextOpen = nextOpenDay(todayIso);
+  const nextLabel = nextOpen === addDaysIso(todayIso, 1) ? 'tomorrow' : weekdayLong(nextOpen);
+
+  const plannedDates = status?.planned?.map((p) => p.date) ?? [];
+  const pendingOnly = pending.filter((d) => !plannedDates.includes(d));
+  const showPlanned = plannedDates.length > 0 || pendingOnly.length > 0;
 
   return (
     <div className={cn(styles.card, className)}>
@@ -106,22 +105,28 @@ export function CheckInCard({ className }: { className?: string }) {
       ) : (
         <>
           <h2 className={styles.title}>Coming in?</h2>
-          <div className={styles.seg}>
-            <button type="button" className={`${styles.segBtn} ${!half ? styles.segOn : ''}`} onClick={() => setHalf(false)}>
+
+          {/* Full / Half day — a proper segmented toggle, defaults to Full. */}
+          <div className={styles.seg} role="tablist" aria-label="Day length">
+            <button type="button" role="tab" aria-selected={!half} className={cn(styles.segBtn, !half && styles.segOn)} onClick={() => setHalf(false)}>
               Full day
             </button>
-            <button type="button" className={`${styles.segBtn} ${half ? styles.segOn : ''}`} onClick={() => setHalf(true)}>
+            <button type="button" role="tab" aria-selected={half} className={cn(styles.segBtn, half && styles.segOn)} onClick={() => setHalf(true)}>
               Half day
             </button>
           </div>
+
           <div className={styles.actions}>
-            <Button variant="primary" size="sm" onClick={doCheckIn} disabled={busy}>
-              I&rsquo;m in today
-            </Button>
-            <Button variant="secondary" size="sm" onClick={doTomorrow} disabled={busy}>
-              I&rsquo;ll be in tomorrow
+            {openToday ? (
+              <Button variant="primary" size="sm" onClick={doCheckIn} disabled={busy}>
+                I&rsquo;m in today
+              </Button>
+            ) : null}
+            <Button variant={openToday ? 'secondary' : 'primary'} size="sm" onClick={() => doReserveDate(nextOpen)} disabled={busy}>
+              I&rsquo;ll be in {nextLabel}
             </Button>
           </div>
+
           <div className={styles.planAhead}>
             <WeekStrip label="Plan ahead" onSelect={doReserveDate} />
             <button type="button" className={styles.dateBtn} onClick={() => setPickerOpen(true)}>
@@ -131,16 +136,21 @@ export function CheckInCard({ className }: { className?: string }) {
         </>
       )}
 
-      {status?.planned?.length ? (
+      {showPlanned ? (
         <div className={styles.planned}>
           <span className={styles.plannedLabel}>Planned</span>
-          {status.planned.map((p) => (
+          {status?.planned?.map((p) => (
             <span key={p.id} className={styles.chip}>
               {fmtDate(p.date)}
               {p.length === 'Half' ? ' · ½' : ''}
               <button className={styles.chipX} onClick={() => doCancel(p.id)} aria-label="Cancel reservation" disabled={busy}>
                 ×
               </button>
+            </span>
+          ))}
+          {pendingOnly.map((d) => (
+            <span key={`pend-${d}`} className={cn(styles.chip, styles.chipPending)} aria-live="polite">
+              {fmtDate(d)} · adding…
             </span>
           ))}
         </div>
@@ -152,7 +162,7 @@ export function CheckInCard({ className }: { className?: string }) {
         open={pickerOpen}
         onClose={() => setPickerOpen(false)}
         onPick={doReserveDate}
-        planned={status?.planned?.map((p) => p.date) || []}
+        planned={[...plannedDates, ...pending]}
       />
     </div>
   );

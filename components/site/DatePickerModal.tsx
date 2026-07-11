@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Icon } from '@/components/ds/Icon';
+import { Button } from '@/components/ds/Button';
 import styles from './DatePickerModal.module.css';
 
 const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -24,6 +25,13 @@ export function DatePickerModal({
   const today = new Date();
   const [ym, setYm] = useState<{ y: number; m: number }>({ y: today.getFullYear(), m: today.getMonth() });
   const [holidays, setHolidays] = useState<Set<string>>(new Set());
+  // Days picked this session — shown selected immediately so you can add several
+  // before closing (the parent reserves each in the background).
+  const [justPicked, setJustPicked] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (open) setJustPicked(new Set());
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -95,15 +103,15 @@ export function DatePickerModal({
             const dow = new Date(ym.y, ym.m, d).getDay();
             const closed = dow === 0 || dow === 6 || ds < todayStr || holidays.has(ds) || shutdown(ds);
             const isToday = ds === todayStr;
-            const isPlanned = plannedSet.has(ds);
+            const isPlanned = plannedSet.has(ds) || justPicked.has(ds);
             return (
               <button
                 key={ds}
                 className={`${styles.day} ${closed ? styles.closed : ''} ${isToday ? styles.today : ''} ${isPlanned ? styles.planned : ''}`}
-                disabled={closed}
+                disabled={closed || isPlanned}
                 onClick={() => {
                   onPick(ds);
-                  onClose();
+                  setJustPicked((s) => new Set(s).add(ds));
                 }}
               >
                 {d}
@@ -111,7 +119,16 @@ export function DatePickerModal({
             );
           })}
         </div>
-        <p className={styles.note}>Weekdays only — weekends and closed days can&rsquo;t be picked.</p>
+        <div className={styles.footer}>
+          <span className={styles.note}>
+            {justPicked.size > 0
+              ? `${justPicked.size} day${justPicked.size === 1 ? '' : 's'} added — pick more or close.`
+              : 'Pick as many days as you like.'}
+          </span>
+          <Button size="sm" variant="primary" onClick={onClose}>
+            Done
+          </Button>
+        </div>
       </div>
     </div>
   );
