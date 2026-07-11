@@ -13,7 +13,7 @@ import { CheckInCard } from './CheckInCard';
 import { MyBookingsCard } from './MyBookingsCard';
 import { EventsCard } from './EventsCard';
 import { CarnetMini } from './CarnetMini';
-import { getMemberstack, memberName, memberDaysRemaining, memberRenewalDate, memberDoorCode } from '@/lib/memberstack';
+import { getMemberstack, memberName, memberDaysRemaining, memberRenewalDate, memberDoorCode, memberHasPaymentIssue } from '@/lib/memberstack';
 import { PLANS, PLAN_DAY_ALLOWANCE } from '@/lib/plans';
 import { STRIPE_BILLING_PORTAL_URL } from '@/lib/commerce';
 import styles from './DashboardClient.module.css';
@@ -166,8 +166,22 @@ export function DashboardClient() {
     }
   }
 
+  const payIssue = memberHasPaymentIssue(member);
+
   return (
     <div className={styles.page}>
+      {payIssue ? (
+        <div className={styles.payAlert} role="alert">
+          <span>
+            <Icon name="credit-card" size={16} color="var(--ink-900)" /> There&rsquo;s a problem with your last payment. Please update your card to keep your
+            membership active.
+          </span>
+          <Button variant="primary" size="sm" onClick={handleManageBilling} disabled={billingBusy}>
+            {billingBusy ? 'Opening…' : 'Update card'}
+          </Button>
+        </div>
+      ) : null}
+
       <header className={styles.hero}>
         <span className={styles.heroEyebrow}>Quarter Dashboard</span>
         <h1 className={styles.title}>Welcome back{first ? `, ${first}` : ''}</h1>
@@ -201,7 +215,6 @@ export function DashboardClient() {
 
           <CheckInCard />
           <MyBookingsCard />
-          <EventsCard />
         </div>
 
         <aside className={styles.rail}>
@@ -223,6 +236,8 @@ export function DashboardClient() {
           ) : null}
 
           <CarnetMini />
+
+          <EventsCard />
 
           <div className={styles.linksCard}>
             <span className={styles.cardEyebrow}>Quick links</span>

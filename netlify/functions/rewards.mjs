@@ -8,7 +8,7 @@
  */
 import { verifyMember, memberEmail, tokenFromRequest } from './_member.mjs';
 import { airtableReady } from './_airtable.mjs';
-import { listRewards, listFloats, rewardAvailability, memberPoints, redeemReward, memberRedemptions, memberLedger } from './_rewards.mjs';
+import { listRewards, listFloats, rewardAvailability, memberPoints, memberLifetimePoints, redeemReward, memberRedemptions, memberLedger } from './_rewards.mjs';
 import { mintToken } from './_tokens.mjs';
 
 const MS_SECRET = process.env.MEMBERSTACK_SECRET_KEY;
@@ -47,7 +47,7 @@ export default async function handler(req) {
       .reduce((s, e) => s + e.delta, 0);
     const meta = vm.member.metaData || {};
     const birthday = { bday: meta.bday || null, claimed: meta.bdayClaimed || null };
-    return json({ points: memberPoints(vm.member), earnedLately, catalogue, redemptions, birthday });
+    return json({ points: memberPoints(vm.member), lifetimePoints: memberLifetimePoints(vm.member), earnedLately, catalogue, redemptions, birthday });
   }
 
   if (req.method !== 'POST') return json({ error: 'method-not-allowed' }, 405);

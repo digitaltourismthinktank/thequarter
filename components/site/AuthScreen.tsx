@@ -63,7 +63,11 @@ export function AuthScreen({ mode }: { mode: 'login' | 'signup' }) {
       // Client-side navigation keeps the just-authenticated Memberstack instance
       // in memory; a full page reload raced session restore and bounced to /login.
       // Staff land straight on the admin page (they can switch to the member view).
-      const dest = isAdminEmail(email) ? '/admin' : '/dashboard';
+      // A ?redirect=/path (same-origin only) returns the member where they came from —
+      // e.g. the arrival screen sends them back to finish checking in.
+      const wanted = new URLSearchParams(window.location.search).get('redirect');
+      const safe = wanted && wanted.startsWith('/') && !wanted.startsWith('//') ? wanted : null;
+      const dest = safe ?? (isAdminEmail(email) ? '/admin' : '/dashboard');
       router.push(dest);
     } catch (err) {
       setStatus('error');

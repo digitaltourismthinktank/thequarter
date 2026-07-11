@@ -43,6 +43,13 @@ export default async function handler(req) {
       return json({ events });
     }
 
+    if (action === 'published') {
+      // All published events (past + upcoming) for the member Events tab. Published
+      // events are public, so no auth is required.
+      const recs = await listRecords(T.events, { filterByFormula: '{Published}', sort: [{ field: 'Start' }] });
+      return json({ events: recs.map(mapEvent) });
+    }
+
     if (action === 'all') {
       const vm = await verifyMember(tokenFromRequest(req, null));
       if (!vm.ok) return json({ error: vm.reason }, 401);

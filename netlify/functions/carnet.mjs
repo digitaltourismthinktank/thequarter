@@ -10,9 +10,18 @@
 import memberstackAdmin from '@memberstack/admin';
 import { verifyMember, memberEmail, memberName, tokenFromRequest } from './_member.mjs';
 import { listRecords, createRecord, T, F, airtableReady, esc } from './_airtable.mjs';
-import { londonNow, isWeekday } from './_time.mjs';
+import { londonNow } from './_time.mjs';
 import { isClosedDay } from './_holidays.mjs';
-import { appendLedger, memberPoints, checkinBonusesThisMonth, CHECKIN_BONUS, CHECKIN_QUIET_BONUS, CHECKIN_BONUS_CAP } from './_rewards.mjs';
+import {
+  appendLedger,
+  memberPoints,
+  memberLifetimePoints,
+  earnBoostForMember,
+  checkinBonusesThisMonth,
+  CHECKIN_BONUS,
+  CHECKIN_QUIET_BONUS,
+  CHECKIN_BONUS_CAP,
+} from './_rewards.mjs';
 import { isQuietDay } from './_busyness.mjs';
 
 const MS_SECRET = process.env.MEMBERSTACK_SECRET_KEY;
@@ -39,7 +48,6 @@ export default async function handler(req) {
     const today = londonNow().dateStr;
     if (c.remaining <= 0) return json({ error: 'no-passes' }, 400);
     if (c.expires && c.expires < today) return json({ error: 'expired' }, 400);
-    if (!isWeekday(today)) return json({ error: 'closed-weekend' }, 400);
     if (await isClosedDay(today)) return json({ error: 'closed-day' }, 400);
 
     const todays = await listRecords(T.checkins, {
@@ -53,14 +61,21 @@ export default async function handler(req) {
     const used = await checkinBonusesThisMonth(email, today.slice(0, 7));
     if (used < CHECKIN_BONUS_CAP) {
       const quiet = isQuietDay(today);
-      pts = quiet ? CHECKIN_QUIET_BONUS : CHECKIN_BONUS;
+      pts = Math.round((quiet ? CHECKIN_QUIET_BONUS : CHECKIN_BONUS) * earnBoostForMember(me));
       await appendLedger(email, pts, quiet ? 'checkin-quiet' : 'checkin', today);
     }
     const newRemaining = c.remaining - 1;
     const admin = memberstackAdmin.init(MS_SECRET);
     await admin.members.update({
       id: me.id,
-      data: { metaData: { ...(me.metaData || {}), carnet: { ...c, remaining: newRemaining }, points: memberPoints(me) + pts } },
+      data: {
+        metaData: {
+          ...(me.metaData || {}),
+          carnet: { ...c, remaining: newRemaining },
+          points: memberPoints(me) + pts,
+          lifetimePoints: memberLifetimePoints(me) + pts,
+        },
+      },
     });
     await createRecord(T.checkins, {
       [F.checkins.ref]: `${memberName(me)} · ${today}`,

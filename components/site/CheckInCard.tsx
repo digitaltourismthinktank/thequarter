@@ -133,7 +133,7 @@ export function CheckInCard({ className }: { className?: string }) {
 
           {/* Plan-ahead stays available even once you're checked in today. */}
           <div className={styles.planAhead}>
-            <WeekStrip label={status?.checkedIn ? 'Book another day' : 'Book for the coming week'} onSelect={doReserveDate} />
+            <WeekStrip label={status?.checkedIn ? 'Book another day' : 'Book for the coming week'} onSelect={doReserveDate} booked={[...plannedDates, ...pending]} />
             <button type="button" className={styles.dateBtn} onClick={() => setPickerOpen(true)}>
               + Pick a date
             </button>

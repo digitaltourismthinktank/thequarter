@@ -89,7 +89,7 @@ async function handleEvent(event) {
 
   // Resolve the member email for the event types we handle.
   let email = null;
-  if (type === 'invoice.paid' || type === 'invoice.payment_succeeded') {
+  if (type === 'invoice.paid' || type === 'invoice.payment_succeeded' || type === 'invoice.payment_failed') {
     email = obj.customer_email || (await emailFromCustomer(obj.customer));
   } else if (type === 'customer.subscription.created' || type === 'customer.subscription.updated' || type === 'customer.subscription.deleted') {
     email = await emailFromCustomer(obj.customer);
@@ -133,11 +133,16 @@ async function handleEvent(event) {
     if (welcome > 0) await appendLedger(email, welcome, 'welcome', obj.id || '');
     // First paid plan → credit whoever referred this member (no-op if not referred).
     if (welcome > 0) await creditReferral(email);
-    if (spend > 0 || welcome > 0) {
-      const cur = Math.max(0, Math.round(Number(metaData?.points) || 0));
-      earnMeta = { ...(metaData || {}), points: cur + spend + welcome };
-    }
+    // A successful payment always clears any prior payment-issue flag.
+    const cur = Math.max(0, Math.round(Number(metaData?.points) || 0));
+    const life = Math.max(0, Math.round(Number(metaData?.lifetimePoints) || cur));
+    earnMeta = { ...(metaData || {}), paymentIssue: false, points: cur + spend + welcome, lifetimePoints: life + spend + welcome };
     applied = { billingReason: obj.billing_reason, resetDays: isRenewal, spend, welcome };
+  } else if (type === 'invoice.payment_failed') {
+    // Card declined / payment failed — flag the member so both they and admin see it,
+    // and the app can ask them to update their card before changing plan.
+    earnMeta = { ...(metaData || {}), paymentIssue: true };
+    applied = { paymentFailed: true };
   } else if (type === 'checkout.session.completed') {
     // Day-pass carnet purchase (one-off). Top up balance, reset the 12-month expiry,
     // and earn spend points. amount_total maps to a bundle via config (provisional).
@@ -151,7 +156,8 @@ async function handleEvent(event) {
       const spend = pointsForGBP(amount / 100);
       if (spend > 0) await appendLedger(email, spend, 'spend', obj.id || '');
       const cur = Math.max(0, Math.round(Number(metaData?.points) || 0));
-      earnMeta = { ...(metaData || {}), carnet: { remaining, total, expires }, points: cur + spend };
+      const life = Math.max(0, Math.round(Number(metaData?.lifetimePoints) || cur));
+      earnMeta = { ...(metaData || {}), carnet: { remaining, total, expires }, points: cur + spend, lifetimePoints: life + spend };
       applied = { carnet: passes, spend };
     } else {
       applied = { checkout: 'no-carnet-match', amount };

@@ -24,12 +24,24 @@ export const MEMBERSTACK_PLAN_IDS: Record<string, string> = {
   'hybrid-office': process.env.NEXT_PUBLIC_MS_PLAN_HYBRID ?? '',
 };
 
-/** Reverse lookup: Memberstack plan id → our plan id (for showing the tier). */
-export const PLAN_ID_TO_SLUG: Record<string, string> = Object.fromEntries(
-  Object.entries(MEMBERSTACK_PLAN_IDS)
-    .filter(([, id]) => id)
-    .map(([slug, id]) => [id, slug]),
-);
+/**
+ * Reverse lookup: Memberstack plan id → our plan slug (for showing the tier).
+ * The known live plan ids are hardcoded so a member's tier resolves even when the
+ * NEXT_PUBLIC_MS_PLAN_* env vars aren't set (mirrors PLAN_MEMBERSTACK_ID in
+ * lib/plans.ts and PLAN_ALLOWANCE server-side). Any env-configured ids overlay these.
+ */
+export const PLAN_ID_TO_SLUG: Record<string, string> = {
+  'pln_daily-plan-45nv0v26': 'day-pass',
+  'pln_visitor-plan-blk50re2': 'visitor',
+  'pln_resident-plan-mqjy0f6w': 'resident',
+  'pln_citizen-plan-q9oa04p9': 'citizen',
+  'pln_hybrid-plan-r4k60rjp': 'hybrid-office',
+  ...Object.fromEntries(
+    Object.entries(MEMBERSTACK_PLAN_IDS)
+      .filter(([, id]) => id)
+      .map(([slug, id]) => [id, slug]),
+  ),
+};
 
 // Local preview only: resolve the mock member's plan to "resident".
 if (process.env.NODE_ENV !== 'production') {
@@ -144,6 +156,11 @@ export const PAUSED_PLAN_ID = 'pln_paused-fns0m38';
 /** True when the member is on the Paused plan (billing paused, days frozen). */
 export function memberIsPaused(member: Member | null): boolean {
   return !!member?.planConnections?.some((c) => c.planId === PAUSED_PLAN_ID && (c.active ?? true));
+}
+
+/** True when the member's last payment failed (set by the Stripe webhook). */
+export function memberHasPaymentIssue(member: Member | null): boolean {
+  return !!member?.metaData?.paymentIssue;
 }
 
 /** The member's door entry code (custom field), or null if not set. */

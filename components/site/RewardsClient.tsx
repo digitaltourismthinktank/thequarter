@@ -5,7 +5,7 @@ import { Icon, type IconName } from '@/components/ds/Icon';
 import { Button } from '@/components/ds/Button';
 import { useMember, memberPlanSlug } from './useMember';
 import { PLANS } from '@/lib/plans';
-import { EARN_RULES, LEVELS, levelForPlan } from '@/lib/rewards';
+import { EARN_RULES, LEVELS, levelProgress } from '@/lib/rewards';
 import { getRewards, redeemReward, type RewardItem, type Redemption, type BirthdayState } from '@/lib/booking';
 import { BirthdayCard } from './BirthdayCard';
 import { ReferFriendCard } from './ReferFriendCard';
@@ -35,6 +35,7 @@ function fmtDate(iso: string | null): string {
 export function RewardsClient() {
   const { loading: memberLoading, member } = useMember();
   const [points, setPoints] = useState(0);
+  const [lifetime, setLifetime] = useState(0);
   const [earnedLately, setEarnedLately] = useState(0);
   const [catalogue, setCatalogue] = useState<RewardItem[]>([]);
   const [redemptions, setRedemptions] = useState<Redemption[]>([]);
@@ -53,12 +54,15 @@ export function RewardsClient() {
     const slug = memberPlanSlug(member);
     return slug ? PLANS.find((p) => p.id === slug)?.name ?? null : null;
   }, [member]);
-  const level = useMemo(() => levelForPlan(memberPlanSlug(member)), [member]);
+  // Earned level + progress to the next one (drives the ring + the levels rail).
+  const prog = useMemo(() => levelProgress(lifetime), [lifetime]);
+  const level = prog.level;
 
   const load = useCallback(async () => {
     const r = await getRewards();
     if (r.ok) {
       setPoints(r.data.points);
+      setLifetime(r.data.lifetimePoints ?? r.data.points);
       setEarnedLately(r.data.earnedLately);
       setCatalogue(r.data.catalogue);
       setRedemptions(r.data.redemptions);
@@ -83,13 +87,6 @@ export function RewardsClient() {
         .map((r) => r.rewardId),
     );
   }, [redemptions]);
-
-  // Progress to the next reward the member can't yet afford.
-  const nextReward = useMemo(
-    () => [...catalogue].filter((r) => r.cost > points).sort((a, b) => a.cost - b.cost)[0],
-    [catalogue, points],
-  );
-  const pct = nextReward ? Math.min(100, Math.round((points / nextReward.cost) * 100)) : 100;
 
   async function doRedeem() {
     if (!confirm) return;
@@ -136,37 +133,42 @@ export function RewardsClient() {
         <div className={styles.pcLeft}>
           <span className={styles.pcOver}>Quarter Points</span>
           <span className={styles.pcName}>
-            {memberName}
-            {planName ? ` · ${planName}` : ''}
+            {memberName} · {level.name}
           </span>
           <div className={styles.pcBalance}>
             <strong>{points.toLocaleString('en-GB')}</strong>
             <span>points</span>
           </div>
+          <span className={styles.pcNext}>
+            {prog.next ? `${prog.toGo.toLocaleString('en-GB')} points to ${prog.next.name}` : 'Top tier reached — thank you'}
+          </span>
           {earnedLately > 0 ? <span className={styles.pcPill}>+{earnedLately.toLocaleString('en-GB')} earned lately</span> : null}
         </div>
-        <div className={styles.ring} style={{ '--pct': String(pct) } as CSSProperties}>
+        <div className={styles.ring} style={{ '--pct': String(prog.pct) } as CSSProperties}>
           <div className={styles.ringHole}>
-            <strong>{pct}%</strong>
-            <span>{nextReward ? 'to go' : 'all set'}</span>
+            <strong>{prog.pct}%</strong>
+            <span>{prog.next ? `to ${prog.next.name}` : 'top tier'}</span>
           </div>
         </div>
       </section>
 
-      {/* Levels — the more of a regular you are, the faster you earn. */}
+      {/* Levels — named tiers everyone climbs by earning points over time. */}
       <section className={styles.levels} aria-label="Your level">
         {LEVELS.map((lv) => {
-          const on = lv.slug === level;
+          const on = lv.slug === level.slug;
+          const reached = lifetime >= lv.min;
           return (
             <div key={lv.slug} className={`${styles.level} ${on ? styles.levelOn : ''}`}>
               <div className={styles.levelHead}>
                 <span className={styles.levelName}>{lv.name}</span>
-                {on ? <span className={styles.levelYou}>Your level</span> : null}
+                {on ? <span className={styles.levelYou}>You’re here</span> : <span className={styles.levelThresh}>{lv.min > 0 ? `${lv.min.toLocaleString('en-GB')} pts` : 'Start'}</span>}
               </div>
-              <span className={styles.levelRate}>{lv.rate}× points</span>
+              <span className={styles.levelRate}>{lv.boost === 1 ? 'Base earn rate' : `Earn ${Math.round((lv.boost - 1) * 100)}% faster`}</span>
               <ul className={styles.levelPerks}>
                 {lv.perks.map((p) => (
-                  <li key={p}>{p}</li>
+                  <li key={p} className={reached ? '' : styles.perkLocked}>
+                    {p}
+                  </li>
                 ))}
               </ul>
             </div>

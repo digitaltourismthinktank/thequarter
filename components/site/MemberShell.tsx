@@ -14,6 +14,7 @@ import styles from './MemberShell.module.css';
 const TABS: { href: string; label: string; icon: IconName }[] = [
   { href: '/dashboard', label: 'Dashboard', icon: 'monitor' },
   { href: '/book', label: 'Book', icon: 'calendar' },
+  { href: '/events', label: 'Events', icon: 'party-popper' },
   { href: '/rewards', label: 'Rewards', icon: 'star' },
   { href: '/perks', label: 'Perks', icon: 'gift' },
   { href: '/plan', label: 'Plan', icon: 'credit-card' },
@@ -84,7 +85,7 @@ export function MemberShell({ children, wide = false }: { children: ReactNode; w
               </Link>
             ) : admin ? (
               <Link href="/admin" className={styles.switch}>
-                <Icon name="settings" size={17} />
+                <Icon name="key" size={16} />
                 <span>Admin</span>
               </Link>
             ) : null}

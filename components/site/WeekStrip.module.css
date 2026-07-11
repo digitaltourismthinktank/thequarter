@@ -90,6 +90,25 @@
 .on .num {
   color: var(--pure-white);
 }
+.booked {
+  background: var(--gold-100);
+  border-color: var(--gold-300);
+}
+.booked .num {
+  color: var(--gold-700);
+}
+.booked .dow {
+  color: var(--gold-700);
+}
+.bookedTag {
+  position: absolute;
+  bottom: 5px;
+  font-size: 9px;
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--gold-700);
+}
 .past {
   opacity: 0.35;
   cursor: not-allowed;

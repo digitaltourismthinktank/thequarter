@@ -5,7 +5,7 @@ import { Button } from '@/components/ds/Button';
 import { useMember, memberPlanSlug } from './useMember';
 import { PLANS, PLAN_STRIPE_PRICE, type PlanId } from '@/lib/plans';
 import { ANNUAL_PLANS, annualSaving } from '@/lib/rewards';
-import { getMemberToken, memberIsPaused, memberDaysRemaining, memberRenewalDate } from '@/lib/memberstack';
+import { getMemberToken, memberIsPaused, memberDaysRemaining, memberRenewalDate, memberHasPaymentIssue } from '@/lib/memberstack';
 import { switchPlan, pausePlan, resumePlan } from '@/lib/booking';
 import { CarnetCard } from './CarnetCard';
 import styles from './PlanClient.module.css';
@@ -17,9 +17,10 @@ type Term = 'monthly' | 'annual';
 type Pending = { kind: 'switch'; slug: PlanId; term: Term } | { kind: 'pause' } | { kind: 'resume' } | null;
 
 export function PlanClient() {
-  const { loading, member } = useMember();
+  const { loading, member, refresh } = useMember();
   const currentSlug = memberPlanSlug(member) as PlanId | null;
   const paused = memberIsPaused(member);
+  const payIssue = memberHasPaymentIssue(member);
   const days = memberDaysRemaining(member);
   const renewal = memberRenewalDate(member);
 
@@ -85,6 +86,15 @@ export function PlanClient() {
         if (ok) setDone('Welcome back — your membership is resuming.');
       }
       if (!ok) setErr('Something went wrong — please try again, or manage it in the billing portal.');
+      else {
+        // The Stripe webhook updates Memberstack a few seconds later — poll so this
+        // page reflects the new plan/pause state without a manual reload.
+        let n = 0;
+        const iv = setInterval(async () => {
+          await refresh();
+          if ((n += 1) >= 6) clearInterval(iv);
+        }, 3000);
+      }
     } catch {
       setErr('Something went wrong — please try again.');
     }
@@ -179,6 +189,12 @@ export function PlanClient() {
           </div>
         </div>
 
+        {payIssue ? (
+          <p className={styles.done} style={{ color: 'var(--ink-900)' }}>
+            There&rsquo;s a problem with your card — please “Manage card &amp; invoices” to update it before changing plan.
+          </p>
+        ) : null}
+
         <div className={styles.options}>
           {SWITCHABLE.map((slug) => {
             const plan = PLANS.find((p) => p.id === slug);
@@ -204,7 +220,7 @@ export function PlanClient() {
                   variant={isCurrent ? 'ghost' : 'secondary'}
                   size="sm"
                   onClick={() => setPending({ kind: 'switch', slug, term })}
-                  disabled={busy}
+                  disabled={busy || payIssue}
                 >
                   {isCurrent ? 'Switch billing term' : `Switch to ${plan.name}`}
                 </Button>

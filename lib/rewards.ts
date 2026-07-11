@@ -31,34 +31,48 @@ export const CHECKIN_BONUS_CAP = 12; // counted check-ins per calendar month
 export const REFERRAL_BONUS = 500; // one-off, when the referred friend starts a paid plan/carnet
 export const WELCOME_BONUS = 150; // one-off, on first paid plan/carnet
 
-// --- Levels — regulars earn faster (mirror of _rewards.mjs EARN_MULTIPLIER) ------
+// --- Levels — earned status tiers (mirror of _rewards.mjs LEVELS) ----------------
+// Everyone climbs the same named tiers by *earning* points over time (not by plan),
+// so a day-pass visitor and a Citizen are on the same ladder. Higher tiers are
+// perks-led with a small, capped earn boost — so the most-active members can't run
+// the give-back away. Thresholds are on LIFETIME points earned (spending never demotes).
 
-export type LevelSlug = 'visitor' | 'resident' | 'citizen';
-
-/** The check-in bonuses are multiplied by the member's level. */
-export const EARN_MULTIPLIER: Record<LevelSlug, number> = { visitor: 1, resident: 1.5, citizen: 2 };
+export type LevelSlug = 'newcomer' | 'regular' | 'local' | 'cornerstone';
 
 export interface Level {
   slug: LevelSlug;
   name: string;
-  /** Check-in earn multiplier (×). */
-  rate: number;
-  /** What the level enjoys — real, wired benefits only. */
+  /** Lifetime points earned to reach this level. */
+  min: number;
+  /** Check-in earn boost at this level (× the base bonus). Gentle, capped at 1.5. */
+  boost: number;
+  /** What the level enjoys. */
   perks: string[];
 }
 
-/** Presentation of the three levels for the Rewards page (current level highlighted). */
 export const LEVELS: Level[] = [
-  { slug: 'visitor', name: 'Visitor', rate: 1, perks: ['Earn points on every visit', '5 days a month'] },
-  { slug: 'resident', name: 'Resident', rate: 1.5, perks: ['Points earn 1.5× faster', '10 days a month'] },
-  { slug: 'citizen', name: 'Citizen', rate: 2, perks: ['Points earn 2× faster', 'Unlimited days', 'A treat on your birthday'] },
+  { slug: 'newcomer', name: 'Newcomer', min: 0, boost: 1, perks: ['A treat on your birthday', 'Points on every visit & every £1'] },
+  { slug: 'regular', name: 'Regular', min: 1500, boost: 1.15, perks: ['Points earn 15% faster', 'A treat on your birthday'] },
+  { slug: 'local', name: 'Local', min: 4000, boost: 1.3, perks: ['Points earn 30% faster', 'A little something extra on your birthday'] },
+  { slug: 'cornerstone', name: 'Cornerstone', min: 9000, boost: 1.5, perks: ['Points earn 50% faster', 'Our warmest birthday treat', 'First to know about what’s on'] },
 ];
 
-/** Map a plan slug (from Memberstack) to a rewards level; defaults to Visitor. */
-export function levelForPlan(slug?: string | null): LevelSlug {
-  if (slug === 'citizen') return 'citizen';
-  if (slug === 'resident' || slug === 'hybrid') return 'resident';
-  return 'visitor';
+/** The member's level from their lifetime points earned. */
+export function levelForPoints(lifetime: number): Level {
+  let out = LEVELS[0];
+  for (const l of LEVELS) if (lifetime >= l.min) out = l;
+  return out;
+}
+
+/** Progress toward the next level (for the ring): current level, next, % there, points to go. */
+export function levelProgress(lifetime: number): { level: Level; next: Level | null; pct: number; toGo: number } {
+  const level = levelForPoints(lifetime);
+  const idx = LEVELS.findIndex((l) => l.slug === level.slug);
+  const next = LEVELS[idx + 1] ?? null;
+  if (!next) return { level, next: null, pct: 100, toGo: 0 };
+  const span = next.min - level.min;
+  const done = Math.max(0, lifetime - level.min);
+  return { level, next, pct: Math.min(100, Math.round((done / span) * 100)), toGo: Math.max(0, next.min - lifetime) };
 }
 
 /** Points for a real GBP payment (rounded). The canonical spend-earn. */

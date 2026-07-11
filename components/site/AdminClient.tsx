@@ -20,6 +20,7 @@ import {
   adminCompanyBooking,
   adminCancel,
   adminAdjustDays,
+  adminGrantPasses,
   adminCheckinMember,
   adminGetEvents,
   adminCreateEvent,
@@ -34,6 +35,9 @@ import {
   adminDeletePerk,
   adminGetFloats,
   adminTopUpFloat,
+  adminGetPayouts,
+  adminMarkPaid,
+  type PayoutPartner,
   adminGetToday,
   getRoll,
   signOutGuest,
@@ -264,6 +268,7 @@ function MembersPane() {
               <th>Member</th>
               <th>Plan</th>
               <th>Days</th>
+              <th>Passes</th>
               <th>Points</th>
               <th>Renewal</th>
               <th aria-label="actions" />
@@ -286,6 +291,7 @@ function MembersPane() {
                 <td>
                   {m.plan || '—'}
                   {m.paused ? <span className={styles.pausedTag}>Paused</span> : null}
+                  {m.paymentIssue ? <span className={styles.issueTag}>Card issue</span> : null}
                 </td>
                 <td>
                   <input
@@ -298,6 +304,7 @@ function MembersPane() {
                     Save
                   </button>
                 </td>
+                <td className={styles.muted}>{m.carnet || '—'}</td>
                 <td className={styles.muted}>{m.points.toLocaleString('en-GB')}</td>
                 <td className={styles.muted}>{m.renewal || '—'}</td>
                 <td>
@@ -331,6 +338,7 @@ function MemberProfileModal({ id, bday, onClose, onChanged }: { id: string | nul
   const [reason, setReason] = useState('');
   const [rewardId, setRewardId] = useState('');
   const [planSel, setPlanSel] = useState('');
+  const [passes, setPasses] = useState('');
   const [confirmAdjust, setConfirmAdjust] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -370,6 +378,19 @@ function MemberProfileModal({ id, bday, onClose, onChanged }: { id: string | nul
       await load();
       onChanged();
     } else setMsg('Could not adjust points.');
+  }
+  async function grant() {
+    const n = Math.round(Number(passes) || 0);
+    if (!n || !id) return;
+    setBusy(true);
+    setMsg(null);
+    const r = await adminGrantPasses(id, n);
+    setBusy(false);
+    if (r.ok) {
+      setPasses('');
+      setMsg(`Day passes updated — ${r.data.carnet.remaining} left.`);
+      onChanged();
+    } else setMsg('Could not update passes.');
   }
   async function redeem() {
     if (!rewardId || !id) return;
@@ -528,6 +549,23 @@ function MemberProfileModal({ id, bday, onClose, onChanged }: { id: string | nul
                     Adjust
                   </button>
                 )}
+              </div>
+            </div>
+
+            <div className={styles.profSection}>
+              <span className={styles.profSectionTitle}>Day passes</span>
+              <div className={styles.formRow}>
+                <input
+                  className={styles.dayInput}
+                  type="number"
+                  placeholder="+/−"
+                  value={passes}
+                  onChange={(e) => setPasses(e.target.value)}
+                />
+                <button type="button" className={styles.smallBtn} onClick={grant} disabled={busy || !passes}>
+                  Grant passes
+                </button>
+                <span className={styles.muted}>For comps or to test a purchase.</span>
               </div>
             </div>
 
@@ -1084,6 +1122,7 @@ function ContentPane() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [editing, setEditing] = useState<any | null>(null);
+  const [valueGbp, setValueGbp] = useState(''); // £ value helper → suggested points
 
   const refresh = useCallback(async () => {
     const [r, p] = await Promise.all([adminGetRewards(), adminGetPerksAll()]);
@@ -1162,17 +1201,45 @@ function ContentPane() {
               ))}
             </select>
             {isReward ? (
-              <div className={styles.formRow}>
-                <input className={styles.dayInput} type="number" placeholder="Cost (pts)" value={editing.cost} onChange={(e) => set('cost', Number(e.target.value))} />
-                <select className={styles.select} value={editing.funding} onChange={(e) => set('funding', e.target.value)} aria-label="Funding">
-                  <option value="inventory">Quarter inventory</option>
-                  <option value="partner">Partner-funded</option>
-                  <option value="quarter">Quarter-funded</option>
-                </select>
-                <label className={styles.check}>
-                  <input type="checkbox" checked={!!editing.hero} onChange={(e) => set('hero', e.target.checked)} /> Hero
-                </label>
-              </div>
+              <>
+                <div className={styles.formRow}>
+                  <input className={styles.dayInput} type="number" placeholder="Cost (pts)" value={editing.cost} onChange={(e) => set('cost', Number(e.target.value))} />
+                  <select className={styles.select} value={editing.funding} onChange={(e) => set('funding', e.target.value)} aria-label="Funding">
+                    <option value="inventory">Quarter inventory</option>
+                    <option value="partner">Partner-funded</option>
+                    <option value="quarter">Quarter-funded</option>
+                  </select>
+                  <label className={styles.check}>
+                    <input type="checkbox" checked={!!editing.hero} onChange={(e) => set('hero', e.target.checked)} /> Hero
+                  </label>
+                </div>
+                {/* Price → points helper. 100 pts = £1, so a reward worth £X costs X×100 pts. */}
+                <div className={styles.calcRow}>
+                  <span className={styles.calcNote}>≈ £{((Number(editing.cost) || 0) / 100).toFixed(2)} to the member · 100 pts = £1</span>
+                  <span className={styles.calcTool}>
+                    <span className={styles.calcGbp}>
+                      £
+                      <input
+                        className={styles.calcInput}
+                        type="number"
+                        step="0.5"
+                        min="0"
+                        placeholder="value"
+                        value={valueGbp}
+                        onChange={(e) => setValueGbp(e.target.value)}
+                      />
+                    </span>
+                    <button
+                      type="button"
+                      className={styles.smallBtn}
+                      disabled={!valueGbp}
+                      onClick={() => set('cost', Math.round((Number(valueGbp) || 0) * 100))}
+                    >
+                      Set {valueGbp ? `${Math.round((Number(valueGbp) || 0) * 100).toLocaleString('en-GB')} pts` : 'points'}
+                    </button>
+                  </span>
+                </div>
+              </>
             ) : (
               <div className={styles.formRow}>
                 <select className={styles.select} value={editing.type} onChange={(e) => set('type', e.target.value)} aria-label="Perk type">
@@ -1259,6 +1326,9 @@ function PartnersPane() {
   const [floats, setFloats] = useState<AdminFloat[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [payouts, setPayouts] = useState<PayoutPartner[]>([]);
+  const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [payMsg, setPayMsg] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     const r = await adminGetFloats();
@@ -1268,6 +1338,36 @@ function PartnersPane() {
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  const loadPayouts = useCallback(async () => {
+    const r = await adminGetPayouts(month || undefined);
+    if (r.ok) setPayouts(r.data.partners);
+  }, [month]);
+  useEffect(() => {
+    loadPayouts();
+  }, [loadPayouts]);
+
+  async function markPaid(partner: string) {
+    if (!window.confirm(`Mark ${partner} as paid for ${month}? This clears their owed balance for the month.`)) return;
+    setBusy(true);
+    setPayMsg(null);
+    const r = await adminMarkPaid(partner, month || undefined);
+    setBusy(false);
+    if (r.ok) {
+      setPayMsg(`${partner} marked paid — ${r.data.settled} redemption${r.data.settled === 1 ? '' : 's'} settled.`);
+      await loadPayouts();
+    } else setPayMsg('Could not mark paid.');
+  }
+
+  function exportPayouts() {
+    const rows: (string | number)[][] = [
+      ['The Quarter — partner payouts', month],
+      [],
+      ['Partner', 'Owed (£)', 'Redemptions', 'Already settled (£)', 'Last redemption'],
+      ...payouts.map((p) => [p.partner, p.owed.toFixed(2), p.owedCount, p.paid.toFixed(2), p.lastAt ? p.lastAt.slice(0, 10) : '']),
+    ];
+    downloadCSV(`quarter-payouts-${month}.csv`, rows);
+  }
 
   async function topUp(id: string) {
     const amount = Number(window.prompt('Top up by how much (£)?', '50'));
@@ -1302,6 +1402,46 @@ function PartnersPane() {
 
   return (
     <div>
+      {/* Payouts — what we owe each partner for rewards we settle. Pick a month, pay
+          from Starling, then mark it paid (the balance resets). */}
+      <div className={styles.panel}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, marginBottom: 12, flexWrap: 'wrap' }}>
+          <div>
+            <span className={styles.panelTitle}>Partner payouts</span>
+            <p className={styles.muted}>What we owe each partner this month for rewards we fund. Pay from your bank, then mark it paid.</p>
+          </div>
+          <div className={styles.payTools}>
+            <input type="month" className={styles.select} value={month} onChange={(e) => setMonth(e.target.value)} aria-label="Month" />
+            <Button variant="secondary" size="sm" onClick={exportPayouts} disabled={!payouts.length}>
+              Export CSV
+            </Button>
+          </div>
+        </div>
+        {payouts.length ? (
+          <div className={styles.list}>
+            {payouts.map((p) => (
+              <div key={p.partner} className={styles.payRow}>
+                <span className={styles.payName}>{p.partner}</span>
+                <span className={styles.payOwed}>£{p.owed.toFixed(2)}</span>
+                <span className={styles.muted}>
+                  {p.owedCount} redemption{p.owedCount === 1 ? '' : 's'}
+                  {p.paid > 0 ? ` · £${p.paid.toFixed(2)} settled` : ''}
+                </span>
+                <button type="button" className={styles.smallBtn} disabled={busy || p.owed <= 0} onClick={() => markPaid(p.partner)}>
+                  Mark as paid
+                </button>
+                <button type="button" className={styles.smallBtn} disabled title="Coming soon — one-tap Faster Payment via Starling">
+                  Pay via Starling
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className={styles.muted}>Nothing owed for {month}.</p>
+        )}
+        {payMsg ? <p className={styles.msg}>{payMsg}</p> : null}
+      </div>
+
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, marginBottom: 16, flexWrap: 'wrap' }}>
         <div>
           <span className={styles.panelTitle}>Partner floats</span>

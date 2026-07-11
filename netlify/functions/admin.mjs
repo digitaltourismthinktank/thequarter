@@ -15,7 +15,7 @@ import { verifyMember, isAdmin, tokenFromRequest } from './_member.mjs';
 import { listRecords, createRecord, updateRecord, deleteRecord, T, F, airtableReady, esc } from './_airtable.mjs';
 import { londonWallClockToISO, isoToLondonMin, hhmmToMin, londonNow, holdReleased } from './_time.mjs';
 import { PLAN_NAMES, allowanceForMember, setMemberPlan, renewMember } from './_quarter-sync.mjs';
-import { listRewards, listPerks, listFloats, floatStatus, awardPoints, redeemReward } from './_rewards.mjs';
+import { listRewards, listPerks, listFloats, floatStatus, awardPoints, redeemReward, partnerPayouts, markPartnerPaid } from './_rewards.mjs';
 
 const PERK_TYPES = ['Discount', 'On the house', 'Upgrade', 'Extra', 'Bundle', 'Priority', 'Welcome gift', 'Experience'];
 const FUNDINGS = ['inventory', 'partner', 'quarter'];
@@ -49,6 +49,8 @@ async function listAllMembers() {
         bday: md.bday || null,
         bdayClaimed: md.bdayClaimed || null,
         points: Math.max(0, Math.round(Number(md.points) || 0)),
+        carnet: Math.max(0, Number(md.carnet?.remaining) || 0),
+        paymentIssue: !!md.paymentIssue,
         company: md.company || null,
         phone: md.phone || null,
       });
@@ -168,6 +170,10 @@ export default async function handler(req) {
   if (req.method === 'GET') {
     const action = new URL(req.url).searchParams.get('action');
     if (action === 'members') return json({ members: await listAllMembers() });
+    if (action === 'payouts') {
+      const month = new URL(req.url).searchParams.get('month') || undefined;
+      return json({ partners: await partnerPayouts({ month }) });
+    }
     if (action === 'spaces') return json({ spaces: await allSpaces() });
     if (action === 'calendar') {
       const date = new URL(req.url).searchParams.get('date');
@@ -253,6 +259,31 @@ export default async function handler(req) {
     const admin = memberstackAdmin.init(MS_SECRET);
     await admin.members.update({ id: body.memberId, data: { customFields: { 'days-remaining': String(body.days ?? '') } } });
     return json({ ok: true });
+  }
+
+  // Grant (or correct) a member's day passes — for comping and for testing the
+  // carnet without a real purchase. Tops up the carnet balance + resets the expiry.
+  if (action === 'grantPasses') {
+    if (!body.memberId) return json({ error: 'missing-member' }, 400);
+    const n = Math.round(Number(body.passes) || 0);
+    if (n === 0) return json({ error: 'bad-count' }, 400);
+    const admin = memberstackAdmin.init(MS_SECRET);
+    const r = await admin.members.retrieve({ id: body.memberId });
+    const m = r?.data;
+    if (!m) return json({ error: 'not-found' }, 404);
+    const c = m.metaData?.carnet || {};
+    const remaining = Math.max(0, (Number(c.remaining) || 0) + n);
+    const total = Math.max(0, (Number(c.total) || 0) + Math.max(0, n));
+    const expires = new Date(Date.now() + 365 * 86400000).toISOString().slice(0, 10);
+    await admin.members.update({ id: body.memberId, data: { metaData: { ...(m.metaData || {}), carnet: { remaining, total, expires } } } });
+    return json({ ok: true, carnet: { remaining, total, expires } });
+  }
+
+  // Settle a partner's owed redemptions (running balance resets to zero).
+  if (action === 'markPaid') {
+    if (!body.partner) return json({ error: 'missing-partner' }, 400);
+    const r = await markPartnerPaid(body.partner, body.month || undefined);
+    return json({ ok: true, ...r });
   }
 
   // Manually check a member in for today (admin), deducting a day unless unlimited.

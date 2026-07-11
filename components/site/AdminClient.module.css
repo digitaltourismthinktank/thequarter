@@ -111,6 +111,16 @@
   padding: 2px 8px;
   border-radius: var(--radius-pill);
 }
+.issueTag {
+  display: inline-block;
+  margin-left: 8px;
+  font-size: var(--text-2xs);
+  font-weight: var(--fw-semibold);
+  color: var(--ink-900);
+  background: var(--gold-500);
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+}
 .dayInput {
   width: 56px;
   padding: 6px 8px;
@@ -193,6 +203,20 @@
 .label {
   flex: 1;
   min-width: 140px;
+}
+/* Drop the native select chrome (which sits its text off-centre, worst in Safari)
+   for a custom chevron — so every dropdown lines up with the inputs beside it. */
+.select,
+select.input {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  padding-right: 30px;
+  line-height: 1.3;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23736C5E' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 12px;
 }
 .to {
   color: var(--text-muted);
@@ -405,6 +429,42 @@
   flex-direction: column;
   gap: 10px;
 }
+.calcRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 2px 0;
+}
+.calcNote {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+.calcTool {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.calcGbp {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+  font-size: var(--text-sm);
+  color: var(--ink-900);
+}
+.calcInput {
+  width: 62px;
+  border: none;
+  background: none;
+  outline: none;
+  font-size: var(--text-sm);
+  color: var(--ink-900);
+}
 .textarea {
   width: 100%;
   min-height: 64px;
@@ -522,6 +582,36 @@
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: 14px;
   margin-bottom: 26px;
+}
+.payTools {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.payRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-card);
+}
+.payName {
+  font-weight: var(--fw-semibold);
+  color: var(--ink-900);
+  min-width: 130px;
+}
+.payOwed {
+  font-size: var(--text-md);
+  font-weight: var(--fw-bold);
+  color: var(--gold-700);
+  min-width: 70px;
+}
+.payRow > .muted {
+  flex: 1;
+  min-width: 120px;
 }
 .floatCard {
   display: flex;

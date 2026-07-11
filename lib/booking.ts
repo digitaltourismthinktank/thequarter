@@ -102,6 +102,8 @@ export interface AdminMember {
   bday: string | null;
   bdayClaimed: string | null;
   points: number;
+  carnet: number;
+  paymentIssue: boolean;
   company: string | null;
   phone: string | null;
 }
@@ -171,6 +173,11 @@ export const adminCompanyBooking = (b: {
 export const adminCancel = (id: string) => call<{ ok: boolean }>('admin', { method: 'POST', body: { action: 'cancelBooking', id } });
 export const adminAdjustDays = (memberId: string, days: string) =>
   call<{ ok: boolean }>('admin', { method: 'POST', body: { action: 'adjustDays', memberId, days } });
+export const adminGrantPasses = (memberId: string, passes: number) =>
+  call<{ ok: boolean; carnet: { remaining: number; total: number; expires: string } }>('admin', {
+    method: 'POST',
+    body: { action: 'grantPasses', memberId, passes },
+  });
 export const adminCheckinMember = (memberId: string, length: 'Full' | 'Half') =>
   call<{ ok: boolean }>('admin', { method: 'POST', body: { action: 'checkinMember', memberId, length } });
 export const adminClaimBirthday = (memberId: string, claimed: boolean, date?: string) =>
@@ -184,6 +191,18 @@ export const adminSavePerk = (p: Partial<PerkItem> & { id?: string }) =>
   call<{ ok: boolean; id: string }>('admin', { method: 'POST', body: { action: 'savePerk', ...p } });
 export const adminDeletePerk = (id: string) => call<{ ok: boolean }>('admin', { method: 'POST', body: { action: 'deletePerk', id } });
 export const adminGetFloats = () => call<{ floats: AdminFloat[] }>('admin?action=floats');
+export interface PayoutPartner {
+  partner: string;
+  owed: number;
+  owedCount: number;
+  paid: number;
+  paidCount: number;
+  lastAt: string | null;
+}
+export const adminGetPayouts = (month?: string) =>
+  call<{ partners: PayoutPartner[] }>(`admin?action=payouts${month ? `&month=${encodeURIComponent(month)}` : ''}`);
+export const adminMarkPaid = (partner: string, month?: string) =>
+  call<{ ok: boolean; settled: number }>('admin', { method: 'POST', body: { action: 'markPaid', partner, month } });
 export const adminTopUpFloat = (id: string, amount: number) =>
   call<{ ok: boolean; balance: number; floatTotal: number }>('admin', { method: 'POST', body: { action: 'topUpFloat', id, amount } });
 export interface AdminCheckin {
@@ -232,6 +251,7 @@ export interface QuarterEvent {
   published?: boolean;
 }
 export const getUpcomingEvents = () => call<{ events: QuarterEvent[] }>('events?action=upcoming', { auth: false });
+export const getPublishedEvents = () => call<{ events: QuarterEvent[] }>('events?action=published', { auth: false });
 export const adminGetEvents = () => call<{ events: QuarterEvent[] }>('events?action=all');
 export const adminCreateEvent = (e: Partial<QuarterEvent>) =>
   call<{ ok: boolean; id: string }>('events', { method: 'POST', body: { action: 'create', ...e } });
@@ -317,7 +337,7 @@ export interface BirthdayState {
   claimed: string | null; // ISO date claimed, or null
 }
 export const getRewards = () =>
-  call<{ points: number; earnedLately: number; catalogue: RewardItem[]; redemptions: Redemption[]; birthday: BirthdayState }>(
+  call<{ points: number; lifetimePoints: number; earnedLately: number; catalogue: RewardItem[]; redemptions: Redemption[]; birthday: BirthdayState }>(
     'rewards',
   );
 

@@ -72,6 +72,7 @@ export function previewCall(path: string, method: string): Result | null {
   if (path === 'rewards' && method === 'GET')
     return ok({
       points: 720,
+      lifetimePoints: 2100,
       earnedLately: 40,
       catalogue: [
         { id: 'treat', partner: 'A.T. Patisserie', title: 'A treat on us', cost: 300, category: 'Bakery & treats', icon: 'cake', hero: false, image: null, pos: '', avail: 'ok' },

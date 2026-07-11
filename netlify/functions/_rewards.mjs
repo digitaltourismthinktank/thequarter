@@ -11,7 +11,6 @@
  */
 import memberstackAdmin from '@memberstack/admin';
 import { listRecords, createRecord, updateRecord, T, F, esc } from './_airtable.mjs';
-import { tierForMember } from './_quarter-sync.mjs';
 
 const MS_SECRET = process.env.MEMBERSTACK_SECRET_KEY;
 
@@ -25,12 +24,30 @@ export const REFERRAL_BONUS = 500;
 export const WELCOME_BONUS = 150;
 
 /**
- * Levels — the higher a member's commitment, the faster they earn. Multiplies the
- * check-in bonuses (the frequent, visible earn). Spend give-back stays a flat % so
- * the total give-back never breaches the brief's ~2–3% of revenue cap.
+ * Levels — earned status tiers (mirror of lib/rewards.ts LEVELS). Everyone climbs
+ * the same ladder by EARNING points over time (not by plan). Higher tiers give a
+ * small, capped check-in earn boost (perks-led), so the most-active members can't
+ * run the give-back away. Thresholds are on lifetime points (spending never demotes).
  */
-export const EARN_MULTIPLIER = { visitor: 1, resident: 1.5, citizen: 2 };
-export const earnMultiplierForMember = (m) => EARN_MULTIPLIER[tierForMember(m)] || 1;
+export const LEVEL_TIERS = [
+  { min: 0, boost: 1 },
+  { min: 1500, boost: 1.15 },
+  { min: 4000, boost: 1.3 },
+  { min: 9000, boost: 1.5 },
+];
+export function levelBoost(lifetime) {
+  let b = 1;
+  const n = Number(lifetime) || 0;
+  for (const l of LEVEL_TIERS) if (n >= l.min) b = l.boost;
+  return b;
+}
+/** Lifetime points earned. Back-fills from the current balance for members from
+ *  before lifetime tracking, so nobody is demoted to Newcomer on rollout. */
+export function memberLifetimePoints(m) {
+  const life = Number(m?.metaData?.lifetimePoints);
+  return Number.isFinite(life) && life >= 0 ? Math.round(life) : memberPoints(m);
+}
+export const earnBoostForMember = (m) => levelBoost(memberLifetimePoints(m));
 
 /** Carnet purchase: Stripe checkout amount (pence) → passes. Provisional — mirrors
  *  lib/rewards CARNET_BUNDLES (10 @ £194.40, 30 @ £550.80). Confirm + wire real Stripe
@@ -71,8 +88,10 @@ export async function awardPoints(member, delta, reason, ref = '') {
   const email = member.auth?.email || member.email || '';
   await appendLedger(email, d, reason, ref);
   const next = Math.max(0, memberPoints(member) + d);
+  // Lifetime only ever grows (earning), so redemptions don't demote a member's level.
+  const life = memberLifetimePoints(member) + (d > 0 ? d : 0);
   const admin = memberstackAdmin.init(MS_SECRET);
-  await admin.members.update({ id: member.id, data: { metaData: { ...(member.metaData || {}), points: next } } });
+  await admin.members.update({ id: member.id, data: { metaData: { ...(member.metaData || {}), points: next, lifetimePoints: life } } });
   return next;
 }
 
@@ -204,6 +223,63 @@ export async function drawFloat(partner, gbp) {
     [F.partners.lastUsed]: new Date().toISOString().slice(0, 10),
     [F.partners.status]: floatStatus(balance, f.floatTotal),
   });
+}
+
+// --- Partner payouts (arrears — what we owe each partner) -----------------------
+// Only rewards WE settle at a partner (funding 'quarter') create a payable. Each
+// redemption's £ value is the anchor value of its points cost. "Owed" = quarter-
+// funded redemptions still marked 'redeemed'; marking a partner paid flips theirs to
+// 'settled' (the running balance resets). A month filter is for viewing/exporting.
+
+export async function partnerPayouts({ month } = {}) {
+  const [rewards, rows] = await Promise.all([
+    listRewards({ liveOnly: false }),
+    listRecords(T.redemptions, { sort: [{ field: 'At', direction: 'desc' }] }),
+  ]);
+  const fundingById = new Map(rewards.map((r) => [r.id, r.funding]));
+  const byPartner = new Map();
+  for (const r of rows) {
+    const f = r.fields;
+    const rewardId = f[F.redemptions.rewardId] || '';
+    if ((fundingById.get(rewardId) || 'inventory') !== 'quarter') continue; // not a payable
+    const at = f[F.redemptions.at] || null;
+    const ym = at ? String(at).slice(0, 7) : '';
+    if (month && ym !== month) continue;
+    const partner = f[F.redemptions.partner] || '—';
+    const gbp = (Number(f[F.redemptions.cost]) || 0) / POINTS_PER_POUND_VALUE;
+    const settled = (f[F.redemptions.status] || 'redeemed') === 'settled';
+    const cur = byPartner.get(partner) || { partner, owed: 0, owedCount: 0, paid: 0, paidCount: 0, lastAt: at };
+    if (settled) {
+      cur.paid += gbp;
+      cur.paidCount += 1;
+    } else {
+      cur.owed += gbp;
+      cur.owedCount += 1;
+    }
+    if (at && (!cur.lastAt || at > cur.lastAt)) cur.lastAt = at;
+    byPartner.set(partner, cur);
+  }
+  return [...byPartner.values()]
+    .map((p) => ({ ...p, owed: Math.round(p.owed * 100) / 100, paid: Math.round(p.paid * 100) / 100 }))
+    .sort((a, b) => b.owed - a.owed);
+}
+
+/** Settle a partner's owed redemptions (optionally just one month) → status 'settled'. */
+export async function markPartnerPaid(partner, month) {
+  const [rewards, rows] = await Promise.all([
+    listRewards({ liveOnly: false }),
+    listRecords(T.redemptions, { filterByFormula: `AND({Partner}='${esc(partner)}', {Status}='redeemed')` }),
+  ]);
+  const fundingById = new Map(rewards.map((r) => [r.id, r.funding]));
+  let settled = 0;
+  for (const r of rows) {
+    const f = r.fields;
+    if ((fundingById.get(f[F.redemptions.rewardId]) || 'inventory') !== 'quarter') continue;
+    if (month && String(f[F.redemptions.at] || '').slice(0, 7) !== month) continue;
+    await updateRecord(T.redemptions, r.id, { [F.redemptions.status]: 'settled' }, { typecast: true });
+    settled += 1;
+  }
+  return { settled };
 }
 
 // --- Redeem a reward (deduct points + log; the voucher token is minted by caller) -

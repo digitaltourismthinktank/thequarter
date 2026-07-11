@@ -15,7 +15,7 @@ import { verifyMember, memberEmail, memberName, tokenFromRequest } from './_memb
 import { listRecords, createRecord, updateRecord, T, F, airtableReady, esc } from './_airtable.mjs';
 import { londonNow, addDays, isoToLondonDate } from './_time.mjs';
 import { allowanceForMember } from './_quarter-sync.mjs';
-import { awardPoints, checkinBonusesThisMonth, earnMultiplierForMember, CHECKIN_BONUS, CHECKIN_QUIET_BONUS, CHECKIN_BONUS_CAP } from './_rewards.mjs';
+import { awardPoints, checkinBonusesThisMonth, earnBoostForMember, CHECKIN_BONUS, CHECKIN_QUIET_BONUS, CHECKIN_BONUS_CAP } from './_rewards.mjs';
 import { isQuietDay } from './_busyness.mjs';
 import { isClosedDay } from './_holidays.mjs';
 
@@ -140,8 +140,8 @@ export default async function handler(req) {
       const used = await checkinBonusesThisMonth(email, today.slice(0, 7));
       if (used < CHECKIN_BONUS_CAP) {
         const quiet = isQuietDay(today);
-        // The member's level multiplies the base bonus (regulars earn faster).
-        const mult = earnMultiplierForMember(me);
+        // The member's earned level gives a gentle boost to the base bonus.
+        const mult = earnBoostForMember(me);
         pointsAwarded = Math.round((quiet ? CHECKIN_QUIET_BONUS : CHECKIN_BONUS) * mult);
         await awardPoints(me, pointsAwarded, quiet ? 'checkin-quiet' : 'checkin', today);
       }

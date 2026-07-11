@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { getMemberstack, PLAN_ID_TO_SLUG, type Member } from '@/lib/memberstack';
 import { PREVIEW, previewMember } from '@/lib/devMock';
 
@@ -8,17 +8,34 @@ export interface MemberState {
   loading: boolean;
   member: Member | null;
 }
+export interface UseMember extends MemberState {
+  /** Re-read the member from Memberstack (uncached) — e.g. after a plan change. */
+  refresh: () => Promise<void>;
+}
 
 /** Subscribe to Memberstack auth state on the client.
    Retries getCurrentMember briefly to ride out the session not being readable
    immediately after a fresh page load post-login (which otherwise bounced the
    dashboard back to /login). */
-export function useMember(): MemberState {
+export function useMember(): UseMember {
   // Local preview seeds the mock member synchronously so it's present from the
   // first client render (no redirect race). Never runs in production.
   const [state, setState] = useState<MemberState>(
     PREVIEW ? { loading: false, member: previewMember } : { loading: true, member: null },
   );
+
+  // Re-read the member on demand (e.g. after a plan switch — poll for the webhook).
+  const refresh = useCallback(async () => {
+    if (PREVIEW) return;
+    const ms = await getMemberstack();
+    if (!ms) return;
+    try {
+      const { data } = await ms.getCurrentMember({ useCache: false });
+      setState({ loading: false, member: data ?? null });
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   useEffect(() => {
     if (PREVIEW) return;
@@ -61,7 +78,7 @@ export function useMember(): MemberState {
     };
   }, []);
 
-  return state;
+  return { ...state, refresh };
 }
 
 /** The member's current Quarter plan slug (e.g. 'visitor'), or null. */

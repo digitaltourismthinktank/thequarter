@@ -58,7 +58,7 @@ export function ArriveClient() {
           <>
             <h1 className={styles.h1}>Welcome</h1>
             <p className={styles.lead}>Log in on your phone to check in.</p>
-            <a className={styles.bigBtn} href="/login">
+            <a className={styles.bigBtn} href="/login?redirect=/arrive">
               Log in
             </a>
           </>

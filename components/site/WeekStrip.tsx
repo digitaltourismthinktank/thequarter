@@ -33,10 +33,13 @@ export function WeekStrip({
   value,
   onSelect,
   label,
+  booked = [],
 }: {
   value?: string | null;
   onSelect: (iso: string) => void;
   label?: string;
+  /** Days already booked/reserved — shown tinted so they read as "already yours". */
+  booked?: string[];
 }) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -76,17 +79,19 @@ export function WeekStrip({
           const past = iso < todayISO;
           const isToday = iso === todayISO;
           const on = value === iso;
+          const isBooked = booked.includes(iso);
           return (
             <button
               key={iso}
               type="button"
               disabled={past}
-              className={`${styles.day} ${on ? styles.on : ''} ${past ? styles.past : ''}`}
+              className={`${styles.day} ${on ? styles.on : ''} ${isBooked && !on ? styles.booked : ''} ${past ? styles.past : ''}`}
               onClick={() => onSelect(iso)}
+              title={isBooked ? 'Already booked' : undefined}
             >
               <span className={styles.dow}>{d.toLocaleDateString('en-GB', { weekday: 'short' })}</span>
               <span className={styles.num}>{d.getDate()}</span>
-              {isToday ? <span className={styles.todayDot} aria-hidden="true" /> : null}
+              {isBooked ? <span className={styles.bookedTag}>Booked</span> : isToday ? <span className={styles.todayDot} aria-hidden="true" /> : null}
             </button>
           );
         })}

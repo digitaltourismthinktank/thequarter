@@ -5,6 +5,7 @@ import { Button } from '@/components/ds/Button';
 import { Icon } from '@/components/ds/Icon';
 import { EVENTS } from '@/lib/events';
 import { PHOTOS } from '@/lib/media';
+import { EventsClient } from '@/components/site/EventsClient';
 import styles from './events.module.css';
 
 export const metadata: Metadata = {
@@ -15,7 +16,7 @@ export const metadata: Metadata = {
 };
 
 export default function EventsPage() {
-  return (
+  const marketing = (
     <>
       <Section tone="card" style={{ paddingBottom: 'clamp(40px, 6vw, 64px)' }}>
         <div style={{ maxWidth: 680 }}>
@@ -88,4 +89,6 @@ export default function EventsPage() {
       </Section>
     </>
   );
+
+  return <EventsClient marketing={marketing} />;
 }

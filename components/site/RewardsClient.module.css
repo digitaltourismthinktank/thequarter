@@ -105,6 +105,11 @@
   font-size: var(--text-md);
   color: var(--gold-300);
 }
+.pcNext {
+  margin-top: 4px;
+  font-size: var(--text-sm);
+  color: var(--gold-200);
+}
 .pcPill {
   align-self: flex-start;
   margin-top: 10px;
@@ -202,6 +207,14 @@
   background: var(--sand-50);
   padding: 3px 9px;
   border-radius: var(--radius-pill);
+}
+.levelThresh {
+  font-size: var(--text-2xs);
+  font-weight: var(--fw-semibold);
+  color: var(--text-muted);
+}
+.perkLocked {
+  opacity: 0.5;
 }
 .levelRate {
   font-size: var(--text-lg);
