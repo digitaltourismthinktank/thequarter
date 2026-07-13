@@ -30,10 +30,10 @@ export const WELCOME_BONUS = 150;
  * run the give-back away. Thresholds are on lifetime points (spending never demotes).
  */
 export const LEVEL_TIERS = [
-  { min: 0, boost: 1 },
-  { min: 1500, boost: 1.15 },
-  { min: 4000, boost: 1.3 },
-  { min: 9000, boost: 1.5 },
+  { min: 0, boost: 1 }, // Newbie
+  { min: 750, boost: 1.15 }, // Regular
+  { min: 2500, boost: 1.3 }, // Family
+  { min: 6000, boost: 1.5 }, // Ambassador
 ];
 export function levelBoost(lifetime) {
   let b = 1;

@@ -37,7 +37,7 @@ export const WELCOME_BONUS = 150; // one-off, on first paid plan/carnet
 // perks-led with a small, capped earn boost — so the most-active members can't run
 // the give-back away. Thresholds are on LIFETIME points earned (spending never demotes).
 
-export type LevelSlug = 'newcomer' | 'regular' | 'local' | 'cornerstone';
+export type LevelSlug = 'newbie' | 'regular' | 'family' | 'ambassador';
 
 export interface Level {
   slug: LevelSlug;
@@ -51,10 +51,10 @@ export interface Level {
 }
 
 export const LEVELS: Level[] = [
-  { slug: 'newcomer', name: 'Newcomer', min: 0, boost: 1, perks: ['A treat on your birthday', 'Points on every visit & every £1'] },
-  { slug: 'regular', name: 'Regular', min: 1500, boost: 1.15, perks: ['Points earn 15% faster', 'A treat on your birthday'] },
-  { slug: 'local', name: 'Local', min: 4000, boost: 1.3, perks: ['Points earn 30% faster', 'A little something extra on your birthday'] },
-  { slug: 'cornerstone', name: 'Cornerstone', min: 9000, boost: 1.5, perks: ['Points earn 50% faster', 'Our warmest birthday treat', 'First to know about what’s on'] },
+  { slug: 'newbie', name: 'Newbie', min: 0, boost: 1, perks: ['A treat on your birthday', 'Points on every visit & every £1'] },
+  { slug: 'regular', name: 'Regular', min: 750, boost: 1.15, perks: ['Points earn 15% faster', 'A treat on your birthday'] },
+  { slug: 'family', name: 'Family', min: 2500, boost: 1.3, perks: ['Points earn 30% faster', 'A guest day pass to bring someone', 'A little extra on your birthday'] },
+  { slug: 'ambassador', name: 'Ambassador', min: 6000, boost: 1.5, perks: ['Points earn 50% faster', 'Guest passes when you need them', 'Our warmest birthday treat', 'First to know what’s on'] },
 ];
 
 /** The member's level from their lifetime points earned. */

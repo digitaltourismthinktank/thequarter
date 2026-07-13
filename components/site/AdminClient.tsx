@@ -912,7 +912,7 @@ function AdminTodayPane({ onAllBirthdays }: { onAllBirthdays: () => void }) {
           {b.closed ? (
             <span className={styles.todayBand}>Closed</span>
           ) : b.band ? (
-            <span className={`${styles.todayBand} ${styles[`band_${b.band.id}`]}`}>Today feels {b.band.label.toLowerCase()}</span>
+            <span className={`${styles.todayBand} ${styles[`band_${b.band.id}`]}`}>Expected {b.band.label.toLowerCase()} · from past weeks</span>
           ) : null}
         </div>
         <div className={styles.seg}>
@@ -1044,6 +1044,9 @@ function ScreensPane() {
         <div className={styles.shortcuts}>
           <a className={styles.shortcut} href="/screen" target="_blank" rel="noreferrer">
             <Icon name="monitor" size={16} color="var(--gold-700)" /> Entrance screen
+          </a>
+          <a className={styles.shortcut} href="/arrive" target="_blank" rel="noreferrer">
+            <Icon name="check" size={16} color="var(--gold-700)" /> Arrival check-in
           </a>
           <a className={styles.shortcut} href="/guest" target="_blank" rel="noreferrer">
             <Icon name="users" size={16} color="var(--gold-700)" /> Guest sign-in

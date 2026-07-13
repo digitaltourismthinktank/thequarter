@@ -22,10 +22,22 @@ export function StatTile({ label, value, unit, icon, hint, progress, tone = 'def
   const bg = isInk ? 'var(--ink-900)' : isGold ? 'var(--gold-100)' : 'var(--surface-card)';
   const fg = isInk ? 'var(--sand-50)' : 'var(--ink-900)';
   const sub = isInk ? 'rgba(251,248,242,0.66)' : 'var(--text-muted)';
-  // Long text values (e.g. "Resident", "Unlimited") step down so they never
-  // overflow the tile; numbers keep the full display size.
-  const vlen = typeof value === 'string' ? value.length : 3;
-  const valueSize = vlen <= 6 ? 'var(--text-3xl)' : vlen <= 9 ? 'var(--text-2xl)' : 'var(--text-xl)';
+  // Word values (e.g. "Paused", "Resident", "Unlimited") step down harder so they
+  // never truncate; numbers and codes (e.g. "10", "1324#") keep the display size.
+  const s = typeof value === 'string' ? value : '';
+  const vlen = s.length || 3;
+  const hasLetters = /[a-zA-Z]/.test(s);
+  const valueSize = hasLetters
+    ? vlen <= 5
+      ? 'var(--text-2xl)'
+      : vlen <= 8
+        ? 'var(--text-xl)'
+        : 'var(--text-lg)'
+    : vlen <= 6
+      ? 'var(--text-3xl)'
+      : vlen <= 9
+        ? 'var(--text-2xl)'
+        : 'var(--text-xl)';
   return (
     <div
       style={{

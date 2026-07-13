@@ -199,10 +199,10 @@ export function DashboardClient() {
           {band ? (
             <div className={styles.busy}>
               <div>
-                <span className={styles.busyEyebrow}>Today at The Quarter</span>
+                <span className={styles.busyEyebrow}>How busy we expect it to be</span>
                 <div className={styles.busyLine}>
                   <strong className={styles.busyBand}>{band.label}</strong>
-                  <span className={styles.busyDesc}>{band.line}</span>
+                  <span className={styles.busyDesc}>{band.line} Our best guess from past weeks.</span>
                 </div>
               </div>
               <div className={styles.busyMeter} aria-hidden="true">
@@ -225,8 +225,8 @@ export function DashboardClient() {
             logoSrc="/brand/logo-wordmark-black.png"
             style={{ maxWidth: '100%' }}
           />
-          <Button variant="primary" fullWidth onClick={handleManageBilling} disabled={billingBusy} iconAfter="arrow-right">
-            {billingBusy ? 'Opening…' : hasPlan ? 'Manage plan & billing' : 'Choose a plan'}
+          <Button variant="primary" fullWidth href="/plan" iconAfter="arrow-right">
+            {hasPlan ? 'Manage plan & billing' : 'Choose a plan'}
           </Button>
           {billingError ? (
             <p className={styles.billingError}>
