@@ -55,13 +55,29 @@ export function ArriveClient() {
         {memberLoading ? (
           <p className={styles.muted}>One moment…</p>
         ) : !member ? (
-          <>
-            <h1 className={styles.h1}>Welcome</h1>
-            <p className={styles.lead}>Log in on your phone to check in.</p>
-            <a className={styles.bigBtn} href="/login?redirect=/arrive">
-              Log in
-            </a>
-          </>
+          <div className={styles.chooser}>
+            <h1 className={styles.h1}>Welcome to The Quarter</h1>
+
+            <div className={styles.chooseGroup}>
+              <span className={styles.chooseLabel}>Members</span>
+              <a className={styles.bigBtn} href="/login?redirect=/arrive">
+                Sign in to check in
+              </a>
+            </div>
+
+            <div className={styles.chooseGroup}>
+              <span className={styles.chooseLabel}>Guests</span>
+              <a className={styles.bigBtnAlt} href="/day-pass">
+                Buy a day pass
+              </a>
+              <a className={styles.bigBtnAlt} href="/guest">
+                I&rsquo;m here for a meeting
+              </a>
+              <a className={styles.textLink} href="/plans">
+                Thinking about joining? See plans
+              </a>
+            </div>
+          </div>
         ) : done ? (
           <div className={styles.doneWrap}>
             <span className={styles.tick} aria-hidden="true">

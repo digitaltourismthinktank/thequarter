@@ -51,6 +51,7 @@ async function listAllMembers() {
         points: Math.max(0, Math.round(Number(md.points) || 0)),
         carnet: Math.max(0, Number(md.carnet?.remaining) || 0),
         paymentIssue: !!md.paymentIssue,
+        vatRequested: md.vatRequested || null,
         company: md.company || null,
         phone: md.phone || null,
       });
@@ -280,6 +281,19 @@ export default async function handler(req) {
     const expires = new Date(Date.now() + 365 * 86400000).toISOString().slice(0, 10);
     await admin.members.update({ id: body.memberId, data: { metaData: { ...(m.metaData || {}), carnet: { remaining, total, expires } } } });
     return json({ ok: true, carnet: { remaining, total, expires } });
+  }
+
+  // Clear a member's VAT-invoice request (admin has actioned it manually).
+  if (action === 'clearVat') {
+    if (!body.memberId) return json({ error: 'missing-member' }, 400);
+    const admin = memberstackAdmin.init(MS_SECRET);
+    const r = await admin.members.retrieve({ id: body.memberId });
+    const m = r?.data;
+    if (!m) return json({ error: 'not-found' }, 404);
+    const meta = { ...(m.metaData || {}) };
+    delete meta.vatRequested;
+    await admin.members.update({ id: body.memberId, data: { metaData: meta } });
+    return json({ ok: true });
   }
 
   // Set / change a member's door entry code.

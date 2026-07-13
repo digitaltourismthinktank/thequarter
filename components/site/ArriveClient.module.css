@@ -87,6 +87,39 @@
   transform: none;
 }
 
+.chooser {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  width: 100%;
+}
+.chooseGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.chooseLabel {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  color: var(--gold-700);
+  font-weight: var(--fw-semibold);
+}
+.bigBtnAlt {
+  width: 100%;
+  padding: 18px 24px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-card);
+  color: var(--ink-900);
+  font-size: var(--text-lg);
+  font-weight: var(--fw-semibold);
+  text-decoration: none;
+  transition: transform var(--duration-base) var(--ease-out);
+}
+.bigBtnAlt:hover {
+  transform: translateY(-2px);
+}
 .doneWrap {
   display: flex;
   flex-direction: column;

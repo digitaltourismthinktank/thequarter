@@ -104,6 +104,7 @@ export interface AdminMember {
   points: number;
   carnet: number;
   paymentIssue: boolean;
+  vatRequested: string | null;
   company: string | null;
   phone: string | null;
 }
@@ -347,6 +348,10 @@ export const getRewards = () =>
 // ---- Member profile (birthday / company on Memberstack metaData) ----
 export const saveProfile = (body: { bday?: string | null; company?: string }) =>
   call<{ ok: boolean; bday: string | null; company: string | null }>('member-profile', { method: 'POST', body });
+export const requestVatInvoice = () =>
+  call<{ ok: boolean; vatRequested: string | null }>('member-profile', { method: 'POST', body: { vatRequest: true } });
+export const adminClearVat = (memberId: string) =>
+  call<{ ok: boolean }>('admin', { method: 'POST', body: { action: 'clearVat', memberId } });
 
 // ---- Day-pass carnet ----
 export interface CarnetState {

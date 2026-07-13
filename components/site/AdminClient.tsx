@@ -22,6 +22,7 @@ import {
   adminAdjustDays,
   adminGrantPasses,
   adminSetDoorCode,
+  adminClearVat,
   adminCheckinMember,
   adminGetEvents,
   adminCreateEvent,
@@ -913,6 +914,10 @@ function AdminTodayPane({ onAllBirthdays }: { onAllBirthdays: () => void }) {
     await signOutGuest(id);
     loadRoll();
   }
+  async function clearVat(id: string) {
+    await adminClearVat(id);
+    setMembers((ms) => ms.filter((m) => m.id !== id));
+  }
 
   useEffect(() => {
     if (!date) return;
@@ -1075,6 +1080,28 @@ function AdminTodayPane({ onAllBirthdays }: { onAllBirthdays: () => void }) {
           </div>
         </div>
       )}
+
+      {members.filter((m) => m.vatRequested).length ? (
+        <div className={styles.panel} style={{ marginTop: 18, borderColor: 'var(--gold-400)' }}>
+          <span className={styles.panelTitle}>VAT invoice requests</span>
+          <p className={styles.muted}>Members asking for a VAT invoice — action it, then mark it done.</p>
+          <div className={styles.list}>
+            {members
+              .filter((m) => m.vatRequested)
+              .map((m) => (
+                <div key={m.id} className={styles.payRow}>
+                  <span className={styles.payName}>{m.name || m.email}</span>
+                  <span className={styles.muted}>
+                    Requested {m.vatRequested ? new Date(m.vatRequested).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : ''}
+                  </span>
+                  <button type="button" className={styles.smallBtn} onClick={() => clearVat(m.id)}>
+                    Done
+                  </button>
+                </div>
+              ))}
+          </div>
+        </div>
+      ) : null}
 
       <DatePickerModal
         open={pickerOpen}

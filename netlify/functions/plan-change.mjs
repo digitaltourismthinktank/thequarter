@@ -129,8 +129,14 @@ export default async function handler(req) {
       return json({ ok: true, paused: true });
     }
 
-    // resume
-    const updated = await stripe(`/v1/subscriptions/${sub.id}`, 'POST', { pause_collection: '' });
+    // resume — clear the pause AND restart the billing cycle from today, so they
+    // don't wait until the old renewal date to come back. No proration; their frozen
+    // rollover days carry over into the fresh cycle.
+    const updated = await stripe(`/v1/subscriptions/${sub.id}`, 'POST', {
+      pause_collection: '',
+      billing_cycle_anchor: 'now',
+      proration_behavior: 'none',
+    });
     if (updated?.error) return json({ error: 'stripe', detail: updated.error.message }, 502);
     return json({ ok: true, paused: false });
   } catch (err) {

@@ -29,8 +29,11 @@ export default async function handler(req) {
     if (c) meta.company = c;
     else delete meta.company;
   }
+  // A VAT-invoice request — flagged for admin to action manually (our Stripe prices
+  // are VAT-inclusive). Stamped with the request time; admin clears it when done.
+  if (body.vatRequest === true) meta.vatRequested = new Date().toISOString();
 
   const admin = memberstackAdmin.init(MS_SECRET);
   await admin.members.update({ id: vm.member.id, data: { metaData: meta } });
-  return json({ ok: true, bday: meta.bday || null, company: meta.company || null });
+  return json({ ok: true, bday: meta.bday || null, company: meta.company || null, vatRequested: meta.vatRequested || null });
 }

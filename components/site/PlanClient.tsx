@@ -6,7 +6,7 @@ import { useMember, memberPlanSlug } from './useMember';
 import { PLANS, PLAN_STRIPE_PRICE, type PlanId } from '@/lib/plans';
 import { ANNUAL_PLANS, annualSaving } from '@/lib/rewards';
 import { getMemberToken, memberIsPaused, memberDaysRemaining, memberRenewalDate, memberHasPaymentIssue } from '@/lib/memberstack';
-import { switchPlan, pausePlan, resumePlan } from '@/lib/booking';
+import { switchPlan, pausePlan, resumePlan, requestVatInvoice } from '@/lib/booking';
 import { CarnetCard } from './CarnetCard';
 import styles from './PlanClient.module.css';
 
@@ -29,6 +29,13 @@ export function PlanClient() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
+  const [vatMsg, setVatMsg] = useState<string | null>(null);
+
+  async function requestVat() {
+    setVatMsg(null);
+    const r = await requestVatInvoice();
+    setVatMsg(r.ok ? 'Requested — we’ll email your VAT invoice shortly.' : 'Could not send the request — please try again.');
+  }
 
   const currentName = useMemo(() => (currentSlug ? PLANS.find((p) => p.id === currentSlug)?.name ?? null : null), [currentSlug]);
 
@@ -83,7 +90,7 @@ export function PlanClient() {
       } else {
         const r = await resumePlan();
         ok = r.ok;
-        if (ok) setDone('Welcome back — your membership is resuming.');
+        if (ok) setDone('Welcome back — your membership is active again from today.');
       }
       if (!ok) setErr('Something went wrong — please try again, or manage it in the billing portal.');
       else {
@@ -104,8 +111,8 @@ export function PlanClient() {
 
   const pendingLabel = useMemo(() => {
     if (!pending) return '';
-    if (pending.kind === 'pause') return 'Pause your membership? Billing stops and your remaining days are kept, frozen, until you resume.';
-    if (pending.kind === 'resume') return 'Resume your membership? Billing restarts and your days unfreeze.';
+    if (pending.kind === 'pause') return 'Pause your membership? Your current month runs out as normal, then billing stops and your remaining days freeze until you resume.';
+    if (pending.kind === 'resume') return 'Resume your membership? A fresh billing cycle starts today, and your frozen days carry over.';
     const name = PLANS.find((p) => p.id === pending.slug)?.name ?? pending.slug;
     return `Switch to ${name}, billed ${pending.term === 'annual' ? 'annually' : 'monthly'}? It takes effect at your next renewal — no mid-cycle charge.`;
   }, [pending]);
@@ -152,8 +159,13 @@ export function PlanClient() {
           <button type="button" className={styles.linkBtn} onClick={manageBilling} disabled={busy}>
             Manage card &amp; invoices
           </button>
+          <button type="button" className={styles.linkBtn} onClick={requestVat}>
+            Request a VAT invoice
+          </button>
         </div>
       </section>
+
+      {vatMsg ? <p className={styles.done}>{vatMsg}</p> : null}
 
       {done ? <p className={styles.done}>{done}</p> : null}
       {err ? <p className={styles.err}>{err}</p> : null}
