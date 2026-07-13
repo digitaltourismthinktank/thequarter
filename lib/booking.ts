@@ -442,6 +442,22 @@ export const getReferrals = () =>
 export const registerReferral = (referrerId: string) =>
   call<{ ok: boolean }>('referrals', { method: 'POST', body: { action: 'register', referrerId } });
 
+// ---- Billing self-service (invoices + card update) ----
+export interface Invoice {
+  id: string;
+  number: string | null;
+  created: number | null;
+  total: number;
+  currency: string;
+  status: string;
+  pdf: string | null;
+  url: string | null;
+}
+export const getInvoices = () => call<{ invoices: Invoice[] }>('invoices');
+export const createSetupIntent = () => call<{ clientSecret: string }>('invoices', { method: 'POST', body: { action: 'setup-intent' } });
+export const setDefaultCard = (paymentMethodId: string) =>
+  call<{ ok: boolean }>('invoices', { method: 'POST', body: { action: 'set-default', paymentMethodId } });
+
 // ---- Native plan change (switch / pause / resume via Stripe) ----
 export const switchPlan = (priceId: string) =>
   call<{ ok: boolean }>('plan-change', { method: 'POST', body: { action: 'switch', priceId } });

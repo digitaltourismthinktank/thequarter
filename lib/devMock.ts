@@ -84,6 +84,14 @@ export function previewCall(path: string, method: string): Result | null {
       birthday: { bday: '05-14', claimed: null },
     });
   if (path === 'carnet' && method === 'GET') return ok({ carnet: { remaining: 6, total: 10, expires: addDays(t, 300) } });
+  if (path === 'invoices' && method === 'GET')
+    return ok({
+      invoices: [
+        { id: 'in_3', number: 'QTR-0009', created: Date.parse(`${t}T09:00:00Z`), total: 138, currency: 'GBP', status: 'paid', pdf: '#', url: '#' },
+        { id: 'in_2', number: 'QTR-0008', created: Date.parse(`${addDays(t, -30)}T09:00:00Z`), total: 138, currency: 'GBP', status: 'paid', pdf: '#', url: '#' },
+        { id: 'in_1', number: 'QTR-0007', created: Date.parse(`${addDays(t, -60)}T09:00:00Z`), total: 21.6, currency: 'GBP', status: 'paid', pdf: '#', url: '#' },
+      ],
+    });
   if (method === 'POST') return ok({ ok: true, balance: '10' }); // check-in / reserve / cancel / book / plan-change all succeed
   return null;
 }

@@ -1,13 +1,14 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ds/Button';
 import { useMember, memberPlanSlug } from './useMember';
 import { PLANS, PLAN_STRIPE_PRICE, type PlanId } from '@/lib/plans';
 import { ANNUAL_PLANS, annualSaving } from '@/lib/rewards';
 import { getMemberToken, memberIsPaused, memberDaysRemaining, memberRenewalDate, memberHasPaymentIssue } from '@/lib/memberstack';
-import { switchPlan, pausePlan, resumePlan, requestVatInvoice } from '@/lib/booking';
+import { switchPlan, pausePlan, resumePlan, requestVatInvoice, getInvoices, type Invoice } from '@/lib/booking';
 import { CarnetCard } from './CarnetCard';
+import { CardUpdate } from './CardUpdate';
 import styles from './PlanClient.module.css';
 
 /** The three switchable plans (Hybrid is annual-only and handled separately). */
@@ -30,6 +31,14 @@ export function PlanClient() {
   const [err, setErr] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
   const [vatMsg, setVatMsg] = useState<string | null>(null);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+
+  useEffect(() => {
+    if (!member) return;
+    getInvoices().then((r) => {
+      if (r.ok) setInvoices(r.data.invoices);
+    });
+  }, [member]);
 
   async function requestVat() {
     setVatMsg(null);
@@ -156,9 +165,7 @@ export function PlanClient() {
               Pause membership
             </Button>
           ) : null}
-          <button type="button" className={styles.linkBtn} onClick={manageBilling} disabled={busy}>
-            Manage card &amp; invoices
-          </button>
+          <CardUpdate onDone={refresh} />
           <button type="button" className={styles.linkBtn} onClick={requestVat}>
             Request a VAT invoice
           </button>
@@ -241,6 +248,43 @@ export function PlanClient() {
         <p className={styles.note}>
           Switches take effect at your next renewal, with no mid-cycle charge. Prefer to do it yourself? Use “Manage card &amp; invoices”.
         </p>
+      </section>
+
+      <section className={styles.card}>
+        <div className={styles.switchHead}>
+          <h2 className={styles.h2}>Invoices</h2>
+          <button type="button" className={styles.linkBtn} onClick={manageBilling} disabled={busy}>
+            Open Stripe portal
+          </button>
+        </div>
+        {invoices.length ? (
+          <div className={styles.invList}>
+            {invoices.map((inv) => (
+              <div key={inv.id} className={styles.invRow}>
+                <span className={styles.invDate}>
+                  {inv.created ? new Date(inv.created).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : ''}
+                </span>
+                <span className={styles.invNum}>{inv.number || inv.id}</span>
+                <span className={styles.invAmt}>£{inv.total.toFixed(2)}</span>
+                <span className={styles.invStatus}>{inv.status === 'paid' ? 'Paid' : inv.status}</span>
+                {inv.pdf ? (
+                  <a className={styles.linkBtn} href={inv.pdf}>
+                    Download
+                  </a>
+                ) : inv.url ? (
+                  <a className={styles.linkBtn} href={inv.url}>
+                    View
+                  </a>
+                ) : (
+                  <span />
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className={styles.note}>No invoices yet.</p>
+        )}
+        <p className={styles.note}>Our prices include VAT. Need a formal VAT invoice? Use &ldquo;Request a VAT invoice&rdquo; above.</p>
       </section>
 
       <CarnetCard />

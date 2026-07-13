@@ -28,6 +28,11 @@ export const STRIPE_HYBRID_OFFICE_URL =
 export const TYPEFORM_DAYPASS_URL =
   process.env.NEXT_PUBLIC_TYPEFORM_DAYPASS_URL ?? 'https://dttt.typeform.com/to/VScIAjrW';
 
+/** Stripe publishable key (public by design) — used client-side by Stripe Elements
+ *  so members can update their card without leaving the app. */
+export const STRIPE_PUBLISHABLE_KEY =
+  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? 'pk_live_eBhLPhjrDvYGMPBqUKlDNUN9';
+
 /** Stripe billing portal (members manage/switch plan). Used as the fallback for
  * the dashboard's "Manage plan" button until the one-click Netlify Function
  * (/.netlify/functions/billing-portal) is live with a Stripe key. */
