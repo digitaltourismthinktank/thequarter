@@ -93,16 +93,34 @@ export default async function handler(req) {
     if (!sub) return json({ error: 'no-subscription' }, 404);
 
     if (action === 'switch') {
-      const itemId = sub.items?.data?.[0]?.id;
-      if (!itemId) return json({ error: 'no-item' }, 409);
-      const updated = await stripe(`/v1/subscriptions/${sub.id}`, 'POST', {
-        'items[0][id]': itemId,
-        'items[0][price]': body.priceId,
-        proration_behavior: 'create_prorations',
-        pause_collection: '', // switching resumes a paused subscription
+      const item = sub.items?.data?.[0];
+      if (!item) return json({ error: 'no-item' }, 409);
+      // Apply the new plan at the member's NEXT renewal, with NO proration — flat
+      // invoices, no mid-cycle maths. We drive this with a Stripe subscription
+      // schedule: the current price runs to period end, then the new price takes over.
+      let scheduleId = sub.schedule;
+      if (!scheduleId) {
+        const created = await stripe('/v1/subscription_schedules', 'POST', { from_subscription: sub.id });
+        if (created?.error) return json({ error: 'stripe', detail: created.error.message }, 502);
+        scheduleId = created.id;
+      }
+      const sched = await stripe(`/v1/subscription_schedules/${scheduleId}`, 'GET');
+      const p0 = sched?.phases?.[0];
+      if (!p0?.items?.[0]) return json({ error: 'no-phase' }, 502);
+      const curPrice = typeof p0.items[0].price === 'string' ? p0.items[0].price : p0.items[0].price?.id;
+      const updated = await stripe(`/v1/subscription_schedules/${scheduleId}`, 'POST', {
+        end_behavior: 'release',
+        proration_behavior: 'none',
+        'phases[0][items][0][price]': curPrice,
+        'phases[0][items][0][quantity]': String(p0.items[0].quantity || 1),
+        'phases[0][start_date]': String(p0.start_date),
+        'phases[0][end_date]': String(p0.end_date),
+        'phases[1][items][0][price]': body.priceId,
+        'phases[1][items][0][quantity]': '1',
+        'phases[1][iterations]': '1',
       });
       if (updated?.error) return json({ error: 'stripe', detail: updated.error.message }, 502);
-      return json({ ok: true });
+      return json({ ok: true, effective: 'next-renewal' });
     }
 
     if (action === 'pause') {

@@ -21,6 +21,7 @@ import {
   adminCancel,
   adminAdjustDays,
   adminGrantPasses,
+  adminSetDoorCode,
   adminCheckinMember,
   adminGetEvents,
   adminCreateEvent,
@@ -104,6 +105,16 @@ function downloadCSV(filename: string, rows: (string | number)[][]) {
   a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
+}
+/** Shift a 'YYYY-MM' by whole months, and format one as "July 2026". */
+function shiftMonth(ym: string, delta: number): string {
+  const [y, m] = ym.split('-').map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
+}
+function fmtMonth(ym: string): string {
+  const [y, m] = ym.split('-').map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
 }
 function firstWeekday(): string {
   const d = new Date();
@@ -324,6 +335,7 @@ function MembersPane() {
       <MemberProfileModal
         id={profileId}
         bday={members.find((m) => m.id === profileId)?.bday ?? null}
+        doorCode={members.find((m) => m.id === profileId)?.doorCode ?? null}
         onClose={() => setProfileId(null)}
         onChanged={refresh}
       />
@@ -331,7 +343,19 @@ function MembersPane() {
   );
 }
 
-function MemberProfileModal({ id, bday, onClose, onChanged }: { id: string | null; bday?: string | null; onClose: () => void; onChanged: () => void }) {
+function MemberProfileModal({
+  id,
+  bday,
+  doorCode,
+  onClose,
+  onChanged,
+}: {
+  id: string | null;
+  bday?: string | null;
+  doorCode?: string | null;
+  onClose: () => void;
+  onChanged: () => void;
+}) {
   const [p, setP] = useState<MemberProfile | null>(null);
   const [rewards, setRewards] = useState<AdminReward[]>([]);
   const [delta, setDelta] = useState('');
@@ -339,9 +363,14 @@ function MemberProfileModal({ id, bday, onClose, onChanged }: { id: string | nul
   const [rewardId, setRewardId] = useState('');
   const [planSel, setPlanSel] = useState('');
   const [passes, setPasses] = useState('');
+  const [door, setDoor] = useState('');
   const [confirmAdjust, setConfirmAdjust] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    setDoor(doorCode ?? '');
+  }, [doorCode]);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -391,6 +420,17 @@ function MemberProfileModal({ id, bday, onClose, onChanged }: { id: string | nul
       setMsg(`Day passes updated — ${r.data.carnet.remaining} left.`);
       onChanged();
     } else setMsg('Could not update passes.');
+  }
+  async function saveDoor() {
+    if (!id) return;
+    setBusy(true);
+    setMsg(null);
+    const r = await adminSetDoorCode(id, door.trim());
+    setBusy(false);
+    if (r.ok) {
+      setMsg('Door code updated.');
+      onChanged();
+    } else setMsg('Could not update the door code.');
   }
   async function redeem() {
     if (!rewardId || !id) return;
@@ -566,6 +606,16 @@ function MemberProfileModal({ id, bday, onClose, onChanged }: { id: string | nul
                   Grant passes
                 </button>
                 <span className={styles.muted}>For comps or to test a purchase.</span>
+              </div>
+            </div>
+
+            <div className={styles.profSection}>
+              <span className={styles.profSectionTitle}>Door code</span>
+              <div className={styles.formRow}>
+                <input className={styles.dayInput} value={door} onChange={(e) => setDoor(e.target.value)} placeholder="e.g. 1324#" aria-label="Door code" />
+                <button type="button" className={styles.smallBtn} onClick={saveDoor} disabled={busy}>
+                  Save code
+                </button>
               </div>
             </div>
 
@@ -948,11 +998,25 @@ function AdminTodayPane({ onAllBirthdays }: { onAllBirthdays: () => void }) {
         <div className={styles.todayGrid}>
           <div className={styles.todayCard}>
             <span className={styles.todayCardLabel}>Who&rsquo;s in</span>
-            <strong className={styles.todayBig}>{isLiveToday ? roll.headcount : checkins.length}</strong>
+            <strong className={styles.todayBig}>{checkins.length}</strong>
             <span className={styles.todayCardSub}>
-              {isLiveToday ? `${roll.membersIn} member${roll.membersIn === 1 ? '' : 's'} · ${roll.guests.length} guest${roll.guests.length === 1 ? '' : 's'} on site` : 'Planned ahead — check-ins land on the day.'}
+              {checkins.filter((c) => c.status === 'Checked-in').length} here · {checkins.filter((c) => c.status !== 'Checked-in').length} expected
+              {isLiveToday && roll.guests.length ? ` · ${roll.guests.length} guest${roll.guests.length === 1 ? '' : 's'}` : ''}
             </span>
-            {checkins.length ? <span className={styles.todayCardSub}>{checkins.map((c) => c.name).join(', ')}</span> : null}
+            {checkins.length ? (
+              <div className={styles.whoWrap}>
+                {checkins.map((c, i) => (
+                  <span
+                    key={`${c.name}-${i}`}
+                    className={`${styles.who} ${c.length === 'Half' ? styles.whoHalf : ''} ${c.status !== 'Checked-in' ? styles.whoExpected : ''}`}
+                    title={`${c.status === 'Checked-in' ? 'Here now' : 'Expected'} · ${c.length === 'Half' ? 'Half day' : 'Full day'}`}
+                  >
+                    {c.name}
+                    {c.length === 'Half' ? ' · ½' : ''}
+                  </span>
+                ))}
+              </div>
+            ) : null}
           </div>
           {isLiveToday ? (
             <div className={styles.todayCard}>
@@ -1414,7 +1478,15 @@ function PartnersPane() {
             <p className={styles.muted}>What we owe each partner this month for rewards we fund. Pay from your bank, then mark it paid.</p>
           </div>
           <div className={styles.payTools}>
-            <input type="month" className={styles.select} value={month} onChange={(e) => setMonth(e.target.value)} aria-label="Month" />
+            <div className={styles.monthPick}>
+              <button type="button" className={styles.monthArrow} onClick={() => setMonth(shiftMonth(month, -1))} aria-label="Previous month">
+                ‹
+              </button>
+              <span className={styles.monthLabel}>{fmtMonth(month)}</span>
+              <button type="button" className={styles.monthArrow} onClick={() => setMonth(shiftMonth(month, 1))} aria-label="Next month">
+                ›
+              </button>
+            </div>
             <Button variant="secondary" size="sm" onClick={exportPayouts} disabled={!payouts.length}>
               Export CSV
             </Button>

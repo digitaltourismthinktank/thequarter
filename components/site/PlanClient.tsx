@@ -75,7 +75,7 @@ export function PlanClient() {
         }
         const r = await switchPlan(priceId);
         ok = r.ok;
-        if (ok) setDone('Your plan is changing — this can take a moment to update here.');
+        if (ok) setDone('Done — your new plan starts at your next renewal.');
       } else if (pending.kind === 'pause') {
         const r = await pausePlan();
         ok = r.ok;
@@ -107,9 +107,7 @@ export function PlanClient() {
     if (pending.kind === 'pause') return 'Pause your membership? Billing stops and your remaining days are kept, frozen, until you resume.';
     if (pending.kind === 'resume') return 'Resume your membership? Billing restarts and your days unfreeze.';
     const name = PLANS.find((p) => p.id === pending.slug)?.name ?? pending.slug;
-    return pending.term === 'annual'
-      ? `Switch to ${name}, billed annually? You’ll be charged the prorated difference now.`
-      : `Switch to ${name}, billed monthly? Any difference is prorated on your next invoice.`;
+    return `Switch to ${name}, billed ${pending.term === 'annual' ? 'annually' : 'monthly'}? It takes effect at your next renewal — no mid-cycle charge.`;
   }, [pending]);
 
   if (loading) return <p className={styles.state}>Loading your plan…</p>;
@@ -229,7 +227,7 @@ export function PlanClient() {
           })}
         </div>
         <p className={styles.note}>
-          Switches take effect immediately and are prorated by Stripe. Prefer to do it yourself? Use “Manage card &amp; invoices”.
+          Switches take effect at your next renewal, with no mid-cycle charge. Prefer to do it yourself? Use “Manage card &amp; invoices”.
         </p>
       </section>
 

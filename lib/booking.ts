@@ -178,6 +178,8 @@ export const adminGrantPasses = (memberId: string, passes: number) =>
     method: 'POST',
     body: { action: 'grantPasses', memberId, passes },
   });
+export const adminSetDoorCode = (memberId: string, code: string) =>
+  call<{ ok: boolean }>('admin', { method: 'POST', body: { action: 'setDoorCode', memberId, code } });
 export const adminCheckinMember = (memberId: string, length: 'Full' | 'Half') =>
   call<{ ok: boolean }>('admin', { method: 'POST', body: { action: 'checkinMember', memberId, length } });
 export const adminClaimBirthday = (memberId: string, claimed: boolean, date?: string) =>
@@ -208,6 +210,7 @@ export const adminTopUpFloat = (id: string, amount: number) =>
 export interface AdminCheckin {
   name: string;
   length: string;
+  status?: string;
 }
 export const adminGetToday = (date: string) =>
   call<{ date: string; checkins: AdminCheckin[]; bookings: AdminBooking[] }>(`admin?action=today&date=${date}`);

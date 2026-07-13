@@ -14,7 +14,7 @@ import styles from './MemberShell.module.css';
 const TABS: { href: string; label: string; icon: IconName }[] = [
   { href: '/dashboard', label: 'Dashboard', icon: 'monitor' },
   { href: '/book', label: 'Book', icon: 'calendar' },
-  { href: '/events', label: 'Events', icon: 'party-popper' },
+  { href: '/whats-on', label: 'Events', icon: 'party-popper' },
   { href: '/rewards', label: 'Rewards', icon: 'star' },
   { href: '/perks', label: 'Perks', icon: 'gift' },
   { href: '/plan', label: 'Plan', icon: 'credit-card' },

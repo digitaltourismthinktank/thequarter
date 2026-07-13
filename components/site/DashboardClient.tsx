@@ -173,8 +173,8 @@ export function DashboardClient() {
       {payIssue ? (
         <div className={styles.payAlert} role="alert">
           <span>
-            <Icon name="credit-card" size={16} color="var(--ink-900)" /> There&rsquo;s a problem with your last payment. Please update your card to keep your
-            membership active.
+            <Icon name="credit-card" size={16} color="var(--ink-900)" /> There&rsquo;s a problem with your last payment — please update your card. Your
+            membership may be suspended until it&rsquo;s sorted.
           </span>
           <Button variant="primary" size="sm" onClick={handleManageBilling} disabled={billingBusy}>
             {billingBusy ? 'Opening…' : 'Update card'}

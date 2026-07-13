@@ -13,8 +13,8 @@ import { useMember } from './useMember';
 
    /perks is dual-mode: a crawlable marketing page when logged out, the member
    browse when signed in — so there we hide the marketing chrome only for members. */
-const ALWAYS_APP = ['/dashboard', '/book', '/rewards', '/plan', '/admin', '/arrive'];
-const MEMBER_WHEN_AUTHED = ['/perks', '/events'];
+const ALWAYS_APP = ['/dashboard', '/book', '/rewards', '/plan', '/admin', '/arrive', '/whats-on'];
+const MEMBER_WHEN_AUTHED = ['/perks'];
 
 function matches(prefixes: string[], pathname: string | null): boolean {
   if (!pathname) return false;

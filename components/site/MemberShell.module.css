@@ -14,7 +14,8 @@
   border-bottom: 1px solid var(--border-subtle);
 }
 .navInner {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
   gap: 20px;
   max-width: var(--container-wide);
@@ -26,7 +27,7 @@
   display: inline-flex;
   align-items: center;
   gap: 9px;
-  flex: none;
+  justify-self: start;
 }
 .brandImg {
   height: 26px;
@@ -46,9 +47,10 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  flex: 1;
+  justify-self: center;
   justify-content: center;
   min-width: 0;
+  max-width: 100%;
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -88,7 +90,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  flex: none;
+  justify-self: end;
 }
 .switch {
   display: inline-flex;

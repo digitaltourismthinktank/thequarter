@@ -588,6 +588,36 @@ select.input {
   align-items: center;
   gap: 8px;
 }
+.monthPick {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill);
+  background: var(--surface-card);
+}
+.monthArrow {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ink-900);
+  font-size: var(--text-md);
+  line-height: 1;
+  cursor: pointer;
+}
+.monthArrow:hover {
+  background: var(--sand-100);
+}
+.monthLabel {
+  min-width: 108px;
+  text-align: center;
+  font-size: var(--text-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--ink-900);
+}
 .payRow {
   display: flex;
   align-items: center;
@@ -803,6 +833,34 @@ select.input {
   font-size: var(--text-sm);
   color: var(--text-muted);
   line-height: 1.45;
+}
+.whoWrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+/* Name pill. Colour = day length (gold full / sand half); outlined = expected (booked
+   ahead, not yet arrived), solid = here now. */
+.who {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid transparent;
+  background: var(--gold-100);
+  color: var(--gold-700);
+  font-size: var(--text-sm);
+  font-weight: var(--fw-semibold);
+}
+.whoHalf {
+  background: var(--sand-100);
+  color: var(--ink-900);
+}
+.whoExpected {
+  background: transparent;
+  border-color: var(--border-subtle);
+  color: var(--text-muted);
 }
 .bdayList {
   display: flex;

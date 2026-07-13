@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Icon } from '@/components/ds/Icon';
 import { MemberShell } from './MemberShell';
 import { useMember } from './useMember';
@@ -42,11 +42,11 @@ function EventRow({ e, past }: { e: QuarterEvent; past?: boolean }) {
 }
 
 /**
- * /events is dual-mode (like /perks): logged-out visitors get the crawlable
- * marketing page; signed-in members get their in-app Events tab — the live
- * what's-on, upcoming and past, from the same feed the entrance screen uses.
+ * The member Events tab (/whats-on) — the live what's-on, upcoming and past, from
+ * the same feed the entrance screen uses. A dedicated member route (not the public
+ * /events marketing page) so there's no marketing-hero flash on the way in.
  */
-export function EventsClient({ marketing }: { marketing: ReactNode }) {
+export function EventsClient() {
   const { loading, member } = useMember();
   const [events, setEvents] = useState<QuarterEvent[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -63,42 +63,50 @@ export function EventsClient({ marketing }: { marketing: ReactNode }) {
   const upcoming = useMemo(() => events.filter((e) => e.start && e.start.slice(0, 10) >= today), [events, today]);
   const past = useMemo(() => events.filter((e) => e.start && e.start.slice(0, 10) < today).reverse(), [events, today]);
 
-  if (loading || !member) return <>{marketing}</>;
-
   return (
     <MemberShell>
       <div className={styles.wrap}>
-        <header className={styles.header}>
-          <span className={styles.eyebrow}>What&rsquo;s on</span>
-          <h1 className={styles.h1}>Events at The Quarter</h1>
-          <p className={styles.sub}>Socials, briefings and workshops — part of being here.</p>
-        </header>
+        {loading ? (
+          <p className={styles.state}>Loading…</p>
+        ) : !member ? (
+          <p className={styles.state}>
+            Please <a href="/login?redirect=/whats-on">log in</a> to see events.
+          </p>
+        ) : (
+          <>
+            <header className={styles.header}>
+              <span className={styles.eyebrow}>What&rsquo;s on</span>
+              <h1 className={styles.h1}>Events at The Quarter</h1>
+              <p className={styles.sub}>Socials, briefings and workshops — part of being here.</p>
+            </header>
 
-        <section className={styles.section}>
-          <h2 className={styles.h2}>Coming up</h2>
-          {!loaded ? (
-            <p className={styles.state}>Loading…</p>
-          ) : upcoming.length ? (
-            <div className={styles.list}>
-              {upcoming.map((e) => (
-                <EventRow key={e.id} e={e} />
-              ))}
-            </div>
-          ) : (
-            <p className={styles.muted}>Nothing on the calendar just yet — check back soon.</p>
-          )}
-        </section>
+            <section className={styles.section}>
+              <h2 className={styles.h2}>Coming up</h2>
+              {!loaded ? (
+                <p className={styles.state}>Loading…</p>
+              ) : upcoming.length ? (
+                <div className={styles.list}>
+                  {upcoming.map((e) => (
+                    <EventRow key={e.id} e={e} />
+                  ))}
+                </div>
+              ) : (
+                <p className={styles.muted}>Nothing on the calendar just yet — check back soon.</p>
+              )}
+            </section>
 
-        {past.length ? (
-          <section className={styles.section}>
-            <h2 className={styles.h2}>Recently</h2>
-            <div className={styles.list}>
-              {past.slice(0, 12).map((e) => (
-                <EventRow key={e.id} e={e} past />
-              ))}
-            </div>
-          </section>
-        ) : null}
+            {past.length ? (
+              <section className={styles.section}>
+                <h2 className={styles.h2}>Recently</h2>
+                <div className={styles.list}>
+                  {past.slice(0, 12).map((e) => (
+                    <EventRow key={e.id} e={e} past />
+                  ))}
+                </div>
+              </section>
+            ) : null}
+          </>
+        )}
       </div>
     </MemberShell>
   );

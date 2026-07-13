@@ -150,12 +150,15 @@ async function bookingsForDate(date) {
 }
 
 async function checkinsForDate(date) {
+  // Include Planned (booked ahead, not yet arrived) as well as Checked-in, so
+  // "who's in" reflects everyone expected that day — not just those on site now.
   const recs = await listRecords(T.checkins, {
-    filterByFormula: `AND(DATETIME_FORMAT({Date}, 'YYYY-MM-DD')='${esc(date)}', {Status}='Checked-in')`,
+    filterByFormula: `AND(DATETIME_FORMAT({Date}, 'YYYY-MM-DD')='${esc(date)}', OR({Status}='Checked-in', {Status}='Planned'))`,
   });
   return recs.map((r) => ({
     name: r.fields[F.checkins.name] || r.fields[F.checkins.email] || 'Member',
     length: r.fields[F.checkins.length] || 'Full',
+    status: r.fields[F.checkins.status] || 'Planned',
   }));
 }
 
@@ -277,6 +280,14 @@ export default async function handler(req) {
     const expires = new Date(Date.now() + 365 * 86400000).toISOString().slice(0, 10);
     await admin.members.update({ id: body.memberId, data: { metaData: { ...(m.metaData || {}), carnet: { remaining, total, expires } } } });
     return json({ ok: true, carnet: { remaining, total, expires } });
+  }
+
+  // Set / change a member's door entry code.
+  if (action === 'setDoorCode') {
+    if (!body.memberId) return json({ error: 'missing-member' }, 400);
+    const admin = memberstackAdmin.init(MS_SECRET);
+    await admin.members.update({ id: body.memberId, data: { customFields: { 'door-code': String(body.code ?? '') } } });
+    return json({ ok: true });
   }
 
   // Settle a partner's owed redemptions (running balance resets to zero).
