@@ -13,11 +13,13 @@ import styles from './NotificationToggle.module.css';
  */
 const VAPID = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 
-function urlBase64ToUint8Array(base64String: string): Uint8Array {
+// Return type is pinned to Uint8Array<ArrayBuffer> (not the default Uint8Array<ArrayBufferLike>
+// in TS 5.7+): pushManager.subscribe's applicationServerKey requires an ArrayBuffer-backed view.
+function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
   const raw = atob(base64);
-  const arr = new Uint8Array(raw.length);
+  const arr = new Uint8Array(new ArrayBuffer(raw.length));
   for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
   return arr;
 }
