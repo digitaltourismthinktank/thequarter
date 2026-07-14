@@ -10,8 +10,9 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: '*',
         allow: '/',
-        // Member-gated areas, in-office displays + link-only pages.
-        disallow: ['/dashboard', '/rewards', '/plan', '/book', '/admin', '/v/', '/i/', '/screen', '/kiosk', '/guest', '/welcome'],
+        // Member-gated areas, in-office displays + link-only pages. (/rewards and
+        // /perks are public marketing pages — crawlable.)
+        disallow: ['/dashboard', '/plan', '/book', '/admin', '/v/', '/i/', '/screen', '/kiosk', '/guest', '/welcome', '/arrive'],
       },
     ],
     sitemap: `${base}/sitemap.xml`,

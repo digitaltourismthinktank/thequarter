@@ -23,6 +23,9 @@ import {
   stampSync,
 } from './_quarter-sync.mjs';
 import { pointsForGBP, appendLedger, WELCOME_BONUS, creditReferral, CARNET_AMOUNT_TO_PASSES } from './_rewards.mjs';
+import { listRecords, createRecord, T, F, airtableReady, esc } from './_airtable.mjs';
+import { londonWallClockToISO } from './_time.mjs';
+import { sendEmail, emailShell, escapeHtml, OPS_EMAIL } from './_email.mjs';
 
 const MS_SECRET = process.env.MEMBERSTACK_SECRET_KEY;
 const STRIPE_SECRET = process.env.STRIPE_SECRET_KEY;
@@ -73,6 +76,186 @@ async function emailFromCustomer(customerId) {
 }
 
 /**
+ * Finalise a paid room booking: create the Airtable booking (once — idempotent on
+ * the PaymentIntent id stored in Notes) and email the guest + ops. Best-effort
+ * emails never block the booking. Metadata is set by room-booking.mjs.
+ */
+async function finaliseRoomBooking(pi) {
+  if (!airtableReady()) return { skipped: 'no-airtable' };
+  const m = pi.metadata || {};
+  const piId = pi.id || '';
+  if (!m.spaceId || !m.date || !m.start || !m.end) return { skipped: 'bad-metadata' };
+
+  // Idempotency: a webhook retry must not double-book. The PaymentIntent id lives
+  // in the booking's Notes; if a confirmed booking for this space/date already
+  // carries it, we're done.
+  const dayRecs = await listRecords(T.bookings, {
+    filterByFormula: `AND(DATETIME_FORMAT({Date}, 'YYYY-MM-DD')='${esc(m.date)}', {Status}='Confirmed')`,
+  });
+  const dup = dayRecs.find((r) => {
+    const sp = r.fields[F.bookings.space];
+    return Array.isArray(sp) && sp.includes(m.spaceId) && String(r.fields[F.bookings.notes] || '').includes(piId);
+  });
+  if (dup) return { skipped: 'duplicate', id: dup.id };
+
+  const total = (pi.amount ?? 0) / 100;
+  const people = Number(m.people) || 1;
+  const lunch = m.lunch === 'yes';
+  const notes = [`Paid booking · ${piId}`, `£${total.toFixed(2)} inc VAT`, `${people} ${people === 1 ? 'person' : 'people'}`, lunch ? 'Lunch added' : 'No lunch']
+    .filter(Boolean)
+    .join(' · ');
+
+  const rec = await createRecord(
+    T.bookings,
+    {
+      [F.bookings.title]: `${m.start}–${m.end} · ${m.company || m.name || 'Booking'}`,
+      [F.bookings.space]: [m.spaceId],
+      [F.bookings.date]: m.date,
+      [F.bookings.start]: londonWallClockToISO(m.date, m.start),
+      [F.bookings.end]: londonWallClockToISO(m.date, m.end),
+      [F.bookings.kind]: 'Company',
+      [F.bookings.email]: m.email || '',
+      [F.bookings.name]: m.name || '',
+      [F.bookings.company]: m.company || '',
+      [F.bookings.status]: 'Confirmed',
+      [F.bookings.source]: 'Web',
+      [F.bookings.notes]: notes,
+    },
+    { typecast: true },
+  );
+
+  await sendRoomBookingEmails({ m, total, people, lunch });
+  return { created: rec?.id || null };
+}
+
+async function sendRoomBookingEmails({ m, total, people, lunch }) {
+  const when = `${m.date} · ${m.start}–${m.end}`;
+  const rows = `
+    <p style="margin:0 0 6px;"><strong>${escapeHtml(m.spaceName || 'Room')}</strong></p>
+    <p style="margin:0 0 6px;">${escapeHtml(when)}</p>
+    <p style="margin:0 0 6px;">${people} ${people === 1 ? 'person' : 'people'}${lunch ? ' · lunch added' : ''}</p>
+    <p style="margin:0 0 6px;">Total paid: <strong>£${total.toFixed(2)}</strong> (inc VAT)</p>`;
+  if (m.email) {
+    await sendEmail({
+      to: m.email,
+      subject: `Your booking is confirmed — ${m.spaceName || 'The Quarter'}`,
+      replyTo: OPS_EMAIL,
+      html: emailShell(
+        'Your booking is confirmed',
+        `<p>Thank you${m.name ? `, ${escapeHtml(m.name)}` : ''} — your room is booked.</p>${rows}<p style="margin:12px 0 0;">We look forward to seeing you. Any changes, just reply to this email or give us a call.</p>`,
+        'Your Quarter room booking is confirmed',
+      ),
+    });
+  }
+  await sendEmail({
+    to: OPS_EMAIL,
+    subject: `New room booking — ${m.spaceName || 'Room'} (${m.company || m.name || 'guest'})`,
+    html: emailShell(
+      'New room booking',
+      `${rows}<p style="margin:12px 0 0;">Company: ${escapeHtml(m.company || '—')}<br/>Contact: ${escapeHtml(m.name || '—')} · ${escapeHtml(m.email || '—')}</p>`,
+      'A new room booking was just paid',
+    ),
+  });
+}
+
+const normName = (s) => String(s ?? '').toLowerCase().replace(/[‘’']/g, "'").replace(/\s+/g, ' ').trim();
+async function spaceIdByName(name) {
+  const recs = await listRecords(T.spaces, {});
+  const m = recs.find((r) => normName(r.fields[F.spaces.name]) === normName(name));
+  return m?.id || null;
+}
+
+/**
+ * Finalise a team-room privatisation: record it (once — idempotent on the Checkout
+ * session id in Notes), link the room, and email the company + ops. The record is a
+ * single 'Privatisation' marker; generating the recurring weekly room blocks (so the
+ * room reads as unavailable on those weekdays) is an admin/scheduled follow-up.
+ */
+async function finalisePrivatisation(session) {
+  if (!airtableReady()) return { skipped: 'no-airtable' };
+  const m = session.metadata || {};
+  const sid = session.id || '';
+  const existing = await listRecords(T.bookings, { filterByFormula: `AND({Status}='Confirmed', {Kind}='Privatisation')` });
+  if (existing.some((r) => String(r.fields[F.bookings.notes] || '').includes(sid))) return { skipped: 'duplicate' };
+
+  const spaceId = await spaceIdByName(m.roomName || '');
+  const notes = [`Privatisation · ${sid}`, `${m.frequency || ''} (${m.days || 'full week'})`, `${m.members || '?'} members`, `from ${m.startDate || ''}`].join(' · ');
+  const fields = {
+    [F.bookings.title]: `Privatisation · ${m.company || m.roomName || ''}`,
+    [F.bookings.kind]: 'Privatisation',
+    [F.bookings.company]: m.company || '',
+    [F.bookings.email]: m.email || session.customer_details?.email || session.customer_email || '',
+    [F.bookings.name]: m.name || '',
+    [F.bookings.status]: 'Confirmed',
+    [F.bookings.source]: 'Web',
+    [F.bookings.recurring]: true,
+    [F.bookings.notes]: notes,
+  };
+  if (m.startDate) fields[F.bookings.date] = m.startDate;
+  if (spaceId) fields[F.bookings.space] = [spaceId];
+  const rec = await createRecord(T.bookings, fields, { typecast: true });
+  await sendPrivatisationEmails(m, session);
+  return { created: rec?.id || null, space: spaceId };
+}
+
+async function sendPrivatisationEmails(m, session) {
+  const to = m.email || session.customer_details?.email || session.customer_email || '';
+  const body = `
+    <p style="margin:0 0 6px;"><strong>${escapeHtml(m.roomName || 'Team room')}</strong> · ${escapeHtml(m.frequency || '')}</p>
+    <p style="margin:0 0 6px;">Days: ${escapeHtml(m.days || 'full week')}</p>
+    <p style="margin:0 0 6px;">Starts: ${escapeHtml(m.startDate || '')}</p>
+    <p style="margin:0 0 6px;">Members: ${escapeHtml(String(m.members || ''))}</p>
+    <p style="margin:0 0 6px;">Invoiced quarterly.</p>`;
+  if (to) {
+    await sendEmail({
+      to,
+      replyTo: OPS_EMAIL,
+      subject: `Your team room is reserved — ${m.roomName || 'The Quarter'}`,
+      html: emailShell(
+        'Your team room is reserved',
+        `<p>Thank you${m.name ? `, ${escapeHtml(m.name)}` : ''} — ${escapeHtml(m.company || 'your company')} is set up.</p>${body}<p style="margin:12px 0 0;">We’ll be in touch to get your team’s accounts ready. Any questions, just reply.</p>`,
+        'Your Quarter team room is reserved',
+      ),
+    });
+  }
+  await sendEmail({
+    to: OPS_EMAIL,
+    subject: `New privatisation — ${m.roomName || ''} (${m.company || ''})`,
+    html: emailShell('New privatisation', `${body}<p style="margin:12px 0 0;">Company: ${escapeHtml(m.company || '')}<br/>Contact: ${escapeHtml(m.name || '')} · ${escapeHtml(to)}</p>`, 'A team room was just privatised'),
+  });
+}
+
+const memberFirstName = (member) => String(member?.customFields?.['first-name'] || '').trim();
+
+async function sendWelcomeEmail(email, member) {
+  const fn = memberFirstName(member);
+  await sendEmail({
+    to: email,
+    replyTo: OPS_EMAIL,
+    subject: 'Welcome to The Quarter',
+    html: emailShell(
+      'Welcome to The Quarter',
+      `<p>Hi${fn ? ` ${escapeHtml(fn)}` : ''},</p><p>Welcome — we’re so glad you’re here. Your membership is live: pop in for breakfast, take any free desk, and say hello. Your Quarter Rewards start earning from your very first visit.</p>`,
+      'Welcome to The Quarter',
+    ),
+  });
+}
+
+async function sendPaymentFailedEmail(email, member) {
+  const fn = memberFirstName(member);
+  await sendEmail({
+    to: email,
+    replyTo: OPS_EMAIL,
+    subject: 'A quick note about your payment',
+    html: emailShell(
+      'We couldn’t take your payment',
+      `<p>Hi${fn ? ` ${escapeHtml(fn)}` : ''},</p><p>Your latest payment didn’t go through — usually just a card that’s expired or changed. Pop into your account and update your card, and you’re all set. Any trouble at all, simply reply to this email.</p>`,
+      'Please update your payment card',
+    ),
+  });
+}
+
+/**
  * Process one Stripe event and return a compact summary (for the debug ring).
  *
  * Stale-event guard: Stripe doesn't guarantee delivery order and retries failed
@@ -86,6 +269,17 @@ async function handleEvent(event) {
   const created = event?.created || 0;
   const eventId = event?.id;
   const base = { at: created, id: eventId, type };
+
+  // Paid room booking (public — the payer may be a non-member). Finalise it before
+  // the member-resolution path below so it never depends on a Memberstack record.
+  if (type === 'payment_intent.succeeded' && obj?.metadata?.kind === 'room-booking') {
+    return { ...base, roomBooking: await finaliseRoomBooking(obj) };
+  }
+
+  // Team-room privatisation subscription (public, company-led — no member record).
+  if (type === 'checkout.session.completed' && obj?.metadata?.kind === 'privatisation') {
+    return { ...base, privatisation: await finalisePrivatisation(obj) };
+  }
 
   // Resolve the member email for the event types we handle.
   let email = null;
@@ -133,6 +327,8 @@ async function handleEvent(event) {
     if (welcome > 0) await appendLedger(email, welcome, 'welcome', obj.id || '');
     // First paid plan → credit whoever referred this member (no-op if not referred).
     if (welcome > 0) await creditReferral(email);
+    // First paid plan → a warm welcome email (best-effort).
+    if (welcome > 0) await sendWelcomeEmail(email, member);
     // A successful payment always clears any prior payment-issue flag.
     const cur = Math.max(0, Math.round(Number(metaData?.points) || 0));
     const life = Math.max(0, Math.round(Number(metaData?.lifetimePoints) || cur));
@@ -143,6 +339,7 @@ async function handleEvent(event) {
     // and the app can ask them to update their card before changing plan.
     earnMeta = { ...(metaData || {}), paymentIssue: true };
     applied = { paymentFailed: true };
+    await sendPaymentFailedEmail(email, member); // dunning nudge (best-effort)
   } else if (type === 'checkout.session.completed') {
     // Day-pass carnet purchase (one-off). Top up balance, reset the 12-month expiry,
     // and earn spend points. amount_total maps to a bundle via config (provisional).

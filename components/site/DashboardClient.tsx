@@ -13,9 +13,14 @@ import { CheckInCard } from './CheckInCard';
 import { MyBookingsCard } from './MyBookingsCard';
 import { EventsCard } from './EventsCard';
 import { CarnetMini } from './CarnetMini';
+import { InstallPrompt } from './InstallPrompt';
+import { GeoCheckIn } from './GeoCheckIn';
+import { NotificationToggle } from './NotificationToggle';
 import { getMemberstack, memberName, memberDaysRemaining, memberRenewalDate, memberDoorCode, memberHasPaymentIssue } from '@/lib/memberstack';
 import { PLANS, PLAN_DAY_ALLOWANCE } from '@/lib/plans';
 import { STRIPE_BILLING_PORTAL_URL } from '@/lib/commerce';
+import { getRewards } from '@/lib/booking';
+import { levelForPoints, type LevelSlug } from '@/lib/rewards';
 import styles from './DashboardClient.module.css';
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -29,6 +34,25 @@ export function DashboardClient() {
   const [billingError, setBillingError] = useState<string | null>(null);
   const [allPlans, setAllPlans] = useState<unknown>(null);
   const [today, setToday] = useState<ReturnType<typeof busyness> | null>(null);
+  // Seed the loyalty card from the last-known values (instant render, works offline).
+  const [points, setPoints] = useState<number | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const c = JSON.parse(localStorage.getItem('q-card') || 'null');
+      return c && typeof c.points === 'number' ? c.points : null;
+    } catch {
+      return null;
+    }
+  });
+  const [level, setLevel] = useState<LevelSlug>(() => {
+    if (typeof window === 'undefined') return 'newbie';
+    try {
+      const c = JSON.parse(localStorage.getItem('q-card') || 'null');
+      return c && c.level ? c.level : 'newbie';
+    } catch {
+      return 'newbie';
+    }
+  });
 
   useEffect(() => {
     setToday(busyness(new Date()));
@@ -52,6 +76,29 @@ export function DashboardClient() {
         if (active && data?.name) setPlanName(data.name);
       } catch {
         /* ignore — fall back to a generic label */
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [member]);
+
+  // Points + earned level for the loyalty card.
+  useEffect(() => {
+    if (!member) return;
+    let active = true;
+    (async () => {
+      const r = await getRewards();
+      if (active && r.ok) {
+        const pts = r.data.points;
+        const lvl = levelForPoints(r.data.lifetimePoints ?? r.data.points).slug;
+        setPoints(pts);
+        setLevel(lvl);
+        try {
+          localStorage.setItem('q-card', JSON.stringify({ points: pts, level: lvl }));
+        } catch {
+          /* ignore */
+        }
       }
     })();
     return () => {
@@ -191,9 +238,15 @@ export function DashboardClient() {
       <div className={styles.layout}>
         <div className={styles.mainCol}>
           <div className={styles.statRow}>
-            <StatTile label="Your days" tone="ink" icon="calendar" value={daysValue} unit={daysUnit} hint={daysHint} progress={daysProg} />
-            <StatTile label="Your plan" tone="gold" icon="user" value={planLabel} hint={planMeta} />
-            <StatTile label="Door code" icon="door-open" value={doorCode ?? '—'} hint={doorCode ? 'Keep it to yourself' : 'Ask the team'} />
+            <StatTile label="Your days" tone="ink" icon="calendar" value={daysValue} unit={daysUnit} hint={daysHint} progress={daysProg} valueSize="var(--text-2xl)" />
+            <StatTile label="Your plan" tone="gold" icon="user" value={planLabel} hint={planMeta} valueSize="var(--text-2xl)" />
+            <StatTile
+              label="Door code"
+              icon="door-open"
+              value={doorCode ?? '—'}
+              hint={doorCode ? 'Keep it to yourself' : 'Ask the team'}
+              valueSize="var(--text-2xl)"
+            />
           </div>
 
           {band ? (
@@ -213,6 +266,7 @@ export function DashboardClient() {
             </div>
           ) : null}
 
+          <GeoCheckIn />
           <CheckInCard />
           <MyBookingsCard />
         </div>
@@ -222,12 +276,16 @@ export function DashboardClient() {
             memberName={display ?? email}
             plan={isPaused ? 'Paused' : slug ? cap(slug) : hasPlan ? 'Member' : 'Guest'}
             cardId={cardId}
+            level={level}
+            points={points ?? undefined}
             logoSrc="/brand/logo-wordmark-black.png"
             style={{ maxWidth: '100%' }}
           />
           <Button variant="primary" fullWidth href="/plan" iconAfter="arrow-right">
             {hasPlan ? 'Manage plan & billing' : 'Choose a plan'}
           </Button>
+          <InstallPrompt />
+          <NotificationToggle />
           {billingError ? (
             <p className={styles.billingError}>
               Couldn&rsquo;t open one-click billing ({billingError}).{' '}

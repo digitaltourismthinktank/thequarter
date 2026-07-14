@@ -8,7 +8,8 @@
  * metaData is free-form, so these need no Memberstack dashboard setup.
  */
 import memberstackAdmin from '@memberstack/admin';
-import { verifyMember, tokenFromRequest } from './_member.mjs';
+import { verifyMember, tokenFromRequest, memberEmail } from './_member.mjs';
+import { sendEmail, emailShell, escapeHtml, OPS_EMAIL } from './_email.mjs';
 
 const MS_SECRET = process.env.MEMBERSTACK_SECRET_KEY;
 const json = (b, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { 'content-type': 'application/json' } });
@@ -35,5 +36,29 @@ export default async function handler(req) {
 
   const admin = memberstackAdmin.init(MS_SECRET);
   await admin.members.update({ id: vm.member.id, data: { metaData: meta } });
+
+  // Acknowledge a VAT-invoice request by email (member + ops). Best-effort.
+  if (body.vatRequest === true) {
+    const email = memberEmail(vm.member);
+    const fn = String(vm.member?.customFields?.['first-name'] || '').trim();
+    if (email) {
+      await sendEmail({
+        to: email,
+        replyTo: OPS_EMAIL,
+        subject: 'Your VAT invoice request',
+        html: emailShell(
+          'Your VAT invoice is on its way',
+          `<p>Hi${fn ? ` ${escapeHtml(fn)}` : ''},</p><p>Thanks — we’ve logged your request for a VAT invoice. Our team will issue it within the next business day, to this email address.</p>`,
+          'We’ve logged your VAT invoice request',
+        ),
+      });
+    }
+    await sendEmail({
+      to: OPS_EMAIL,
+      subject: `VAT invoice requested — ${email || vm.member.id}`,
+      html: emailShell('VAT invoice requested', `<p><strong>${escapeHtml(email || '')}</strong> has requested a VAT invoice.</p>`, 'A member requested a VAT invoice'),
+    });
+  }
+
   return json({ ok: true, bday: meta.bday || null, company: meta.company || null, vatRequested: meta.vatRequested || null });
 }

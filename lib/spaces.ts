@@ -33,9 +33,9 @@ export const SPACES: SpaceItem[] = [
   },
   {
     id: 'flexi',
-    name: 'The Flexi Rooms',
+    name: 'The Phone Pods',
     tag: 'The Bell Tower & the Scriptorium',
-    blurb: 'Private slat-lined booths for a call, a catch-up or an hour of quiet. Included with every desk plan.',
+    blurb: 'Private slat-lined booths for a call, a catch-up or an hour of quiet. Included with every desk plan — or book one on its own for a single meeting.',
     photo: PHOTOS.flexi,
     meta: [
       { icon: 'door-open', label: 'Drop-in' },
@@ -50,7 +50,7 @@ export const SPACES: SpaceItem[] = [
     blurb: 'The cathedral view, the natural light and the breakfast. Not bookable — just ours to share.',
     photo: PHOTOS.cafe,
     meta: [
-      { icon: 'coffee', label: 'Lavazza & breakfast' },
+      { icon: 'coffee', label: 'Coffee & breakfast' },
       { icon: 'leaf', label: 'Cathedral view' },
     ],
     href: '/spaces#cafe',
@@ -59,9 +59,10 @@ export const SPACES: SpaceItem[] = [
 
 export const INCLUDED: SpaceMetaItem[] = [
   { icon: 'wifi', label: 'Fibre internet' },
-  { icon: 'briefcase', label: 'Ergonomic desks' },
-  { icon: 'monitor', label: 'Plug-and-play A/V' },
-  { icon: 'utensils', label: 'Daily healthy breakfast' },
-  { icon: 'coffee', label: 'Lavazza coffee & premium drinks' },
-  { icon: 'door-open', label: 'Access to the Flexi Rooms' },
+  { icon: 'monitor', label: 'A monitor at every desk' },
+  { icon: 'coffee', label: 'Bean-to-cup coffee & teas' },
+  { icon: 'utensils', label: 'Breakfast, yoghurts & cereals' },
+  { icon: 'cake', label: 'Pastries & cakes, on us' },
+  { icon: 'door-open', label: 'Phone pods for calls' },
+  { icon: 'heart', label: 'Dog friendly' },
 ];

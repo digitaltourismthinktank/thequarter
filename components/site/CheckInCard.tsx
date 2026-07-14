@@ -42,6 +42,7 @@ export function CheckInCard({ className }: { className?: string }) {
   const [error, setError] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pending, setPending] = useState<string[]>([]); // optimistic reservations in flight
+  const [note, setNote] = useState<string | null>(null);
 
   async function refresh() {
     const r = await getCheckinToday();
@@ -67,9 +68,11 @@ export function CheckInCard({ className }: { className?: string }) {
     if (!v) return;
     setBusy(true);
     setError(null);
+    setNote(null);
     setPending((p) => (p.includes(v) ? p : [...p, v])); // instant feedback
     const r = await reserveDay(v, half ? 'Half' : 'Full');
     if (!r.ok) setError(friendly(r.data?.error));
+    else if (r.data.requested) setNote('Weekend access requested — we’ll confirm by email.');
     await refresh();
     setPending((p) => p.filter((x) => x !== v));
     setBusy(false);
@@ -161,6 +164,21 @@ export function CheckInCard({ className }: { className?: string }) {
         </div>
       ) : null}
 
+      {status?.requested?.length ? (
+        <div className={styles.planned}>
+          <span className={styles.plannedLabel}>Weekend requests — awaiting confirmation</span>
+          {status.requested.map((p) => (
+            <span key={p.id} className={cn(styles.chip, styles.chipPending)}>
+              {fmtDate(p.date)}
+              <button className={styles.chipX} onClick={() => doCancel(p.id)} aria-label="Cancel request" disabled={busy}>
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      ) : null}
+
+      {note ? <p className={styles.meta}>{note}</p> : null}
       {error ? <p className={styles.error}>{error}</p> : null}
 
       <DatePickerModal
@@ -180,6 +198,10 @@ function friendly(code?: string): string {
       return 'The Quarter is open Monday to Friday.';
     case 'closed-day':
       return 'The Quarter is closed that day (bank holiday or seasonal closure).';
+    case 'weekend-request':
+      return 'Weekends are by request — pick a weekend day and we’ll confirm.';
+    case 'weekend-pending':
+      return 'Your weekend request is in — we’ll confirm by email before the day.';
     case 'not-configured':
       return 'Check-in isn’t available just yet.';
     case 'network':

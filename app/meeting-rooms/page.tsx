@@ -1,24 +1,25 @@
 import type { Metadata } from 'next';
-import { Section, SectionHead, Eyebrow } from '@/components/site/primitives';
+import { Section, SectionHead, Eyebrow, Photo } from '@/components/site/primitives';
 import { Button } from '@/components/ds/Button';
 import { Icon } from '@/components/ds/Icon';
 import { RoomCard } from '@/components/ds/RoomCard';
 import { MeetingRoomsExplorer } from '@/components/site/MeetingRoomsExplorer';
 import { EnquiryForm } from '@/components/site/EnquiryForm';
 import { MEETING_ROOMS } from '@/lib/rooms';
+import { PHOTOS } from '@/lib/media';
 import styles from './meeting-rooms.module.css';
 
 export const metadata: Metadata = {
   title: 'Meeting rooms',
   description:
-    'Check this week’s availability and reserve a hybrid-ready boardroom or one of two high-spec meeting rooms in Canterbury’s Cathedral Quarter. Half-day and full-day packages with catering.',
+    'Check this week’s availability and book one of two high-spec meeting rooms — including a hybrid-ready boardroom — in Canterbury’s Cathedral Quarter. Half-day and full-day packages, with a lunch add-on and a quiet-day discount.',
   alternates: { canonical: '/meeting-rooms' },
 };
 
 const ASSURANCES = [
-  'Pricing is quoted on enquiry, around half-day and full-day packages.',
-  'Add catering — Lavazza, pastries and a healthy lunch platter.',
-  'We reply within one working day to confirm your slot.',
+  'Half-day and full-day packages — from £90 (The Chapter House), £144 (The Knight’s Tale), inc. VAT.',
+  'Add lunch — baguettes and cake from The Sandwich Bar, £12 a head.',
+  'Save 20% on room hire on our quieter days: Monday, Wednesday & Friday.',
 ];
 
 export default function MeetingRoomsPage() {
@@ -29,7 +30,7 @@ export default function MeetingRoomsPage() {
           dark
           eyebrow="Meeting rooms"
           title="Check availability & reserve"
-          intro="Pick a room, find a free slot this week, and enquire to reserve in a couple of taps — or send a note with your catering needs. Pricing is quoted on enquiry, around half-day and full-day packages."
+          intro="Pick a room, find a free slot this week, and book in a couple of clicks — or send a note with your catering needs. Half-day and full-day packages, with a lunch add-on and a quiet-day discount."
           max={620}
         />
       </Section>
@@ -39,7 +40,7 @@ export default function MeetingRoomsPage() {
       </Section>
 
       <Section tone="card">
-        <SectionHead eyebrow="The rooms" title="Three rooms, one warm standard" max={560} />
+        <SectionHead eyebrow="The rooms" title="Two rooms, one warm standard" max={560} />
         <div className={styles.roomsGrid}>
           {MEETING_ROOMS.map((r) => (
             <RoomCard
@@ -67,7 +68,7 @@ export default function MeetingRoomsPage() {
             <SectionHead title="Tell us what you need" max={420} />
             <p className={styles.enquireText}>
               Send us the room, a rough date and time, and anything that would make it perfect. We&rsquo;ll come back to
-              confirm and quote.
+              confirm your booking.
             </p>
             <div className={styles.enquireList}>
               {ASSURANCES.map((a) => (
@@ -77,6 +78,12 @@ export default function MeetingRoomsPage() {
                 </div>
               ))}
             </div>
+            <figure style={{ margin: '24px 0 0' }}>
+              <Photo src={PHOTOS.catering.src} alt={PHOTOS.catering.alt} ratio="16 / 9" sizes="(max-width: 900px) 100vw, 480px" />
+              <figcaption style={{ marginTop: 8, fontSize: 'var(--text-sm)', color: 'var(--stone-700)' }}>
+                Make it a hosted lunch — baguettes &amp; cake from The Sandwich Bar, £12 a head.
+              </figcaption>
+            </figure>
           </div>
           <EnquiryForm formName="room-enquiry" />
         </div>

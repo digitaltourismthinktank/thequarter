@@ -27,7 +27,7 @@ export default function TermsPage() {
       <h2>2. Your membership</h2>
       <p>
         Our plans, day passes and the day-pass carnet, with what each includes, are set out on our site. Membership gives you access to the open
-        workspace, the flexi rooms and the things we lay on (fibre, ergonomic desks, plug-and-play A/V, breakfast, specialty coffee and
+        workspace, the phone pods and the things we lay on (fibre, a monitor at every desk, plug-and-play A/V, breakfast, specialty coffee and
         refreshments), used reasonably and in the spirit of the Code of Conduct. Plans are personal to you and can&rsquo;t be shared or transferred.
       </p>
 

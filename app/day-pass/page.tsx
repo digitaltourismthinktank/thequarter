@@ -9,7 +9,7 @@ import styles from './day-pass.module.css';
 export const metadata: Metadata = {
   title: 'Book a Day Pass',
   description:
-    'Your way in. A Day Pass at The Quarter, Canterbury — £21.60 for a full day with plug-and-play A/V, a daily healthy breakfast, Lavazza coffee and the Flexi Rooms. Includes VAT.',
+    'Your way in. A Day Pass at The Quarter, Canterbury — £21.60 for a full day with plug-and-play A/V, a daily breakfast, bean-to-cup coffee and the phone pods. Includes VAT.',
   alternates: { canonical: '/day-pass' },
 };
 
@@ -31,7 +31,7 @@ export default function DayPassPage() {
           </Badge>
           <h1 className={styles.h1}>Book your Day Pass</h1>
           <p className={styles.lead}>
-            A full day with us — breakfast, Lavazza, fibre and the Flexi Rooms included. No commitment, just a really
+            A full day with us — breakfast, coffee, fibre and the phone pods included. No commitment, just a really
             good day.
           </p>
 

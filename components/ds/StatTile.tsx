@@ -13,10 +13,12 @@ export interface StatTileProps {
   hint?: string;
   progress?: number;
   tone?: 'default' | 'gold' | 'ink';
+  /** Force a specific value font-size (a --text-* var) — e.g. to keep a row uniform. */
+  valueSize?: string;
   style?: CSSProperties;
 }
 
-export function StatTile({ label, value, unit, icon, hint, progress, tone = 'default', style }: StatTileProps) {
+export function StatTile({ label, value, unit, icon, hint, progress, tone = 'default', valueSize: valueSizeProp, style }: StatTileProps) {
   const isInk = tone === 'ink';
   const isGold = tone === 'gold';
   const bg = isInk ? 'var(--ink-900)' : isGold ? 'var(--gold-100)' : 'var(--surface-card)';
@@ -27,17 +29,19 @@ export function StatTile({ label, value, unit, icon, hint, progress, tone = 'def
   const s = typeof value === 'string' ? value : '';
   const vlen = s.length || 3;
   const hasLetters = /[a-zA-Z]/.test(s);
-  const valueSize = hasLetters
-    ? vlen <= 5
-      ? 'var(--text-2xl)'
-      : vlen <= 8
-        ? 'var(--text-xl)'
-        : 'var(--text-lg)'
-    : vlen <= 6
-      ? 'var(--text-3xl)'
-      : vlen <= 9
+  const valueSize =
+    valueSizeProp ??
+    (hasLetters
+      ? vlen <= 5
         ? 'var(--text-2xl)'
-        : 'var(--text-xl)';
+        : vlen <= 8
+          ? 'var(--text-xl)'
+          : 'var(--text-lg)'
+      : vlen <= 6
+        ? 'var(--text-3xl)'
+        : vlen <= 9
+          ? 'var(--text-2xl)'
+          : 'var(--text-xl)');
   return (
     <div
       style={{

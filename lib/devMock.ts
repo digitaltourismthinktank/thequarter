@@ -52,13 +52,14 @@ export function previewCall(path: string, method: string): Result | null {
   if (path.startsWith('bookings?action=spaces'))
     return ok({
       spaces: [
-        { id: 's1', name: 'The Board Room', type: 'Meeting room', capacity: 10, capacityLabel: '8–10', bookable: true, colour: null },
-        { id: 's2', name: 'The Hop Yard', type: 'Meeting room', capacity: 8, capacityLabel: '6–8', bookable: true, colour: null },
+        { id: 's1', name: 'The Knight’s Tale', type: 'Meeting room', capacity: 10, capacityLabel: '8–10', bookable: true, colour: null },
+        { id: 's2', name: 'The Chapter House', type: 'Meeting room', capacity: 4, capacityLabel: '4', bookable: true, colour: null },
         { id: 's3', name: 'The Bell Tower', type: 'Phone pod', capacity: 1, capacityLabel: '1', bookable: true, colour: null },
+        { id: 's4', name: 'The Scriptorium', type: 'Phone pod', capacity: 1, capacityLabel: '1', bookable: true, colour: null },
       ],
     });
   if (path.startsWith('bookings?action=mine'))
-    return ok({ bookings: [{ id: 'b1', date: addDays(t, 2), startMin: 540, endMin: 600, space: 's2', title: 'The Hop Yard' }] });
+    return ok({ bookings: [{ id: 'b1', date: addDays(t, 2), startMin: 540, endMin: 600, space: 's2', title: 'The Chapter House' }] });
   if (path.startsWith('bookings?action=availability'))
     return ok({ openMin: 480, closeMin: 1080, slotMin: 30, busy: [{ startMin: 600, endMin: 720 }] });
   if (path.startsWith('bookings?action=today')) return ok({ date: t, nowMin: 600, spaces: [], bookings: [] });

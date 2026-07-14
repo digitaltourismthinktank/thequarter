@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { AvailabilityCalendar, type AvailabilitySelection } from '@/components/ds/AvailabilityCalendar';
+import { useState, useEffect } from 'react';
+import { AvailabilityCalendar, type AvailabilitySelection, type SlotStatus } from '@/components/ds/AvailabilityCalendar';
 import { Badge } from '@/components/ds/Badge';
 import { Button } from '@/components/ds/Button';
 import { Select } from '@/components/ds/Select';
@@ -10,8 +10,31 @@ import { Icon } from '@/components/ds/Icon';
 import { Photo } from '@/components/site/primitives';
 import { MEETING_ROOMS } from '@/lib/rooms';
 import { getWeeklyAvailability } from '@/lib/availability';
+import { getSpaces, getAvailability } from '@/lib/booking';
+import { PREVIEW } from '@/lib/devMock';
 import { cn } from '@/lib/cn';
 import styles from './MeetingRoomsExplorer.module.css';
+
+const SLOTS = ['09:00', '10:00', '11:00', '12:00', '14:00', '15:00', '16:00'];
+const normName = (s: string) => s.toLowerCase().replace(/[‘’']/g, "'").replace(/\s+/g, ' ').trim();
+
+/** The next `n` weekdays (Mon–Fri) from today, with iso for fetching. */
+function upcomingWeekdays(n = 5) {
+  const out: { label: string; date: string; iso: string }[] = [];
+  const d = new Date();
+  while (out.length < n) {
+    const dow = d.getDay();
+    if (dow !== 0 && dow !== 6) {
+      out.push({
+        label: d.toLocaleDateString('en-GB', { weekday: 'short' }),
+        date: String(d.getDate()),
+        iso: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
+      });
+    }
+    d.setDate(d.getDate() + 1);
+  }
+  return out;
+}
 
 /* The Quarter — meeting-room availability explorer. Switch rooms, read this
    week's availability (fed by the lib/availability seam) and pick a slot; the
@@ -25,8 +48,38 @@ export function MeetingRoomsExplorer() {
   const [catering, setCatering] = useState(true);
 
   const room = MEETING_ROOMS[roomIdx];
-  const week = getWeeklyAvailability(room.slug);
+  const [week, setWeek] = useState(() => getWeeklyAvailability(MEETING_ROOMS[0].slug));
   const selectedKey = selection ? `${selection.dayIndex}-${selection.slotIndex}` : '';
+
+  // Mirror the real backend: reseed instantly, then resolve this room to its Airtable
+  // space, read this week's confirmed bookings per day, and paint busy vs available.
+  useEffect(() => {
+    setWeek(getWeeklyAvailability(room.slug));
+    if (PREVIEW) return;
+    let cancelled = false;
+    (async () => {
+      const spacesRes = await getSpaces();
+      if (cancelled || !spacesRes.ok) return;
+      const space = spacesRes.data.spaces.find((s) => normName(s.name) === normName(room.name));
+      if (!space) return;
+      const days = upcomingWeekdays(5);
+      const perDay = await Promise.all(days.map((d) => getAvailability(space.id, d.iso)));
+      if (cancelled) return;
+      const data: SlotStatus[][] = SLOTS.map((slot) => {
+        const sMin = Number(slot.slice(0, 2)) * 60;
+        const eMin = sMin + 60;
+        return days.map((_, di) => {
+          const r = perDay[di];
+          const busy = r.ok ? (r.data.busy || []).some((b) => sMin < b.endMin && eMin > b.startMin) : false;
+          return busy ? 'busy' : 'available';
+        });
+      });
+      setWeek({ weekLabel: 'This week', days: days.map((d) => ({ label: d.label, date: d.date })), slots: SLOTS, data });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [roomIdx, room.slug, room.name]);
 
   return (
     <div>
@@ -96,21 +149,24 @@ export function MeetingRoomsExplorer() {
               <div className={styles.slotMain}>
                 {selection ? `${selection.day.label} ${selection.day.date ?? ''} · ${selection.slot}` : 'Pick a slot from the grid'}
               </div>
-              <div className={styles.slotSub}>{selection ? 'Slot selected' : 'Free slots are tappable'}</div>
+              <div className={styles.slotSub}>{selection ? 'Slot selected' : 'Free slots are clickable'}</div>
             </div>
           </div>
 
           <Select label="Package" options={['Half day', 'Full day']} value={pkg} onChange={(e) => setPkg(e.target.value)} />
           <Checkbox
-            label="Add catering"
-            description="Lavazza, pastries & a healthy lunch platter"
+            label="Add lunch"
+            description="Baguettes & cake from The Sandwich Bar · £12 a head"
             checked={catering}
             onChange={() => setCatering((c) => !c)}
           />
 
           <div className={styles.totalRow}>
-            <span>Total</span>
-            <span className={styles.totalVal}>Quoted on enquiry</span>
+            <span>Room hire</span>
+            <span className={styles.totalVal}>
+              £{pkg === 'Half day' ? room.price.half : room.price.full}
+              {catering ? ' + lunch' : ''} · inc. VAT
+            </span>
           </div>
 
           <Button variant={selection ? 'accent' : 'primary'} fullWidth href="#enquire" iconAfter="arrow-right">

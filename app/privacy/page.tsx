@@ -107,13 +107,13 @@ export default function PrivacyPage() {
           <strong>Our membership and authentication provider</strong> — account sign-in and member records.
         </li>
         <li>
-          <strong>Intercom</strong> — member email, CRM and live chat.
+          <strong>Crisp</strong> — live chat with our team.
+        </li>
+        <li>
+          <strong>Resend</strong> — sending your booking, payment and account emails.
         </li>
         <li>
           <strong>Airtable</strong> — editing perks and events content.
-        </li>
-        <li>
-          <strong>Apple Wallet</strong> — your membership pass, where you add one.
         </li>
         <li>
           <strong>Cookie-Script</strong> — recording your cookie preferences.

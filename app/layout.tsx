@@ -1,10 +1,12 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import Script from 'next/script';
 import { DM_Sans } from 'next/font/google';
 import { SITE } from '@/lib/site';
 import { MEMBERSTACK_APP_ID } from '@/lib/memberstack';
 import { SiteHeader, SiteFooter } from '@/components/site/SiteChrome';
 import { JsonLd } from '@/components/site/JsonLd';
+import { TopProgress } from '@/components/site/TopProgress';
+import { PWARegister } from '@/components/site/PWARegister';
 import '@/styles/globals.css';
 
 /* DM Sans — the one family, self-hosted via next/font (no render-blocking
@@ -25,6 +27,7 @@ export const metadata: Metadata = {
   },
   description: SITE.description,
   applicationName: SITE.name,
+  appleWebApp: { capable: true, statusBarStyle: 'default', title: 'The Quarter' },
   icons: { icon: '/icon.png', apple: '/icon.png' },
   openGraph: {
     type: 'website',
@@ -43,6 +46,10 @@ export const metadata: Metadata = {
   },
 };
 
+export const viewport: Viewport = {
+  themeColor: '#1e1a15',
+};
+
 const LOCAL_BUSINESS = {
   '@context': 'https://schema.org',
   '@type': 'LocalBusiness',
@@ -57,21 +64,44 @@ const LOCAL_BUSINESS = {
   telephone: SITE.phone,
   address: {
     '@type': 'PostalAddress',
-    streetAddress: '1st Floor, 27–28 Burgate',
+    streetAddress: '1st & 2nd Floor, 27–28 Burgate',
     addressLocality: 'Canterbury',
     addressRegion: 'Kent',
     postalCode: 'CT1 2HA',
     addressCountry: 'GB',
   },
   areaServed: 'Canterbury',
+  priceRange: '££',
+  slogan: SITE.tagline,
+  geo: { '@type': 'GeoCoordinates', latitude: 51.2798, longitude: 1.0817 },
+  hasMap: 'https://www.google.com/maps?q=27-28+Burgate,+Canterbury,+CT1+2HA',
+  knowsAbout: ['Co-working', 'Meeting rooms', 'Registered office', 'Hot desking', 'Canterbury Cathedral Quarter'],
+  amenityFeature: [
+    { '@type': 'LocationFeatureSpecification', name: 'High-speed fibre WiFi', value: true },
+    { '@type': 'LocationFeatureSpecification', name: 'Meeting rooms', value: true },
+    { '@type': 'LocationFeatureSpecification', name: 'Phone pods', value: true },
+    { '@type': 'LocationFeatureSpecification', name: 'Free coffee & breakfast', value: true },
+    { '@type': 'LocationFeatureSpecification', name: 'Dog friendly', value: true },
+    { '@type': 'LocationFeatureSpecification', name: 'Registered office address', value: true },
+  ],
   openingHoursSpecification: [
     {
       '@type': 'OpeningHoursSpecification',
       dayOfWeek: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
-      opens: '08:00',
-      closes: '18:00',
+      opens: '09:00',
+      closes: '17:30',
     },
   ],
+};
+
+const WEBSITE = {
+  '@context': 'https://schema.org',
+  '@type': 'WebSite',
+  name: SITE.name,
+  url: SITE.url,
+  description: SITE.description,
+  publisher: { '@id': SITE.url },
+  inLanguage: 'en-GB',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -91,13 +121,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* Cookiescript — GDPR consent banner (gates non-essential cookies). The
             cookie-policy report script lives on the privacy page. */}
         <Script src="https://cdn.cookie-script.com/s/064e38604f7ba35680d8f547f21c404a.js" strategy="afterInteractive" />
-        {/* Intercom (DTTT messenger, ink-recoloured, launcher hidden — we use our own
-            "Talk to us" buttons). */}
-        <Script id="intercom" strategy="afterInteractive">{`
-          window.intercomSettings={app_id:"o3cs3sqo",api_base:"https://api-iam.intercom.io",hide_default_launcher:true,action_color:"#1E1A15",background_color:"#1E1A15",source:"the_quarter_site"};
-          (function(){var w=window;var ic=w.Intercom;if(typeof ic==="function"){ic('reattach_activator');ic('update',w.intercomSettings);}else{var d=document;var i=function(){i.c(arguments);};i.q=[];i.c=function(args){i.q.push(args);};w.Intercom=i;var l=function(){var s=d.createElement('script');s.type='text/javascript';s.async=true;s.src='https://widget.intercom.io/widget/o3cs3sqo';var x=d.getElementsByTagName('script')[0];x.parentNode.insertBefore(s,x);};if(document.readyState==='complete'){l();}else if(w.attachEvent){w.attachEvent('onload',l);}else{w.addEventListener('load',l,false);}}})();
+        {/* Crisp chat. The default launcher bubble is hidden; our own "Talk to us" /
+            "Chat to our team" buttons open it (and it re-hides when closed). */}
+        <Script id="crisp" strategy="afterInteractive">{`
+          window.$crisp=[];window.CRISP_WEBSITE_ID="9a243419-809f-4f2a-9a77-56bdff85cd0d";
+          window.$crisp.push(["safe", true]);
+          window.$crisp.push(["do", "chat:hide"]);
+          window.$crisp.push(["on", "chat:closed", function(){ window.$crisp.push(["do","chat:hide"]); }]);
+          (function(){var d=document,s=d.createElement("script");s.src="https://client.crisp.chat/l.js";s.async=1;d.getElementsByTagName("head")[0].appendChild(s);})();
         `}</Script>
         <JsonLd data={LOCAL_BUSINESS} />
+        <JsonLd data={WEBSITE} />
+        <PWARegister />
+        <TopProgress />
         <a href="#main" className="q-skip-link">
           Skip to content
         </a>

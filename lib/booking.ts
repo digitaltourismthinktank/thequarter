@@ -65,6 +65,7 @@ export interface CheckinStatus {
   length: 'Full' | 'Half' | null;
   balance: string | null;
   planned: { id: string; date: string; length: 'Full' | 'Half' }[];
+  requested?: { id: string; date: string; length: 'Full' | 'Half' }[];
 }
 
 // Bookings
@@ -80,12 +81,102 @@ export const createBooking = (b: { spaceId: string; date: string; start: string;
 export const cancelBooking = (bookingId: string) =>
   call<{ ok: boolean }>('bookings', { method: 'POST', body: { action: 'cancel', bookingId } });
 
+// Native paid room booking (public — anyone can book + pay a meeting room / pod).
+export interface RoomQuoteLine {
+  label: string;
+  amount: number;
+}
+export interface RoomQuote {
+  amountPence: number;
+  lines: RoomQuoteLine[];
+  start: string;
+  end: string;
+}
+export interface RoomIntent extends RoomQuote {
+  clientSecret: string;
+}
+export interface RoomBookingInput {
+  spaceId: string;
+  date: string;
+  /** Meeting rooms: 'am' | 'pm' | 'full'. Pods: a start time 'HH:MM'. */
+  pkg: string;
+  people?: number;
+  lunch?: boolean;
+  company?: string;
+  name?: string;
+  email?: string;
+}
+export const roomQuote = (b: RoomBookingInput) =>
+  call<RoomQuote>('room-booking', { method: 'POST', auth: false, body: { action: 'quote', ...b } });
+export const roomIntent = (b: RoomBookingInput) =>
+  call<RoomIntent>('room-booking', { method: 'POST', auth: false, body: { action: 'intent', ...b } });
+// Member free-booking (two main rooms, capped) — needs the member token (auth).
+export interface RoomMemberStatus {
+  capHours: number;
+  usedHours: number;
+  remaining: number;
+}
+export const roomMemberStatus = (date?: string) =>
+  call<RoomMemberStatus>('room-booking', { method: 'POST', body: { action: 'member-status', date } });
+export const roomMemberFree = (b: RoomBookingInput) =>
+  call<{ ok: boolean; id: string; remaining: number; capHours: number }>('room-booking', { method: 'POST', body: { action: 'member-free', ...b } });
+
+// Team-room privatisation (custom Stripe subscription, billed quarterly).
+export interface PrivatisationQuote {
+  monthly: number;
+  quarterly: number;
+  lines: RoomQuoteLine[];
+}
+export const privatisationQuote = (b: { roomSlug: string; frequency: string }) =>
+  call<PrivatisationQuote>('privatisation', { method: 'POST', auth: false, body: { action: 'quote', ...b } });
+export const privatisationCheckout = (b: {
+  roomSlug: string;
+  frequency: string;
+  days: number[];
+  startDate: string;
+  company: string;
+  name: string;
+  email: string;
+  members: number;
+}) => call<{ url: string }>('privatisation', { method: 'POST', auth: false, body: { action: 'checkout', ...b } });
+
+// Join with a chosen future start date (Stripe Checkout, trial-until start).
+export const joinWithStartDate = (b: { plan: string; term: 'monthly' | 'annual'; startDate?: string; email?: string }) =>
+  call<{ url: string }>('join', { method: 'POST', auth: false, body: b });
+
+// Public perks shopfront — the live Airtable perks (display fields only, no auth).
+export interface PublicPerk {
+  partner: string;
+  offer: string;
+  category: string;
+  days: string;
+  icon: string;
+}
+export const getPublicPerks = () => call<{ perks: PublicPerk[] }>('perks?public=1', { auth: false });
+
+// Push notifications (member).
+export const pushSubscribe = (subscription: unknown) =>
+  call<{ ok: boolean; configured?: boolean }>('push', { method: 'POST', body: { action: 'subscribe', subscription } });
+export const pushUnsubscribe = (endpoint: string) =>
+  call<{ ok: boolean }>('push', { method: 'POST', body: { action: 'unsubscribe', endpoint } });
+export const pushTest = () => call<{ ok: boolean }>('push', { method: 'POST', body: { action: 'test' } });
+
+// Book a tour (public, free).
+export interface TourSlot {
+  time: string;
+  available: boolean;
+}
+export const getTourSlots = (date: string) =>
+  call<{ date: string; slots: TourSlot[]; closed?: boolean }>(`tour?date=${date}`, { auth: false });
+export const bookTour = (b: { date: string; time: string; name: string; email: string; phone?: string; notes?: string }) =>
+  call<{ ok: boolean }>('tour', { method: 'POST', auth: false, body: b });
+
 // Check-in
 export const getCheckinToday = () => call<CheckinStatus>('checkin?action=today');
 export const checkInToday = (length: 'Full' | 'Half') =>
   call<{ ok: boolean; balance: string | null }>('checkin', { method: 'POST', body: { action: 'checkin', length } });
 export const reserveDay = (date: string, length: 'Full' | 'Half') =>
-  call<{ ok: boolean }>('checkin', { method: 'POST', body: { action: 'reserve', date, length } });
+  call<{ ok: boolean; requested?: boolean }>('checkin', { method: 'POST', body: { action: 'reserve', date, length } });
 export const cancelReservation = (id: string) =>
   call<{ ok: boolean }>('checkin', { method: 'POST', body: { action: 'cancel', id } });
 
@@ -172,6 +263,28 @@ export const adminCompanyBooking = (b: {
   notes?: string;
 }) => call<{ ok: boolean; id: string }>('admin', { method: 'POST', body: { action: 'company', ...b } });
 export const adminCancel = (id: string) => call<{ ok: boolean }>('admin', { method: 'POST', body: { action: 'cancelBooking', id } });
+// Close tours (independent of room blocks). Reopen via adminCancel(id).
+export interface TourBlock {
+  id: string;
+  date: string;
+  start: number;
+  end: number;
+  title: string;
+}
+export const adminGetTourBlocks = () => call<{ blocks: TourBlock[] }>('admin?action=tourBlocks');
+export const adminBlockTours = (b: { date: string; start?: string; end?: string }) =>
+  call<{ ok: boolean; id: string }>('admin', { method: 'POST', body: { action: 'blockTours', ...b } });
+// Weekend access requests (members request; staff approve/decline).
+export interface WeekendRequest {
+  id: string;
+  date: string;
+  name: string;
+  email: string;
+  length: string;
+}
+export const adminGetWeekendRequests = () => call<{ requests: WeekendRequest[] }>('admin?action=weekendRequests');
+export const adminApproveWeekend = (id: string) => call<{ ok: boolean }>('admin', { method: 'POST', body: { action: 'approveWeekend', id } });
+export const adminDeclineWeekend = (id: string) => call<{ ok: boolean }>('admin', { method: 'POST', body: { action: 'declineWeekend', id } });
 export const adminAdjustDays = (memberId: string, days: string) =>
   call<{ ok: boolean }>('admin', { method: 'POST', body: { action: 'adjustDays', memberId, days } });
 export const adminGrantPasses = (memberId: string, passes: number) =>
@@ -226,6 +339,7 @@ export interface MemberProfile {
   company: string | null;
   phone: string | null;
   bday: string | null;
+  roomHoursCap: number | null;
   points: number;
   daysIn: number;
   rewardsRedeemed: number;
@@ -240,6 +354,10 @@ export const adminAdjustPoints = (memberId: string, delta: number, reason: strin
   call<{ ok: boolean; balance: number }>('admin', { method: 'POST', body: { action: 'adjustPoints', memberId, delta, reason } });
 export const adminRedeemForMember = (memberId: string, rewardId: string) =>
   call<{ ok: boolean; balance: number; reward: string }>('admin', { method: 'POST', body: { action: 'redeemForMember', memberId, rewardId } });
+export const adminUpdateMember = (
+  memberId: string,
+  fields: { firstName?: string; lastName?: string; company?: string; phone?: string; meetingRoomHoursCap?: number | null },
+) => call<{ ok: boolean }>('admin', { method: 'POST', body: { action: 'updateMember', memberId, ...fields } });
 export const adminAssignPlan = (memberId: string, planId: string) =>
   call<{ ok: boolean }>('admin', { method: 'POST', body: { action: 'assignPlan', memberId, planId } });
 

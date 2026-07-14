@@ -17,7 +17,7 @@ export default function CodeOfConductPage() {
 
       <h2>Calls and noise</h2>
       <p>
-        Keep the main workspace calm. Take calls and video meetings in a phone booth or a flexi room, and pop your headphones on for anything with
+        Keep the main workspace calm. Take calls and video meetings in a phone pod, and pop your headphones on for anything with
         sound. A bit of friendly chatter is part of the place; a long speakerphone call in the open space isn&rsquo;t.
       </p>
 

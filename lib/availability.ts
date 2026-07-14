@@ -34,7 +34,7 @@ const B: SlotStatus = 'busy';
 const S: SlotStatus = 'soon';
 
 const PATTERNS: Record<string, SlotStatus[][]> = {
-  'the-board-room': [
+  'the-knights-tale': [
     [A, B, A, S, A],
     [B, A, A, B, A],
     [A, A, B, A, S],
@@ -42,15 +42,6 @@ const PATTERNS: Record<string, SlotStatus[][]> = {
     [A, S, A, B, A],
     [A, A, B, A, B],
     [A, B, A, A, A],
-  ],
-  'the-hop-yard': [
-    [B, A, A, A, S],
-    [A, A, B, A, A],
-    [A, B, A, S, A],
-    [A, A, A, B, B],
-    [S, A, B, A, A],
-    [A, B, A, A, A],
-    [B, A, A, S, A],
   ],
   'the-chapter-house': [
     [A, A, B, A, A],
@@ -63,7 +54,7 @@ const PATTERNS: Record<string, SlotStatus[][]> = {
   ],
 };
 
-const DEFAULT_PATTERN: SlotStatus[][] = PATTERNS['the-board-room'];
+const DEFAULT_PATTERN: SlotStatus[][] = PATTERNS['the-knights-tale'];
 
 export function getWeeklyAvailability(roomSlug: string): WeeklyAvailability {
   return {

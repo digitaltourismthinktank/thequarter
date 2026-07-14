@@ -5,14 +5,15 @@ import type { FormEvent } from 'react';
 import { Button } from '@/components/ds/Button';
 import { Icon } from '@/components/ds/Icon';
 import { MEETING_ROOMS } from '@/lib/rooms';
+import { PREVIEW } from '@/lib/devMock';
 import { cn } from '@/lib/cn';
 import styles from './EnquiryForm.module.css';
 
 /* The Quarter — enquiry / contact form.
-   Submits to Netlify Forms (no backend). The <form> is pre-rendered into the
-   static HTML so Netlify detects it at deploy; JS enhances it with an AJAX
-   submit + inline success state, and it still works without JS as a normal POST.
-   PHASE-2 SEAM: swap the submit handler for a live booking/CRM endpoint. */
+   Posts the fields as JSON to the `enquiry` Netlify Function, which emails ops
+   (reply-to the sender) via Resend and sends the sender an acknowledgement. A
+   honeypot field (bot-field) is checked server-side. In local preview the submit
+   is short-circuited to the success state (no function to call). */
 
 export interface EnquiryFormProps {
   formName?: string;
@@ -29,13 +30,29 @@ export function EnquiryForm({ formName = 'room-enquiry', defaultRoom = '', withR
     setStatus('submitting');
     const form = e.currentTarget;
     const data = new FormData(form);
-    data.set('form-name', formName);
+    const payload = {
+      formName,
+      name: String(data.get('name') || ''),
+      email: String(data.get('email') || ''),
+      room: String(data.get('room') || ''),
+      company: String(data.get('company') || ''),
+      preferred: String(data.get('preferred') || ''),
+      message: String(data.get('message') || ''),
+      'bot-field': String(data.get('bot-field') || ''),
+    };
+    // Local preview has no Functions — show the success state directly.
+    if (PREVIEW) {
+      setStatus('done');
+      form.reset();
+      return;
+    }
     try {
-      await fetch('/', {
+      const res = await fetch('/.netlify/functions/enquiry', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams(data as unknown as Record<string, string>).toString(),
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(payload),
       });
+      if (!res.ok) throw new Error('send-failed');
       setStatus('done');
       form.reset();
     } catch {
@@ -58,16 +75,8 @@ export function EnquiryForm({ formName = 'room-enquiry', defaultRoom = '', withR
   }
 
   return (
-    <form
-      name={formName}
-      method="POST"
-      data-netlify="true"
-      netlify-honeypot="bot-field"
-      onSubmit={handleSubmit}
-      className={cn(styles.form, className)}
-    >
-      {/* Netlify needs form-name in the POST body; honeypot catches bots. */}
-      <input type="hidden" name="form-name" value={formName} />
+    <form onSubmit={handleSubmit} className={cn(styles.form, className)}>
+      {/* Honeypot: bots fill this hidden field; the server ignores those submits. */}
       <p className={styles.hp}>
         <label>
           Don&rsquo;t fill this out if you&rsquo;re human: <input name="bot-field" tabIndex={-1} autoComplete="off" />
@@ -134,7 +143,7 @@ export function EnquiryForm({ formName = 'room-enquiry', defaultRoom = '', withR
       </div>
 
       {status === 'error' ? (
-        <p className={styles.errorMsg}>Something went wrong sending that. Please try again, or email hello@thequarter.example.</p>
+        <p className={styles.errorMsg}>Something went wrong sending that. Please try again, or email info@thequarter.work.</p>
       ) : null}
 
       <div className={styles.actions}>

@@ -16,9 +16,32 @@
  * Write, Customers: Read). Returns 503 until both are set.
  */
 import memberstackAdmin from '@memberstack/admin';
+import { sendEmail, emailShell, escapeHtml, OPS_EMAIL } from './_email.mjs';
 
 const MS_SECRET = process.env.MEMBERSTACK_SECRET_KEY;
 const STRIPE_SECRET = process.env.STRIPE_SECRET_KEY;
+
+/** Notify ops (info@) + the member about a plan change. Best-effort (no-op without Resend). */
+async function notifyPlanChange(member, email, what) {
+  const fn = String(member?.customFields?.['first-name'] || '').trim();
+  const memberCopy = {
+    paused: 'Your membership is paused — billing has stopped and your remaining days are frozen, safe for when you’re back. Resume any time from your account.',
+    resumed: 'Welcome back — your membership is active again, a fresh billing cycle starts today, and your frozen days have carried over.',
+    switched: 'Your plan change is set — it takes effect at your next renewal, with no mid-cycle charge.',
+  }[what];
+  const subject = { paused: 'Your membership is paused', resumed: 'Welcome back', switched: 'Your plan change is set' }[what];
+  await sendEmail({
+    to: OPS_EMAIL,
+    subject: `Plan change — ${what} (${email})`,
+    html: emailShell('Plan change', `<p><strong>${escapeHtml(email)}</strong> — ${escapeHtml(what)} their plan.</p>`, `A member ${what} their plan`),
+  });
+  await sendEmail({
+    to: email,
+    replyTo: OPS_EMAIL,
+    subject,
+    html: emailShell(what === 'resumed' ? 'Welcome back' : 'All set', `<p>Hi${fn ? ` ${escapeHtml(fn)}` : ''},</p><p>${escapeHtml(memberCopy)}</p>`, memberCopy),
+  });
+}
 
 /**
  * Prices we permit switching to — never trust a client-supplied price blindly.
@@ -120,12 +143,14 @@ export default async function handler(req) {
         'phases[1][iterations]': '1',
       });
       if (updated?.error) return json({ error: 'stripe', detail: updated.error.message }, 502);
+      await notifyPlanChange(member, email, 'switched');
       return json({ ok: true, effective: 'next-renewal' });
     }
 
     if (action === 'pause') {
       const updated = await stripe(`/v1/subscriptions/${sub.id}`, 'POST', { 'pause_collection[behavior]': 'void' });
       if (updated?.error) return json({ error: 'stripe', detail: updated.error.message }, 502);
+      await notifyPlanChange(member, email, 'paused');
       return json({ ok: true, paused: true });
     }
 
@@ -138,6 +163,7 @@ export default async function handler(req) {
       proration_behavior: 'none',
     });
     if (updated?.error) return json({ error: 'stripe', detail: updated.error.message }, 502);
+    await notifyPlanChange(member, email, 'resumed');
     return json({ ok: true, paused: false });
   } catch (err) {
     return json({ error: 'failed', detail: String(err?.message || err) }, 500);

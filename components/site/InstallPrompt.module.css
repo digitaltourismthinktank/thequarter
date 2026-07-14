@@ -1,0 +1,83 @@
+.card {
+  position: relative;
+  background: linear-gradient(155deg, #2a251e 0%, #1e1a15 60%, #14110d 100%);
+  color: var(--sand-50);
+  border: 1px solid var(--gold-500);
+  border-radius: var(--radius-xl);
+  padding: 20px 22px;
+  box-shadow: var(--shadow-gold);
+}
+.close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  color: var(--sand-50);
+  cursor: pointer;
+}
+.close:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+.head {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding-right: 28px;
+}
+.icon {
+  width: 46px;
+  height: 46px;
+  border-radius: var(--radius-md);
+  flex: none;
+}
+.title {
+  font-size: var(--text-lg);
+  font-weight: var(--fw-bold);
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+.sub {
+  margin: 3px 0 0;
+  font-size: var(--text-sm);
+  color: rgba(251, 248, 242, 0.7);
+}
+.benefits {
+  list-style: none;
+  margin: 14px 0 16px;
+  padding: 0;
+  display: grid;
+  gap: 7px;
+}
+.benefits li {
+  position: relative;
+  padding-left: 22px;
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  color: rgba(251, 248, 242, 0.9);
+}
+.benefits li::before {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--gold-400);
+}
+.ios {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: rgba(251, 248, 242, 0.9);
+}
+.ios strong {
+  color: var(--gold-300);
+}

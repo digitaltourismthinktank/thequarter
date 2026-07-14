@@ -19,6 +19,14 @@ export default async function handler(req) {
   if (!airtableReady() || !MS_SECRET) return json({ error: 'not-configured' }, 503);
 
   if (req.method === 'GET') {
+    // Public shopfront (no auth): the SAME live Airtable perks the members see, but
+    // only the safe display fields — no redemption/POS/authoriser data. Drives the
+    // public /perks grid so changing a partner in Airtable updates the site.
+    if (new URL(req.url).searchParams.get('public') === '1') {
+      const live = await listPerks({ liveOnly: true });
+      const perks = live.map((p) => ({ partner: p.partner, offer: p.offer, category: p.category, days: p.days, icon: p.icon }));
+      return json({ perks });
+    }
     const vm = await verifyMember(tokenFromRequest(req, null));
     if (!vm.ok) return json({ error: vm.reason }, 401);
     const perks = await listPerks();

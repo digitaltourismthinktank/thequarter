@@ -6,6 +6,7 @@ import { Button } from '@/components/ds/Button';
 import { Icon } from '@/components/ds/Icon';
 import { AvailabilityCalendar } from '@/components/ds/AvailabilityCalendar';
 import { EnquiryForm } from '@/components/site/EnquiryForm';
+import { RoomBooking } from '@/components/site/RoomBooking';
 import { MEETING_ROOMS, ROOM_SLUGS, getMeetingRoom } from '@/lib/rooms';
 import { getWeeklyAvailability } from '@/lib/availability';
 import styles from './room.module.css';
@@ -85,8 +86,8 @@ export default function RoomDetailPage({ params }: RoomParams) {
               ))}
             </ul>
             <div className={styles.actions}>
-              <Button variant="accent" href="#enquire" iconAfter="arrow-right">
-                Enquire to reserve
+              <Button variant="accent" href="#book" iconAfter="arrow-right">
+                Book &amp; pay online
               </Button>
               <span className={styles.feature}>
                 <Icon name="credit-card" size={16} color="var(--gold-600)" />
@@ -95,6 +96,17 @@ export default function RoomDetailPage({ params }: RoomParams) {
             </div>
           </div>
         </div>
+      </Section>
+
+      {/* Book & pay online */}
+      <Section tone="page" id="book">
+        <SectionHead
+          eyebrow="Book & pay online"
+          title={`Reserve ${room.name}`}
+          intro="Choose your date and package, add lunch if you’d like it, and pay securely by card or Apple Pay. Quiet-day rate (20% off hire on Mon, Wed & Fri) is applied automatically."
+          max={620}
+        />
+        <RoomBooking roomName={room.name} price={room.price} />
       </Section>
 
       {/* This week's availability */}

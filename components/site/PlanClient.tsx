@@ -5,7 +5,7 @@ import { Button } from '@/components/ds/Button';
 import { useMember, memberPlanSlug } from './useMember';
 import { PLANS, PLAN_STRIPE_PRICE, type PlanId } from '@/lib/plans';
 import { ANNUAL_PLANS, annualSaving } from '@/lib/rewards';
-import { getMemberToken, memberIsPaused, memberDaysRemaining, memberRenewalDate, memberHasPaymentIssue } from '@/lib/memberstack';
+import { memberIsPaused, memberDaysRemaining, memberRenewalDate, memberHasPaymentIssue } from '@/lib/memberstack';
 import { switchPlan, pausePlan, resumePlan, requestVatInvoice, getInvoices, type Invoice } from '@/lib/booking';
 import { CarnetCard } from './CarnetCard';
 import { CardUpdate } from './CardUpdate';
@@ -43,37 +43,14 @@ export function PlanClient() {
   async function requestVat() {
     setVatMsg(null);
     const r = await requestVatInvoice();
-    setVatMsg(r.ok ? 'Requested — we’ll email your VAT invoice shortly.' : 'Could not send the request — please try again.');
+    setVatMsg(
+      r.ok
+        ? 'Requested — our team will issue your VAT invoice within the next business day.'
+        : 'Could not send the request — please try again.',
+    );
   }
 
   const currentName = useMemo(() => (currentSlug ? PLANS.find((p) => p.id === currentSlug)?.name ?? null : null), [currentSlug]);
-
-  async function manageBilling() {
-    setBusy(true);
-    setErr(null);
-    try {
-      const token = await getMemberToken();
-      if (!token) {
-        setErr('Please log in again to manage billing.');
-        setBusy(false);
-        return;
-      }
-      const res = await fetch('/.netlify/functions/billing-portal', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
-        body: JSON.stringify({ token }),
-      });
-      const data = (await res.json().catch(() => ({}))) as { url?: string };
-      if (res.ok && data.url) {
-        window.location.assign(data.url);
-        return;
-      }
-      setErr('Could not open billing just now — please try again.');
-    } catch {
-      setErr('Could not open billing just now — please try again.');
-    }
-    setBusy(false);
-  }
 
   async function confirmPending() {
     if (!pending) return;
@@ -158,7 +135,7 @@ export function PlanClient() {
         <div className={styles.currentActions}>
           {paused ? (
             <Button variant="primary" size="sm" onClick={() => setPending({ kind: 'resume' })} disabled={busy}>
-              Resume membership
+              Resume {currentName ? `${currentName} ` : ''}membership
             </Button>
           ) : currentSlug ? (
             <Button variant="secondary" size="sm" onClick={() => setPending({ kind: 'pause' })} disabled={busy}>
@@ -245,17 +222,16 @@ export function PlanClient() {
             );
           })}
         </div>
-        <p className={styles.note}>
-          Switches take effect at your next renewal, with no mid-cycle charge. Prefer to do it yourself? Use “Manage card &amp; invoices”.
-        </p>
+        <p className={styles.note}>Switches take effect at your next renewal, with no mid-cycle charge.</p>
       </section>
+
+      <div style={{ marginTop: 18 }}>
+        <CarnetCard />
+      </div>
 
       <section className={styles.card}>
         <div className={styles.switchHead}>
           <h2 className={styles.h2}>Invoices</h2>
-          <button type="button" className={styles.linkBtn} onClick={manageBilling} disabled={busy}>
-            Open Stripe portal
-          </button>
         </div>
         {invoices.length ? (
           <div className={styles.invList}>
@@ -286,8 +262,6 @@ export function PlanClient() {
         )}
         <p className={styles.note}>Our prices include VAT. Need a formal VAT invoice? Use &ldquo;Request a VAT invoice&rdquo; above.</p>
       </section>
-
-      <CarnetCard />
     </div>
   );
 }

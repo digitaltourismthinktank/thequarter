@@ -1,7 +1,7 @@
 # The Quarter — Netlify build config.
-# Static export (next.config.mjs → output: 'export') outputs to `out/`,
-# served straight from Netlify's CDN. Netlify Forms picks up the enquiry/contact
-# forms automatically from the built HTML.
+# Static export (next.config.mjs → output: 'export') outputs to `out/`, served
+# straight from Netlify's CDN. The enquiry/contact forms POST to the `enquiry`
+# Netlify Function (Resend), not Netlify Forms.
 
 [build]
   command = "npm run build"
@@ -33,3 +33,72 @@
   from = "/i/*"
   to = "/i/"
   status = 200
+
+# --- Canonical host: apex → www (www is the primary domain), matching SITE.url +
+#     every page's canonical, so search engines consolidate on one host. ---
+[[redirects]]
+  from = "https://thequarter.work/*"
+  to = "https://www.thequarter.work/:splat"
+  status = 301
+  force = true
+
+# --- Legacy paths from the previous site → the new structure (301, so indexed old
+#     URLs + link equity carry over). Mapped from the OLD site's own sitemap.xml
+#     (/about, /spaces, /location keep the same path, so they need no redirect). ---
+[[redirects]]
+  from = "/pricing"
+  to = "/plans"
+  status = 301
+[[redirects]]
+  from = "/book-your-desk"
+  to = "/day-pass"
+  status = 301
+[[redirects]]
+  from = "/meetings"
+  to = "/meeting-rooms"
+  status = 301
+[[redirects]]
+  from = "/terms-conditions"
+  to = "/terms"
+  status = 301
+[[redirects]]
+  from = "/log-in"
+  to = "/login"
+  status = 301
+[[redirects]]
+  from = "/sign-up"
+  to = "/signup"
+  status = 301
+[[redirects]]
+  from = "/reset-password"
+  to = "/login"
+  status = 301
+[[redirects]]
+  from = "/update-password"
+  to = "/login"
+  status = 301
+[[redirects]]
+  from = "/access-denied"
+  to = "/login"
+  status = 301
+[[redirects]]
+  from = "/user-account"
+  to = "/dashboard"
+  status = 301
+[[redirects]]
+  from = "/dashboard/home"
+  to = "/dashboard"
+  status = 301
+[[redirects]]
+  from = "/p4g2m05n4r"
+  to = "/"
+  status = 301
+# Common inbound aliases (not in the old sitemap, but cheap insurance).
+[[redirects]]
+  from = "/contact"
+  to = "/location"
+  status = 301
+[[redirects]]
+  from = "/book-a-tour"
+  to = "/tour"
+  status = 301

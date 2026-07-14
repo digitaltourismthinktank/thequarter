@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { Icon, type IconName } from '@/components/ds/Icon';
 import { Button } from '@/components/ds/Button';
 import { useMember, memberPlanSlug } from './useMember';
@@ -10,6 +10,7 @@ import { getRewards, redeemReward, type RewardItem, type Redemption, type Birthd
 import { BirthdayCard } from './BirthdayCard';
 import { ReferFriendCard } from './ReferFriendCard';
 import { RedemptionSheet, type RedemptionInfo } from './RedemptionSheet';
+import { MemberShell } from './MemberShell';
 import styles from './RewardsClient.module.css';
 
 const reasonLabel: Record<string, string> = {
@@ -32,7 +33,12 @@ function fmtDate(iso: string | null): string {
   }
 }
 
-export function RewardsClient() {
+/**
+ * /rewards — the member points dashboard when signed in; the public marketing page
+ * (passed in, server-rendered, crawlable) for everyone else. Mirrors PerksClient so
+ * the same route is both the shopfront and the member view.
+ */
+export function RewardsClient({ marketing }: { marketing: ReactNode }) {
   const { loading: memberLoading, member } = useMember();
   const [points, setPoints] = useState(0);
   const [lifetime, setLifetime] = useState(0);
@@ -111,15 +117,11 @@ export function RewardsClient() {
     setSheet({ kind: 'reward', title: reward.title, partner: reward.partner, icon: reward.icon as IconName, pos: reward.pos, token: r.data.token });
   }
 
-  if (memberLoading) return <p className={styles.state}>Loading your rewards…</p>;
-  if (!member)
-    return (
-      <p className={styles.state}>
-        Please <a href="/login">log in</a> to see Quarter Rewards.
-      </p>
-    );
+  // Logged-out / still resolving → the public marketing page (server-rendered, crawlable).
+  if (memberLoading || !member) return <>{marketing}</>;
 
   return (
+    <MemberShell>
     <div className={styles.wrap}>
       <header className={styles.header}>
         <span className={styles.eyebrow}>Quarter Rewards</span>
@@ -302,5 +304,6 @@ export function RewardsClient() {
 
       <RedemptionSheet info={sheet} memberName={memberName} memberPlan={planName} onClose={() => setSheet(null)} />
     </div>
+    </MemberShell>
   );
 }

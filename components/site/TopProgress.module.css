@@ -1,0 +1,34 @@
+.bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 3px;
+  width: 8%;
+  background: var(--gold-500);
+  box-shadow: 0 0 10px var(--gold-400), 0 0 4px var(--gold-500);
+  z-index: 9999;
+  border-radius: 0 2px 2px 0;
+  animation: q-progress-grow 12s cubic-bezier(0.1, 0.7, 0.1, 1) forwards;
+}
+
+.bar[data-done='true'] {
+  width: 100%;
+  animation: none;
+  transition: width 0.18s ease, opacity 0.3s ease 0.12s;
+  opacity: 0;
+}
+
+@keyframes q-progress-grow {
+  0% {
+    width: 6%;
+  }
+  40% {
+    width: 55%;
+  }
+  75% {
+    width: 82%;
+  }
+  100% {
+    width: 93%;
+  }
+}

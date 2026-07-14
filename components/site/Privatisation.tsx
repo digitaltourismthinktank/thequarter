@@ -1,0 +1,211 @@
+'use client';
+
+import { useEffect, useMemo, useState } from 'react';
+import { Button } from '@/components/ds/Button';
+import { Icon } from '@/components/ds/Icon';
+import { Photo } from '@/components/site/primitives';
+import { PRIVATISATION_ROOMS, FREQUENCIES, WEEKDAYS, PRIVATISATION_MIN_MEMBERS, quarterlyAmount, type FrequencyId } from '@/lib/privatisation';
+import { privatisationCheckout } from '@/lib/booking';
+import { PREVIEW } from '@/lib/devMock';
+import styles from './Privatisation.module.css';
+
+const money = (n: number) => `£${n.toLocaleString('en-GB')}`;
+
+const ERRORS: Record<string, string> = {
+  'already-privatised': 'One team room is already privatised — only one runs at a time, so two stay open. Do get in touch and we’ll find you a date.',
+  'min-members': `Privatisation is for teams of ${PRIVATISATION_MIN_MEMBERS} or more.`,
+  'days-mismatch': 'Please pick the number of days that matches your chosen frequency.',
+  'bad-email': 'Please enter a valid email address.',
+  'missing-company': 'Please add your company name.',
+  'bad-date': 'Please choose a start date.',
+  'not-configured': 'Online setup is being finalised — please enquire and we’ll set you up.',
+};
+
+export function Privatisation() {
+  const [done, setDone] = useState(false);
+  const [roomSlug, setRoomSlug] = useState(PRIVATISATION_ROOMS[0].slug);
+  const [frequency, setFrequency] = useState<FrequencyId>('one');
+  const [days, setDays] = useState<number[]>([]);
+  const [startDate, setStartDate] = useState('');
+  const [company, setCompany] = useState('');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [members, setMembers] = useState(PRIVATISATION_MIN_MEMBERS);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('done') === '1') setDone(true);
+  }, []);
+
+  const room = useMemo(() => PRIVATISATION_ROOMS.find((r) => r.slug === roomSlug)!, [roomSlug]);
+  const freq = useMemo(() => FREQUENCIES.find((f) => f.id === frequency)!, [frequency]);
+  const monthly = room.monthly[frequency];
+  const quarterly = quarterlyAmount(monthly);
+  const wholeWeek = frequency === 'all';
+
+  const todayStr = useMemo(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }, []);
+
+  function toggleDay(id: number) {
+    setDays((cur) => {
+      if (cur.includes(id)) return cur.filter((d) => d !== id);
+      if (cur.length >= freq.daysPerWeek) return [...cur.slice(1), id]; // keep to the frequency limit
+      return [...cur, id];
+    });
+  }
+
+  async function submit() {
+    setError(null);
+    if (!company.trim()) return setError(ERRORS['missing-company']);
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return setError(ERRORS['bad-email']);
+    if (members < PRIVATISATION_MIN_MEMBERS) return setError(ERRORS['min-members']);
+    if (!startDate) return setError(ERRORS['bad-date']);
+    if (!wholeWeek && days.length !== freq.daysPerWeek) return setError(ERRORS['days-mismatch']);
+    if (PREVIEW) {
+      setError('Checkout opens on the live site — this is a preview.');
+      return;
+    }
+    setBusy(true);
+    const r = await privatisationCheckout({
+      roomSlug,
+      frequency,
+      days: wholeWeek ? WEEKDAYS.map((d) => d.id) : days,
+      startDate,
+      company: company.trim(),
+      name: name.trim(),
+      email: email.trim(),
+      members,
+    });
+    setBusy(false);
+    if (r.ok && r.data.url) {
+      window.location.href = r.data.url;
+      return;
+    }
+    setError(ERRORS[r.data?.error ?? ''] ?? 'We couldn’t start checkout just now — please try again or enquire below.');
+  }
+
+  if (done) {
+    return (
+      <div className={styles.done}>
+        <span className={styles.doneIcon}>
+          <Icon name="check" size={26} color="var(--gold-700)" />
+        </span>
+        <h3 className={styles.doneTitle}>Welcome to The Quarter</h3>
+        <p className={styles.doneText}>
+          Your team room is reserved and your subscription is set up — invoiced quarterly. We’ve emailed your confirmation, and
+          we’ll be in touch to get everyone’s accounts ready.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className={styles.wrap}>
+      <div className={styles.formCol}>
+        <div className={styles.field}>
+          <span className={styles.label}>Which room?</span>
+          <div className={styles.roomRow}>
+            {PRIVATISATION_ROOMS.map((r) => (
+              <button key={r.slug} type="button" className={`${styles.room} ${roomSlug === r.slug ? styles.roomOn : ''}`} onClick={() => setRoomSlug(r.slug)}>
+                <strong>{r.name}</strong>
+                <span>Seats {r.capacity}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className={styles.field}>
+          <span className={styles.label}>How often?</span>
+          <div className={styles.freqRow}>
+            {FREQUENCIES.map((f) => (
+              <button
+                key={f.id}
+                type="button"
+                className={`${styles.freq} ${frequency === f.id ? styles.freqOn : ''}`}
+                onClick={() => {
+                  setFrequency(f.id);
+                  setDays([]);
+                }}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {!wholeWeek ? (
+          <div className={styles.field}>
+            <span className={styles.label}>
+              Which day{freq.daysPerWeek > 1 ? 's' : ''}? <span className={styles.hint}>pick {freq.daysPerWeek}</span>
+            </span>
+            <div className={styles.dayRow}>
+              {WEEKDAYS.map((d) => (
+                <button key={d.id} type="button" className={`${styles.day} ${days.includes(d.id) ? styles.dayOn : ''}`} onClick={() => toggleDay(d.id)}>
+                  {d.short}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        <div className={styles.grid2}>
+          <label className={styles.field}>
+            <span className={styles.label}>Start date</span>
+            <input type="date" className={styles.input} value={startDate} min={todayStr} onChange={(e) => setStartDate(e.target.value)} />
+          </label>
+          <label className={styles.field}>
+            <span className={styles.label}>Team size</span>
+            <input type="number" className={styles.input} min={PRIVATISATION_MIN_MEMBERS} max={30} value={members} onChange={(e) => setMembers(Math.max(1, Number(e.target.value) || 0))} />
+          </label>
+        </div>
+
+        <label className={styles.field}>
+          <span className={styles.label}>Company / organisation</span>
+          <input className={styles.input} value={company} onChange={(e) => setCompany(e.target.value)} />
+        </label>
+        <div className={styles.grid2}>
+          <label className={styles.field}>
+            <span className={styles.label}>Your name</span>
+            <input className={styles.input} value={name} onChange={(e) => setName(e.target.value)} />
+          </label>
+          <label className={styles.field}>
+            <span className={styles.label}>Email</span>
+            <input type="email" className={styles.input} value={email} onChange={(e) => setEmail(e.target.value)} />
+          </label>
+        </div>
+      </div>
+
+      <aside className={styles.summary}>
+        <div style={{ marginBottom: 4 }}>
+          <Photo src={room.photo.src} alt={room.photo.alt} ratio="16 / 10" radius="var(--radius-lg)" sizes="(max-width: 820px) 100vw, 380px" />
+        </div>
+        <h3 className={styles.sumTitle}>{room.name}</h3>
+        <p className={styles.sumSub}>
+          {freq.label} · {wholeWeek ? 'full week' : days.length ? WEEKDAYS.filter((d) => days.includes(d.id)).map((d) => d.short).join(', ') : 'pick your days'}
+        </p>
+        <div className={styles.priceBlock}>
+          <div className={styles.priceMain}>
+            {money(monthly)} <small>/ month</small>
+          </div>
+          <div className={styles.priceQuarter}>Billed quarterly · {money(quarterly)} every 3 months</div>
+        </div>
+        <ul className={styles.perks}>
+          <li>The whole room, yours on your days</li>
+          <li>Every seat included — your team keep their own accounts &amp; check in</li>
+          <li>All the usual: breakfast, coffee, fibre, pods &amp; perks</li>
+          <li>Minimum {PRIVATISATION_MIN_MEMBERS} members · invoiced quarterly</li>
+        </ul>
+        <Button variant="accent" fullWidth onClick={submit} disabled={busy} iconAfter="arrow-right">
+          {busy ? 'Starting…' : 'Set up & pay'}
+        </Button>
+        {error ? <p className={styles.err}>{error}</p> : null}
+        <p className={styles.note}>
+          Rather talk first? <a href="/location#contact">Get in touch</a> and we’ll walk you through it.
+        </p>
+      </aside>
+    </div>
+  );
+}

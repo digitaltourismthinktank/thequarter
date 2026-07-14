@@ -1,0 +1,36 @@
+.card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 16px;
+  background: var(--gold-100);
+  border: 1px solid var(--gold-300);
+  border-radius: var(--radius-lg);
+}
+.card[data-state='done'] {
+  color: var(--ink-900);
+  font-size: var(--text-sm);
+}
+.dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--gold-500);
+  box-shadow: 0 0 0 4px var(--gold-200);
+}
+.text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
+}
+.text strong {
+  font-size: var(--text-sm);
+  color: var(--ink-900);
+}
+.text span {
+  font-size: var(--text-xs);
+  color: var(--stone-700);
+}

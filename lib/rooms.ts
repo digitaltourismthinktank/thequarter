@@ -27,80 +27,64 @@ export interface MeetingRoom {
   features: RoomFeatureItem[];
   specs: RoomSpec[];
   priceNote: string;
+  /** Package prices, £ inc-VAT (for the native booking + display). */
+  price: { half: number; full: number };
 }
 
-const PACKAGES = 'Half & full-day packages';
+/** Lunch add-on (The Sandwich Bar: baguette + cake), £ inc-VAT per head. */
+export const LUNCH_ADD_ON = { label: 'Lunch (baguette & cake)', perHead: 12 };
+/** 20% off room hire on quiet days — openly marketed. Lunch stays full price. */
+export const QUIET_DAYS = [1, 3, 5]; // Mon, Wed, Fri (0=Sun)
+export const QUIET_DAY_DISCOUNT = 0.2;
 
 export const MEETING_ROOMS: MeetingRoom[] = [
   {
-    slug: 'the-board-room',
-    name: 'The Board Room',
+    slug: 'the-knights-tale',
+    name: 'The Knight’s Tale',
     capacity: '8–10',
     status: 'available',
     blurb: 'Hybrid-ready boardroom for the meetings that matter, with plug-and-play A/V on the wall.',
     description:
-      'Our largest room, made for the meetings that matter. A long table, a wall-mounted screen and plug-and-play hybrid A/V mean you can have the room and the call in equal measure. Add catering and we’ll look after the rest.',
+      'Our largest room, made for the meetings that matter. A long table, a wall-mounted screen and plug-and-play hybrid A/V mean you can have the room and the call in equal measure. Add lunch and we’ll look after the rest.',
     photo: PHOTOS.boardroom,
     features: [
       { icon: 'monitor', label: 'Hybrid-ready A/V' },
       { icon: 'users', label: 'Seats 8–10' },
     ],
     specs: [
-      { label: 'Capacity', value: '8–10 people' },
+      { label: 'Capacity', value: 'Up to 8–10 people' },
       { label: 'A/V', value: 'Hybrid-ready, plug-and-play' },
       { label: 'Display', value: 'Wall-mounted screen' },
       { label: 'Connectivity', value: 'Fibre internet' },
       { label: 'Layout', value: 'Boardroom' },
-      { label: 'Catering', value: 'Lavazza, pastries & lunch on request' },
+      { label: 'Catering', value: 'Lunch add-on on request' },
     ],
-    priceNote: PACKAGES,
-  },
-  {
-    slug: 'the-hop-yard',
-    name: 'The Hop Yard',
-    capacity: '6–8',
-    status: 'soon',
-    statusLabel: 'Free at 14:00',
-    blurb: 'A high-spec meeting room with warmth and character. Made for focused, creative work.',
-    description:
-      'A high-spec room with warmth and character — the right size for a workshop, a pitch or a half-day of focused, creative work. Plug-and-play A/V and fibre throughout, with catering whenever you need it.',
-    photo: PHOTOS.boardroom,
-    features: [
-      { icon: 'monitor', label: 'Plug-and-play A/V' },
-      { icon: 'wifi', label: 'Fibre' },
-    ],
-    specs: [
-      { label: 'Capacity', value: '6–8 people' },
-      { label: 'A/V', value: 'Plug-and-play' },
-      { label: 'Display', value: 'Screen & screen-share' },
-      { label: 'Connectivity', value: 'Fibre internet' },
-      { label: 'Layout', value: 'Flexible' },
-      { label: 'Catering', value: 'Lavazza, pastries & lunch on request' },
-    ],
-    priceNote: PACKAGES,
+    priceNote: 'From £144 half-day · £240 full-day (inc. VAT)',
+    price: { half: 144, full: 240 },
   },
   {
     slug: 'the-chapter-house',
     name: 'The Chapter House',
-    capacity: '4–6',
+    capacity: '4',
     status: 'busy',
     blurb: 'Our most intimate high-spec room, with the cathedral right there in the window.',
     description:
       'Our most intimate high-spec room, with the cathedral right there in the window. A round table for the conversations that need a little more closeness — interviews, one-to-ones and small, important meetings.',
     photo: PHOTOS.meetingWindow,
     features: [
-      { icon: 'users', label: 'Seats 4–6' },
+      { icon: 'users', label: 'Seats up to 4' },
       { icon: 'leaf', label: 'Cathedral view' },
     ],
     specs: [
-      { label: 'Capacity', value: '4–6 people' },
+      { label: 'Capacity', value: 'Up to 4 people' },
       { label: 'A/V', value: 'Plug-and-play' },
       { label: 'Display', value: 'Screen & screen-share' },
       { label: 'Connectivity', value: 'Fibre internet' },
       { label: 'Layout', value: 'Round table' },
-      { label: 'Catering', value: 'Lavazza, pastries & lunch on request' },
+      { label: 'Catering', value: 'Lunch add-on on request' },
     ],
-    priceNote: PACKAGES,
+    priceNote: 'From £90 half-day · £150 full-day (inc. VAT)',
+    price: { half: 90, full: 150 },
   },
 ];
 

@@ -13,9 +13,11 @@
 import memberstackAdmin from '@memberstack/admin';
 import { verifyMember, isAdmin, tokenFromRequest } from './_member.mjs';
 import { listRecords, createRecord, updateRecord, deleteRecord, T, F, airtableReady, esc } from './_airtable.mjs';
-import { londonWallClockToISO, isoToLondonMin, hhmmToMin, londonNow, holdReleased } from './_time.mjs';
+import { londonWallClockToISO, isoToLondonMin, isoToLondonDate, hhmmToMin, londonNow, holdReleased } from './_time.mjs';
 import { PLAN_NAMES, allowanceForMember, setMemberPlan, renewMember } from './_quarter-sync.mjs';
 import { listRewards, listPerks, listFloats, floatStatus, awardPoints, redeemReward, partnerPayouts, markPartnerPaid } from './_rewards.mjs';
+import { sendEmail, emailShell, escapeHtml, OPS_EMAIL } from './_email.mjs';
+import { pushToEmail } from './_push.mjs';
 
 const PERK_TYPES = ['Discount', 'On the house', 'Upgrade', 'Extra', 'Bundle', 'Priority', 'Welcome gift', 'Experience'];
 const FUNDINGS = ['inventory', 'partner', 'quarter'];
@@ -95,6 +97,7 @@ async function memberProfile(id) {
     company: md.company || null,
     phone: md.phone || null,
     bday: md.bday || null,
+    roomHoursCap: md.meetingRoomHoursCap ?? null,
     points: Math.max(0, Math.round(Number(md.points) || 0)),
     daysIn: checkins.length,
     rewardsRedeemed: redemptions.length,
@@ -192,6 +195,36 @@ export default async function handler(req) {
     if (action === 'rewards') return json({ rewards: await listRewards({ liveOnly: false }) });
     if (action === 'perks') return json({ perks: await listPerks({ liveOnly: false }) });
     if (action === 'floats') return json({ floats: await listFloats() });
+    if (action === 'weekendRequests') {
+      const today = londonNow().dateStr;
+      const recs = await listRecords(T.checkins, {
+        filterByFormula: `AND({Status}='Requested', DATETIME_FORMAT({Date}, 'YYYY-MM-DD')>='${esc(today)}')`,
+        sort: [{ field: 'Date' }],
+      });
+      const requests = recs.map((r) => ({
+        id: r.id,
+        date: isoToLondonDate(r.fields[F.checkins.date]),
+        name: r.fields[F.checkins.name] || '',
+        email: r.fields[F.checkins.email] || '',
+        length: r.fields[F.checkins.length] || 'Full',
+      }));
+      return json({ requests });
+    }
+    if (action === 'tourBlocks') {
+      const today = londonNow().dateStr;
+      const recs = await listRecords(T.bookings, {
+        filterByFormula: `AND({Status}='Confirmed', {Kind}='Tour block', DATETIME_FORMAT({Date}, 'YYYY-MM-DD')>='${esc(today)}')`,
+        sort: [{ field: 'Start' }],
+      });
+      const blocks = recs.map((r) => ({
+        id: r.id,
+        date: isoToLondonDate(r.fields[F.bookings.date]),
+        start: isoToLondonMin(r.fields[F.bookings.start]),
+        end: isoToLondonMin(r.fields[F.bookings.end]),
+        title: r.fields[F.bookings.title] || 'Tours closed',
+      }));
+      return json({ blocks });
+    }
     if (action === 'memberProfile') {
       const id = new URL(req.url).searchParams.get('id');
       if (!id) return json({ error: 'missing-id' }, 400);
@@ -304,11 +337,112 @@ export default async function handler(req) {
     return json({ ok: true });
   }
 
+  // Edit a member's details (fixes e.g. a wrong name on their record). Memberstack
+  // merges customFields by key, so we only touch the fields provided.
+  if (action === 'updateMember') {
+    if (!body.memberId) return json({ error: 'missing-member' }, 400);
+    const admin = memberstackAdmin.init(MS_SECRET);
+    const cf = {};
+    if (typeof body.firstName === 'string') cf['first-name'] = body.firstName.trim();
+    if (typeof body.lastName === 'string') cf['last-name'] = body.lastName.trim();
+    const data = {};
+    if (Object.keys(cf).length) data.customFields = cf;
+    if (typeof body.company === 'string' || typeof body.phone === 'string' || body.meetingRoomHoursCap !== undefined) {
+      const r = await admin.members.retrieve({ id: body.memberId });
+      const md = { ...(r?.data?.metaData || {}) };
+      if (typeof body.company === 'string') {
+        const c = body.company.trim();
+        if (c) md.company = c;
+        else delete md.company;
+      }
+      if (typeof body.phone === 'string') {
+        const p = body.phone.trim();
+        if (p) md.phone = p;
+        else delete md.phone;
+      }
+      // Per-member override for free meeting-room hours/month (blank/0 → default 4).
+      if (body.meetingRoomHoursCap !== undefined) {
+        const n = Number(body.meetingRoomHoursCap);
+        if (Number.isFinite(n) && n > 0) md.meetingRoomHoursCap = n;
+        else delete md.meetingRoomHoursCap;
+      }
+      data.metaData = md;
+    }
+    if (!Object.keys(data).length) return json({ error: 'nothing-to-update' }, 400);
+    await admin.members.update({ id: body.memberId, data });
+    return json({ ok: true });
+  }
+
   // Settle a partner's owed redemptions (running balance resets to zero).
   if (action === 'markPaid') {
     if (!body.partner) return json({ error: 'missing-partner' }, 400);
     const r = await markPartnerPaid(body.partner, body.month || undefined);
     return json({ ok: true, ...r });
+  }
+
+  // Approve or decline a member's weekend-access request (emails them the outcome).
+  if (action === 'approveWeekend' || action === 'declineWeekend') {
+    if (!body.id) return json({ error: 'missing-id' }, 400);
+    const recs = await listRecords(T.checkins, { filterByFormula: `RECORD_ID()='${esc(body.id)}'`, maxRecords: 1 });
+    const r = recs[0];
+    if (!r) return json({ error: 'not-found' }, 404);
+    const approve = action === 'approveWeekend';
+    await updateRecord(T.checkins, body.id, { [F.checkins.status]: approve ? 'Planned' : 'Cancelled' }, { typecast: true });
+    const email = r.fields[F.checkins.email];
+    const name = r.fields[F.checkins.name] || 'there';
+    const date = isoToLondonDate(r.fields[F.checkins.date]);
+    let when = date;
+    try {
+      when = new Date(`${date}T12:00:00Z`).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+    } catch {
+      /* keep iso */
+    }
+    if (email) {
+      await sendEmail(
+        approve
+          ? {
+              to: email,
+              replyTo: OPS_EMAIL,
+              subject: `Weekend access confirmed — ${when}`,
+              html: emailShell('Your weekend access is confirmed', `<p>Hi ${escapeHtml(name)},</p><p>Good news — you’re all set to come in on <strong>${escapeHtml(when)}</strong>. Just check in as usual when you arrive. See you then.</p>`, 'Your weekend access is confirmed'),
+            }
+          : {
+              to: email,
+              replyTo: OPS_EMAIL,
+              subject: `Weekend access — ${when}`,
+              html: emailShell('About that weekend', `<p>Hi ${escapeHtml(name)},</p><p>Sorry — we’re not able to open on <strong>${escapeHtml(when)}</strong> this time. Do get in touch and we’ll help you find another day.</p>`, 'An update on your weekend access request'),
+            },
+      );
+    }
+    if (approve && email) {
+      await pushToEmail(email, { title: 'Weekend access confirmed', body: `You’re set for ${when}. See you then.`, url: '/dashboard/' });
+    }
+    return json({ ok: true });
+  }
+
+  // Close tours for a whole day, or a set of hours — independent of room blocks.
+  if (action === 'blockTours') {
+    const date = String(body.date || '');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return json({ error: 'bad-date' }, 400);
+    const hasRange = /^\d{2}:\d{2}$/.test(body.start || '') && /^\d{2}:\d{2}$/.test(body.end || '');
+    const start = hasRange ? body.start : '09:30';
+    const end = hasRange ? body.end : '17:00';
+    if (hhmmToMin(start) >= hhmmToMin(end)) return json({ error: 'bad-range' }, 400);
+    const rec = await createRecord(
+      T.bookings,
+      {
+        [F.bookings.title]: hasRange ? `Tours closed ${start}–${end}` : 'Tours closed (all day)',
+        [F.bookings.date]: date,
+        [F.bookings.start]: londonWallClockToISO(date, start),
+        [F.bookings.end]: londonWallClockToISO(date, end),
+        [F.bookings.kind]: 'Tour block',
+        [F.bookings.status]: 'Confirmed',
+        [F.bookings.source]: 'Admin',
+        [F.bookings.notes]: 'Tours closed',
+      },
+      { typecast: true },
+    );
+    return json({ ok: true, id: rec.id });
   }
 
   // Manually check a member in for today (admin), deducting a day unless unlimited.

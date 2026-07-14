@@ -18,9 +18,41 @@ import { allowanceForMember } from './_quarter-sync.mjs';
 import { awardPoints, checkinBonusesThisMonth, earnBoostForMember, CHECKIN_BONUS, CHECKIN_QUIET_BONUS, CHECKIN_BONUS_CAP } from './_rewards.mjs';
 import { isQuietDay } from './_busyness.mjs';
 import { isClosedDay } from './_holidays.mjs';
+import { sendEmail, emailShell, escapeHtml, OPS_EMAIL } from './_email.mjs';
 
 const MS_SECRET = process.env.MEMBERSTACK_SECRET_KEY;
 const json = (b, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { 'content-type': 'application/json' } });
+
+/** Weekend (Sat/Sun) for a YYYY-MM-DD — weekend access is by request, not a given. */
+const isWeekend = (dateStr) => {
+  const d = new Date(`${dateStr}T00:00:00Z`).getUTCDay();
+  return d === 0 || d === 6;
+};
+const friendlyDate = (d) => {
+  try {
+    return new Date(`${d}T12:00:00Z`).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+  } catch {
+    return d;
+  }
+};
+async function sendWeekendRequestEmails({ email, name, date }) {
+  const when = friendlyDate(date);
+  await sendEmail({
+    to: email,
+    replyTo: OPS_EMAIL,
+    subject: 'Your weekend access request',
+    html: emailShell(
+      'Weekend access — request received',
+      `<p>Hi ${escapeHtml(name)},</p><p>Thanks — we’ve logged your request to come in on <strong>${escapeHtml(when)}</strong>. Weekends aren’t always staffed, so this one isn’t automatic — we’ll confirm by email as soon as we can.</p>`,
+      'We’ve received your weekend access request',
+    ),
+  });
+  await sendEmail({
+    to: OPS_EMAIL,
+    subject: `Weekend access requested — ${when} (${name})`,
+    html: emailShell('Weekend access requested', `<p><strong>${escapeHtml(name)}</strong> (${escapeHtml(email)}) has requested weekend access for <strong>${escapeHtml(when)}</strong>.</p><p>Approve or decline in Admin → Today.</p>`, 'A member requested weekend access'),
+  });
+}
 
 function parseDays(raw) {
   if (raw == null || String(raw).toLowerCase() === 'unlimited') return null;
@@ -69,12 +101,17 @@ export default async function handler(req) {
       filterByFormula: `AND({Member email}='${esc(email)}', {Status}='Planned', DATETIME_FORMAT({Date}, 'YYYY-MM-DD')>='${today}')`,
       sort: [{ field: 'Date' }],
     });
+    const requested = await listRecords(T.checkins, {
+      filterByFormula: `AND({Member email}='${esc(email)}', {Status}='Requested', DATETIME_FORMAT({Date}, 'YYYY-MM-DD')>='${today}')`,
+      sort: [{ field: 'Date' }],
+    });
     return json({
       date: today,
       checkedIn: !!active,
       length: active ? active.fields[F.checkins.length] : null,
       balance: vm.member.customFields?.['days-remaining'] ?? null,
       planned: planned.map((r) => ({ id: r.id, date: isoToLondonDate(r.fields[F.checkins.date]), length: r.fields[F.checkins.length] })),
+      requested: requested.map((r) => ({ id: r.id, date: isoToLondonDate(r.fields[F.checkins.date]), length: r.fields[F.checkins.length] })),
     });
   }
 
@@ -93,10 +130,15 @@ export default async function handler(req) {
   // Check in for TODAY (deducts unless unlimited). Idempotent per day.
   if (body.action === 'checkin') {
     const today = londonNow().dateStr;
-    // Weekends are allowed (members can use the space out of hours); bank-holiday
-    // and seasonal closures still block a check-in.
+    // Bank-holiday / seasonal closures block a check-in. Weekends are by REQUEST —
+    // you can only check in if staff approved your request (a Planned record exists).
     if (await isClosedDay(today)) return json({ error: 'closed-day' }, 400);
     const recs = await checkinsFor(email, today);
+    if (isWeekend(today)) {
+      const approved = recs.find((r) => r.fields[F.checkins.status] === 'Planned');
+      const pending = recs.find((r) => r.fields[F.checkins.status] === 'Requested');
+      if (!approved) return json({ error: pending ? 'weekend-pending' : 'weekend-request' }, 400);
+    }
     const already = recs.find((r) => r.fields[F.checkins.status] === 'Checked-in');
     if (already) {
       return json({ ok: true, alreadyCheckedIn: true, balance: me.customFields?.['days-remaining'] ?? null });
@@ -161,17 +203,25 @@ export default async function handler(req) {
     if (existing.some((r) => r.fields[F.checkins.status] !== 'Cancelled')) {
       return json({ ok: true, alreadyReserved: true });
     }
-    const rec = await createRecord(T.checkins, {
-      [F.checkins.ref]: `${name} · ${date}`,
-      [F.checkins.email]: email,
-      [F.checkins.name]: name,
-      [F.checkins.date]: date,
-      [F.checkins.length]: length,
-      [F.checkins.dayCost]: 0,
-      [F.checkins.status]: 'Planned',
-      [F.checkins.source]: 'Self',
-    });
-    return json({ ok: true, id: rec.id });
+    // Weekends are by request (not a given): create a 'Requested' record + notify staff.
+    // Weekdays reserve straight to 'Planned'.
+    const weekend = isWeekend(date);
+    const rec = await createRecord(
+      T.checkins,
+      {
+        [F.checkins.ref]: `${name} · ${date}`,
+        [F.checkins.email]: email,
+        [F.checkins.name]: name,
+        [F.checkins.date]: date,
+        [F.checkins.length]: length,
+        [F.checkins.dayCost]: 0,
+        [F.checkins.status]: weekend ? 'Requested' : 'Planned',
+        [F.checkins.source]: 'Self',
+      },
+      { typecast: true },
+    );
+    if (weekend) await sendWeekendRequestEmails({ email, name, date });
+    return json({ ok: true, id: rec.id, requested: weekend });
   }
 
   // Cancel an own Planned reservation.
@@ -181,7 +231,8 @@ export default async function handler(req) {
     const r = recs[0];
     if (!r) return json({ error: 'not-found' }, 404);
     if (r.fields[F.checkins.email] !== email) return json({ error: 'forbidden' }, 403);
-    if (r.fields[F.checkins.status] !== 'Planned') return json({ error: 'only-planned-cancellable' }, 400);
+    const st = r.fields[F.checkins.status];
+    if (st !== 'Planned' && st !== 'Requested') return json({ error: 'only-planned-cancellable' }, 400);
     await updateRecord(T.checkins, body.id, { [F.checkins.status]: 'Cancelled' });
     return json({ ok: true });
   }

@@ -9,15 +9,15 @@ import styles from './about.module.css';
 export const metadata: Metadata = {
   title: 'About',
   description:
-    'The Quarter is a boutique coworking home in Canterbury’s Cathedral Quarter, run by the Digital Tourism Think Tank as a considered sideline. Warmth wins.',
+    'The Quarter is a boutique co-working home in Canterbury’s Cathedral Quarter, run by SE1 Media. Going to work here feels like coming home.',
   alternates: { canonical: '/about' },
 };
 
 const VALUES: { icon: IconName; title: string; text: string }[] = [
   {
     icon: 'coffee',
-    title: 'Warmth wins',
-    text: 'Where “slick” and “warm” pull against each other, warmth wins. Hospitality-grade, never tech-startup.',
+    title: 'Like coming home',
+    text: 'Going to work at The Quarter should feel like coming home — a friendly welcome, familiar faces and none of the isolation of the spare room.',
   },
   {
     icon: 'sparkles',
@@ -27,7 +27,7 @@ const VALUES: { icon: IconName; title: string; text: string }[] = [
   {
     icon: 'leaf',
     title: 'An escape from home',
-    text: 'A reason to leave the spare room — natural light, real people and a proper change of scene.',
+    text: 'A reason to leave the spare room — natural light, real people and a proper change of scenery.',
   },
 ];
 
@@ -40,11 +40,11 @@ export default function AboutPage() {
           <Badge tone="gold" icon="map-pin">
             Cathedral Quarter, Canterbury
           </Badge>
-          <h1 className={styles.h1}>A considered sideline, run with care</h1>
+          <h1 className={styles.h1}>Going to work that feels like coming home</h1>
           <p className={styles.lead}>
-            The Quarter is a boutique coworking home on the first floor of a renovated building in Canterbury&rsquo;s
-            Cathedral Quarter — run by the Digital Tourism Think Tank, for people who want warmth, human contact and a
-            change of scene.
+            The Quarter is a boutique co-working home across the first and second floors of a lovingly renovated building
+            in Canterbury&rsquo;s Cathedral Quarter — run by SE1 Media, for people who want warmth, human contact and a
+            change of scenery.
           </p>
         </div>
       </Section>
@@ -61,8 +61,8 @@ export default function AboutPage() {
               we wanted to spend our own days in, opened up to a community of people who feel the same.
             </p>
             <p className={styles.featureText}>
-              Renovated in 2025, it&rsquo;s fresh, full of light and full of plants, with the cathedral right there in the
-              window of the café. Come for the view and the breakfast; stay for the people.
+              Renovated between 2023 and 2025, it&rsquo;s fresh, full of light and full of plants, with the Cathedral right
+              there in the window of the café. Come for the view and the breakfast; stay for the people.
             </p>
           </div>
         </div>
@@ -75,11 +75,27 @@ export default function AboutPage() {
             <Eyebrow>Plantspiration</Eyebrow>
             <h2 className={styles.featureTitle}>A little plantspiration</h2>
             <p className={styles.featureText}>
-              Greenery runs throughout, the light pours in, and the day starts with a daily healthy breakfast and Lavazza
+              Greenery runs throughout, the light pours in, and the day starts with a daily breakfast and bean-to-cup
               coffee. It&rsquo;s the kind of place you actually want to spend your day — calm, cared-for and quietly alive.
             </p>
           </div>
           <Photo src={PHOTOS.cafe.src} alt={PHOTOS.cafe.alt} ratio="5 / 4" sizes="(max-width: 900px) 100vw, 600px" />
+        </div>
+      </Section>
+
+      {/* Dog friendly — Marmaduke */}
+      <Section tone="page">
+        <div className={styles.split}>
+          <div>
+            <Eyebrow>Dog friendly</Eyebrow>
+            <h2 className={styles.featureTitle}>Meet Marmaduke, our Chief Happiness Officer</h2>
+            <p className={styles.featureText}>
+              We&rsquo;re proudly dog-friendly — well-behaved four-legged colleagues are always welcome. Chief among them is
+              Marmaduke, our resident pug and self-appointed Chief Happiness Officer, who takes his morning-greeting and
+              lap-warming duties very seriously. Bring yours along; they&rsquo;ll be in good company.
+            </p>
+          </div>
+          <Photo src={PHOTOS.marmaduke.src} alt={PHOTOS.marmaduke.alt} ratio="5 / 4" sizes="(max-width: 900px) 100vw, 600px" />
         </div>
       </Section>
 
@@ -105,15 +121,15 @@ export default function AboutPage() {
           <SectionHead
             align="center"
             title="Come and see what we’ve built"
-            intro="Book a Day Pass and spend a morning with us. We think you’ll want to stay."
+            intro="The best way to feel the place is to visit. Book a tour, or spend a morning on a Day Pass — we think you’ll want to stay."
             max={560}
           />
           <div className={styles.closingActions}>
-            <Button size="lg" variant="primary" href="/day-pass" iconAfter="arrow-right">
-              Book a Day Pass
+            <Button size="lg" variant="primary" href="/tour" iconAfter="arrow-right">
+              Book a tour
             </Button>
-            <Button size="lg" variant="secondary" href="/location">
-              Find us
+            <Button size="lg" variant="secondary" href="/day-pass">
+              Book a Day Pass
             </Button>
           </div>
         </div>

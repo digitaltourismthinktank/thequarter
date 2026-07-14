@@ -14,12 +14,18 @@ import styles from './home.module.css';
 
 const PLANTSPIRATION: [IconName, string][] = [
   ['leaf', 'Plants throughout'],
-  ['coffee', 'Daily breakfast & Lavazza'],
+  ['coffee', 'Daily breakfast & bean-to-cup coffee'],
   ['users', 'A real community'],
 ];
 
+const REWARD_STEPS: { icon: IconName; label: string }[] = [
+  { icon: 'door-open', label: 'Check in, earn points' },
+  { icon: 'sparkles', label: 'A little more on quiet days' },
+  { icon: 'gift', label: 'Spend them around the corner' },
+];
+
 export default function HomePage() {
-  const boardRoom = MEETING_ROOMS[0];
+  const featuredRoom = MEETING_ROOMS[0];
   return (
     <>
       {/* HERO */}
@@ -36,7 +42,7 @@ export default function HomePage() {
             than a workspace
           </h1>
           <p className={styles.heroLead}>
-            A boutique coworking home above Canterbury&rsquo;s Cathedral Quarter. Come for the warmth, the natural light
+            A boutique co-working home above Canterbury&rsquo;s Cathedral Quarter. Come for the warmth, the natural light
             and the breakfast — find your focus, and an escape from home.
           </p>
           <div className={styles.heroActions}>
@@ -47,6 +53,13 @@ export default function HomePage() {
               See the spaces
             </Button>
           </div>
+          <p style={{ marginTop: 16, fontSize: 'var(--text-sm)', color: 'rgba(255,255,255,0.85)' }}>
+            Want to see it first?{' '}
+            <a href="/tour" style={{ color: '#fff', fontWeight: 600, textDecoration: 'underline', textUnderlineOffset: 2 }}>
+              Book a free tour
+            </a>
+            .
+          </p>
         </div>
       </section>
 
@@ -95,7 +108,7 @@ export default function HomePage() {
               dark
               eyebrow="Meeting rooms"
               title="The room that makes the meeting"
-              intro="Two high-spec rooms and a hybrid-ready boardroom, with plug-and-play A/V and catering on request. Check this week’s availability and reserve in a couple of taps."
+              intro="Two high-spec rooms — including a hybrid-ready boardroom — with plug-and-play A/V and lunch on request. Check this week’s availability and book in a couple of clicks."
               max={520}
             />
             <div className={styles.heroActions}>
@@ -108,17 +121,36 @@ export default function HomePage() {
             </div>
           </div>
           <RoomCard
-            name={boardRoom.name}
-            blurb={boardRoom.blurb}
-            capacity={boardRoom.capacity}
-            features={boardRoom.features}
-            status={boardRoom.status}
-            statusLabel={boardRoom.statusLabel}
-            priceNote={boardRoom.priceNote}
-            imageSrc={boardRoom.photo.src}
-            imageAlt={boardRoom.photo.alt}
-            ctaHref={`/meeting-rooms/${boardRoom.slug}`}
+            name={featuredRoom.name}
+            blurb={featuredRoom.blurb}
+            capacity={featuredRoom.capacity}
+            features={featuredRoom.features}
+            status={featuredRoom.status}
+            statusLabel={featuredRoom.statusLabel}
+            priceNote={featuredRoom.priceNote}
+            imageSrc={featuredRoom.photo.src}
+            imageAlt={featuredRoom.photo.alt}
+            ctaHref={`/meeting-rooms/${featuredRoom.slug}`}
           />
+        </div>
+      </Section>
+
+      {/* REWARDS HOOK — the headline marketing draw */}
+      <Section tone="gold">
+        <SectionHead
+          align="center"
+          eyebrow="Quarter Rewards"
+          title="Work here, earn rewards to spend with local independents"
+          intro="Simply by spending time at The Quarter you earn points — and we turn them into treats at the independent shops, cafés and bars around us. Our way of saying thank you, and of keeping trade local."
+          max={640}
+        />
+        <div style={{ marginTop: 26, display: 'flex', justifyContent: 'center' }}>
+          <IncludedStrip items={REWARD_STEPS} />
+        </div>
+        <div style={{ marginTop: 28, display: 'flex', justifyContent: 'center' }}>
+          <Button size="lg" variant="primary" href="/rewards" iconAfter="arrow-right">
+            How rewards work
+          </Button>
         </div>
       </Section>
 
@@ -167,9 +199,9 @@ export default function HomePage() {
             <Eyebrow>Plantspiration</Eyebrow>
             <h2 className={styles.featureTitle}>Fresh, light and full of plants</h2>
             <p className={styles.featureText}>
-              Renovated in 2025, The Quarter feels fresh and full of life. Greenery runs throughout, the light pours in,
-              and the cathedral sits in the window of the café. It&rsquo;s the kind of place you actually want to spend
-              your day.
+              Lovingly renovated between 2023 and 2025, The Quarter feels fresh and full of life. Greenery runs
+              throughout, the light pours in, and the cathedral sits in the window of the café. It&rsquo;s the kind of
+              place you actually want to spend your day.
             </p>
             <div className={styles.featurePoints}>
               {PLANTSPIRATION.map(([icon, label]) => (

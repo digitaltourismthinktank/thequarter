@@ -4,6 +4,7 @@ import { Badge } from '@/components/ds/Badge';
 import { Button } from '@/components/ds/Button';
 import { Icon } from '@/components/ds/Icon';
 import { PlanCard } from '@/components/ds/PlanCard';
+import { StartLater } from '@/components/site/StartLater';
 import { PLANS } from '@/lib/plans';
 import { INCLUDED } from '@/lib/spaces';
 import { JsonLd } from '@/components/site/JsonLd';
@@ -12,14 +13,14 @@ import styles from './plans.module.css';
 export const metadata: Metadata = {
   title: 'Plans & pricing',
   description:
-    'Day Pass, Visitor, Resident, Citizen and the Hybrid Office — flexible coworking plans in Canterbury’s Cathedral Quarter. Prices include VAT.',
+    'Day Pass, Visitor, Resident, Citizen and the Hybrid Office — flexible co-working plans in Canterbury’s Cathedral Quarter. Prices include VAT.',
   alternates: { canonical: '/plans' },
 };
 
 const FAQS: [string, string][] = [
   [
     'Can I just try it for a day?',
-    'Yes — the Day Pass at £21.60 is our public way in. A full day with breakfast, coffee and the Flexi Rooms included.',
+    'Yes — the Day Pass at £21.60 is our public way in. A full day with breakfast, coffee and use of the phone pods included.',
   ],
   [
     'Do days roll over?',
@@ -27,11 +28,11 @@ const FAQS: [string, string][] = [
   ],
   [
     'What is the Hybrid Office?',
-    'A Canterbury mailing address plus twelve days a year in the space — for those who work from home but want a base in town. Billed annually.',
+    'A registered Canterbury office address plus twelve days a year in the space — for those who work from home but want a base in town. Billed annually.',
   ],
   [
     'How does meeting-room pricing work?',
-    'Quoted on enquiry, around half-day and full-day packages. Add catering — Lavazza, pastries and a healthy lunch — when you reserve.',
+    'Half-day and full-day packages: The Chapter House from £90 half-day / £150 full-day, The Knight’s Tale from £144 / £240 (inc. VAT). Add lunch — baguettes and cake — at £12 a head, and save 20% on room hire on our quieter days (Mon, Wed & Fri).',
   ],
 ];
 
@@ -43,7 +44,7 @@ export default function PlansPage() {
           align="center"
           eyebrow="Plans & pricing"
           title="Find the plan that fits your week"
-          intro="All prices include VAT. Every desk plan comes with fibre, ergonomic desks, plug-and-play A/V, a daily healthy breakfast, Lavazza coffee and access to the Flexi Rooms. Start with a Day Pass — the public way in."
+          intro="All prices include VAT. Every desk plan comes with fibre, a monitor at every desk, plug-and-play A/V, a daily breakfast, bean-to-cup coffee and use of the phone pods. Start with a Day Pass — the public way in."
           max={680}
         />
       </Section>
@@ -80,19 +81,30 @@ export default function PlansPage() {
             <Badge tone="gold">For teams</Badge>
             <h3 className={styles.teamsTitle}>Need a room, not a desk?</h3>
             <p className={styles.teamsText}>
-              Our meeting rooms are quoted on enquiry, around half-day and full-day packages with catering. Check live
-              availability and reserve, or send us a note.
+              Book a meeting room by the half or full day — or give your team a room of their own: privatise The Hop Yard
+              or The Vineyard on your days, everyone included, invoiced quarterly.
             </p>
             <div className={styles.teamsActions}>
-              <Button variant="accent" href="/meeting-rooms" iconAfter="arrow-right">
-                Meeting rooms
+              <Button variant="accent" href="/privatise" iconAfter="arrow-right">
+                Privatise a room
               </Button>
-              <Button variant="inverse" href="/location" icon="phone">
-                Enquire
+              <Button variant="inverse" href="/meeting-rooms">
+                Meeting rooms
               </Button>
             </div>
           </div>
         </div>
+      </Section>
+
+      {/* Start later */}
+      <Section tone="page">
+        <SectionHead
+          eyebrow="Not quite yet?"
+          title="Join now, start when it suits"
+          intro="Pick your plan and a start date — you’ll set up payment now, and your first invoice lands on the day you choose. Perfect if you’re between offices."
+          max={620}
+        />
+        <StartLater />
       </Section>
 
       {/* FAQ */}

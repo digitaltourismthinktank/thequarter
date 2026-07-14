@@ -5,6 +5,7 @@ import { Button } from '@/components/ds/Button';
 import { Icon, type IconName } from '@/components/ds/Icon';
 import { SpaceCard } from '@/components/ds/SpaceCard';
 import { RoomCard } from '@/components/ds/RoomCard';
+import { PodBooking } from '@/components/site/PodBooking';
 import { SPACES, INCLUDED } from '@/lib/spaces';
 import { MEETING_ROOMS } from '@/lib/rooms';
 import { PHOTOS } from '@/lib/media';
@@ -13,7 +14,7 @@ import styles from './spaces.module.css';
 export const metadata: Metadata = {
   title: 'The Spaces',
   description:
-    'The open workspace, the Flexi Rooms, three meeting rooms and the Quarter Café with its cathedral view — every corner of The Quarter in Canterbury’s Cathedral Quarter.',
+    'The open workspace, the phone pods, two meeting rooms and the Quarter Café with its Cathedral view — every corner of The Quarter in Canterbury’s Cathedral Quarter.',
   alternates: { canonical: '/spaces' },
 };
 
@@ -73,8 +74,8 @@ export default function SpacesPage() {
           </Badge>
           <h1 className={styles.h1}>The Spaces</h1>
           <p className={styles.lead}>
-            Open desks, private breakout rooms, high-spec meeting rooms and a café with the cathedral view. Every corner
-            renovated in 2025 and made to feel like home.
+            Open desks, private phone pods, high-spec meeting rooms and a café with the Cathedral view. Every corner
+            renovated between 2023 and 2025 and made to feel like home.
           </p>
         </div>
       </Section>
@@ -102,44 +103,70 @@ export default function SpacesPage() {
         <Feature
           eyebrow="The Open Workspace"
           title="Find your focus in the light"
-          body="Open desks in the main room, with fibre, ergonomic chairs and plug-and-play A/V at hand. Natural light pours in, plants run throughout, and there's the quiet hum of people getting good work done. Your day, your seat."
+          body="Open desks across three light-filled rooms — Dane John Gardens, The Vineyard and The Hop Yard — each with fibre, a monitor at every desk and plug-and-play A/V. Take any free seat: natural light pours in, plants run throughout, and there’s the quiet hum of people getting good work done."
           meta={[
-            { icon: 'users', label: 'Open seating' },
+            { icon: 'users', label: 'Three co-working rooms' },
             { icon: 'wifi', label: 'Fibre internet' },
             { icon: 'leaf', label: 'Plantspiration' },
           ]}
           photo={PHOTOS.mainSpace}
         />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16, marginTop: 'clamp(20px, 3vw, 32px)' }}>
+          {[
+            { p: PHOTOS.hopYard, cap: 'The Hop Yard — seats seven' },
+            { p: PHOTOS.vineyard, cap: 'The Vineyard — seats six' },
+          ].map((it) => (
+            <figure key={it.p.src} style={{ margin: 0 }}>
+              <Photo src={it.p.src} alt={it.p.alt} ratio="3 / 2" sizes="(max-width: 720px) 100vw, 460px" />
+              <figcaption style={{ marginTop: 8, fontSize: 'var(--text-sm)', color: 'var(--stone-700)' }}>{it.cap}</figcaption>
+            </figure>
+          ))}
+        </div>
       </Section>
 
-      {/* The Flexi Rooms */}
+      {/* The Phone Pods */}
       <Section tone="page" id="flexi">
         <Feature
           reverse
-          eyebrow="The Flexi Rooms · the Bell Tower & the Scriptorium"
+          eyebrow="The Phone Pods · the Bell Tower & the Scriptorium"
           title="A door to close when you need it"
-          body="Two slat-lined booths for a call, a catch-up or an hour of heads-down quiet — included with every desk plan. Drop in when you need a moment apart, then step back out into the room."
+          body="Two slat-lined booths for a call, a catch-up or an hour of heads-down quiet — included with every desk plan, or bookable on their own for a single meeting. Drop in when you need a moment apart, then step back out into the room."
           meta={[
-            { icon: 'door-open', label: 'Drop-in, no booking' },
+            { icon: 'door-open', label: 'Drop-in for members' },
             { icon: 'users', label: '1–2 people' },
           ]}
           photo={PHOTOS.flexi}
         />
+        <div style={{ marginTop: 'clamp(24px, 4vw, 40px)' }}>
+          <PodBooking />
+        </div>
       </Section>
 
       {/* The Quarter Café */}
       <Section tone="card" id="cafe">
         <Feature
           eyebrow="The Quarter Café"
-          title="The cathedral view, and the breakfast"
-          body="An open social space — not bookable, just ours to share. It's where the day starts with a daily healthy breakfast and Lavazza coffee, and where the community happens. The cathedral sits right there in the window."
+          title="The Cathedral view, and the breakfast"
+          body="An open social space — not bookable, just ours to share. The day starts here: a daily breakfast with yoghurts, cereals and, when they’re going, complimentary pastries and cakes; a bean-to-cup machine for a coffee made just how you like it, a big range of teas, and Arke still & sparkling water. Snip your own herbs from the Auk urban farm on the windowsill. It’s where the community happens — with the Cathedral right there in the window."
           meta={[
-            { icon: 'coffee', label: 'Lavazza & breakfast' },
-            { icon: 'leaf', label: 'Cathedral view' },
-            { icon: 'utensils', label: 'Not bookable — open to all members' },
+            { icon: 'coffee', label: 'Bean-to-cup, made your way' },
+            { icon: 'leaf', label: 'Herbs from the Auk urban farm' },
+            { icon: 'cake', label: 'Pastries & cakes, on us' },
           ]}
           photo={PHOTOS.cafe}
         />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginTop: 'clamp(20px, 3vw, 32px)' }}>
+          {[
+            { p: PHOTOS.urbanFarm, cap: 'Our little Auk urban farm — help yourself to fresh herbs' },
+            { p: PHOTOS.coffeeMachine, cap: 'Personalise your coffee, with syrups and cold drinks alongside' },
+            { p: PHOTOS.pastries, cap: 'Pastries & cakes, complimentary and subject to availability' },
+          ].map((it) => (
+            <figure key={it.p.src} style={{ margin: 0 }}>
+              <Photo src={it.p.src} alt={it.p.alt} ratio="4 / 3" sizes="(max-width: 720px) 100vw, 360px" />
+              <figcaption style={{ marginTop: 8, fontSize: 'var(--text-sm)', color: 'var(--stone-700)', lineHeight: 1.4 }}>{it.cap}</figcaption>
+            </figure>
+          ))}
+        </div>
       </Section>
 
       {/* Meeting rooms */}
@@ -147,7 +174,7 @@ export default function SpacesPage() {
         <SectionHead
           eyebrow="Meeting rooms"
           title="Rooms for the meetings that matter"
-          intro="A hybrid-ready boardroom and two high-spec rooms — half-day and full-day packages with catering. Check this week's availability and reserve, or send an enquiry."
+          intro="Two high-spec rooms — including a hybrid-ready boardroom — as half-day and full-day packages, with a lunch add-on and 20% off hire on quiet days. Check this week's availability and book, or send an enquiry."
           max={580}
         />
         <div className={styles.roomsList}>

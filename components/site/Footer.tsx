@@ -21,11 +21,23 @@ export function Footer() {
               className={styles.logoImg}
             />
             <p className={styles.tagline}>
-              So much more than a workspace. A boutique coworking home in Canterbury&rsquo;s Cathedral Quarter.
+              So much more than a workspace. A boutique co-working home in Canterbury&rsquo;s Cathedral Quarter.
             </p>
             <div className={styles.address}>
               <Icon name="map-pin" size={16} color="var(--gold-400)" />
               <span>{SITE.address}</span>
+            </div>
+            <a className={styles.address} href={`tel:${SITE.phone.replace(/[^0-9+]/g, '')}`}>
+              <Icon name="phone" size={16} color="var(--gold-400)" />
+              <span>{SITE.phone}</span>
+            </a>
+            <a className={styles.address} href={`mailto:${SITE.email}`}>
+              <Icon name="mail" size={16} color="var(--gold-400)" />
+              <span>{SITE.email}</span>
+            </a>
+            <div className={styles.address}>
+              <Icon name="clock" size={16} color="var(--gold-400)" />
+              <span>{SITE.hours}</span>
             </div>
             <div style={{ marginTop: 16 }}>
               <TalkToUs variant="solid" />

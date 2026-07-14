@@ -1,0 +1,26 @@
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  justify-content: center;
+  padding: 10px 14px;
+  font-size: var(--text-sm);
+  font-weight: var(--fw-semibold);
+  font-family: inherit;
+  color: var(--text-body);
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: border-color var(--duration-base) var(--ease-out);
+}
+.toggle:hover {
+  border-color: var(--gold-400);
+}
+.toggle[data-on='true'] {
+  color: var(--gold-700);
+  border-color: var(--gold-300);
+  background: var(--gold-100);
+  cursor: default;
+}

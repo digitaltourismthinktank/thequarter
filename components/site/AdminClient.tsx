@@ -19,6 +19,13 @@ import {
   adminExternal,
   adminCompanyBooking,
   adminCancel,
+  adminGetTourBlocks,
+  adminBlockTours,
+  type TourBlock,
+  adminGetWeekendRequests,
+  adminApproveWeekend,
+  adminDeclineWeekend,
+  type WeekendRequest,
   adminAdjustDays,
   adminGrantPasses,
   adminSetDoorCode,
@@ -47,6 +54,7 @@ import {
   adminAdjustPoints,
   adminRedeemForMember,
   adminAssignPlan,
+  adminUpdateMember,
   type AdminMember,
   type AdminBooking,
   type AdminSpace,
@@ -70,7 +78,7 @@ const ICON_CHOICES: IconName[] = [
   'activity', 'scissors', 'building', 'map-pin',
 ];
 /** Where events happen — a dropdown so venues stay consistent. */
-const EVENT_LOCATIONS = ['The Kentish Pantry', 'The Board Room', 'The Hop Yard', 'The Chapter House', 'The whole Quarter', 'Off-site'];
+const EVENT_LOCATIONS = ['The Kentish Pantry', 'The Knight’s Tale', 'The Chapter House', 'The Hop Yard', 'The Vineyard', 'The whole Quarter', 'Off-site'];
 /** Content categories for rewards + perks — a picker to avoid typos. */
 const CONTENT_CATEGORIES = ['Food & drink', 'Coffee & cake', 'Culture', 'Wellbeing', 'Getting here', 'Shopping', 'Services', 'Treats', 'Experiences'];
 
@@ -133,6 +141,17 @@ const EVENT_TIMES: string[] = (() => {
   for (let m = 7 * 60; m <= 22 * 60; m += 15) a.push(minToHHMM(m));
   return a;
 })();
+/** Whole days until a member's next birthday (from an 'MM-DD'), or null. */
+function daysToBirthday(bday: string | null): number | null {
+  if (!bday || !/^\d{2}-\d{2}$/.test(bday)) return null;
+  const [mm, dd] = bday.split('-').map(Number);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  let next = new Date(now.getFullYear(), mm - 1, dd);
+  if (next.getTime() < today.getTime()) next = new Date(now.getFullYear() + 1, mm - 1, dd);
+  return Math.round((next.getTime() - today.getTime()) / 86400000);
+}
+
 export function AdminClient() {
   const { loading, member } = useMember();
   const [tab, setTab] = useState<'today' | 'members' | 'rooms' | 'events' | 'content' | 'partners' | 'birthdays' | 'screens'>('today');
@@ -218,6 +237,26 @@ function MembersPane() {
   const [msg, setMsg] = useState<string | null>(null);
   const [q, setQ] = useState('');
   const [planFilter, setPlanFilter] = useState('All');
+  const [dismissed, setDismissed] = useState<Set<string>>(() => {
+    if (typeof window === 'undefined') return new Set();
+    try {
+      return new Set(JSON.parse(localStorage.getItem('q-attn-dismissed') || '[]'));
+    } catch {
+      return new Set();
+    }
+  });
+  function dismiss(key: string) {
+    setDismissed((prev) => {
+      const next = new Set(prev);
+      next.add(key);
+      try {
+        localStorage.setItem('q-attn-dismissed', JSON.stringify([...next]));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  }
   const [profileId, setProfileId] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
@@ -258,6 +297,18 @@ function MembersPane() {
     return `${m.name || ''} ${m.email || ''} ${m.company || ''}`.toLowerCase().includes(q.toLowerCase());
   });
 
+  // Members needing a look: card issue, VAT request pending, or a birthday within a week.
+  const attention = members
+    .flatMap((m) => {
+      const items: { m: AdminMember; key: string; label: string; danger?: boolean }[] = [];
+      if (m.paymentIssue) items.push({ m, key: `${m.id}:card`, label: 'Card issue', danger: true });
+      if (m.vatRequested) items.push({ m, key: `${m.id}:vat`, label: 'VAT invoice requested' });
+      const dtb = daysToBirthday(m.bday);
+      if (dtb != null && dtb <= 7) items.push({ m, key: `${m.id}:bday`, label: dtb === 0 ? 'Birthday today' : `Birthday in ${dtb}d` });
+      return items;
+    })
+    .filter((it) => !dismissed.has(it.key));
+
   return (
     <div>
       <div className={styles.mFilters}>
@@ -270,6 +321,31 @@ function MembersPane() {
           ))}
         </div>
       </div>
+
+      {attention.length > 0 ? (
+        <div style={{ border: '1px solid var(--gold-300)', background: 'var(--gold-100)', borderRadius: 'var(--radius-lg)', padding: '14px 16px', marginBottom: 16 }}>
+          <div style={{ fontSize: 'var(--text-xs)', fontWeight: 700, letterSpacing: 'var(--tracking-caps)', textTransform: 'uppercase', color: 'var(--gold-700)', marginBottom: 10 }}>
+            Needs attention · {attention.length}
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {attention.map((it) => (
+              <span
+                key={it.key}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'var(--surface-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-pill)', padding: '5px 6px 5px 12px', fontSize: 'var(--text-sm)' }}
+              >
+                <button type="button" onClick={() => setProfileId(it.m.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', font: 'inherit', color: 'var(--ink-900)', fontWeight: 600 }}>
+                  {it.m.name || it.m.email}
+                </button>
+                <span style={{ color: it.danger ? 'var(--danger)' : 'var(--gold-700)', fontSize: 'var(--text-xs)' }}>{it.label}</span>
+                <button type="button" onClick={() => dismiss(it.key)} aria-label="Dismiss" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 14, lineHeight: 1, padding: '2px 4px' }}>
+                  ✕
+                </button>
+              </span>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
       <p className={styles.count}>
         {filtered.length} {planFilter === 'All' ? 'members' : planFilter}
       </p>
@@ -365,6 +441,9 @@ function MemberProfileModal({
   const [planSel, setPlanSel] = useState('');
   const [passes, setPasses] = useState('');
   const [door, setDoor] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [capOverride, setCapOverride] = useState('');
   const [confirmAdjust, setConfirmAdjust] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -372,6 +451,12 @@ function MemberProfileModal({
   useEffect(() => {
     setDoor(doorCode ?? '');
   }, [doorCode]);
+  useEffect(() => {
+    const parts = (p?.name || '').trim().split(/\s+/).filter(Boolean);
+    setFirstName(parts[0] || '');
+    setLastName(parts.slice(1).join(' '));
+    setCapOverride(p?.roomHoursCap != null ? String(p.roomHoursCap) : '');
+  }, [p]);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -432,6 +517,19 @@ function MemberProfileModal({
       setMsg('Door code updated.');
       onChanged();
     } else setMsg('Could not update the door code.');
+  }
+  async function saveDetails() {
+    if (!id) return;
+    setBusy(true);
+    setMsg(null);
+    const cap = capOverride.trim() === '' ? null : Math.max(0, Number(capOverride) || 0);
+    const r = await adminUpdateMember(id, { firstName: firstName.trim(), lastName: lastName.trim(), meetingRoomHoursCap: cap });
+    setBusy(false);
+    if (r.ok) {
+      setMsg('Details updated.');
+      await load();
+      onChanged();
+    } else setMsg('Could not update details.');
   }
   async function redeem() {
     if (!rewardId || !id) return;
@@ -522,6 +620,28 @@ function MemberProfileModal({
                 <strong>{since}</strong>
                 <span>member since</span>
               </div>
+            </div>
+
+            <div className={styles.profSection}>
+              <span className={styles.profSectionTitle}>Edit details</span>
+              <div className={styles.formRow}>
+                <input className={styles.label} placeholder="First name" value={firstName} onChange={(e) => setFirstName(e.target.value)} aria-label="First name" />
+                <input className={styles.label} placeholder="Last name" value={lastName} onChange={(e) => setLastName(e.target.value)} aria-label="Last name" />
+                <input
+                  className={styles.dayInput}
+                  type="number"
+                  min={0}
+                  placeholder="4h"
+                  value={capOverride}
+                  onChange={(e) => setCapOverride(e.target.value)}
+                  aria-label="Free meeting-room hours per month"
+                  title="Free meeting-room hours per month (blank = default 4)"
+                />
+                <button type="button" className={styles.smallBtn} onClick={saveDetails} disabled={busy}>
+                  Save
+                </button>
+              </div>
+              <span className={styles.muted}>Fixes a wrong name; the number is their free meeting-room hours/month (blank = 4).</span>
             </div>
 
             <div className={styles.profSection}>
@@ -645,6 +765,103 @@ function MemberProfileModal({
   );
 }
 
+const TOUR_TIMES = (() => {
+  const out: string[] = [];
+  for (let m = 570; m <= 1020; m += 30) out.push(`${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`);
+  return out;
+})();
+
+/** Close public tours for a whole day or a set of hours — independent of room blocks. */
+function TourClosePanel() {
+  const [blocks, setBlocks] = useState<TourBlock[]>([]);
+  const [date, setDate] = useState('');
+  const [allDay, setAllDay] = useState(true);
+  const [start, setStart] = useState('09:30');
+  const [end, setEnd] = useState('17:00');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    const r = await adminGetTourBlocks();
+    if (r.ok) setBlocks(r.data.blocks);
+  }, []);
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  async function add() {
+    if (!date) return setMsg('Pick a date.');
+    if (!allDay && hhmmToMin(start) >= hhmmToMin(end)) return setMsg('End must be after start.');
+    setBusy(true);
+    setMsg(null);
+    const r = await adminBlockTours(allDay ? { date } : { date, start, end });
+    setBusy(false);
+    if (r.ok) {
+      setMsg('Tours closed for that time.');
+      setDate('');
+      await load();
+    } else setMsg('Could not close tours.');
+  }
+  async function reopen(id: string) {
+    setBusy(true);
+    await adminCancel(id);
+    setBusy(false);
+    await load();
+  }
+
+  return (
+    <div className={styles.panel}>
+      <span className={styles.panelTitle}>Close tours (independent of room blocks)</span>
+      <div className={styles.formRow}>
+        <input type="date" className={styles.select} value={date} onChange={(e) => setDate(e.target.value)} aria-label="Date" />
+        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 'var(--text-sm)' }}>
+          <input type="checkbox" checked={allDay} onChange={() => setAllDay((v) => !v)} /> All day
+        </label>
+        {!allDay ? (
+          <>
+            <select className={styles.select} value={start} onChange={(e) => setStart(e.target.value)} aria-label="From">
+              {TOUR_TIMES.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+            <span className={styles.to}>to</span>
+            <select className={styles.select} value={end} onChange={(e) => setEnd(e.target.value)} aria-label="To">
+              {TOUR_TIMES.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          </>
+        ) : null}
+        <button type="button" className={styles.smallBtn} onClick={add} disabled={busy}>
+          Close tours
+        </button>
+      </div>
+      {msg ? <p className={styles.muted}>{msg}</p> : null}
+      {blocks.length ? (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+          {blocks.map((b) => (
+            <span
+              key={b.id}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'var(--surface-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-pill)', padding: '5px 6px 5px 12px', fontSize: 'var(--text-sm)' }}
+            >
+              {b.date} · {b.title}
+              <button type="button" onClick={() => reopen(b.id)} aria-label="Reopen tours" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 14, lineHeight: 1, padding: '2px 4px' }}>
+                ✕
+              </button>
+            </span>
+          ))}
+        </div>
+      ) : (
+        <p className={styles.muted}>Tours are open on all upcoming weekdays.</p>
+      )}
+    </div>
+  );
+}
+
 function RoomsPane() {
   const [date, setDate] = useState<string>(() => firstWeekday());
   const [spaces, setSpaces] = useState<AdminSpace[]>([]);
@@ -752,6 +969,8 @@ function RoomsPane() {
   return (
     <div>
       <WeekStrip value={date} onSelect={setDate} />
+
+      <TourClosePanel />
 
       <div className={styles.panel}>
         <span className={styles.panelTitle}>Add a block, external or company booking</span>
@@ -870,6 +1089,56 @@ function RoomsPane() {
 }
 
 // ---------------------------------------------------------------- Today (admin home)
+/** Pending weekend-access requests — approve/decline (emails the member). Hidden when none. */
+function WeekendRequestsPanel() {
+  const [reqs, setReqs] = useState<WeekendRequest[]>([]);
+  const [busy, setBusy] = useState(false);
+  const load = useCallback(async () => {
+    const r = await adminGetWeekendRequests();
+    if (r.ok) setReqs(r.data.requests);
+  }, []);
+  useEffect(() => {
+    load();
+  }, [load]);
+  async function act(id: string, approve: boolean) {
+    setBusy(true);
+    await (approve ? adminApproveWeekend(id) : adminDeclineWeekend(id));
+    setBusy(false);
+    await load();
+  }
+  if (!reqs.length) return null;
+  const fmt = (iso: string) => {
+    try {
+      const [y, m, d] = iso.split('-').map(Number);
+      return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
+    } catch {
+      return iso;
+    }
+  };
+  return (
+    <div className={styles.panel} style={{ borderColor: 'var(--gold-300)', background: 'var(--gold-100)' }}>
+      <span className={styles.panelTitle}>Weekend access requests · {reqs.length}</span>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {reqs.map((q) => (
+          <div key={q.id} className={styles.formRow} style={{ alignItems: 'center' }}>
+            <span style={{ fontWeight: 600 }}>{q.name || q.email}</span>
+            <span className={styles.muted}>
+              {fmt(q.date)}
+              {q.length === 'Half' ? ' · ½' : ''}
+            </span>
+            <button type="button" className={styles.smallBtn} onClick={() => act(q.id, true)} disabled={busy}>
+              Approve
+            </button>
+            <button type="button" className={styles.smallBtn} onClick={() => act(q.id, false)} disabled={busy}>
+              Decline
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function AdminTodayPane({ onAllBirthdays }: { onAllBirthdays: () => void }) {
   const [offset, setOffset] = useState(0); // 0 = today, 1 = next open day
   const [custom, setCustom] = useState<string>(''); // a hand-picked day (overrides offset)
@@ -961,6 +1230,7 @@ function AdminTodayPane({ onAllBirthdays }: { onAllBirthdays: () => void }) {
 
   return (
     <div>
+      <WeekendRequestsPanel />
       <div className={styles.todayHead}>
         <div>
           <h2 className={styles.todayDate}>{dateLabel}</h2>
@@ -1498,7 +1768,7 @@ function PartnersPane() {
     <div>
       {/* Payouts — what we owe each partner for rewards we settle. Pick a month, pay
           from Starling, then mark it paid (the balance resets). */}
-      <div className={styles.panel}>
+      <div className={styles.payouts}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, marginBottom: 12, flexWrap: 'wrap' }}>
           <div>
             <span className={styles.panelTitle}>Partner payouts</span>
@@ -1520,7 +1790,7 @@ function PartnersPane() {
           </div>
         </div>
         {payouts.length ? (
-          <div className={styles.list}>
+          <div className={styles.payList}>
             {payouts.map((p) => (
               <div key={p.partner} className={styles.payRow}>
                 <span className={styles.payName}>{p.partner}</span>

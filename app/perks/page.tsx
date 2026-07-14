@@ -38,12 +38,15 @@ export default function PerksPage() {
             align="center"
             dark
             title="Perks live on your Quarter Card"
-            intro="Members carry the Quarter Card in Apple Wallet. Tap to browse partner perks and redeem them in a moment — arriving with the member app."
+            intro="Your Quarter Card sits in the member dashboard — browse partner perks and redeem them in a moment. And every visit earns points to spend locally, through Quarter Rewards."
             max={560}
           />
           <div className={styles.ctaActions}>
             <Button size="lg" variant="accent" href="/plans" iconAfter="arrow-right">
               Become a member
+            </Button>
+            <Button size="lg" variant="inverse" href="/rewards">
+              How rewards work
             </Button>
           </div>
         </div>

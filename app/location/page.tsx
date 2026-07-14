@@ -8,7 +8,7 @@ import styles from './location.module.css';
 export const metadata: Metadata = {
   title: 'Location & contact',
   description:
-    'Find The Quarter on the first floor of Canterbury’s Cathedral Quarter. Opening hours, how to get here, and how to reach us.',
+    'Find The Quarter across the first and second floors of Canterbury’s Cathedral Quarter. Opening hours, how to get here, and how to reach us.',
   alternates: { canonical: '/location' },
 };
 
@@ -20,8 +20,8 @@ export default function LocationPage() {
           <Eyebrow>Find us</Eyebrow>
           <h1 className={styles.h1}>Location &amp; contact</h1>
           <p className={styles.lead}>
-            First floor, in the heart of Canterbury&rsquo;s Cathedral Quarter — with the cathedral right there in the
-            café window. Come up and say hello.
+            The first and second floors, in the heart of Canterbury&rsquo;s Cathedral Quarter — with the Cathedral right
+            there in the café window. Come up and say hello.
           </p>
         </div>
       </Section>
@@ -32,7 +32,7 @@ export default function LocationPage() {
           <div>
             <Eyebrow>Visit</Eyebrow>
             <h2 className={styles.formTitle} style={{ marginTop: 12 }}>
-              Come up to the first floor
+              Come up to the first &amp; second floors
             </h2>
 
             <div className={styles.infoList}>
@@ -52,7 +52,7 @@ export default function LocationPage() {
                 </span>
                 <div>
                   <div className={styles.infoLabel}>Hours</div>
-                  <div className={styles.infoText}>Monday to Friday, 8am – 6pm. Members have access on their plan.</div>
+                  <div className={styles.infoText}>Monday to Friday, 9am – 5:30pm. Members have access on their plan.</div>
                 </div>
               </div>
 

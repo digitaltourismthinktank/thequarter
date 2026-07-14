@@ -20,7 +20,7 @@ export const EVENTS: QuarterEvent[] = [
     title: 'Friday breakfast social',
     time: '08:30 – 10:00',
     kind: 'Community',
-    blurb: 'Start the weekend early. Pastries, Lavazza and good company in the café.',
+    blurb: 'Start the weekend early. Pastries, coffee and good company in the café.',
   },
   {
     date: '24 Jun',
