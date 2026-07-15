@@ -11,6 +11,7 @@ import { ANNUAL_PLANS } from '@/lib/rewards';
 import { subscribeToPlan, saveProfile, registerReferral } from '@/lib/booking';
 import { PREVIEW } from '@/lib/devMock';
 import { CompanyInput } from './CompanyInput';
+import { DatePickerModal } from './DatePickerModal';
 import s from './WelcomeClient.module.css';
 import pay from './RoomBooking.module.css';
 
@@ -76,6 +77,7 @@ export function JoinClient({ plan }: { plan: string }) {
   const [agree, setAgree] = useState(false);
   const [startMode, setStartMode] = useState<'today' | 'date'>('today');
   const [startDate, setStartDate] = useState('');
+  const [dateOpen, setDateOpen] = useState(false);
   // Server decides the real mode from the (London-timezone) start date; 'setup' = future-dated
   // (save the card now, Stripe charges at the start date), 'payment' = charge now.
   const [payMode, setPayMode] = useState<'payment' | 'setup'>('payment');
@@ -93,10 +95,6 @@ export function JoinClient({ plan }: { plan: string }) {
 
   const termLabel = useMemo(() => (annualOnly ? 'billed annually' : term === 'annual' ? 'billed annually' : 'billed monthly'), [term, annualOnly]);
 
-  const todayStr = useMemo(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  }, []);
   const startLabel = useMemo(
     () => (startDate ? new Date(`${startDate}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' }) : ''),
     [startDate],
@@ -335,10 +333,16 @@ export function JoinClient({ plan }: { plan: string }) {
               </div>
             </div>
             {startMode === 'date' && (
-              <label className={s.field}>
+              <div className={s.field}>
                 <span>Choose your start date</span>
-                <input type="date" value={startDate} min={todayStr} onChange={(e) => setStartDate(e.target.value)} />
-              </label>
+                <button type="button" className={pay.dateTrigger} onClick={() => setDateOpen(true)}>
+                  <Icon name="calendar" size={16} color="var(--gold-700)" />
+                  {startDate
+                    ? new Date(`${startDate}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'long' })
+                    : 'Choose a start date'}
+                </button>
+                <DatePickerModal open={dateOpen} onClose={() => setDateOpen(false)} onPick={(d) => setStartDate(d)} single />
+              </div>
             )}
             {error ? <p className={s.error}>{error}</p> : null}
             <Button variant="primary" onClick={toPayment} disabled={busy}>

@@ -18,6 +18,13 @@ export interface Plan {
   badge?: string;
   ctaLabel: string;
   ctaHref: string;
+  /**
+   * One-off Quarter Rewards welcome bonus granted on joining this plan (in points).
+   * Surfaced as the gold reward callout on the PlanCard. MUST match JOIN_BONUS in
+   * netlify/functions/stripe-webhook.mjs (visitor 250 / resident 500 / citizen 1000).
+   * Absent = no welcome bonus (Day Pass, Hybrid Office).
+   */
+  welcomeReward?: number;
 }
 
 export const PLANS: Plan[] = [
@@ -43,9 +50,12 @@ export const PLANS: Plan[] = [
     price: '£84',
     period: 'five days',
     summary: 'Five days to use across the month.',
+    welcomeReward: 250,
     features: [
-      'Everything in Day Pass',
-      'Five days’ access, flexible',
+      'Five days’ access each month',
+      'From £16.80 a working day',
+      'Everything in the Day Pass, included',
+      '24/7 access',
       'A registered office address',
       'Cancel any time',
     ],
@@ -60,10 +70,14 @@ export const PLANS: Plan[] = [
     featured: true,
     badge: 'Most popular',
     summary: 'Ten days a month to call your own.',
+    welcomeReward: 500,
     features: [
-      'Everything in Visitor',
-      'Ten days’ access a month',
+      'Ten days’ access each month',
+      'From £13.80 a working day',
+      'Everything in Visitor, included',
+      '24/7 access',
       'A registered office address',
+      'Cancel any time',
     ],
     ctaLabel: 'Choose Resident',
     ctaHref: '/join/resident',
@@ -74,11 +88,14 @@ export const PLANS: Plan[] = [
     price: '£258',
     period: 'a month',
     summary: 'Unrestricted. For those who are mostly here.',
+    welcomeReward: 1000,
     features: [
-      'Everything in Resident',
-      'Unrestricted access',
+      'Unlimited days — work here every day',
+      'Everything in Resident, included',
       'Priority room booking',
+      '24/7 access',
       'A registered office address',
+      'Cancel any time',
     ],
     ctaLabel: 'Choose Citizen',
     ctaHref: '/join/citizen',

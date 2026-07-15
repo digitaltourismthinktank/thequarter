@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
@@ -29,6 +29,16 @@ export function AuthScreen({ mode }: { mode: 'login' | 'signup' }) {
   const [status, setStatus] = useState<Status>('idle');
   const [error, setError] = useState('');
   const [agree, setAgree] = useState(false);
+
+  // Pre-fill the email from ?email= — the post-purchase "Create your account" CTAs
+  // (Day Pass / room / carnet confirmations) link here with the buyer's email so their
+  // guest booking or passes attach to the right account. Read client-side (like the
+  // ?redirect param below) to stay compatible with the static export. Signup only.
+  useEffect(() => {
+    if (isLogin || typeof window === 'undefined') return;
+    const pre = new URLSearchParams(window.location.search).get('email');
+    if (pre && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(pre)) setEmail(pre);
+  }, [isLogin]);
 
   async function handleAuth(e: FormEvent) {
     e.preventDefault();

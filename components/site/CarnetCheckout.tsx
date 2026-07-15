@@ -2,9 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ds/Button';
-import { Icon } from '@/components/ds/Icon';
 import { STRIPE_PUBLISHABLE_KEY } from '@/lib/commerce';
 import { carnetIntentPublic } from '@/lib/booking';
+import { Confirmation, signupHref } from './Confirmation';
 import { CARNET_BUNDLES, carnetPerPass } from '@/lib/rewards';
 import { PREVIEW } from '@/lib/devMock';
 import s from './WelcomeClient.module.css';
@@ -130,21 +130,34 @@ export function CarnetCheckout() {
 
   if (step === 'done') {
     return (
-      <div className={pay.done}>
-        <span className={pay.doneIcon}>
-          <Icon name="check" size={26} color="var(--gold-700)" />
-        </span>
-        <h3 className={pay.doneTitle}>Payment complete</h3>
-        <p className={pay.doneText}>
-          Your {passes} day passes are paid. Now create your account with <strong>{email}</strong> so your passes land in your wallet — we
-          add them automatically once you’re set up.
-        </p>
-        <div style={{ marginTop: 18 }}>
-          <Button variant="accent" href="/signup" iconAfter="arrow-right">
-            Create your account
-          </Button>
-        </div>
-      </div>
+      <Confirmation
+        eyebrow="Payment complete"
+        title="Your day passes are paid"
+        intro={
+          <>
+            Thanks{firstName ? `, ${firstName}` : ''} — your carnet is ready. One last step: create your account so we can drop the passes
+            into your wallet.
+          </>
+        }
+        rows={[
+          { icon: 'ticket', label: 'Day passes', value: `${passes} passes` },
+          { icon: 'clock', label: 'Valid', value: '12 months' },
+        ]}
+        amount={gbp(bundle.price)}
+        email={email}
+        emailNote={<>We’ve emailed your receipt to <strong>{email}</strong>.</>}
+        account={{
+          heading: 'Create your account to claim your passes',
+          body: (
+            <>
+              Your {passes} passes are held against <strong>{email}</strong>. Create your account with the same email and we add them to your
+              wallet automatically — usually within a minute.
+            </>
+          ),
+          cta: 'Create your account',
+          href: signupHref(email),
+        }}
+      />
     );
   }
 

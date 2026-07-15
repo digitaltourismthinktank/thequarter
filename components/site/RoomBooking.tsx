@@ -15,6 +15,7 @@ import {
   type RoomMemberStatus,
 } from '@/lib/booking';
 import { useMember } from './useMember';
+import { Confirmation, signupHref, type ConfirmationRow } from './Confirmation';
 import { TalkToUs } from './TalkToUs';
 import { DatePickerModal } from './DatePickerModal';
 import { PREVIEW } from '@/lib/devMock';
@@ -198,6 +199,15 @@ export function RoomBooking({ roomName, price }: { roomName: string; price: { ha
     };
   }, [spaceId, date]);
 
+  // A fetched quote (serverLines) is priced for one exact date / selection / party only.
+  // Invalidate it whenever any pricing input changes so the summary falls back to est —
+  // recomputed from the CURRENT date — instead of leaving a stale quiet-day discount on
+  // screen after the date moves back to a standard (non-quiet) day. Continuing to payment
+  // sets serverLines without touching these deps, so the quote survives into the pay step.
+  useEffect(() => {
+    setServerLines(null);
+  }, [date, sel, people, lunch]);
+
   const slots = useMemo(() => {
     const out: number[] = [];
     for (let s = DAY_OPEN; s < DAY_CLOSE; s += SLOT) out.push(s);
@@ -368,18 +378,47 @@ export function RoomBooking({ roomName, price }: { roomName: string; price: { ha
   }
 
   if (step === 'done') {
+    const prettyDate = date
+      ? new Date(`${date}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+      : '';
+    const paidTotal = serverLines ? serverLines.reduce((a, l) => a + l.amount, 0) : est?.total ?? 0;
+    const guestEmail = member ? '' : email.trim();
+    const shownEmail = member ? memberEmailOf(member) : guestEmail;
+    const doneRows: ConfirmationRow[] = [{ icon: 'calendar', label: 'Date', value: prettyDate || '—' }];
+    if (sel) doneRows.push({ icon: 'clock', label: 'Time', value: fmtRange(sel.start, sel.end) });
+    doneRows.push({ icon: 'users', label: 'People', value: `${people} ${people === 1 ? 'person' : 'people'}` });
     return (
-      <div className={styles.done}>
-        <span className={styles.doneIcon}>
-          <Icon name="check" size={26} color="var(--gold-700)" />
-        </span>
-        <h3 className={styles.doneTitle}>You’re booked in</h3>
-        <p className={styles.doneText}>
-          {roomName} is reserved for {date}
-          {sel ? `, ${fmtRange(sel.start, sel.end)}` : ''}
-          {freeDone ? ' — free, on your membership.' : `. We’ve emailed your confirmation${email ? ` to ${email}` : ''}.`} See you then.
-        </p>
-      </div>
+      <Confirmation
+        eyebrow={`${roomName} booked`}
+        title="You’re booked in"
+        intro={
+          freeDone ? (
+            <>{roomName} is reserved for you — free on your membership. It’s saved to your dashboard.</>
+          ) : (
+            <>{roomName} is reserved and paid. We look forward to seeing you.</>
+          )
+        }
+        rows={doneRows}
+        amount={freeDone ? undefined : money(paidTotal)}
+        email={shownEmail || undefined}
+        emailNote={freeDone ? <>A confirmation is on its way to <strong>{shownEmail}</strong>.</> : undefined}
+        account={
+          member
+            ? null
+            : {
+                heading: 'Create your account',
+                body: (
+                  <>
+                    Save this booking to your profile. Create an account with <strong>{guestEmail}</strong> to manage or cancel it, book more
+                    rooms, and start earning Quarter Rewards.
+                  </>
+                ),
+                cta: 'Create your account',
+                href: signupHref(guestEmail),
+              }
+        }
+        footnote={member ? undefined : <>Booked for {company.trim() || 'your company'}.</>}
+      />
     );
   }
 
@@ -411,7 +450,7 @@ export function RoomBooking({ roomName, price }: { roomName: string; price: { ha
       : []);
 
   return (
-    <div className={styles.wrap}>
+    <div className={cn(styles.wrap, step === 'pay' && styles.paying)}>
       <div className={styles.formCol}>
         {member && status ? (
           <div className={styles.memberBanner}>
@@ -531,7 +570,7 @@ export function RoomBooking({ roomName, price }: { roomName: string; price: { ha
               <input className={styles.input} value={jobTitle} onChange={(e) => setJobTitle(e.target.value)} disabled={step === 'pay'} placeholder="e.g. Operations Manager" />
             </label>
             <label className={styles.field}>
-              <span className={styles.label}>Email for confirmation</span>
+              <span className={styles.label}>Email</span>
               <input type="email" className={styles.input} value={email} onChange={(e) => setEmail(e.target.value)} disabled={step === 'pay'} />
             </label>
           </div>

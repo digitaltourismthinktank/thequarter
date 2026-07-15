@@ -174,6 +174,7 @@ export default function HomePage() {
               features={p.features}
               featured={p.featured}
               badge={p.badge}
+              welcomeReward={p.welcomeReward}
               ctaLabel={p.ctaLabel}
               ctaHref={p.ctaHref}
             />

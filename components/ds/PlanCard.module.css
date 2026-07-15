@@ -76,6 +76,37 @@
   color: rgba(251, 248, 242, 0.78);
 }
 
+.reward {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 11px 14px;
+  border-radius: var(--radius-md);
+  background: var(--gold-100);
+  border: 1px solid var(--gold-300);
+  color: var(--gold-700);
+}
+.featured .reward {
+  background: rgba(190, 155, 83, 0.18);
+  border-color: rgba(210, 181, 118, 0.42);
+  color: var(--gold-300);
+}
+.rewardIcon {
+  flex: none;
+}
+.rewardText {
+  font-size: var(--text-sm);
+  font-weight: var(--fw-semibold);
+  letter-spacing: -0.005em;
+}
+.rewardText strong {
+  font-weight: var(--fw-bold);
+  color: var(--ink-900);
+}
+.featured .rewardText strong {
+  color: var(--gold-300);
+}
+
 .divider {
   height: 1px;
   background: var(--border-subtle);

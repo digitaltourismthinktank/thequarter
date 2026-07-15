@@ -1,0 +1,171 @@
+/* Shared post-purchase confirmation — one look across Day Pass, meeting room and carnet. */
+
+.wrap {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 8px 0 4px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(150deg, var(--gold-500), var(--gold-700));
+  box-shadow: 0 8px 22px rgba(166, 130, 60, 0.28);
+  margin-bottom: 18px;
+  animation: confMark 0.45s var(--ease-out, ease-out) both;
+}
+@keyframes confMark {
+  from {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.eyebrow {
+  margin: 0 0 6px;
+  font-size: var(--text-2xs);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: var(--fw-semibold);
+  color: var(--gold-700);
+}
+
+.title {
+  margin: 0 0 8px;
+  font-size: var(--text-xl);
+  font-weight: var(--fw-bold);
+  letter-spacing: -0.02em;
+  color: var(--ink-900);
+}
+
+.intro {
+  margin: 0 0 20px;
+  font-size: var(--text-base);
+  line-height: 1.6;
+  color: var(--text-body);
+}
+
+/* ---- Summary card ---- */
+.card {
+  width: 100%;
+  text-align: left;
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  padding: 18px 20px;
+}
+.rows {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+.rowLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+.rowLabel svg {
+  flex: none;
+}
+.rowValue {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--ink-900);
+  text-align: right;
+}
+
+.amount {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-subtle);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+.amountValue {
+  font-size: var(--text-lg);
+  font-weight: var(--fw-bold);
+  color: var(--ink-900);
+}
+
+/* ---- Emailed-to line ---- */
+.emailed {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 16px 0 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+.emailed svg {
+  flex: none;
+}
+.emailed strong {
+  color: var(--text-body);
+  font-weight: var(--fw-semibold);
+}
+
+/* ---- Create-account block ---- */
+.account {
+  width: 100%;
+  margin-top: 22px;
+  padding: 20px;
+  text-align: left;
+  background: var(--gold-100);
+  border: 1px solid var(--gold-200);
+  border-radius: var(--radius-lg);
+}
+.accountHeading {
+  margin: 0 0 6px;
+  font-size: var(--text-base);
+  font-weight: var(--fw-bold);
+  color: var(--ink-900);
+}
+.accountBody {
+  margin: 0 0 16px;
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  color: var(--text-body);
+}
+.accountBody strong {
+  color: var(--ink-900);
+  font-weight: var(--fw-semibold);
+}
+
+.footnote {
+  margin: 16px 0 0;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+.footnote a {
+  color: var(--gold-700);
+  font-weight: var(--fw-semibold);
+}

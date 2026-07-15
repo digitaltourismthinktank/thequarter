@@ -15,6 +15,8 @@ export interface PlanCardProps {
   features?: string[];
   featured?: boolean;
   badge?: string;
+  /** One-off Quarter Rewards welcome bonus (points). Shows a gold reward callout. */
+  welcomeReward?: number;
   ctaLabel?: string;
   ctaHref: string;
   className?: string;
@@ -29,6 +31,7 @@ export function PlanCard({
   features = [],
   featured = false,
   badge,
+  welcomeReward,
   ctaLabel = 'Choose plan',
   ctaHref,
   className,
@@ -45,6 +48,20 @@ export function PlanCard({
         </div>
         {summary ? <p className={styles.summary}>{summary}</p> : null}
       </div>
+      {welcomeReward ? (
+        <div className={styles.reward}>
+          <Icon
+            name="gift"
+            size={18}
+            color={featured ? 'var(--gold-400)' : 'var(--gold-600)'}
+            strokeWidth={2}
+            className={styles.rewardIcon}
+          />
+          <span className={styles.rewardText}>
+            <strong>{welcomeReward.toLocaleString('en-GB')}</strong> welcome rewards
+          </span>
+        </div>
+      ) : null}
       <div className={styles.divider} />
       <ul className={styles.features}>
         {features.map((f, i) => (

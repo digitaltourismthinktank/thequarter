@@ -5,6 +5,7 @@ import { Button } from '@/components/ds/Button';
 import { Icon } from '@/components/ds/Icon';
 import { STRIPE_PUBLISHABLE_KEY } from '@/lib/commerce';
 import { dayPassIntent } from '@/lib/booking';
+import { Confirmation, signupHref } from './Confirmation';
 import { DatePickerModal } from './DatePickerModal';
 import { PREVIEW } from '@/lib/devMock';
 import s from './WelcomeClient.module.css';
@@ -113,16 +114,35 @@ export function DayPassCheckout() {
   }
 
   if (step === 'done') {
+    const prettyDate = date
+      ? new Date(`${date}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+      : '';
     return (
-      <div className={pay.done}>
-        <span className={pay.doneIcon}>
-          <Icon name="check" size={26} color="var(--gold-700)" />
-        </span>
-        <h3 className={pay.doneTitle}>You’re booked in</h3>
-        <p className={pay.doneText}>
-          Your Day Pass for {date} is paid. We’ve emailed the details to {email} — see you then.
-        </p>
-      </div>
+      <Confirmation
+        eyebrow="Day Pass confirmed"
+        title="Your day is reserved"
+        intro={
+          <>
+            You’re all set for {prettyDate || 'your chosen day'}. Your day is already held against your email — no account needed to walk
+            in. Just tell the team you have a Day Pass.
+          </>
+        }
+        rows={[{ icon: 'ticket', label: 'Day Pass', value: prettyDate || '—' }]}
+        amount="£21.60"
+        email={email}
+        account={{
+          heading: 'Create your account',
+          body: (
+            <>
+              Your day is booked either way. Create a free account with <strong>{email}</strong> to save it to your profile, and to unlock
+              Quarter Rewards and room bookings for next time.
+            </>
+          ),
+          cta: 'Create your account',
+          href: signupHref(email),
+        }}
+        footnote={<>Breakfast, coffee and a desk are waiting on the 1st &amp; 2nd floors, 27–28 Burgate.</>}
+      />
     );
   }
 

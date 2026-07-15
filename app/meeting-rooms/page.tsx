@@ -71,6 +71,21 @@ export default function MeetingRoomsPage() {
         </div>
       </Section>
 
+      <Section tone="gold">
+        <SectionHead
+          align="center"
+          eyebrow="For teams"
+          title="A regular base for your team?"
+          intro="Looking for a regular workspace for your team? Privatise one of our open workspaces — The Hop Yard or The Vineyard — on a weekly basis. The whole room, everyone included, invoiced quarterly."
+          max={620}
+        />
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 24 }}>
+          <Button href="/privatise" variant="primary" iconAfter="arrow-right">
+            Explore privatisation
+          </Button>
+        </div>
+      </Section>
+
       <Section tone="page" id="enquire">
         <SectionHead
           align="center"
