@@ -119,6 +119,10 @@ export default async function handler(req) {
     customer: customerId,
     'items[0][price]': priceId,
     payment_behavior: 'default_incomplete',
+    // Declare a payment method so Stripe always mints a PaymentIntent (→ client_secret) on the
+    // first invoice. Without this the default_incomplete sub can return no client_secret and the
+    // browser shows "We couldn't set up the payment" (same fix as privatisation.mjs / B18).
+    'payment_settings[payment_method_types][0]': 'card',
     'payment_settings[save_default_payment_method]': 'on_subscription',
     'metadata[plan]': plan,
     'metadata[term]': term,

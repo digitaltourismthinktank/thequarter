@@ -5,6 +5,7 @@ import { Button } from '@/components/ds/Button';
 import { Icon } from '@/components/ds/Icon';
 import { getSpaces, roomMemberFree } from '@/lib/booking';
 import { useMember } from './useMember';
+import { DatePickerModal } from './DatePickerModal';
 import { PREVIEW } from '@/lib/devMock';
 import styles from './RoomBooking.module.css';
 
@@ -25,6 +26,7 @@ export function PodBooking() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  const [dateOpen, setDateOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -108,10 +110,16 @@ export function PodBooking() {
             ))}
           </div>
         </div>
-        <label className={styles.field}>
+        <div className={styles.field}>
           <span className={styles.label}>Date</span>
-          <input type="date" className={styles.input} value={date} min={todayStr} onChange={(e) => setDate(e.target.value)} />
-        </label>
+          <button type="button" className={styles.dateTrigger} onClick={() => setDateOpen(true)}>
+            <Icon name="calendar" size={16} color="var(--gold-700)" />
+            {date
+              ? new Date(`${date}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'long' })
+              : 'Choose a day'}
+          </button>
+          <DatePickerModal open={dateOpen} onClose={() => setDateOpen(false)} onPick={(d) => setDate(d)} single />
+        </div>
         <label className={styles.field}>
           <span className={styles.label}>Time (one hour)</span>
           <select className={styles.input} value={hour} onChange={(e) => setHour(e.target.value)}>
