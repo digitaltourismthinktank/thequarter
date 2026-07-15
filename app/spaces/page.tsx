@@ -124,6 +124,22 @@ export default function SpacesPage() {
         </div>
       </Section>
 
+      {/* Privatise nudge — the open rooms can become a team's own */}
+      <Section tone="gold">
+        <SectionHead
+          align="center"
+          eyebrow="For teams"
+          title="Make one of these rooms your team's own"
+          intro="Bringing your team in on the same days each week or month? Privatise The Hop Yard or The Vineyard — the whole room, everyone included, set up in minutes and invoiced quarterly."
+          max={620}
+        />
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 24 }}>
+          <Button href="/privatise" variant="primary" iconAfter="arrow-right">
+            Explore privatisation
+          </Button>
+        </div>
+      </Section>
+
       {/* The Phone Pods */}
       <Section tone="page" id="flexi">
         <Feature
