@@ -16,6 +16,7 @@ import {
 } from '@/lib/booking';
 import { useMember } from './useMember';
 import { TalkToUs } from './TalkToUs';
+import { DatePickerModal } from './DatePickerModal';
 import { PREVIEW } from '@/lib/devMock';
 import { cn } from '@/lib/cn';
 import styles from './RoomBooking.module.css';
@@ -127,6 +128,7 @@ export function RoomBooking({ roomName, price }: { roomName: string; price: { ha
   const [name, setName] = useState('');
   const [jobTitle, setJobTitle] = useState('');
   const [email, setEmail] = useState('');
+  const [dateOpen, setDateOpen] = useState(false);
 
   // Range picker (mirrors BookingClient): pending start tap, hovered slot, committed range.
   const [busy, setBusy] = useState<BusyRange[]>([]);
@@ -420,10 +422,14 @@ export function RoomBooking({ roomName, price }: { roomName: string; price: { ha
           </div>
         ) : null}
 
-        <label className={styles.field}>
+        <div className={styles.field}>
           <span className={styles.label}>Date</span>
-          <input type="date" className={styles.input} value={date} min={todayStr} onChange={(e) => setDate(e.target.value)} disabled={step === 'pay'} />
-        </label>
+          <button type="button" className={styles.dateTrigger} onClick={() => setDateOpen(true)} disabled={step === 'pay'}>
+            <Icon name="calendar" size={16} color="var(--gold-700)" />
+            {date ? new Date(`${date}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'long' }) : 'Choose a date'}
+          </button>
+        </div>
+        <DatePickerModal open={dateOpen} onClose={() => setDateOpen(false)} onPick={(d) => setDate(d)} single />
 
         <div className={styles.field}>
           <span className={styles.label}>Choose your time</span>

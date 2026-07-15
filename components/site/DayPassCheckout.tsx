@@ -5,6 +5,7 @@ import { Button } from '@/components/ds/Button';
 import { Icon } from '@/components/ds/Icon';
 import { STRIPE_PUBLISHABLE_KEY } from '@/lib/commerce';
 import { dayPassIntent } from '@/lib/booking';
+import { DatePickerModal } from './DatePickerModal';
 import { PREVIEW } from '@/lib/devMock';
 import s from './WelcomeClient.module.css';
 import pay from './RoomBooking.module.css';
@@ -51,6 +52,7 @@ export function DayPassCheckout() {
   const [company, setCompany] = useState('');
   const [email, setEmail] = useState('');
   const [date, setDate] = useState('');
+  const [dateOpen, setDateOpen] = useState(false);
   const [step, setStep] = useState<'form' | 'pay' | 'done'>('form');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -118,7 +120,7 @@ export function DayPassCheckout() {
         </span>
         <h3 className={pay.doneTitle}>You’re booked in</h3>
         <p className={pay.doneText}>
-          Your Day Pass for {date} is paid. We’ve emailed the details to {email} — see you then. Breakfast is on us.
+          Your Day Pass for {date} is paid. We’ve emailed the details to {email} — see you then.
         </p>
       </div>
     );
@@ -146,10 +148,14 @@ export function DayPassCheckout() {
             <span>Email</span>
             <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" placeholder="you@company.com" />
           </label>
-          <label className={s.field}>
+          <div className={s.field}>
             <span>Which day?</span>
-            <input type="date" value={date} min={todayStr} onChange={(e) => setDate(e.target.value)} />
-          </label>
+            <button type="button" className={pay.dateTrigger} onClick={() => setDateOpen(true)}>
+              <Icon name="calendar" size={16} color="var(--gold-700)" />
+              {date ? new Date(`${date}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'long' }) : 'Choose your day'}
+            </button>
+          </div>
+          <DatePickerModal open={dateOpen} onClose={() => setDateOpen(false)} onPick={(d) => setDate(d)} single />
           {error ? <p className={s.error}>{error}</p> : null}
           <Button variant="accent" onClick={toPayment} disabled={busy}>
             {busy ? 'Starting…' : 'Continue to payment · £21.60'}

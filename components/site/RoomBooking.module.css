@@ -52,6 +52,29 @@
   background: var(--sand-100);
   color: var(--text-muted);
 }
+.dateTrigger {
+  width: 100%;
+  padding: 11px 13px;
+  font-size: var(--text-base);
+  font-family: inherit;
+  color: var(--ink-900);
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  text-align: left;
+  cursor: pointer;
+}
+.dateTrigger:hover:not(:disabled) {
+  border-color: var(--gold-500);
+}
+.dateTrigger:disabled {
+  background: var(--sand-100);
+  color: var(--text-muted);
+  cursor: default;
+}
 
 .pkgRow {
   display: flex;
@@ -101,12 +124,17 @@
 }
 
 .contact {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 14px;
   padding-top: 4px;
   border-top: 1px solid var(--border-subtle);
   margin-top: 2px;
+}
+@media (max-width: 620px) {
+  .contact {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* ---- Range picker (click-scroll-click, mirrors the member booker) ---- */
