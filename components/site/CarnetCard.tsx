@@ -32,6 +32,14 @@ function loadStripe(): Promise<any> {
   return stripePromise;
 }
 
+// Stripe.js can resolve before React has committed the re-render that mounts the payment
+// field (e.g. when Stripe.js is already cached), so the mount node may not exist yet. Wait
+// briefly for it rather than throwing immediately on a null ref.
+async function waitForNode(ref: { current: HTMLDivElement | null }): Promise<HTMLDivElement | null> {
+  for (let i = 0; i < 40 && !ref.current; i++) await new Promise((r) => setTimeout(r, 16));
+  return ref.current;
+}
+
 const gbp = (n: number) => `£${n.toFixed(2)}`;
 
 function friendly(code?: string): string {
@@ -101,11 +109,12 @@ export function CarnetCard() {
     setBuying(passes);
     try {
       const stripe = await loadStripe();
-      if (!stripe || !mountRef.current) throw new Error('stripe');
+      const node = await waitForNode(mountRef);
+      if (!stripe || !node) throw new Error('stripe');
       stripeRef.current = stripe;
       const elements = stripe.elements({ clientSecret: r.data.clientSecret, appearance: { theme: 'flat' } });
       const payEl = elements.create('payment', { layout: 'tabs' });
-      payEl.mount(mountRef.current);
+      payEl.mount(node);
       elementsRef.current = elements;
     } catch {
       setPayErr('Couldn’t load the secure payment form — please try again.');

@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ds/Button';
 import { Icon } from '@/components/ds/Icon';
 import { STRIPE_PUBLISHABLE_KEY } from '@/lib/commerce';
@@ -38,6 +38,14 @@ function loadStripe(): Promise<any> {
   return stripePromise;
 }
 
+// Stripe.js can resolve before React has committed the 'pay'-step re-render (e.g. when
+// Stripe.js is already cached), so the mount node may not exist yet. Wait briefly for it
+// rather than throwing immediately on a null ref.
+async function waitForNode(ref: { current: HTMLDivElement | null }): Promise<HTMLDivElement | null> {
+  for (let i = 0; i < 40 && !ref.current; i++) await new Promise((r) => setTimeout(r, 16));
+  return ref.current;
+}
+
 const gbp = (n: number) => `£${n.toFixed(2)}`;
 const isEmail = (e: string) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e);
 
@@ -59,6 +67,15 @@ export function CarnetCheckout() {
   const stripeRef = useRef<any>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const elementsRef = useRef<any>(null);
+
+  // Static export (output:'export'): read ?bundle=10|30 client-side rather than with
+  // next/navigation's useSearchParams (which forces a Suspense boundary and can break the
+  // export). Invalid/absent leaves the default (30). SSR-guarded.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const n = Number(new URLSearchParams(window.location.search).get('bundle'));
+    if (CARNET_BUNDLES.some((b) => b.passes === n)) setPasses(n);
+  }, []);
 
   const bundle = CARNET_BUNDLES.find((b) => b.passes === passes) ?? CARNET_BUNDLES[0];
 
@@ -83,11 +100,12 @@ export function CarnetCheckout() {
     setStep('pay');
     try {
       const stripe = await loadStripe();
-      if (!stripe || !mountRef.current) throw new Error('stripe');
+      const node = await waitForNode(mountRef);
+      if (!stripe || !node) throw new Error('stripe');
       stripeRef.current = stripe;
       const elements = stripe.elements({ clientSecret: r.data.clientSecret, appearance: { theme: 'flat' } });
       const payEl = elements.create('payment', { layout: 'tabs' });
-      payEl.mount(mountRef.current);
+      payEl.mount(node);
       elementsRef.current = elements;
     } catch {
       setError('Couldn’t load the secure payment form — please try again.');

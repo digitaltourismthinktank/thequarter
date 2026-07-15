@@ -14,7 +14,7 @@ const RESEND_API_KEY = process.env.RESEND_API_KEY;
 
 export const FROM = 'The Quarter <no-reply@notifications.thequarter.work>';
 /** Operations inbox — booking + plan-change notifications land here. */
-export const OPS_EMAIL = 'info@thequarter.work';
+export const OPS_EMAIL = 'info@thinkdigital.travel';
 
 export function emailReady() {
   return !!RESEND_API_KEY;

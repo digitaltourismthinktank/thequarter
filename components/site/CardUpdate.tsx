@@ -31,6 +31,14 @@ function loadStripe(): Promise<unknown> {
   return stripePromise;
 }
 
+// Stripe.js can resolve before React has committed the re-render that mounts the card
+// field (e.g. when Stripe.js is already cached), so the mount node may not exist yet.
+// Wait briefly for it rather than bailing immediately on a null ref.
+async function waitForNode(ref: { current: HTMLDivElement | null }): Promise<HTMLDivElement | null> {
+  for (let i = 0; i < 40 && !ref.current; i++) await new Promise((r) => setTimeout(r, 16));
+  return ref.current;
+}
+
 /**
  * Update the member's card without leaving the app. The card number is entered
  * only into Stripe's own iframe (Stripe Elements) — this app never sees it. We
@@ -55,11 +63,12 @@ export function CardUpdate({ onDone }: { onDone?: () => void }) {
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const stripe: any = await loadStripe();
-        if (cancelled || !stripe || !mountRef.current) return;
+        const node = await waitForNode(mountRef);
+        if (cancelled || !stripe || !node) return;
         stripeRef.current = stripe;
         const elements = stripe.elements();
         const card = elements.create('card', { hidePostalCode: false });
-        card.mount(mountRef.current);
+        card.mount(node);
         cardRef.current = card;
         setReady(true);
       } catch {

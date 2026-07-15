@@ -110,7 +110,7 @@ export default function PlansPage() {
               featured={b.bestValue}
               badge={b.bestValue ? 'Best value' : undefined}
               ctaLabel="Buy carnet"
-              ctaHref="/buy-carnet"
+              ctaHref={`/buy-carnet?bundle=${b.passes}`}
             />
           ))}
         </div>
