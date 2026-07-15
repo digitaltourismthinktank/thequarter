@@ -6,7 +6,7 @@ import { Button } from '@/components/ds/Button';
 import { Icon } from '@/components/ds/Icon';
 import { STRIPE_PUBLISHABLE_KEY } from '@/lib/commerce';
 import { getMemberstack, memberstackError } from '@/lib/memberstack';
-import { PLANS, PLAN_MEMBERSTACK_ID, PLAN_DAY_ALLOWANCE, type PlanId } from '@/lib/plans';
+import { PLANS, PLAN_MEMBERSTACK_ID, PLAN_DAY_ALLOWANCE, PLAN_BENEFITS, type PlanId } from '@/lib/plans';
 import { ANNUAL_PLANS } from '@/lib/rewards';
 import { subscribeToPlan, saveProfile, registerReferral } from '@/lib/booking';
 import { PREVIEW } from '@/lib/devMock';
@@ -61,6 +61,7 @@ export function JoinClient({ plan }: { plan: string }) {
   const planDef = PLANS.find((p) => p.id === slug);
   const plnId = PLAN_MEMBERSTACK_ID[slug];
   const allowance = PLAN_DAY_ALLOWANCE[slug];
+  const benefits = PLAN_BENEFITS[slug] ?? [];
   const annualOnly = slug === 'hybrid-office';
 
   const [term, setTerm] = useState<'monthly' | 'annual'>(annualOnly ? 'annual' : 'monthly');
@@ -257,7 +258,7 @@ export function JoinClient({ plan }: { plan: string }) {
           : `Join as ${planDef.name}`}
       </h1>
       <p className={s.sub}>
-        {step === 'details' && <>The {planDef.name} plan — {displayPrice} · {displayPeriod}. Pay securely below; no accounts to create first.</>}
+        {step === 'details' && <><strong>{displayPrice}</strong> · {displayPeriod}. No account to set up first — pay securely below.</>}
         {step === 'pay' &&
           (payMode === 'setup' && startLabel ? (
             <>You&rsquo;re joining {planDef.name} ({termLabel}). Starts {startLabel} — save your card now, nothing to pay today.</>
@@ -287,6 +288,22 @@ export function JoinClient({ plan }: { plan: string }) {
                   </button>
                 </div>
               </div>
+            )}
+            {showAnnual && (
+              <span className={s.freeBadge}>
+                <Icon name="party-popper" size={14} color="var(--ink-900)" strokeWidth={2} />
+                2 Months free!
+              </span>
+            )}
+            {benefits.length > 0 && (
+              <ul className={s.benefits}>
+                {benefits.map((b) => (
+                  <li key={b.text} className={s.benefit}>
+                    <Icon name={b.icon} size={17} color="var(--gold-600)" strokeWidth={2} className={s.benefitIcon} />
+                    <span>{b.text}</span>
+                  </li>
+                ))}
+              </ul>
             )}
             <label className={s.field}>
               <span>Email</span>

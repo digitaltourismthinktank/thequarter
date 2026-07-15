@@ -3,6 +3,8 @@
 
 /** The Quarter — membership plans. Prices include VAT. */
 
+import type { IconName } from '@/components/ds/Icon';
+
 export type PlanId = 'day-pass' | 'visitor' | 'resident' | 'citizen' | 'hybrid-office';
 
 export interface Plan {
@@ -102,6 +104,64 @@ export const PLANS: Plan[] = [
 export function getPlan(id: PlanId): Plan | undefined {
   return PLANS.find((p) => p.id === id);
 }
+
+/**
+ * Per-plan benefit bullets for the native join flow (components/site/JoinClient.tsx
+ * "details" step). Icon + text, rendered as a tidy list. The welcome-reward figures
+ * MUST match JOIN_BONUS in netlify/functions/stripe-webhook.mjs (visitor 250 /
+ * resident 500 / citizen 1000 / hybrid-office none — deliberately no welcome bullet).
+ * Day Pass has its own one-off checkout, so it has no join bullets here.
+ */
+export interface PlanBenefit {
+  icon: IconName;
+  text: string;
+}
+
+export const PLAN_BENEFITS: Partial<Record<PlanId, PlanBenefit[]>> = {
+  visitor: [
+    { icon: 'pound-sterling', text: '£84 per month, everything included' },
+    { icon: 'calendar', text: '5 days access per month' },
+    { icon: 'map-pin', text: 'Register your business address at The Quarter' },
+    { icon: 'monitor', text: 'Pick any available workspace, monitor included' },
+    { icon: 'coffee', text: 'Unlimited coffee, refreshments, cereals, yoghurts and pastries' },
+    { icon: 'gift', text: '250 welcome rewards' },
+    { icon: 'sparkles', text: 'Earn extra rewards by checking in on quiet days' },
+    { icon: 'users', text: 'Join member socials every month' },
+    { icon: 'badge-check', text: 'No long-term commitment, cancel any time' },
+  ],
+  resident: [
+    { icon: 'pound-sterling', text: '£138 per month, everything included' },
+    { icon: 'calendar', text: '10 days access per month' },
+    { icon: 'map-pin', text: 'Register your business address at The Quarter' },
+    { icon: 'monitor', text: 'Pick any available workspace, monitor included' },
+    { icon: 'coffee', text: 'Unlimited coffee, refreshments, cereals, yoghurts and pastries' },
+    { icon: 'gift', text: '500 welcome rewards' },
+    { icon: 'sparkles', text: 'Earn extra rewards by checking in on quiet days' },
+    { icon: 'users', text: 'Join member socials every month' },
+    { icon: 'badge-check', text: 'No long-term commitment, cancel any time' },
+  ],
+  citizen: [
+    { icon: 'pound-sterling', text: '£258 per month, everything included' },
+    { icon: 'calendar', text: 'Unlimited days access' },
+    { icon: 'map-pin', text: 'Register your business address at The Quarter' },
+    { icon: 'monitor', text: 'Pick any available workspace, monitor included' },
+    { icon: 'coffee', text: 'Unlimited coffee, refreshments, cereals, yoghurts and pastries' },
+    { icon: 'gift', text: '1000 welcome rewards' },
+    { icon: 'sparkles', text: 'Earn extra rewards by checking in on quiet days' },
+    { icon: 'users', text: 'Join member socials every month' },
+    { icon: 'badge-check', text: 'No long-term commitment, cancel any time' },
+  ],
+  'hybrid-office': [
+    { icon: 'map-pin', text: 'Register your business address at The Quarter' },
+    { icon: 'pound-sterling', text: '£42 per month, billed annually (£504/year)' },
+    { icon: 'calendar', text: '12 days access per year' },
+    { icon: 'monitor', text: 'Pick any available workspace, monitor included' },
+    { icon: 'coffee', text: 'Unlimited coffee, refreshments, cereals, yoghurts and pastries' },
+    { icon: 'sparkles', text: 'Earn extra rewards by checking in on quiet days' },
+    { icon: 'users', text: 'Join member socials every month' },
+    { icon: 'badge-check', text: 'No long-term commitment, cancel any time' },
+  ],
+};
 
 /**
  * Monthly day allowance per plan (null = unlimited). Mirrors the server-side

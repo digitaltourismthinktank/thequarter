@@ -73,13 +73,14 @@ export default function AboutPage() {
         <div className={styles.split}>
           <div>
             <Eyebrow>Plantspiration</Eyebrow>
-            <h2 className={styles.featureTitle}>A little plantspiration</h2>
+            <h2 className={styles.featureTitle}>Help yourself to the harvest</h2>
             <p className={styles.featureText}>
-              Greenery runs throughout, the light pours in, and the day starts with a daily breakfast and bean-to-cup
-              coffee. It&rsquo;s the kind of place you actually want to spend your day — calm, cared-for and quietly alive.
+              Our Auk Smart Garden is a living urban farm at the heart of the office &mdash; fresh herbs and greens growing
+              all year round, and you&rsquo;re welcome to help yourself to whatever&rsquo;s ready to pick. Greenery runs
+              right through the building too, so the air stays fresh and everyone breathes a little easier.
             </p>
           </div>
-          <Photo src={PHOTOS.cafe.src} alt={PHOTOS.cafe.alt} ratio="5 / 4" sizes="(max-width: 900px) 100vw, 600px" />
+          <Photo src={PHOTOS.urbanFarm.src} alt={PHOTOS.urbanFarm.alt} ratio="5 / 4" sizes="(max-width: 900px) 100vw, 600px" />
         </div>
       </Section>
 

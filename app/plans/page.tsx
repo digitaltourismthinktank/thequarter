@@ -73,10 +73,10 @@ export default function PlansPage() {
         <p className={styles.vatNote}>Prices include VAT. Cancel any time on Visitor, Resident and Citizen.</p>
       </Section>
 
-      {/* Other plans — Hybrid Office + day-pass carnets */}
+      {/* Other Plans — Hybrid Office + day-pass carnets */}
       <Section tone="page" style={{ paddingTop: 8 }}>
         <SectionHead
-          eyebrow="Other plans"
+          eyebrow="Other Plans"
           title="Other ways in"
           intro="A registered address with a few days in the space, or a book of day passes to use as you like — cheaper per day than buying them one at a time."
           max={620}
