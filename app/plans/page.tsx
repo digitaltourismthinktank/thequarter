@@ -4,10 +4,12 @@ import { Badge } from '@/components/ds/Badge';
 import { Button } from '@/components/ds/Button';
 import { Icon } from '@/components/ds/Icon';
 import { PlanCard } from '@/components/ds/PlanCard';
-import { PLANS, getPlan } from '@/lib/plans';
+import { PLANS, getPlan, type Plan } from '@/lib/plans';
 import { CARNET_BUNDLES, carnetPerPass, DAY_PASS_PRICE } from '@/lib/rewards';
 import { INCLUDED } from '@/lib/spaces';
 import { JsonLd } from '@/components/site/JsonLd';
+import { Breadcrumbs } from '@/components/site/Breadcrumbs';
+import { absoluteUrl } from '@/lib/site';
 import styles from './plans.module.css';
 
 export const metadata: Metadata = {
@@ -37,6 +39,58 @@ const FAQS: [string, string][] = [
 ];
 
 const gbp = (n: number) => `£${n.toFixed(2)}`;
+
+/* --- Offer / Product schema (schema.org) -------------------------------------
+   Describes the sellable plans as an ItemList of Product nodes, each with an
+   Offer. Prices come from data (PLANS + DAY_PASS_PRICE) — never hardcoded here.
+   Day Pass is a one-off; memberships are monthly subscriptions, expressed with a
+   UnitPriceSpecification (unitText 'MONTH') so the recurring price is valid. */
+const OFFER_CURRENCY = 'GBP';
+
+/** Numeric price for a plan (Day Pass uses DAY_PASS_PRICE; others parse PLANS.price). */
+const planPrice = (p: Plan): number =>
+  p.id === 'day-pass' ? DAY_PASS_PRICE : Number(p.price.replace(/[^0-9.]/g, ''));
+
+function planOffer(p: Plan): Record<string, unknown> {
+  const price = planPrice(p).toFixed(2);
+  const recurring = p.id !== 'day-pass';
+  const offer: Record<string, unknown> = {
+    '@type': 'Offer',
+    price,
+    priceCurrency: OFFER_CURRENCY,
+    availability: 'https://schema.org/InStock',
+    url: absoluteUrl(p.ctaHref),
+    category: recurring ? 'Membership' : 'Day pass',
+  };
+  if (recurring) {
+    offer.priceSpecification = {
+      '@type': 'UnitPriceSpecification',
+      price,
+      priceCurrency: OFFER_CURRENCY,
+      unitText: 'MONTH',
+    };
+  }
+  return offer;
+}
+
+const PLANS_LD = {
+  '@context': 'https://schema.org',
+  '@type': 'ItemList',
+  name: 'The Quarter — plans & pricing',
+  itemListElement: PLANS.map((p, i) => ({
+    '@type': 'ListItem',
+    position: i + 1,
+    item: {
+      '@type': 'Product',
+      name: p.name,
+      description: p.summary,
+      url: absoluteUrl(p.ctaHref),
+      brand: { '@type': 'Brand', name: 'The Quarter' },
+      category: p.id === 'day-pass' ? 'Day pass' : 'Membership',
+      offers: planOffer(p),
+    },
+  })),
+};
 
 export default function PlansPage() {
   const hybrid = getPlan('hybrid-office');
@@ -172,6 +226,8 @@ export default function PlansPage() {
           })),
         }}
       />
+      <JsonLd data={PLANS_LD} />
+      <Breadcrumbs trail={[{ name: 'Plans & pricing', path: '/plans' }]} />
     </>
   );
 }

@@ -9,6 +9,7 @@ import { PodBooking } from '@/components/site/PodBooking';
 import { SPACES, INCLUDED } from '@/lib/spaces';
 import { MEETING_ROOMS } from '@/lib/rooms';
 import { PHOTOS } from '@/lib/media';
+import { Breadcrumbs } from '@/components/site/Breadcrumbs';
 import styles from './spaces.module.css';
 
 export const metadata: Metadata = {
@@ -240,6 +241,8 @@ export default function SpacesPage() {
           </div>
         </div>
       </Section>
+
+      <Breadcrumbs trail={[{ name: 'The Spaces', path: '/spaces' }]} />
     </>
   );
 }

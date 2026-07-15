@@ -4,6 +4,7 @@ import { Badge } from '@/components/ds/Badge';
 import { Icon } from '@/components/ds/Icon';
 import { DayPassCheckout } from '@/components/site/DayPassCheckout';
 import { getPlan } from '@/lib/plans';
+import { Breadcrumbs } from '@/components/site/Breadcrumbs';
 import styles from './day-pass.module.css';
 
 export const metadata: Metadata = {
@@ -18,6 +19,7 @@ export default function DayPassPage() {
   const features = dayPass?.features ?? [];
 
   return (
+    <>
     <Section tone="page">
       <a href="/" className={styles.back}>
         <Icon name="arrow-left" size={16} /> Back to home
@@ -54,5 +56,7 @@ export default function DayPassPage() {
         <DayPassCheckout />
       </div>
     </Section>
+    <Breadcrumbs trail={[{ name: 'Day Pass', path: '/day-pass' }]} />
+    </>
   );
 }

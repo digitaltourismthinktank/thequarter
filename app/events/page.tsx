@@ -5,6 +5,7 @@ import { Button } from '@/components/ds/Button';
 import { Icon } from '@/components/ds/Icon';
 import { EVENTS } from '@/lib/events';
 import { PHOTOS } from '@/lib/media';
+import { Breadcrumbs } from '@/components/site/Breadcrumbs';
 import styles from './events.module.css';
 
 export const metadata: Metadata = {
@@ -86,6 +87,8 @@ export default function EventsPage() {
           </div>
         </div>
       </Section>
+
+      <Breadcrumbs trail={[{ name: 'Events', path: '/events' }]} />
     </>
   );
 }

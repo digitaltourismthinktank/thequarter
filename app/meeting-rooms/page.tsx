@@ -7,6 +7,7 @@ import { MeetingRoomsExplorer } from '@/components/site/MeetingRoomsExplorer';
 import { RoomRefreshments } from '@/components/site/RoomRefreshments';
 import { TalkToUs } from '@/components/site/TalkToUs';
 import { MEETING_ROOMS } from '@/lib/rooms';
+import { Breadcrumbs } from '@/components/site/Breadcrumbs';
 import styles from './meeting-rooms.module.css';
 
 export const metadata: Metadata = {
@@ -106,6 +107,8 @@ export default function MeetingRoomsPage() {
           <TalkToUs variant="solid" label="Chat to us now" prefill="I’d like to book a meeting room: " />
         </div>
       </Section>
+
+      <Breadcrumbs trail={[{ name: 'Meeting rooms', path: '/meeting-rooms' }]} />
     </>
   );
 }

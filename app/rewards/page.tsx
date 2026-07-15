@@ -4,6 +4,7 @@ import { Button } from '@/components/ds/Button';
 import { Icon, type IconName } from '@/components/ds/Icon';
 import { RewardsClient } from '@/components/site/RewardsClient';
 import { LEVELS, CATALOGUE_SEED } from '@/lib/rewards';
+import { Breadcrumbs } from '@/components/site/Breadcrumbs';
 import styles from './rewards.module.css';
 
 export const metadata: Metadata = {
@@ -156,5 +157,10 @@ export default function RewardsPage() {
     </>
   );
 
-  return <RewardsClient marketing={marketing} />;
+  return (
+    <>
+      <RewardsClient marketing={marketing} />
+      <Breadcrumbs trail={[{ name: 'Quarter Rewards', path: '/rewards' }]} />
+    </>
+  );
 }

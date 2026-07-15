@@ -22,3 +22,39 @@ export const SITE = {
   phone: '01227 202 227',
   hours: 'Mon–Fri, 09:00–17:30',
 } as const;
+
+/** A single breadcrumb step (a page in the trail). Home is prepended automatically. */
+export interface Crumb {
+  name: string;
+  path: string;
+}
+
+/**
+ * Absolute URL for a site path, built from SITE.url (the single source of the
+ * domain — never hardcode it). Handles the trailing slash and leading slash so
+ * absoluteUrl('/') === `${origin}/` and absoluteUrl('/plans') === `${origin}/plans`.
+ */
+export function absoluteUrl(path: string): string {
+  const base = SITE.url.replace(/\/$/, '');
+  if (path === '/' || path === '') return `${base}/`;
+  return `${base}${path.startsWith('/') ? path : `/${path}`}`;
+}
+
+/**
+ * BreadcrumbList JSON-LD. Always leads with Home ("/"); positions start at 1.
+ * Pass the trail *after* Home, e.g. breadcrumbLd([{ name: 'Plans', path: '/plans' }]).
+ * Item URLs are absolute (SITE.url + path).
+ */
+export function breadcrumbLd(trail: Crumb[]): Record<string, unknown> {
+  const items: Crumb[] = [{ name: 'Home', path: '/' }, ...trail];
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: items.map((c, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      name: c.name,
+      item: absoluteUrl(c.path),
+    })),
+  };
+}

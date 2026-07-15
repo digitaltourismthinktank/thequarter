@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Section, SectionHead, Eyebrow } from '@/components/site/primitives';
 import { Privatisation } from '@/components/site/Privatisation';
+import { Breadcrumbs } from '@/components/site/Breadcrumbs';
 
 export const metadata: Metadata = {
   title: 'Privatise a team room',
@@ -52,6 +53,8 @@ export default function PrivatisePage() {
         />
         <Privatisation />
       </Section>
+
+      <Breadcrumbs trail={[{ name: 'Privatise a team room', path: '/privatise' }]} />
     </>
   );
 }

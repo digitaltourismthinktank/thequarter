@@ -28,7 +28,13 @@ export const metadata: Metadata = {
   description: SITE.description,
   applicationName: SITE.name,
   appleWebApp: { capable: true, statusBarStyle: 'default', title: 'The Quarter' },
-  icons: { icon: '/icon.png', apple: '/icon.png' },
+  icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: 'any' },
+      { url: '/icon.png', type: 'image/png' },
+    ],
+    apple: '/icon.png',
+  },
   openGraph: {
     type: 'website',
     siteName: SITE.name,

@@ -4,6 +4,7 @@ import { Badge } from '@/components/ds/Badge';
 import { Button } from '@/components/ds/Button';
 import { Icon, type IconName } from '@/components/ds/Icon';
 import { PHOTOS } from '@/lib/media';
+import { Breadcrumbs } from '@/components/site/Breadcrumbs';
 import styles from './about.module.css';
 
 export const metadata: Metadata = {
@@ -135,6 +136,8 @@ export default function AboutPage() {
           </div>
         </div>
       </Section>
+
+      <Breadcrumbs trail={[{ name: 'About', path: '/about' }]} />
     </>
   );
 }

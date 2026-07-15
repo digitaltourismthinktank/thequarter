@@ -8,6 +8,7 @@ import { RoomBooking } from '@/components/site/RoomBooking';
 import { RoomRefreshments } from '@/components/site/RoomRefreshments';
 import { TalkToUs } from '@/components/site/TalkToUs';
 import { ROOM_SLUGS, getMeetingRoom } from '@/lib/rooms';
+import { Breadcrumbs } from '@/components/site/Breadcrumbs';
 import styles from './room.module.css';
 
 interface RoomParams {
@@ -122,6 +123,13 @@ export default function RoomDetailPage({ params }: RoomParams) {
           </div>
         </div>
       </Section>
+
+      <Breadcrumbs
+        trail={[
+          { name: 'Meeting rooms', path: '/meeting-rooms' },
+          { name: room.name, path: `/meeting-rooms/${room.slug}` },
+        ]}
+      />
     </>
   );
 }

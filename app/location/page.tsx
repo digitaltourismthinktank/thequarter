@@ -3,6 +3,7 @@ import { Section, Eyebrow } from '@/components/site/primitives';
 import { Icon } from '@/components/ds/Icon';
 import { EnquiryForm } from '@/components/site/EnquiryForm';
 import { SITE } from '@/lib/site';
+import { Breadcrumbs } from '@/components/site/Breadcrumbs';
 import styles from './location.module.css';
 
 export const metadata: Metadata = {
@@ -106,6 +107,8 @@ export default function LocationPage() {
           </div>
         </div>
       </Section>
+
+      <Breadcrumbs trail={[{ name: 'Location & contact', path: '/location' }]} />
     </>
   );
 }
