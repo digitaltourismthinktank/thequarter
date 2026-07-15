@@ -163,8 +163,14 @@ export const joinWithStartDate = (b: { plan: string; term: 'monthly' | 'annual';
   call<{ url: string }>('join', { method: 'POST', auth: false, body: b });
 
 // Native in-site plan subscription (Stripe Elements — no Payment Links, no redirect out).
-export const subscribeToPlan = (b: { plan: string; term: 'monthly' | 'annual'; email: string; name?: string }) =>
-  call<{ clientSecret: string; subscriptionId: string; customerId: string; message?: string }>('subscribe', { method: 'POST', auth: false, body: b });
+// Optional startDate (YYYY-MM-DD, future) dates the subscription forward: the server returns
+// mode:'setup' (save the card now, Stripe charges at the start date) instead of mode:'payment'.
+export const subscribeToPlan = (b: { plan: string; term: 'monthly' | 'annual'; email: string; name?: string; startDate?: string }) =>
+  call<{ clientSecret: string; subscriptionId: string; customerId: string; mode?: 'payment' | 'setup'; message?: string }>('subscribe', {
+    method: 'POST',
+    auth: false,
+    body: b,
+  });
 
 // Native Day Pass one-off checkout (£21.60 PaymentIntent — replaces the Typeform embed).
 export const dayPassIntent = (b: { firstName: string; lastName: string; company?: string; email: string; date: string }) =>

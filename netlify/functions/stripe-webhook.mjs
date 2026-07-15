@@ -489,9 +489,17 @@ async function handleEvent(event) {
     // are handled by the subscription.* events; for those we just refresh the date.
     const line = obj.lines?.data?.[0];
     const isRenewal = obj.billing_reason === 'subscription_cycle';
+    // Future-dated join: the £0 'subscription_create' invoice fires at SIGNUP (the sub is
+    // trialing until the start date). Set the renewal date to the start date, but grant NO
+    // days yet — and actively zero any client-seeded balance so the member can't check in
+    // before their start. The real allowance lands at trial_end via the 'subscription_cycle'
+    // invoice (resetDays), which reads this '0' as no rollover. Discriminator: a normal
+    // start-today first invoice is charged (>£0), so it keeps the client-seeded allowance.
+    const trialingSignup = obj.billing_reason === 'subscription_create' && (obj.amount_paid ?? 0) === 0;
     await renewMember(MS_SECRET, email, {
       renewalDate: formatDate(line?.period?.end || obj.period_end),
       resetDays: isRenewal,
+      ...(trialingSignup ? { explicitDays: '0' } : {}),
     });
     // Quarter Rewards: spend points on every real paid invoice (2% give-back), plus a
     // one-off welcome bonus on the first subscription invoice. Folded into earnMeta so

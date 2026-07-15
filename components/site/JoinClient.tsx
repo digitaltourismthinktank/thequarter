@@ -65,6 +65,11 @@ export function JoinClient({ plan }: { plan: string }) {
   const [bdayMonth, setBdayMonth] = useState('');
   const [company, setCompany] = useState('');
   const [agree, setAgree] = useState(false);
+  const [startMode, setStartMode] = useState<'today' | 'date'>('today');
+  const [startDate, setStartDate] = useState('');
+  // Server decides the real mode from the (London-timezone) start date; 'setup' = future-dated
+  // (save the card now, Stripe charges at the start date), 'payment' = charge now.
+  const [payMode, setPayMode] = useState<'payment' | 'setup'>('payment');
 
   const [step, setStep] = useState<'details' | 'pay' | 'account'>('details');
   const [busy, setBusy] = useState(false);
@@ -78,6 +83,15 @@ export function JoinClient({ plan }: { plan: string }) {
   const elementsRef = useRef<any>(null);
 
   const termLabel = useMemo(() => (annualOnly ? 'billed annually' : term === 'annual' ? 'billed annually' : 'billed monthly'), [term, annualOnly]);
+
+  const todayStr = useMemo(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }, []);
+  const startLabel = useMemo(
+    () => (startDate ? new Date(`${startDate}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' }) : ''),
+    [startDate],
+  );
 
   // The price shown MUST match what Stripe charges for the selected term. Visitor/Resident/Citizen
   // annual totals live in ANNUAL_PLANS; Hybrid is annual-only and quoted per-month as a hook on the
@@ -93,9 +107,11 @@ export function JoinClient({ plan }: { plan: string }) {
   async function toPayment() {
     setError(null);
     if (!isEmail(email.trim())) return setError('Please enter a valid email address.');
+    if (startMode === 'date' && !startDate) return setError('Please choose a start date, or switch to “Start today”.');
     if (PREVIEW) return setError('Checkout runs on the live site — this is a preview.');
     setBusy(true);
-    const r = await subscribeToPlan({ plan: slug, term, email: email.trim().toLowerCase(), name: `${firstName} ${lastName}`.trim() });
+    const startArg = startMode === 'date' && startDate ? startDate : undefined;
+    const r = await subscribeToPlan({ plan: slug, term, email: email.trim().toLowerCase(), name: `${firstName} ${lastName}`.trim(), startDate: startArg });
     setBusy(false);
     if (!r.ok || !r.data.clientSecret) {
       const code = r.data?.error;
@@ -108,6 +124,8 @@ export function JoinClient({ plan }: { plan: string }) {
       );
       return;
     }
+    // The server is the authority on whether this is future-dated (setup) or immediate (payment).
+    setPayMode(r.data.mode === 'setup' ? 'setup' : 'payment');
     custRef.current = { subscriptionId: r.data.subscriptionId, customerId: r.data.customerId };
     setStep('pay');
     try {
@@ -124,11 +142,24 @@ export function JoinClient({ plan }: { plan: string }) {
     }
   }
 
-  // Step 2 → confirm the first-invoice payment in place.
+  // Step 2 → confirm in place. Future-dated (setup): save the card now, Stripe charges at the
+  // start date. Today (payment): confirm the first-invoice PaymentIntent (charge now).
   async function payNow() {
     if (!stripeRef.current || !elementsRef.current) return;
     setBusy(true);
     setError(null);
+    if (payMode === 'setup') {
+      const { error: setupErr, setupIntent } = await stripeRef.current.confirmSetup({
+        elements: elementsRef.current,
+        confirmParams: { return_url: window.location.href },
+        redirect: 'if_required',
+      });
+      setBusy(false);
+      if (setupErr) return setError(setupErr.message || 'We couldn’t save your card — please try again.');
+      if (setupIntent && (setupIntent.status === 'succeeded' || setupIntent.status === 'processing')) setStep('account');
+      else setError('That needs another step — please try again.');
+      return;
+    }
     const { error: payErr, paymentIntent } = await stripeRef.current.confirmPayment({
       elements: elementsRef.current,
       confirmParams: { return_url: window.location.href },
@@ -157,7 +188,10 @@ export function JoinClient({ plan }: { plan: string }) {
       const customFields: Record<string, string> = {};
       if (firstName) customFields['first-name'] = firstName;
       if (lastName) customFields['last-name'] = lastName;
-      if (allowance !== undefined) customFields['days-remaining'] = allowance === null ? 'Unlimited' : String(allowance);
+      // Future-dated joins start with NO days until their start date; the Stripe webhook grants
+      // the allowance when the first real invoice is taken at trial_end (subscription_cycle).
+      if (allowance !== undefined)
+        customFields['days-remaining'] = payMode === 'setup' ? '0' : allowance === null ? 'Unlimited' : String(allowance);
       await ms.signupMemberEmailPassword({
         email: email.trim().toLowerCase(),
         password,
@@ -207,12 +241,26 @@ export function JoinClient({ plan }: { plan: string }) {
     <div className={s.wrap}>
       <span className={s.eyebrow}>Join The Quarter</span>
       <h1 className={s.title}>
-        {step === 'account' ? 'Payment received — set up your login' : `Join as ${planDef.name}`}
+        {step === 'account'
+          ? payMode === 'setup'
+            ? 'Card saved — set up your login'
+            : 'Payment received — set up your login'
+          : `Join as ${planDef.name}`}
       </h1>
       <p className={s.sub}>
         {step === 'details' && <>The {planDef.name} plan — {displayPrice} · {displayPeriod}. Pay securely below; no accounts to create first.</>}
-        {step === 'pay' && <>You&rsquo;re joining {planDef.name} ({termLabel}). Pay by card or Apple Pay — you stay right here.</>}
-        {step === 'account' && <>All done on payment. Create your login to reach your dashboard, door code, days and bookings.</>}
+        {step === 'pay' &&
+          (payMode === 'setup' && startLabel ? (
+            <>You&rsquo;re joining {planDef.name} ({termLabel}). Starts {startLabel} — save your card now, nothing to pay today.</>
+          ) : (
+            <>You&rsquo;re joining {planDef.name} ({termLabel}). Pay by card or Apple Pay — you stay right here.</>
+          ))}
+        {step === 'account' &&
+          (payMode === 'setup' ? (
+            <>Your card is saved and your start date is booked. Create your login to reach your dashboard, door code, days and bookings.</>
+          ) : (
+            <>All done on payment. Create your login to reach your dashboard, door code, days and bookings.</>
+          ))}
       </p>
 
       <div className={s.form}>
@@ -245,6 +293,27 @@ export function JoinClient({ plan }: { plan: string }) {
                 <input value={lastName} onChange={(e) => setLastName(e.target.value)} autoComplete="family-name" />
               </label>
             </div>
+            <label className={s.field}>
+              <span>Company (optional)</span>
+              <CompanyInput value={company} onChange={setCompany} placeholder="" />
+            </label>
+            <div className={s.field}>
+              <span>Start date</span>
+              <div className={pay.pkgRow}>
+                <button type="button" className={`${pay.pkg} ${startMode === 'today' ? pay.pkgOn : ''}`} onClick={() => setStartMode('today')}>
+                  Start today
+                </button>
+                <button type="button" className={`${pay.pkg} ${startMode === 'date' ? pay.pkgOn : ''}`} onClick={() => setStartMode('date')}>
+                  Start on a date
+                </button>
+              </div>
+            </div>
+            {startMode === 'date' && (
+              <label className={s.field}>
+                <span>Choose your start date</span>
+                <input type="date" value={startDate} min={todayStr} onChange={(e) => setStartDate(e.target.value)} />
+              </label>
+            )}
             {error ? <p className={s.error}>{error}</p> : null}
             <Button variant="primary" onClick={toPayment} disabled={busy}>
               {busy ? 'Starting checkout…' : 'Continue to payment'}
@@ -258,9 +327,17 @@ export function JoinClient({ plan }: { plan: string }) {
               <div ref={mountRef} className={pay.payEl} />
               {error ? <p className={s.error}>{error}</p> : null}
               <Button variant="primary" onClick={payNow} disabled={busy}>
-                {busy ? 'Taking payment…' : `Pay — ${displayPrice}`}
+                {busy
+                  ? payMode === 'setup'
+                    ? 'Saving your card…'
+                    : 'Taking payment…'
+                  : payMode === 'setup'
+                    ? `Save card — starts ${startLabel}`
+                    : `Pay — ${displayPrice}`}
               </Button>
-              <p className={pay.secure}>Paid securely with Stripe · Apple Pay &amp; cards.</p>
+              <p className={pay.secure}>
+                {payMode === 'setup' ? <>Saved securely with Stripe · first payment on {startLabel}.</> : <>Paid securely with Stripe · Apple Pay &amp; cards.</>}
+              </p>
             </div>
           </>
         )}
@@ -300,10 +377,6 @@ export function JoinClient({ plan }: { plan: string }) {
                 </select>
               </div>
             </div>
-            <label className={s.field}>
-              <span>Company (optional)</span>
-              <CompanyInput value={company} onChange={setCompany} placeholder="" />
-            </label>
             <label className={s.agree}>
               <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
               <span>
@@ -329,7 +402,7 @@ export function JoinClient({ plan }: { plan: string }) {
       <p className={s.alt}>
         {step === 'account' ? (
           <>
-            <Icon name="check" size={14} color="var(--gold-700)" /> Payment complete
+            <Icon name="check" size={14} color="var(--gold-700)" /> {payMode === 'setup' ? 'Card saved' : 'Payment complete'}
           </>
         ) : (
           <>

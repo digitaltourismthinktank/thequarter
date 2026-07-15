@@ -1,17 +1,25 @@
 /**
  * The Quarter — native in-site subscription checkout (no Payment Links, no redirect).
  *
- *   POST { plan, term, email, name? }
+ *   POST { plan, term, email, name?, startDate? }
  *     → creates/reuses a Stripe Customer, then a Subscription with
- *       payment_behavior=default_incomplete (so nothing is charged until the browser
- *       confirms the first-invoice PaymentIntent with Stripe's Payment Element).
- *     → { clientSecret, subscriptionId, customerId }
+ *       payment_behavior=default_incomplete.
+ *     → START TODAY (no/empty/past startDate): first invoice is due now; the browser
+ *       confirms its PaymentIntent with the Payment Element. → { clientSecret, mode:'payment', … }
+ *     → START ON A FUTURE DATE: the sub trials until London-midnight of that day, so the
+ *       first PAID invoice lands then. A trialing sub's first invoice is £0 (no
+ *       PaymentIntent), so we return the subscription's pending_setup_intent secret — the
+ *       browser saves the card via confirmSetup and Stripe auto-charges at trial_end.
+ *       → { clientSecret, mode:'setup', … }
+ *     → { clientSecret, mode, subscriptionId, customerId }
  *
  * The browser confirms in-site (Elements), then creates the Memberstack account with a
- * password. The Stripe webhook syncs plan/days on invoice.paid. No free trial: the first
- * invoice is due now. Prices mirror PLAN_STRIPE_PRICE (lib/plans.ts) + join.mjs.
+ * password. The Stripe webhook syncs plan/days on invoice.paid (days granted at trial_end
+ * for future-dated joins). Prices mirror PLAN_STRIPE_PRICE (lib/plans.ts) + join.mjs.
  * Env: STRIPE_SECRET_KEY (Subscriptions + Customers write).
  */
+import { londonWallClockToISO } from './_time.mjs';
+
 const STRIPE_SECRET = process.env.STRIPE_SECRET_KEY;
 
 const PLAN_PRICES = {
@@ -57,37 +65,84 @@ export default async function handler(req) {
     customerId = cust.id;
   }
 
+  // Optional future start date → a trial until London-midnight of that day, so the FIRST
+  // PAID invoice (and the day allowance) lands on the start date. Empty / today / past →
+  // charge now (the original behaviour). London tz via londonWallClockToISO (DST-aware).
+  const startDate = String(body.startDate || '');
+  let trialEnd = 0;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
+    const startUnix = Math.floor(new Date(londonWallClockToISO(startDate, '00:00')).getTime() / 1000);
+    if (startUnix > Math.floor(Date.now() / 1000) + 3600) trialEnd = startUnix; // future only
+  }
+  const future = trialEnd > 0;
+
   // Guard against stacking subscriptions when a member retries checkout (this is a pay-first
-  // flow, so an abandoned attempt leaves an unfinished subscription behind). Reuse an
-  // incomplete subscription for this exact price rather than creating a second one, and refuse
-  // outright if they already hold this plan — otherwise a retry would double-bill them.
+  // flow, so an abandoned attempt leaves an unfinished subscription behind). Reuse an in-flight
+  // subscription for this exact price rather than creating a second one, and refuse outright if
+  // they already hold this plan — otherwise a retry would double-bill them. A future-dated join
+  // sits in `trialing` from creation with a pending_setup_intent; an ABANDONED one (card not yet
+  // saved: no default PM, setup not succeeded) is reusable, not a duplicate.
   const existing = await stripe(
-    `/v1/subscriptions?customer=${customerId}&status=all&limit=20&expand[0]=data.latest_invoice.payment_intent`,
+    `/v1/subscriptions?customer=${customerId}&status=all&limit=20&expand[0]=data.latest_invoice.payment_intent&expand[1]=data.pending_setup_intent`,
     'GET',
   );
   const forPrice = (existing?.data || []).filter((s) => (s.items?.data || []).some((it) => it.price?.id === priceId));
-  if (forPrice.some((s) => ['active', 'trialing', 'past_due', 'unpaid'].includes(s.status))) {
+  const setupPending = (s) =>
+    s.status === 'trialing' &&
+    !s.default_payment_method &&
+    s.pending_setup_intent?.client_secret &&
+    s.pending_setup_intent?.status !== 'succeeded';
+  // Already a live membership (charged/active), or a future-dated one whose card is already
+  // saved (setup done, just awaiting its start date) → refuse. Abandoned trials fall through.
+  if (forPrice.some((s) => ['active', 'past_due', 'unpaid'].includes(s.status) || (s.status === 'trialing' && !setupPending(s)))) {
     return json(
       { error: 'already-subscribed', message: 'This email already has a membership started. Please log in — or if you just paid and didn’t finish setting up, contact us and we’ll complete it.' },
       409,
     );
   }
-  const reuse = forPrice.find((s) => s.status === 'incomplete' && s.latest_invoice?.payment_intent?.client_secret);
-  if (reuse) {
-    return json({ clientSecret: reuse.latest_invoice.payment_intent.client_secret, subscriptionId: reuse.id, customerId });
+  const reusePay = forPrice.find((s) => s.status === 'incomplete' && s.latest_invoice?.payment_intent?.client_secret);
+  if (reusePay) {
+    return json({ clientSecret: reusePay.latest_invoice.payment_intent.client_secret, mode: 'payment', subscriptionId: reusePay.id, customerId });
+  }
+  // Reuse an abandoned trial only for another future-dated attempt (switching back to
+  // start-today falls through to a fresh immediate sub; the card-less trial never charges).
+  const reuseSetup = future ? forPrice.find(setupPending) : null;
+  if (reuseSetup) {
+    // Keep the server authoritative on the date: if they changed it on retry, move the trial.
+    if (String(reuseSetup.trial_end) !== String(trialEnd)) {
+      await stripe(`/v1/subscriptions/${reuseSetup.id}`, 'POST', { trial_end: String(trialEnd), 'metadata[startDate]': startDate });
+    }
+    return json({ clientSecret: reuseSetup.pending_setup_intent.client_secret, mode: 'setup', subscriptionId: reuseSetup.id, customerId });
   }
 
-  const sub = await stripe('/v1/subscriptions', 'POST', {
+  const subForm = {
     customer: customerId,
     'items[0][price]': priceId,
     payment_behavior: 'default_incomplete',
     'payment_settings[save_default_payment_method]': 'on_subscription',
-    'expand[0]': 'latest_invoice.payment_intent',
     'metadata[plan]': plan,
     'metadata[term]': term,
     'metadata[source]': 'native-checkout',
-  });
+  };
+  if (future) {
+    // Trialing sub: £0 first invoice now, real charge auto-taken at trial_end from the card
+    // saved via the pending_setup_intent (no PaymentIntent exists to confirm during a trial).
+    // If a member abandons before saving a card, cancel at trial_end (never bill a no-card sub).
+    subForm['trial_end'] = String(trialEnd);
+    subForm['trial_settings[end_behavior][missing_payment_method]'] = 'cancel';
+    subForm['metadata[startDate]'] = startDate;
+    subForm['expand[0]'] = 'pending_setup_intent';
+  } else {
+    subForm['expand[0]'] = 'latest_invoice.payment_intent';
+  }
+  const sub = await stripe('/v1/subscriptions', 'POST', subForm);
+  if (sub?.error) return json({ error: 'stripe', detail: sub?.error?.message }, 502);
+  if (future) {
+    const clientSecret = sub?.pending_setup_intent?.client_secret;
+    if (!clientSecret) return json({ error: 'stripe', detail: 'no-setup-intent' }, 502);
+    return json({ clientSecret, mode: 'setup', subscriptionId: sub.id, customerId });
+  }
   const clientSecret = sub?.latest_invoice?.payment_intent?.client_secret;
-  if (sub?.error || !clientSecret) return json({ error: 'stripe', detail: sub?.error?.message || 'no-client-secret' }, 502);
-  return json({ clientSecret, subscriptionId: sub.id, customerId });
+  if (!clientSecret) return json({ error: 'stripe', detail: 'no-client-secret' }, 502);
+  return json({ clientSecret, mode: 'payment', subscriptionId: sub.id, customerId });
 }
