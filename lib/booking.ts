@@ -158,7 +158,7 @@ export const joinWithStartDate = (b: { plan: string; term: 'monthly' | 'annual';
 
 // Native in-site plan subscription (Stripe Elements — no Payment Links, no redirect out).
 export const subscribeToPlan = (b: { plan: string; term: 'monthly' | 'annual'; email: string; name?: string }) =>
-  call<{ clientSecret: string; subscriptionId: string; customerId: string }>('subscribe', { method: 'POST', auth: false, body: b });
+  call<{ clientSecret: string; subscriptionId: string; customerId: string; message?: string }>('subscribe', { method: 'POST', auth: false, body: b });
 
 // Native Day Pass one-off checkout (£21.60 PaymentIntent — replaces the Typeform embed).
 export const dayPassIntent = (b: { email: string; name: string; date: string }) =>
