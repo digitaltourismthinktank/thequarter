@@ -42,8 +42,8 @@ export default function HomePage() {
             than a workspace
           </h1>
           <p className={styles.heroLead}>
-            A boutique co-working home above Canterbury&rsquo;s Cathedral Quarter. Come for the warmth, the natural light
-            and the breakfast — find your focus, and an escape from home.
+            A boutique co-working space right next to Canterbury Cathedral, with incredible Cathedral views, great
+            workspaces and free coffee and snacks throughout the day.
           </p>
           <div className={styles.heroActions}>
             <Button size="lg" variant="accent" href="/day-pass" iconAfter="arrow-right">

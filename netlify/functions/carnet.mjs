@@ -73,7 +73,7 @@ export default async function handler(req) {
     const pi = await stripe('/v1/payment_intents', 'POST', {
       amount: String(pence),
       currency: 'gbp',
-      'automatic_payment_methods[enabled]': 'true',
+      'payment_method_types[0]': 'card',
       receipt_email: email,
       description: `The Quarter — carnet (${passes} day passes)`,
       'metadata[kind]': 'carnet',

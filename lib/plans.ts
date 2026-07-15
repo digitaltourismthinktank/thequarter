@@ -63,7 +63,6 @@ export const PLANS: Plan[] = [
     features: [
       'Everything in Visitor',
       'Ten days’ access a month',
-      'Your favourite corner, most weeks',
       'A registered office address',
     ],
     ctaLabel: 'Choose Resident',

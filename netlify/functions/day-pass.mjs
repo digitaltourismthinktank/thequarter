@@ -40,7 +40,7 @@ export default async function handler(req) {
   const pi = await stripe('/v1/payment_intents', 'POST', {
     amount: String(DAY_PASS_PENCE),
     currency: 'gbp',
-    'automatic_payment_methods[enabled]': 'true',
+    'payment_method_types[0]': 'card',
     receipt_email: email,
     description: `The Quarter — Day Pass (${date})`,
     'metadata[kind]': 'day-pass',

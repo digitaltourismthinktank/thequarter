@@ -35,7 +35,7 @@ export function SiteHeader() {
   return (
     <>
       <AnnouncementBar
-        message="New here? The Day Pass is our way in — a full day, breakfast included."
+        message="New here? Why not book a Day Pass"
         href="/day-pass"
         linkLabel="Book a Day Pass"
       />

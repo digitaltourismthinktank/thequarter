@@ -4,7 +4,6 @@ import { Badge } from '@/components/ds/Badge';
 import { Button } from '@/components/ds/Button';
 import { Icon } from '@/components/ds/Icon';
 import { PlanCard } from '@/components/ds/PlanCard';
-import { StartLater } from '@/components/site/StartLater';
 import { PLANS, getPlan } from '@/lib/plans';
 import { CARNET_BUNDLES, carnetPerPass, DAY_PASS_PRICE } from '@/lib/rewards';
 import { INCLUDED } from '@/lib/spaces';
@@ -76,8 +75,8 @@ export default function PlansPage() {
       {/* Other Plans — Hybrid Office + day-pass carnets */}
       <Section tone="page" style={{ paddingTop: 8 }}>
         <SectionHead
-          eyebrow="Other Plans"
-          title="Other ways in"
+          eyebrow="Also available"
+          title="Other Plans"
           intro="A registered address with a few days in the space, or a book of day passes to use as you like — cheaper per day than buying them one at a time."
           max={620}
         />
@@ -103,6 +102,7 @@ export default function PlansPage() {
               summary={`A book of ${b.passes} passes to use as you like.`}
               features={[
                 'Cheaper per day than a single pass',
+                'Use standalone or with a plan',
                 'Valid twelve months',
                 'For days your plan doesn’t cover',
                 'Or sign a friend in',
@@ -142,17 +142,6 @@ export default function PlansPage() {
             </div>
           </div>
         </div>
-      </Section>
-
-      {/* Start later */}
-      <Section tone="page">
-        <SectionHead
-          eyebrow="Not quite yet?"
-          title="Join now, start when it suits"
-          intro="Pick your plan and a start date — you’ll set up payment now, and your first invoice lands on the day you choose. Perfect if you’re between offices."
-          max={620}
-        />
-        <StartLater />
       </Section>
 
       {/* FAQ */}

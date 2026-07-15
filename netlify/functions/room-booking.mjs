@@ -236,7 +236,7 @@ export default async function handler(req) {
     const pi = await stripe('/v1/payment_intents', 'POST', {
       amount: String(priced.amountPence),
       currency: 'gbp',
-      'automatic_payment_methods[enabled]': 'true',
+      'payment_method_types[0]': 'card',
       receipt_email: email,
       description: `${space.name} — ${date} (${company})`,
       'metadata[kind]': 'room-booking',
