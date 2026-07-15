@@ -1,7 +1,7 @@
 /**
  * The Quarter — native Day Pass checkout (£21.60 one-off; replaces the Typeform).
  *
- *   POST { email, name, date }  → { clientSecret }   (Stripe PaymentIntent)
+ *   POST { firstName, lastName, company?, email, date }  → { clientSecret }   (Stripe PaymentIntent)
  *
  * The browser confirms in-site with the Payment Element. The Stripe webhook finalises
  * on payment_intent.succeeded (metadata.kind='day-pass') — records the pass + emails
@@ -29,7 +29,10 @@ export default async function handler(req) {
 
   const body = await req.json().catch(() => ({}));
   const email = String(body.email || '').trim().toLowerCase();
-  const name = String(body.name || '').trim();
+  const firstName = String(body.firstName || '').trim();
+  const lastName = String(body.lastName || '').trim();
+  const company = String(body.company || '').trim();
+  const name = `${firstName} ${lastName}`.trim();
   const date = String(body.date || '').trim();
   if (!isEmail(email)) return json({ error: 'bad-email' }, 400);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return json({ error: 'bad-date' }, 400);
@@ -43,6 +46,7 @@ export default async function handler(req) {
     'metadata[kind]': 'day-pass',
     'metadata[email]': email,
     'metadata[name]': name,
+    'metadata[company]': company,
     'metadata[date]': date,
   });
   if (pi?.error || !pi?.client_secret) return json({ error: 'stripe', detail: pi?.error?.message }, 502);

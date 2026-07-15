@@ -197,7 +197,7 @@ async function finaliseDayPass(pi) {
       [F.checkins.length]: 'Full',
       [F.checkins.status]: 'Paid',
       [F.checkins.source]: 'Web',
-      [F.checkins.notes]: `Day Pass · ${piId} · £${total.toFixed(2)}`,
+      [F.checkins.notes]: `Day Pass · ${piId} · £${total.toFixed(2)}${m.company ? ' · ' + m.company : ''}`,
     },
     { typecast: true },
   );

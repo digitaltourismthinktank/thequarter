@@ -88,11 +88,11 @@ export default function AboutPage() {
         <div className={styles.split}>
           <div>
             <Eyebrow>Dog friendly</Eyebrow>
-            <h2 className={styles.featureTitle}>Meet Marmaduke, our Chief Happiness Officer</h2>
+            <h2 className={styles.featureTitle}>Proudly dog-friendly</h2>
             <p className={styles.featureText}>
-              We&rsquo;re proudly dog-friendly — well-behaved four-legged colleagues are always welcome. Chief among them is
-              Marmaduke, our resident pug and self-appointed Chief Happiness Officer, who takes his morning-greeting and
-              lap-warming duties very seriously. Bring yours along; they&rsquo;ll be in good company.
+              Well-behaved four-legged colleagues are always welcome here &mdash; bring yours along, they&rsquo;ll be in
+              good company. Chief among our regulars is Marmaduke, our resident pug and self-appointed Chief Happiness
+              Officer, who takes his morning-greeting and lap-warming duties very seriously.
             </p>
           </div>
           <Photo src={PHOTOS.marmaduke.src} alt={PHOTOS.marmaduke.alt} ratio="5 / 4" sizes="(max-width: 900px) 100vw, 600px" />

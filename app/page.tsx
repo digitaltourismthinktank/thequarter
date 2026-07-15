@@ -197,11 +197,11 @@ export default function HomePage() {
           />
           <div>
             <Eyebrow>Plantspiration</Eyebrow>
-            <h2 className={styles.featureTitle}>Fresh, light and full of plants</h2>
+            <h2 className={styles.featureTitle}>Help yourself to the harvest</h2>
             <p className={styles.featureText}>
-              Lovingly renovated between 2023 and 2025, The Quarter feels fresh and full of life. Greenery runs
-              throughout, the light pours in, and the cathedral sits in the window of the café. It&rsquo;s the kind of
-              place you actually want to spend your day.
+              At the heart of the office, our Auk Smart Garden is a living urban farm &mdash; fresh herbs and greens
+              growing all year round, and you&rsquo;re welcome to help yourself to whatever&rsquo;s ready to pick. Greenery
+              runs right through the building too, so the air stays fresh and everyone breathes a little easier.
             </p>
             <div className={styles.featurePoints}>
               {PLANTSPIRATION.map(([icon, label]) => (

@@ -62,7 +62,7 @@ export default function EventsPage() {
                     </div>
                   </div>
                   <div className={styles.eventAction}>
-                    <Button size="sm" variant="secondary" href="/location#contact">
+                    <Button size="sm" variant="secondary" href="/login">
                       RSVP
                     </Button>
                   </div>

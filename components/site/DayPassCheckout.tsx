@@ -38,7 +38,9 @@ function loadStripe(): Promise<any> {
 const isEmail = (e: string) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e);
 
 export function DayPassCheckout() {
-  const [name, setName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [company, setCompany] = useState('');
   const [email, setEmail] = useState('');
   const [date, setDate] = useState('');
   const [step, setStep] = useState<'form' | 'pay' | 'done'>('form');
@@ -58,12 +60,12 @@ export function DayPassCheckout() {
 
   async function toPayment() {
     setError(null);
-    if (!name.trim()) return setError('Please enter your name.');
+    if (!firstName.trim() || !lastName.trim()) return setError('Please enter your name.');
     if (!isEmail(email.trim())) return setError('Please enter a valid email address.');
     if (!date) return setError('Please choose which day.');
     if (PREVIEW) return setError('Checkout runs on the live site — this is a preview.');
     setBusy(true);
-    const r = await dayPassIntent({ name: name.trim(), email: email.trim().toLowerCase(), date });
+    const r = await dayPassIntent({ firstName: firstName.trim(), lastName: lastName.trim(), company: company.trim(), email: email.trim().toLowerCase(), date });
     setBusy(false);
     if (!r.ok || !r.data.clientSecret) {
       setError(r.data?.error === 'bad-date' ? 'Please choose a valid day.' : 'We couldn’t start checkout just now — please try again.');
@@ -117,9 +119,19 @@ export function DayPassCheckout() {
     <div className={s.form}>
       {step === 'form' ? (
         <>
+          <div className={s.row}>
+            <label className={s.field}>
+              <span>First name</span>
+              <input value={firstName} onChange={(e) => setFirstName(e.target.value)} autoComplete="given-name" />
+            </label>
+            <label className={s.field}>
+              <span>Last name</span>
+              <input value={lastName} onChange={(e) => setLastName(e.target.value)} autoComplete="family-name" />
+            </label>
+          </div>
           <label className={s.field}>
-            <span>Your name</span>
-            <input value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" />
+            <span>Company</span>
+            <input value={company} onChange={(e) => setCompany(e.target.value)} autoComplete="organization" />
           </label>
           <label className={s.field}>
             <span>Email</span>

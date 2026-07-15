@@ -7,6 +7,7 @@ import { Icon } from '@/components/ds/Icon';
 import { STRIPE_PUBLISHABLE_KEY } from '@/lib/commerce';
 import { getMemberstack, memberstackError } from '@/lib/memberstack';
 import { PLANS, PLAN_MEMBERSTACK_ID, PLAN_DAY_ALLOWANCE, type PlanId } from '@/lib/plans';
+import { ANNUAL_PLANS } from '@/lib/rewards';
 import { subscribeToPlan, saveProfile, registerReferral } from '@/lib/booking';
 import { PREVIEW } from '@/lib/devMock';
 import { CompanyInput } from './CompanyInput';
@@ -77,6 +78,16 @@ export function JoinClient({ plan }: { plan: string }) {
   const elementsRef = useRef<any>(null);
 
   const termLabel = useMemo(() => (annualOnly ? 'billed annually' : term === 'annual' ? 'billed annually' : 'billed monthly'), [term, annualOnly]);
+
+  // The price shown MUST match what Stripe charges for the selected term. Visitor/Resident/Citizen
+  // annual totals live in ANNUAL_PLANS; Hybrid is annual-only and quoted per-month as a hook on the
+  // Plans page (£42), so here we surface its real annual total. (Provisional figures — reconcile
+  // with the live Stripe annual prices.)
+  const HYBRID_ANNUAL = 504; // £42 × 12
+  const annualTotal = ANNUAL_PLANS[slug]?.annual ?? (annualOnly ? HYBRID_ANNUAL : null);
+  const showAnnual = annualOnly || term === 'annual';
+  const displayPrice = showAnnual && annualTotal != null ? `£${annualTotal.toLocaleString('en-GB')}` : planDef?.price;
+  const displayPeriod = showAnnual ? 'a year' : planDef?.period;
 
   // Step 1 → create the subscription server-side, then mount the Payment Element.
   async function toPayment() {
@@ -199,7 +210,7 @@ export function JoinClient({ plan }: { plan: string }) {
         {step === 'account' ? 'Payment received — set up your login' : `Join as ${planDef.name}`}
       </h1>
       <p className={s.sub}>
-        {step === 'details' && <>The {planDef.name} plan — {planDef.price} · {planDef.period}. Pay securely below; no accounts to create first.</>}
+        {step === 'details' && <>The {planDef.name} plan — {displayPrice} · {displayPeriod}. Pay securely below; no accounts to create first.</>}
         {step === 'pay' && <>You&rsquo;re joining {planDef.name} ({termLabel}). Pay by card or Apple Pay — you stay right here.</>}
         {step === 'account' && <>All done on payment. Create your login to reach your dashboard, door code, days and bookings.</>}
       </p>
@@ -247,7 +258,7 @@ export function JoinClient({ plan }: { plan: string }) {
               <div ref={mountRef} className={pay.payEl} />
               {error ? <p className={s.error}>{error}</p> : null}
               <Button variant="primary" onClick={payNow} disabled={busy}>
-                {busy ? 'Taking payment…' : `Pay — ${planDef.price}`}
+                {busy ? 'Taking payment…' : `Pay — ${displayPrice}`}
               </Button>
               <p className={pay.secure}>Paid securely with Stripe · Apple Pay &amp; cards.</p>
             </div>
