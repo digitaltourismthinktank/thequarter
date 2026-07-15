@@ -202,6 +202,19 @@ export default async function handler(req) {
   const priced = priceRequest(space, { date, pkg, people, lunch });
   if (priced.error) return json({ error: priced.error }, 400);
 
+  // Meeting-room RECORD window: honour the caller's explicit start/end (the real
+  // slot chosen in the picker) so the saved booking shows the true times. The
+  // AMOUNT stays package-priced above (client can't move the £). Pods keep their
+  // computed single-hour window.
+  if (!priced.isPod) {
+    const rs = String(body.start || '');
+    const re = String(body.end || '');
+    if (/^\d{2}:\d{2}$/.test(rs) && /^\d{2}:\d{2}$/.test(re) && hhmmToMin(re) > hhmmToMin(rs)) {
+      priced.start = rs;
+      priced.end = re;
+    }
+  }
+
   const invalid = await validate(date, priced.start, priced.end);
   if (invalid) return json({ error: invalid }, 400);
 
@@ -215,6 +228,7 @@ export default async function handler(req) {
     const email = String(body.email || '').trim();
     const name = String(body.name || '').trim();
     const company = String(body.company || '').trim();
+    const jobTitle = String(body.jobTitle || '').trim();
     if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: 'bad-email' }, 400);
     if (!company) return json({ error: 'missing-company' }, 400);
     if (priced.amountPence < 100) return json({ error: 'bad-amount' }, 400);
@@ -235,6 +249,7 @@ export default async function handler(req) {
       'metadata[lunch]': lunch ? 'yes' : 'no',
       'metadata[company]': company,
       'metadata[name]': name,
+      'metadata[jobTitle]': jobTitle,
       'metadata[email]': email,
     });
     if (pi?.error || !pi?.client_secret) return json({ error: 'stripe', detail: pi?.error?.message }, 502);

@@ -109,6 +109,157 @@
   margin-top: 2px;
 }
 
+/* ---- Range picker (click-scroll-click, mirrors the member booker) ---- */
+.presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.preset {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 8px 12px;
+  font-family: inherit;
+  color: var(--text-body);
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: border-color var(--duration-base) var(--ease-out), background var(--duration-base) var(--ease-out);
+}
+.preset:hover:not(:disabled) {
+  border-color: var(--gold-400);
+}
+.preset:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.presetLabel {
+  font-size: var(--text-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--ink-900);
+}
+.presetSub {
+  font-size: var(--text-2xs);
+  color: var(--text-muted);
+}
+
+.hintRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+}
+.hint {
+  font-size: var(--text-sm);
+  color: var(--text-body);
+}
+.clear {
+  border: none;
+  background: none;
+  color: var(--gold-700);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+  font-size: var(--text-sm);
+  flex: none;
+}
+
+.slotGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(66px, 1fr));
+  gap: 7px;
+  margin-top: 10px;
+}
+.slot {
+  padding: 9px 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+  cursor: pointer;
+  font-size: var(--text-sm);
+  color: var(--ink-900);
+  text-align: center;
+  transition: border-color var(--duration-fast), background var(--duration-fast);
+}
+.slot:hover:not(:disabled) {
+  border-color: var(--gold-600);
+}
+.slotBusy {
+  background: var(--sand-100);
+  color: var(--text-muted);
+  cursor: not-allowed;
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+.slotSel {
+  background: var(--gold-600);
+  color: var(--pure-white);
+  border-color: var(--gold-600);
+  font-weight: var(--fw-semibold);
+}
+.slotStart {
+  background: var(--gold-100);
+  border-color: var(--gold-600);
+  color: var(--ink-900);
+  font-weight: var(--fw-semibold);
+}
+.slotPreview {
+  background: var(--gold-100);
+  border-color: var(--gold-400);
+  color: var(--ink-900);
+}
+
+.pickerState {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 96px;
+  margin-top: 10px;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+.spinner {
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-pill);
+  border: 2px solid var(--gold-200);
+  border-top-color: var(--gold-600);
+  animation: roomSpin 0.7s linear infinite;
+}
+@keyframes roomSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.pickerNote {
+  margin: 10px 0 0;
+  padding: 12px 14px;
+  background: var(--sand-100);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  color: var(--text-body);
+}
+
+.outOfHours {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  margin-top: 12px;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.pickPrompt {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
 /* ---- Summary rail ---- */
 .summary {
   background: var(--surface-card);

@@ -98,13 +98,19 @@ export interface RoomIntent extends RoomQuote {
 export interface RoomBookingInput {
   spaceId: string;
   date: string;
-  /** Meeting rooms: 'am' | 'pm' | 'full'. Pods: a start time 'HH:MM'. */
+  /** Meeting rooms: 'am' | 'pm' | 'full' (derived from the chosen range). Pods: a start time 'HH:MM'. */
   pkg: string;
+  /** The real chosen window ('HH:MM'). The AMOUNT is package-priced server-side; these
+   *  record the true booked times. Omitted → the server falls back to the package times. */
+  start?: string;
+  end?: string;
   people?: number;
   lunch?: boolean;
   company?: string;
   name?: string;
   email?: string;
+  /** Contact's job title (paid/company bookings). Stored in the booking Notes. */
+  jobTitle?: string;
 }
 export const roomQuote = (b: RoomBookingInput) =>
   call<RoomQuote>('room-booking', { method: 'POST', auth: false, body: { action: 'quote', ...b } });

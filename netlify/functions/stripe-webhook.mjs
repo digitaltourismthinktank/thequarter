@@ -117,7 +117,15 @@ async function finaliseRoomBooking(pi) {
   const total = (pi.amount ?? 0) / 100;
   const people = Number(m.people) || 1;
   const lunch = m.lunch === 'yes';
-  const notes = [`Paid booking · ${piId}`, `£${total.toFixed(2)} inc VAT`, `${people} ${people === 1 ? 'person' : 'people'}`, lunch ? 'Lunch added' : 'No lunch']
+  // F.bookings has no job-title field — carry it in Notes alongside the contact name.
+  const who = `${m.name || ''}${m.jobTitle ? `, ${m.jobTitle}` : ''}`.trim();
+  const notes = [
+    `Paid booking · ${piId}`,
+    `£${total.toFixed(2)} inc VAT`,
+    `${people} ${people === 1 ? 'person' : 'people'}`,
+    lunch ? 'Lunch added' : 'No lunch',
+    who ? `Contact: ${who}` : null,
+  ]
     .filter(Boolean)
     .join(' · ');
 

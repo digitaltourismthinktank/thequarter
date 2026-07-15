@@ -4,16 +4,32 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ds/Button';
 import { Icon } from '@/components/ds/Icon';
 import { STRIPE_PUBLISHABLE_KEY } from '@/lib/commerce';
-import { getSpaces, roomIntent, roomMemberStatus, roomMemberFree, type RoomQuoteLine, type RoomMemberStatus } from '@/lib/booking';
+import {
+  getSpaces,
+  getAvailability,
+  roomIntent,
+  roomMemberStatus,
+  roomMemberFree,
+  type BusyRange,
+  type RoomQuoteLine,
+  type RoomMemberStatus,
+} from '@/lib/booking';
 import { useMember } from './useMember';
+import { TalkToUs } from './TalkToUs';
 import { PREVIEW } from '@/lib/devMock';
+import { cn } from '@/lib/cn';
 import styles from './RoomBooking.module.css';
 
 /**
  * Native meeting-room booking. A logged-in member books free up to their monthly
- * hours cap (the two main rooms; pods are free elsewhere); non-members — and members
- * over their cap — pay by card / Apple Pay via Stripe's Payment Element. Price is a
- * client estimate; the server recomputes the authoritative amount + enforces the cap.
+ * hours cap (the two main rooms); non-members — and members over their cap — pay by
+ * card / Apple Pay via Stripe's Payment Element.
+ *
+ * Time is chosen with a click-scroll-click 30-minute range picker (mirroring the
+ * member dashboard booker): first click sets the start, moving the pointer previews
+ * the range, a second click sets the end; clicking again resets. The range maps to a
+ * half-/full-day PACKAGE for pricing — the server (room-booking.mjs) is the sole £
+ * authority; the client only displays estimates and sends {pkg, start, end}.
  */
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -38,14 +54,46 @@ function loadStripe(): Promise<any> {
 
 const QUIET_DAYS = [1, 3, 5];
 const LUNCH_PER_HEAD = 12;
-const PACKAGES = [
-  { id: 'am', label: 'Morning · 09:00–13:00', span: 'half' as const, hours: 4 },
-  { id: 'pm', label: 'Afternoon · 13:30–17:30', span: 'half' as const, hours: 4 },
-  { id: 'full', label: 'Full day · 09:00–17:30', span: 'full' as const, hours: 8.5 },
-];
+
+// The bookable meeting-room day, in minutes from midnight. 30-minute slots run
+// 09:00–17:30 (the full-day package window); the last selectable END is 17:30.
+const SLOT = 30;
+const DAY_OPEN = 9 * 60; // 09:00
+const DAY_CLOSE = 17 * 60 + 30; // 17:30 — max selectable end
+const MIDDAY = 13 * 60; // 13:00 — the half-day split
 
 const money = (n: number) => `£${n.toFixed(2)}`;
+const round2 = (n: number) => Math.round(n * 100) / 100;
 const norm = (s: string) => s.toLowerCase().replace(/[‘’']/g, "'").replace(/\s+/g, ' ').trim();
+const pad = (n: number) => String(n).padStart(2, '0');
+const minToHHMM = (m: number) => `${pad(Math.floor(m / 60))}:${pad(m % 60)}`;
+const fmtRange = (a: number, b: number) => `${minToHHMM(a)}–${minToHHMM(b)}`;
+
+/** Range → package. Wholly-morning (end ≤ 13:00) → 'am'; wholly-afternoon
+ *  (start ≥ 13:00) → 'pm'; anything that crosses midday → 'full'. So any ≤ half-day
+ *  selection is charged the half-day price; a midday-crossing selection is full day. */
+function pkgForRange(startMin: number, endMin: number): 'am' | 'pm' | 'full' {
+  if (endMin <= MIDDAY) return 'am';
+  if (startMin >= MIDDAY) return 'pm';
+  return 'full';
+}
+const rateLabel = (p: 'am' | 'pm' | 'full') => (p === 'full' ? 'full-day rate' : 'half-day rate');
+
+const PRESETS = [
+  { label: 'Morning', sub: '09:00–13:00', start: DAY_OPEN, end: MIDDAY },
+  { label: 'Afternoon', sub: '13:30–17:30', start: 13 * 60 + 30, end: DAY_CLOSE },
+  { label: 'Full day', sub: '09:00–17:30', start: DAY_OPEN, end: DAY_CLOSE },
+] as const;
+
+function nextWeekdayISO(): string {
+  const d = new Date();
+  for (let i = 0; i < 7; i++) {
+    const dow = d.getDay();
+    if (dow >= 1 && dow <= 5) break;
+    d.setDate(d.getDate() + 1);
+  }
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
 
 const ERRORS: Record<string, string> = {
   'slot-taken': 'That slot has just been taken — please pick another.',
@@ -64,17 +112,24 @@ export function RoomBooking({ roomName, price }: { roomName: string; price: { ha
   const [resolving, setResolving] = useState(true);
   const [status, setStatus] = useState<RoomMemberStatus | null>(null);
 
-  const [date, setDate] = useState('');
-  const [pkg, setPkg] = useState('am');
+  const [date, setDate] = useState<string>(() => nextWeekdayISO());
   const [people, setPeople] = useState(4);
   const [lunch, setLunch] = useState(false);
   const [company, setCompany] = useState('');
   const [name, setName] = useState('');
+  const [jobTitle, setJobTitle] = useState('');
   const [email, setEmail] = useState('');
+
+  // Range picker (mirrors BookingClient): pending start tap, hovered slot, committed range.
+  const [busy, setBusy] = useState<BusyRange[]>([]);
+  const [loadingAvail, setLoadingAvail] = useState(false);
+  const [start, setStart] = useState<number | null>(null);
+  const [hover, setHover] = useState<number | null>(null);
+  const [sel, setSel] = useState<{ start: number; end: number } | null>(null);
 
   const [step, setStep] = useState<'form' | 'pay' | 'done'>('form');
   const [freeDone, setFreeDone] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [serverLines, setServerLines] = useState<RoomQuoteLine[] | null>(null);
 
@@ -112,29 +167,107 @@ export function RoomBooking({ roomName, price }: { roomName: string; price: { ha
     };
   }, [member, date]);
 
-  const pkgDef = PACKAGES.find((p) => p.id === pkg)!;
-  const span = pkgDef.span;
+  // Live availability for the chosen room + date. Slow enough to warrant a spinner.
+  useEffect(() => {
+    if (!spaceId || !date) {
+      setBusy([]);
+      return;
+    }
+    let active = true;
+    setLoadingAvail(true);
+    setStart(null);
+    setSel(null);
+    (async () => {
+      const r = await getAvailability(spaceId, date);
+      if (!active) return;
+      setBusy(r.ok ? r.data.busy || [] : []);
+      setLoadingAvail(false);
+    })();
+    return () => {
+      active = false;
+    };
+  }, [spaceId, date]);
+
+  const slots = useMemo(() => {
+    const out: number[] = [];
+    for (let s = DAY_OPEN; s < DAY_CLOSE; s += SLOT) out.push(s);
+    return out;
+  }, []);
+
+  const slotBusy = (s: number) => busy.some((b) => s < b.endMin && s + SLOT > b.startMin);
+  const rangeFree = (lo: number, hi: number) => {
+    for (let s = lo; s < hi; s += SLOT) if (slotBusy(s)) return false;
+    return true;
+  };
+
+  // Two-tap selection: tap a start time, then an end time (end tap is inclusive).
+  function clickSlot(s: number) {
+    if (step === 'pay') return;
+    setError(null);
+    if (slotBusy(s)) return;
+    if (sel) {
+      setSel(null);
+      setStart(s);
+      return;
+    }
+    if (start === null) {
+      setStart(s);
+      return;
+    }
+    const lo = Math.min(start, s);
+    const hi = Math.max(start, s) + SLOT;
+    if (rangeFree(lo, hi)) {
+      setSel({ start: lo, end: hi });
+      setStart(null);
+    } else {
+      setStart(s); // crossed a busy slot → restart here
+    }
+  }
+
+  function preset(lo: number, hi: number) {
+    if (step === 'pay') return;
+    setError(null);
+    if (rangeFree(lo, hi)) {
+      setSel({ start: lo, end: hi });
+      setStart(null);
+    } else {
+      setError('That block isn’t free — please pick another.');
+    }
+  }
+
+  function clearSel() {
+    setStart(null);
+    setSel(null);
+    setError(null);
+  }
+
+  const pkg = sel ? pkgForRange(sel.start, sel.end) : null;
+  const span: 'half' | 'full' = pkg === 'full' ? 'full' : 'half';
+  const selHours = sel ? round2((sel.end - sel.start) / 60) : 0;
+
   const est = useMemo(() => {
+    if (!sel) return null;
     let hire = span === 'full' ? price.full : price.half;
     const dow = date ? new Date(`${date}T00:00:00`).getDay() : -1;
     const quiet = QUIET_DAYS.includes(dow);
-    if (quiet) hire = Math.round(hire * 0.8 * 100) / 100;
+    if (quiet) hire = round2(hire * 0.8);
     const lunchTotal = lunch ? Math.max(1, people) * LUNCH_PER_HEAD : 0;
-    return { hire, quiet, lunchTotal, total: Math.round((hire + lunchTotal) * 100) / 100 };
-  }, [span, price, date, lunch, people]);
+    return { hire, quiet, lunchTotal, total: round2(hire + lunchTotal) };
+  }, [sel, span, price, date, lunch, people]);
 
   const todayStr = useMemo(() => {
     const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   }, []);
 
-  // A member is booking free when they have enough free hours left for this package.
-  const freeEligible = !!member && !!status && !!date && pkgDef.hours <= status.remaining + 1e-6;
-  const overCap = !!member && !!status && pkgDef.hours > status.remaining + 1e-6;
+  // A member books free when the selected range fits inside their remaining free hours.
+  const freeEligible = !!member && !!status && !!sel && selHours <= status.remaining + 1e-6;
+  const overCap = !!member && !!status && !!sel && selHours > status.remaining + 1e-6;
 
   function validate(): string | null {
     if (!date) return 'Please choose a date.';
     if (new Date(`${date}T00:00:00`).getDay() % 6 === 0) return ERRORS.weekend;
+    if (!sel) return 'Please choose a time on the grid.';
     if (!spaceId) return ERRORS['no-space'];
     return null;
   }
@@ -144,9 +277,16 @@ export function RoomBooking({ roomName, price }: { roomName: string; price: { ha
     if (v) return setError(v);
     if (PREVIEW) return setError('Booking connects on the live site — this is a preview.');
     setError(null);
-    setBusy(true);
-    const r = await roomMemberFree({ spaceId: spaceId!, date, pkg, people });
-    setBusy(false);
+    setWorking(true);
+    const r = await roomMemberFree({
+      spaceId: spaceId!,
+      date,
+      pkg: pkg!,
+      start: minToHHMM(sel!.start),
+      end: minToHHMM(sel!.end),
+      people,
+    });
+    setWorking(false);
     if (r.ok && r.data.ok) {
       setFreeDone(true);
       setStep('done');
@@ -166,18 +306,21 @@ export function RoomBooking({ roomName, price }: { roomName: string; price: { ha
     if (!member && !company.trim()) return setError(ERRORS['missing-company']);
     if (!member && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return setError(ERRORS['bad-email']);
     if (PREVIEW) return setError('Online payment loads on the live site — this is a preview.');
-    setBusy(true);
+    setWorking(true);
     const r = await roomIntent({
       spaceId: spaceId!,
       date,
-      pkg,
+      pkg: pkg!,
+      start: minToHHMM(sel!.start),
+      end: minToHHMM(sel!.end),
       people,
       lunch,
       company: (company || (member ? 'Member booking' : '')).trim(),
       name: name.trim(),
+      jobTitle: jobTitle.trim(),
       email: email.trim() || memberEmailOf(member),
     });
-    setBusy(false);
+    setWorking(false);
     if (!r.ok || !r.data.clientSecret) {
       setError(ERRORS[r.data?.error ?? ''] ?? 'We couldn’t start the booking just now — please try again or enquire below.');
       return;
@@ -200,14 +343,14 @@ export function RoomBooking({ roomName, price }: { roomName: string; price: { ha
 
   async function pay() {
     if (!stripeRef.current || !elementsRef.current) return;
-    setBusy(true);
+    setWorking(true);
     setError(null);
     const { error: payErr, paymentIntent } = await stripeRef.current.confirmPayment({
       elements: elementsRef.current,
       confirmParams: { return_url: window.location.href },
       redirect: 'if_required',
     });
-    setBusy(false);
+    setWorking(false);
     if (payErr) return setError(payErr.message || 'That payment didn’t go through — please try again.');
     if (paymentIntent && (paymentIntent.status === 'succeeded' || paymentIntent.status === 'processing')) setStep('done');
     else setError('Payment needs another step — please try again.');
@@ -222,20 +365,39 @@ export function RoomBooking({ roomName, price }: { roomName: string; price: { ha
         <h3 className={styles.doneTitle}>You’re booked in</h3>
         <p className={styles.doneText}>
           {roomName} is reserved for {date}
+          {sel ? `, ${fmtRange(sel.start, sel.end)}` : ''}
           {freeDone ? ' — free, on your membership.' : `. We’ve emailed your confirmation${email ? ` to ${email}` : ''}.`} See you then.
         </p>
       </div>
     );
   }
 
-  const payTotal = serverLines ? serverLines.reduce((a, l) => a + l.amount, 0) : est.total;
+  // Hover preview of the whole block from the start tap to the hovered slot.
+  const previewRange =
+    start !== null && !sel && hover !== null && hover !== start
+      ? (() => {
+          const lo = Math.min(start, hover);
+          const hi = Math.max(start, hover) + SLOT;
+          return rangeFree(lo, hi) ? { lo, hi } : null;
+        })()
+      : null;
+
+  const hint = sel
+    ? `Selected ${fmtRange(sel.start, sel.end)} · ${rateLabel(pkg!)}`
+    : start !== null
+      ? `Start ${minToHHMM(start)} — now tap your end time`
+      : 'Tap a start time, then an end time — or use a preset above.';
+
+  const payTotal = serverLines ? serverLines.reduce((a, l) => a + l.amount, 0) : est?.total ?? 0;
   const lines: RoomQuoteLine[] =
     serverLines ??
-    [
-      { label: `${roomName} · ${pkgDef.label}`, amount: span === 'full' ? price.full : price.half },
-      ...(est.quiet ? [{ label: 'Quiet-day discount (20%)', amount: -Math.round((span === 'full' ? price.full : price.half) * 0.2 * 100) / 100 }] : []),
-      ...(lunch ? [{ label: `Lunch · ${Math.max(1, people)} × £${LUNCH_PER_HEAD}`, amount: est.lunchTotal }] : []),
-    ];
+    (sel
+      ? [
+          { label: `${roomName} · ${fmtRange(sel.start, sel.end)}`, amount: span === 'full' ? price.full : price.half },
+          ...(est?.quiet ? [{ label: 'Quiet-day discount (20%)', amount: -round2((span === 'full' ? price.full : price.half) * 0.2) }] : []),
+          ...(lunch ? [{ label: `Lunch · ${Math.max(1, people)} × £${LUNCH_PER_HEAD}`, amount: est?.lunchTotal ?? 0 }] : []),
+        ]
+      : []);
 
   return (
     <div className={styles.wrap}>
@@ -255,13 +417,64 @@ export function RoomBooking({ roomName, price }: { roomName: string; price: { ha
         </label>
 
         <div className={styles.field}>
-          <span className={styles.label}>Package</span>
-          <div className={styles.pkgRow}>
-            {PACKAGES.map((p) => (
-              <button key={p.id} type="button" className={`${styles.pkg} ${pkg === p.id ? styles.pkgOn : ''}`} onClick={() => setPkg(p.id)} disabled={step === 'pay'}>
-                {p.label}
+          <span className={styles.label}>Choose your time</span>
+          <div className={styles.presets}>
+            {PRESETS.map((p) => (
+              <button
+                key={p.label}
+                type="button"
+                className={styles.preset}
+                onClick={() => preset(p.start, p.end)}
+                disabled={step === 'pay' || loadingAvail || !spaceId}
+              >
+                <span className={styles.presetLabel}>{p.label}</span>
+                <span className={styles.presetSub}>{p.sub}</span>
               </button>
             ))}
+          </div>
+
+          <div className={styles.hintRow}>
+            <span className={styles.hint}>{hint}</span>
+            {(start !== null || sel) && step !== 'pay' ? (
+              <button type="button" className={styles.clear} onClick={clearSel}>
+                Clear
+              </button>
+            ) : null}
+          </div>
+
+          {loadingAvail || resolving ? (
+            <div className={styles.pickerState}>
+              <span className={styles.spinner} aria-hidden="true" />
+              <span>Checking availability…</span>
+            </div>
+          ) : !spaceId ? (
+            <p className={styles.pickerNote}>Online booking is being set up for this room — please chat to us below to reserve.</p>
+          ) : (
+            <div className={styles.slotGrid} onMouseLeave={() => setHover(null)}>
+              {slots.map((s) => {
+                const isBusy = slotBusy(s);
+                const isSel = !!sel && s >= sel.start && s < sel.end;
+                const isStart = start === s && !sel;
+                const isPreview = !!previewRange && s >= previewRange.lo && s < previewRange.hi;
+                return (
+                  <button
+                    key={s}
+                    type="button"
+                    disabled={isBusy || step === 'pay'}
+                    onClick={() => clickSlot(s)}
+                    onMouseEnter={() => setHover(s)}
+                    className={cn(styles.slot, isBusy && styles.slotBusy, isSel && styles.slotSel, isStart && styles.slotStart, isPreview && styles.slotPreview)}
+                  >
+                    {minToHHMM(s)}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          <div className={styles.outOfHours}>
+            <span>Need a time outside 09:00–17:40?</span>
+            <TalkToUs variant="ghost" label="Chat to us" prefill={`I’d like to book ${roomName} outside 09:00–17:40: `} />
           </div>
         </div>
 
@@ -299,6 +512,10 @@ export function RoomBooking({ roomName, price }: { roomName: string; price: { ha
               <input className={styles.input} value={name} onChange={(e) => setName(e.target.value)} disabled={step === 'pay'} />
             </label>
             <label className={styles.field}>
+              <span className={styles.label}>Job title</span>
+              <input className={styles.input} value={jobTitle} onChange={(e) => setJobTitle(e.target.value)} disabled={step === 'pay'} placeholder="e.g. Operations Manager" />
+            </label>
+            <label className={styles.field}>
               <span className={styles.label}>Email for confirmation</span>
               <input type="email" className={styles.input} value={email} onChange={(e) => setEmail(e.target.value)} disabled={step === 'pay'} />
             </label>
@@ -309,15 +526,21 @@ export function RoomBooking({ roomName, price }: { roomName: string; price: { ha
       <aside className={styles.summary}>
         <h3 className={styles.sumTitle}>{roomName}</h3>
 
-        {freeEligible ? (
+        {!sel ? (
+          <p className={styles.pickPrompt}>Pick a date and time on the left to see your price.</p>
+        ) : freeEligible ? (
           <>
             <div className={styles.total}>
               <span>Total</span>
-              <span>Free <small>on your membership</small></span>
+              <span>
+                Free <small>on your membership</small>
+              </span>
             </div>
-            <p className={styles.quiet}>Uses {pkgDef.hours}h of your {status?.capHours}h monthly allowance.</p>
-            <Button variant="accent" fullWidth onClick={bookFree} disabled={busy || resolving} iconAfter="arrow-right">
-              {busy ? 'Booking…' : 'Book — free'}
+            <p className={styles.quiet}>
+              Uses {selHours}h of your {status?.capHours}h monthly allowance.
+            </p>
+            <Button variant="accent" fullWidth onClick={bookFree} disabled={working || resolving} iconAfter="arrow-right">
+              {working ? 'Booking…' : 'Book — free'}
             </Button>
           </>
         ) : (
@@ -337,23 +560,23 @@ export function RoomBooking({ roomName, price }: { roomName: string; price: { ha
               </div>
             </div>
             {overCap ? <p className={styles.quiet}>You’ve used your free hours this month — this booking is paid.</p> : null}
-            {est.quiet && !serverLines ? <p className={styles.quiet}>Quiet-day rate applied — 20% off room hire.</p> : null}
+            {est?.quiet && !serverLines ? <p className={styles.quiet}>Quiet-day rate applied — 20% off room hire.</p> : null}
 
             {step === 'pay' ? (
               <div className={styles.payBox}>
                 <span className={styles.label}>Payment</span>
                 <div ref={mountRef} className={styles.payEl} />
-                <Button variant="accent" fullWidth onClick={pay} disabled={busy} iconAfter="arrow-right">
-                  {busy ? 'Taking payment…' : `Pay ${money(payTotal)}`}
+                <Button variant="accent" fullWidth onClick={pay} disabled={working} iconAfter="arrow-right">
+                  {working ? 'Taking payment…' : `Pay ${money(payTotal)}`}
                 </Button>
-                <button type="button" className={styles.back} onClick={() => setStep('form')} disabled={busy}>
+                <button type="button" className={styles.back} onClick={() => setStep('form')} disabled={working}>
                   ‹ Back
                 </button>
                 <p className={styles.secure}>Paid securely with Stripe · Apple Pay &amp; cards.</p>
               </div>
             ) : (
-              <Button variant="accent" fullWidth onClick={toPayment} disabled={busy || resolving} iconAfter="arrow-right">
-                {busy ? 'Checking…' : 'Continue to payment'}
+              <Button variant="accent" fullWidth onClick={toPayment} disabled={working || resolving} iconAfter="arrow-right">
+                {working ? 'Checking…' : 'Continue to payment'}
               </Button>
             )}
           </>
@@ -361,7 +584,7 @@ export function RoomBooking({ roomName, price }: { roomName: string; price: { ha
 
         {error ? <p className={styles.err}>{error}</p> : null}
         <p className={styles.note}>
-          Prefer to talk it through? <a href="#enquire">Chat to us</a> instead.
+          Tea, coffee, pastries &amp; yoghurts are included with every booking. Prefer to talk it through? <a href="#enquire">Chat to us</a>.
         </p>
       </aside>
     </div>

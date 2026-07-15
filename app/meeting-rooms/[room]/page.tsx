@@ -5,6 +5,7 @@ import { Badge } from '@/components/ds/Badge';
 import { Button } from '@/components/ds/Button';
 import { Icon } from '@/components/ds/Icon';
 import { RoomBooking } from '@/components/site/RoomBooking';
+import { RoomRefreshments } from '@/components/site/RoomRefreshments';
 import { TalkToUs } from '@/components/site/TalkToUs';
 import { ROOM_SLUGS, getMeetingRoom } from '@/lib/rooms';
 import styles from './room.module.css';
@@ -82,6 +83,17 @@ export default function RoomDetailPage({ params }: RoomParams) {
             </div>
           </div>
         </div>
+      </Section>
+
+      {/* Food & drink — refreshments included, lunch optional */}
+      <Section tone="card">
+        <SectionHead
+          eyebrow="While you’re here"
+          title="Refreshments included — lunch if you’d like it"
+          intro="Every room booking comes with tea, coffee, pastries and yoghurts. Add a proper lunch from The Sandwich Bar for £12 a head."
+          max={620}
+        />
+        <RoomRefreshments />
       </Section>
 
       {/* Book & pay online — instant, in-site */}

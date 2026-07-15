@@ -34,8 +34,8 @@
 
 .layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.5fr) minmax(300px, 0.9fr);
-  gap: 28px;
+  grid-template-columns: minmax(0, 0.82fr) minmax(0, 1.18fr);
+  gap: 32px;
   align-items: start;
 }
 @media (max-width: 940px) {
@@ -48,6 +48,46 @@
   display: flex;
   flex-direction: column;
   gap: 22px;
+}
+
+/* ---- Presentation column (photo + room summary), booker sits to its right ---- */
+.presentCol {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.presentHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+.presentTitle {
+  font-size: var(--text-lg);
+  font-weight: var(--fw-bold);
+  letter-spacing: -0.02em;
+}
+.presentBlurb {
+  margin: -4px 0 0;
+  font-size: var(--text-sm);
+  color: var(--text-body);
+  line-height: 1.55;
+}
+.presentFeatures {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.presentFeature {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  font-weight: var(--fw-medium);
+}
+.bookCol {
+  min-width: 0;
 }
 
 .rail {

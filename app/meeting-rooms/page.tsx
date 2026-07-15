@@ -4,9 +4,9 @@ import { Button } from '@/components/ds/Button';
 import { Icon } from '@/components/ds/Icon';
 import { RoomCard } from '@/components/ds/RoomCard';
 import { MeetingRoomsExplorer } from '@/components/site/MeetingRoomsExplorer';
+import { RoomRefreshments } from '@/components/site/RoomRefreshments';
 import { TalkToUs } from '@/components/site/TalkToUs';
 import { MEETING_ROOMS } from '@/lib/rooms';
-import { PHOTOS } from '@/lib/media';
 import styles from './meeting-rooms.module.css';
 
 export const metadata: Metadata = {
@@ -40,6 +40,16 @@ export default function MeetingRoomsPage() {
       </Section>
 
       <Section tone="card">
+        <SectionHead
+          eyebrow="While you’re here"
+          title="Refreshments included — lunch if you’d like it"
+          intro="Every room booking comes with tea, coffee, pastries and yoghurts. Add a proper lunch from The Sandwich Bar for £12 a head."
+          max={620}
+        />
+        <RoomRefreshments />
+      </Section>
+
+      <Section tone="sunken">
         <SectionHead eyebrow="The rooms" title="Two rooms, one warm standard" max={560} />
         <div className={styles.roomsGrid}>
           {MEETING_ROOMS.map((r) => (
