@@ -5,7 +5,8 @@ import { Button } from '@/components/ds/Button';
 import { Icon } from '@/components/ds/Icon';
 import { PlanCard } from '@/components/ds/PlanCard';
 import { StartLater } from '@/components/site/StartLater';
-import { PLANS } from '@/lib/plans';
+import { PLANS, getPlan } from '@/lib/plans';
+import { CARNET_BUNDLES, carnetPerPass, DAY_PASS_PRICE } from '@/lib/rewards';
 import { INCLUDED } from '@/lib/spaces';
 import { JsonLd } from '@/components/site/JsonLd';
 import styles from './plans.module.css';
@@ -36,7 +37,10 @@ const FAQS: [string, string][] = [
   ],
 ];
 
+const gbp = (n: number) => `£${n.toFixed(2)}`;
+
 export default function PlansPage() {
+  const hybrid = getPlan('hybrid-office');
   return (
     <>
       <Section tone="page" style={{ paddingBottom: 8 }}>
@@ -51,7 +55,7 @@ export default function PlansPage() {
 
       <Section tone="page" style={{ paddingTop: 24 }}>
         <div className={styles.planGrid}>
-          {PLANS.map((p) => (
+          {PLANS.filter((p) => p.id !== 'hybrid-office').map((p) => (
             <PlanCard
               key={p.id}
               name={p.name}
@@ -67,6 +71,50 @@ export default function PlansPage() {
           ))}
         </div>
         <p className={styles.vatNote}>Prices include VAT. Cancel any time on Visitor, Resident and Citizen.</p>
+      </Section>
+
+      {/* Other plans — Hybrid Office + day-pass carnets */}
+      <Section tone="page" style={{ paddingTop: 8 }}>
+        <SectionHead
+          eyebrow="Other plans"
+          title="Other ways in"
+          intro="A registered address with a few days in the space, or a book of day passes to use as you like — cheaper per day than buying them one at a time."
+          max={620}
+        />
+        <div className={styles.planGrid}>
+          {hybrid ? (
+            <PlanCard
+              name={hybrid.name}
+              price={hybrid.price}
+              period={hybrid.period}
+              summary={hybrid.summary}
+              features={hybrid.features}
+              badge={hybrid.badge}
+              ctaLabel={hybrid.ctaLabel}
+              ctaHref={hybrid.ctaHref}
+            />
+          ) : null}
+          {CARNET_BUNDLES.map((b) => (
+            <PlanCard
+              key={b.passes}
+              name={`${b.passes} day passes`}
+              price={gbp(b.price)}
+              period={`${gbp(carnetPerPass(b))} a pass`}
+              summary={`A book of ${b.passes} passes to use as you like.`}
+              features={[
+                'Cheaper per day than a single pass',
+                'Valid twelve months',
+                'For days your plan doesn’t cover',
+                'Or sign a friend in',
+              ]}
+              featured={b.bestValue}
+              badge={b.bestValue ? 'Best value' : undefined}
+              ctaLabel="Buy carnet"
+              ctaHref="/buy-carnet"
+            />
+          ))}
+        </div>
+        <p className={styles.vatNote}>A single day pass is {gbp(DAY_PASS_PRICE)}. Carnet passes are valid for twelve months.</p>
       </Section>
 
       {/* Always included + teams */}

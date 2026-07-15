@@ -32,6 +32,8 @@ const json = (b, s = 200) => new Response(JSON.stringify(b), { status: s, header
 // passes → price in pence (reverse of CARNET_AMOUNT_TO_PASSES — one source of truth).
 const CARNET_PENCE = Object.fromEntries(Object.entries(CARNET_AMOUNT_TO_PASSES).map(([pence, passes]) => [passes, Number(pence)]));
 
+const isEmail = (e) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e);
+
 async function stripe(path, method, form) {
   const res = await fetch(`https://api.stripe.com${path}`, {
     method,
@@ -49,20 +51,25 @@ function carnetOf(m) {
 export default async function handler(req) {
   if (!airtableReady() || !MS_SECRET) return json({ error: 'not-configured' }, 503);
   const body = req.method === 'POST' ? await req.json().catch(() => ({})) : null;
-  const vm = await verifyMember(tokenFromRequest(req, body));
-  if (!vm.ok) return json({ error: vm.reason }, 401);
-  const me = vm.member;
-  const email = memberEmail(me);
 
-  if (req.method === 'GET') return json({ carnet: carnetOf(me) });
-  if (req.method !== 'POST') return json({ error: 'method-not-allowed' }, 405);
-
-  // Native carnet purchase — in-site Stripe PaymentIntent (replaces the Payment Links).
-  if (body.action === 'intent') {
+  // Carnet purchase — in-site Stripe PaymentIntent. PUBLIC (buy-then-join): a guest with no
+  // account can buy a book of passes; their email rides in the PI metadata so the Stripe
+  // webhook credits the passes once an account with that same email exists (its
+  // 'member-not-ready-carnet' retry waits for it). A signed-in member's token, when present,
+  // takes precedence for the email. The £ amount is server-authoritative (CARNET_PENCE) — the
+  // client only *selects* a bundle by pass count, so a forged amount can never reach Stripe.
+  if (req.method === 'POST' && body?.action === 'intent') {
     if (!STRIPE_SECRET) return json({ error: 'not-configured' }, 503);
     const passes = Number(body.passes) || 0;
     const pence = CARNET_PENCE[passes];
     if (!pence) return json({ error: 'bad-bundle' }, 400);
+    // Prefer the signed-in member (token); otherwise the guest's posted details.
+    const vm = await verifyMember(tokenFromRequest(req, body));
+    const email = (vm.ok ? memberEmail(vm.member) : String(body.email || '').trim().toLowerCase()) || '';
+    if (!isEmail(email)) return json({ error: 'bad-email' }, 400);
+    const guestName = `${String(body.firstName || '')} ${String(body.lastName || '')}`.trim() || String(body.name || '').trim();
+    const name = vm.ok ? memberName(vm.member) : guestName;
+    const company = vm.ok ? '' : String(body.company || '').trim();
     const pi = await stripe('/v1/payment_intents', 'POST', {
       amount: String(pence),
       currency: 'gbp',
@@ -72,10 +79,21 @@ export default async function handler(req) {
       'metadata[kind]': 'carnet',
       'metadata[email]': email,
       'metadata[passes]': String(passes),
+      'metadata[name]': name,
+      'metadata[company]': company,
     });
     if (pi?.error || !pi?.client_secret) return json({ error: 'stripe', detail: pi?.error?.message }, 502);
     return json({ clientSecret: pi.client_secret });
   }
+
+  // Everything else (GET balance, POST 'use') requires a member.
+  const vm = await verifyMember(tokenFromRequest(req, body));
+  if (!vm.ok) return json({ error: vm.reason }, 401);
+  const me = vm.member;
+  const email = memberEmail(me);
+
+  if (req.method === 'GET') return json({ carnet: carnetOf(me) });
+  if (req.method !== 'POST') return json({ error: 'method-not-allowed' }, 405);
 
   if (body.action === 'use') {
     const c = carnetOf(me);

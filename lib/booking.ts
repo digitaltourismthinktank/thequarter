@@ -168,6 +168,11 @@ export const dayPassIntent = (b: { firstName: string; lastName: string; company?
 export const carnetIntent = (passes: number) =>
   call<{ clientSecret: string }>('carnet', { method: 'POST', body: { action: 'intent', passes } });
 
+// Public carnet purchase (buy-then-join — no account yet). The guest's email rides in the
+// Stripe PI metadata; the webhook credits the passes once they create an account with it.
+export const carnetIntentPublic = (b: { passes: number; firstName: string; lastName: string; company?: string; email: string }) =>
+  call<{ clientSecret: string }>('carnet', { method: 'POST', auth: false, body: { action: 'intent', ...b } });
+
 // Public perks shopfront — the live Airtable perks (display fields only, no auth).
 export interface PublicPerk {
   partner: string;
