@@ -168,12 +168,15 @@ async function monthlyMeetingRoomHours(email, dateStr) {
   const spaces = await listRecords(T.spaces, {});
   const meetingIds = new Set(spaces.filter((r) => !/pod/.test(norm(r.fields[F.spaces.type] || ''))).map((r) => r.id));
   const recs = await listRecords(T.bookings, {
-    filterByFormula: `AND({Member email}='${esc(email)}', {Status}='Confirmed', DATETIME_FORMAT({Date}, 'YYYY-MM')='${esc(ym)}')`,
+    filterByFormula: `AND(LOWER({Member email})='${esc((email || '').toLowerCase())}', {Status}='Confirmed', DATETIME_FORMAT({Date}, 'YYYY-MM')='${esc(ym)}')`,
   });
   let hours = 0;
   for (const r of recs) {
     const sp = r.fields[F.bookings.space];
     if (!Array.isArray(sp) || !sp.length || !meetingIds.has(sp[0])) continue;
+    // Only FREE member bookings consume the monthly allowance. A member's PAID booking
+    // (kind 'Company') now carries their member email, so guard against it eating free hours.
+    if (r.fields[F.bookings.kind] !== 'Member') continue;
     const s = isoToLondonMin(r.fields[F.bookings.start]);
     const e = isoToLondonMin(r.fields[F.bookings.end]);
     if (Number.isFinite(s) && Number.isFinite(e) && e > s) hours += (e - s) / 60;

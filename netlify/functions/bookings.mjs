@@ -114,10 +114,12 @@ export default async function handler(req) {
     if (action === 'mine') {
       const vm = await verifyMember(tokenFromRequest(req, null));
       if (!vm.ok) return json({ error: vm.reason }, 401);
-      const email = memberEmail(vm.member);
+      // Case-insensitive email match (mirrors checkin.mjs) so a member sees their
+      // bookings regardless of how their address was cased when the record was written.
+      const email = (memberEmail(vm.member) || '').toLowerCase();
       const today = londonNow().dateStr;
       const recs = await listRecords(T.bookings, {
-        filterByFormula: `AND({Member email}='${esc(email)}', {Status}='Confirmed', DATETIME_FORMAT({Date}, 'YYYY-MM-DD')>='${today}')`,
+        filterByFormula: `AND(LOWER({Member email})='${esc(email)}', {Status}='Confirmed', {Kind}!='Privatisation', DATETIME_FORMAT({Date}, 'YYYY-MM-DD')>='${today}')`,
         sort: [{ field: 'Start' }],
       });
       const mine = recs.map((r) => ({
@@ -127,6 +129,7 @@ export default async function handler(req) {
         endMin: isoToLondonMin(r.fields[F.bookings.end]),
         space: Array.isArray(r.fields[F.bookings.space]) ? r.fields[F.bookings.space][0] : null,
         title: r.fields[F.bookings.title],
+        kind: r.fields[F.bookings.kind],
       }));
       return json({ bookings: mine });
     }
@@ -164,7 +167,7 @@ export default async function handler(req) {
     // A member can't hold two rooms at the same time — check their other confirmed
     // bookings that day (any room) for an overlap.
     const mineThatDay = await listRecords(T.bookings, {
-      filterByFormula: `AND(DATETIME_FORMAT({Date}, 'YYYY-MM-DD')='${esc(date)}', {Member email}='${esc(email)}', {Status}='Confirmed')`,
+      filterByFormula: `AND(DATETIME_FORMAT({Date}, 'YYYY-MM-DD')='${esc(date)}', LOWER({Member email})='${esc((email || '').toLowerCase())}', {Status}='Confirmed')`,
     });
     const selfClash = mineThatDay.some((r) => {
       const rs = isoToLondonMin(r.fields[F.bookings.start]);
@@ -195,6 +198,10 @@ export default async function handler(req) {
     const r = recs[0];
     if (!r) return json({ error: 'not-found' }, 404);
     if (r.fields[F.bookings.email] !== email && !isAdmin(me)) return json({ error: 'forbidden' }, 403);
+    // A member must not self-cancel a PAID booking (Kind 'Company', £90–£240) — cancelling
+    // here only sets Status='Cancelled' with no Stripe refund, silently voiding money paid.
+    // Paid changes go through ops/refund, not the member dashboard.
+    if (r.fields[F.bookings.kind] === 'Company') return json({ error: 'paid-booking' }, 403);
     await updateRecord(T.bookings, bookingId, { [F.bookings.status]: 'Cancelled' });
     return json({ ok: true });
   }

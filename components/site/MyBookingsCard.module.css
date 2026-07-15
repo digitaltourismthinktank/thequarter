@@ -67,6 +67,12 @@
   font-size: var(--text-sm);
   flex: none;
 }
+.note {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  flex: none;
+  text-align: right;
+}
 .actions {
   display: flex;
   gap: 10px;

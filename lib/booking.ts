@@ -58,6 +58,8 @@ export interface MyBooking {
   endMin: number;
   space: string | null;
   title: string;
+  /** 'Member' = free self-cancellable booking; 'Company' = paid (no self-cancel — ops/refund). */
+  kind: string;
 }
 export interface CheckinStatus {
   date: string;

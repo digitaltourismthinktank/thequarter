@@ -72,9 +72,13 @@ export function MyBookingsCard({ className }: { className?: string }) {
                     {dayLabel(b.date)} · {minToHHMM(b.startMin)}–{minToHHMM(b.endMin)}
                   </span>
                 </span>
-                <button type="button" className={styles.cancel} onClick={() => cancel(b.id)} disabled={busy}>
-                  Cancel booking
-                </button>
+                {b.kind === 'Member' ? (
+                  <button type="button" className={styles.cancel} onClick={() => cancel(b.id)} disabled={busy}>
+                    Cancel booking
+                  </button>
+                ) : (
+                  <span className={styles.note}>Paid booking · contact us to change</span>
+                )}
               </li>
             ))}
           </ul>

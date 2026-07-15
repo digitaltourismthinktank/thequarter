@@ -125,6 +125,9 @@ async function finaliseRoomBooking(pi) {
     `${people} ${people === 1 ? 'person' : 'people'}`,
     lunch ? 'Lunch added' : 'No lunch',
     who ? `Contact: ${who}` : null,
+    // When a signed-in member pays, {Member email} below holds THEIR address (so the
+    // booking is queryable on the dashboard); keep the booking-form contact email here.
+    m.memberEmail && m.email ? `Contact email: ${m.email}` : null,
   ]
     .filter(Boolean)
     .join(' · ');
@@ -138,7 +141,9 @@ async function finaliseRoomBooking(pi) {
       [F.bookings.start]: londonWallClockToISO(m.date, m.start),
       [F.bookings.end]: londonWallClockToISO(m.date, m.end),
       [F.bookings.kind]: 'Company',
-      [F.bookings.email]: m.email || '',
+      // Prefer the member's own email (set by room-booking.mjs when a signed-in member
+      // pays) so the booking shows on their dashboard; fall back to the form contact.
+      [F.bookings.email]: m.memberEmail || m.email || '',
       [F.bookings.name]: m.name || '',
       [F.bookings.company]: m.company || '',
       [F.bookings.status]: 'Confirmed',
