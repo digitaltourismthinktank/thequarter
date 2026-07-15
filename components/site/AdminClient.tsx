@@ -1275,7 +1275,8 @@ function AdminTodayPane({ onAllBirthdays }: { onAllBirthdays: () => void }) {
             <span className={styles.todayCardLabel}>Who&rsquo;s in</span>
             <strong className={styles.todayBig}>{checkins.length}</strong>
             <span className={styles.todayCardSub}>
-              {checkins.filter((c) => c.status === 'Checked-in').length} here · {checkins.filter((c) => c.status !== 'Checked-in').length} expected
+              {checkins.filter((c) => !c.dayPass && c.status === 'Checked-in').length} here · {checkins.filter((c) => !c.dayPass && c.status !== 'Checked-in').length} expected
+              {checkins.some((c) => c.dayPass) ? ` · ${checkins.filter((c) => c.dayPass).length} day pass` : ''}
               {isLiveToday && roll.guests.length ? ` · ${roll.guests.length} guest${roll.guests.length === 1 ? '' : 's'}` : ''}
             </span>
             {checkins.length ? (
@@ -1283,11 +1284,15 @@ function AdminTodayPane({ onAllBirthdays }: { onAllBirthdays: () => void }) {
                 {checkins.map((c, i) => (
                   <span
                     key={`${c.name}-${i}`}
-                    className={`${styles.who} ${c.length === 'Half' ? styles.whoHalf : ''} ${c.status !== 'Checked-in' ? styles.whoExpected : ''}`}
-                    title={`${c.status === 'Checked-in' ? 'Here now' : 'Expected'} · ${c.length === 'Half' ? 'Half day' : 'Full day'}`}
+                    className={`${styles.who} ${c.dayPass ? styles.whoDayPass : ''} ${c.length === 'Half' ? styles.whoHalf : ''} ${!c.dayPass && c.status !== 'Checked-in' ? styles.whoExpected : ''}`}
+                    title={
+                      c.dayPass
+                        ? `Day Pass · Paid${c.company ? ` · ${c.company}` : ''}${c.email ? ` · ${c.email}` : ''}`
+                        : `${c.status === 'Checked-in' ? 'Here now' : 'Expected'} · ${c.length === 'Half' ? 'Half day' : 'Full day'}`
+                    }
                   >
                     {c.name}
-                    {c.length === 'Half' ? ' · ½' : ''}
+                    {c.dayPass ? <span className={styles.whoTag}>Day Pass · Paid</span> : c.length === 'Half' ? ' · ½' : ''}
                   </span>
                 ))}
               </div>

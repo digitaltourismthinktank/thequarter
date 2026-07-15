@@ -870,6 +870,24 @@ select.input {
   border-color: var(--border-subtle);
   color: var(--text-muted);
 }
+/* Paid day-pass guest (bought online, not a member) — a solid gold fill so staff
+   spot booked day guests at a glance, with an inline "Day Pass · Paid" tag. */
+.whoDayPass {
+  background: var(--gold-500);
+  color: var(--ink-900);
+  border-color: transparent;
+}
+.whoTag {
+  margin-left: 6px;
+  font-size: var(--text-2xs);
+  font-weight: var(--fw-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: var(--surface-card);
+  color: var(--gold-700);
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+}
 .bdayList {
   display: flex;
   flex-direction: column;

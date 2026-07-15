@@ -156,14 +156,32 @@ async function bookingsForDate(date) {
 async function checkinsForDate(date) {
   // Include Planned (booked ahead, not yet arrived) as well as Checked-in, so
   // "who's in" reflects everyone expected that day — not just those on site now.
+  // Also include paid Day Passes (Status='Paid', Source='Web') — guests who've
+  // bought a day online and are due in, so staff can spot them ahead of arrival.
   const recs = await listRecords(T.checkins, {
-    filterByFormula: `AND(DATETIME_FORMAT({Date}, 'YYYY-MM-DD')='${esc(date)}', OR({Status}='Checked-in', {Status}='Planned'))`,
+    filterByFormula: `AND(DATETIME_FORMAT({Date}, 'YYYY-MM-DD')='${esc(date)}', OR({Status}='Checked-in', {Status}='Planned', {Status}='Paid'))`,
   });
-  return recs.map((r) => ({
-    name: r.fields[F.checkins.name] || r.fields[F.checkins.email] || 'Member',
-    length: r.fields[F.checkins.length] || 'Full',
-    status: r.fields[F.checkins.status] || 'Planned',
-  }));
+  return recs.map((r) => {
+    const status = r.fields[F.checkins.status] || 'Planned';
+    const source = r.fields[F.checkins.source] || '';
+    // A paid day-pass guest, not a member — flagged so the UI can mark them distinctly.
+    const dayPass = status === 'Paid' || source === 'Web';
+    // Day-pass rows carry the guest's company at the tail of the Notes field
+    // ("Day Pass · <pi> · £<total> · <company>") — surface it when present.
+    let company = '';
+    if (dayPass) {
+      const parts = String(r.fields[F.checkins.notes] || '').split(' · ');
+      if (parts.length >= 4) company = parts.slice(3).join(' · ').trim();
+    }
+    return {
+      name: r.fields[F.checkins.name] || r.fields[F.checkins.email] || (dayPass ? 'Day guest' : 'Member'),
+      length: r.fields[F.checkins.length] || 'Full',
+      status,
+      dayPass,
+      email: r.fields[F.checkins.email] || '',
+      company,
+    };
+  });
 }
 
 export default async function handler(req) {

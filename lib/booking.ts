@@ -366,6 +366,10 @@ export interface AdminCheckin {
   name: string;
   length: string;
   status?: string;
+  /** True for a paid Day Pass guest (Status 'Paid' / Source 'Web') — not a member. */
+  dayPass?: boolean;
+  email?: string;
+  company?: string;
 }
 export const adminGetToday = (date: string) =>
   call<{ date: string; checkins: AdminCheckin[]; bookings: AdminBooking[] }>(`admin?action=today&date=${date}`);

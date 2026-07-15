@@ -36,13 +36,13 @@ export const metadata: Metadata = {
     url: SITE.url,
     title: `${SITE.name} — ${SITE.tagline}`,
     description: SITE.description,
-    images: [{ url: SITE.ogImage, width: 1200, height: 630, alt: SITE.name }],
+    images: [{ url: '/og-image.png', width: 1200, height: 630, alt: `${SITE.name} — ${SITE.tagline}` }],
   },
   twitter: {
     card: 'summary_large_image',
     title: `${SITE.name} — ${SITE.tagline}`,
     description: SITE.description,
-    images: [SITE.ogImage],
+    images: ['/og-image.png'],
   },
 };
 
