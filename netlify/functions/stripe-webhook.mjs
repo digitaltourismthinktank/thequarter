@@ -308,7 +308,22 @@ async function finalisePrivatisation(m, refId, toEmail) {
   if (existing.some((r) => String(r.fields[F.bookings.notes] || '').includes(refId))) return { skipped: 'duplicate' };
 
   const spaceId = await spaceIdByName(m.roomName || '');
-  const notes = [`Privatisation · ${refId}`, `${m.frequency || ''} (${m.days || 'full week'})`, `${m.members || '?'} members`, `from ${m.startDate || ''}`].join(' · ');
+  // Persist a reliably parseable slots token so privatisation.mjs's availability check can
+  // recompute this booking's occupied dates later. Format MUST match parseSlots there:
+  //   slots=<week|month>:<weekday>-<weekday>   (weekdays 1..5), with Date = startDate.
+  const cadence = String(m.frequency || '').startsWith('month') ? 'month' : 'week';
+  const weekdays = String(m.days || '')
+    .split(',')
+    .map((s) => Number(s.trim()))
+    .filter((n) => n >= 1 && n <= 5);
+  const slots = weekdays.length ? `slots=${cadence}:${weekdays.join('-')}` : '';
+  const notes = [
+    `Privatisation · ${refId}`,
+    `${m.frequency || ''} (${m.days || 'full week'})`,
+    `${m.members || '?'} members`,
+    `from ${m.startDate || ''}`,
+    ...(slots ? [slots] : []),
+  ].join(' · ');
   const fields = {
     [F.bookings.title]: `Privatisation · ${m.company || m.roomName || ''}`,
     [F.bookings.kind]: 'Privatisation',

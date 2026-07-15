@@ -6,7 +6,7 @@ import { Icon } from '@/components/ds/Icon';
 import { Photo } from '@/components/site/primitives';
 import { STRIPE_PUBLISHABLE_KEY } from '@/lib/commerce';
 import { PRIVATISATION_ROOMS, FREQUENCIES, WEEKDAYS, PRIVATISATION_MIN_MEMBERS, quarterlyAmount, type FrequencyId } from '@/lib/privatisation';
-import { privatisationSubscribe } from '@/lib/booking';
+import { privatisationSubscribe, privatisationAvailability } from '@/lib/booking';
 import { DatePickerModal } from './DatePickerModal';
 import { PREVIEW } from '@/lib/devMock';
 import styles from './Privatisation.module.css';
@@ -47,6 +47,7 @@ const ERRORS: Record<string, string> = {
   'min-members': `Privatisation is for teams of ${PRIVATISATION_MIN_MEMBERS} or more.`,
   'over-capacity': 'That’s more people than this room seats — pick the larger room or reduce the team size.',
   'days-mismatch': 'Please pick the number of days that matches your chosen frequency.',
+  'weekday-taken': 'One of those days is already taken on this room — please pick another day or room.',
   'bad-email': 'Please enter a valid email address.',
   'missing-company': 'Please add your company name.',
   'bad-date': 'Please choose a start date.',
@@ -73,6 +74,9 @@ export function Privatisation() {
   const [step, setStep] = useState<'form' | 'pay'>('form');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Real-time per-weekday availability on the chosen room/cadence/start-date.
+  const [avail, setAvail] = useState<Record<number, 'free' | 'taken'>>({});
+  const [checking, setChecking] = useState(false);
 
   const mountRef = useRef<HTMLDivElement | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -93,10 +97,38 @@ export function Privatisation() {
   function toggleDay(id: number) {
     setDays((cur) => {
       if (cur.includes(id)) return cur.filter((d) => d !== id);
-      if (cur.length >= freq.daysPerWeek) return [...cur.slice(1), id]; // keep to the frequency limit
+      if (cur.length >= freq.days) return [...cur.slice(1), id]; // keep to the frequency limit
       return [...cur, id];
     });
   }
+
+  // Check which weekdays are already taken on this room whenever the room, cadence or start
+  // date changes. Debounced; resilient — on any error we leave the map empty (nothing greyed,
+  // submit not blocked) and let the server re-check with 'weekday-taken'.
+  useEffect(() => {
+    if (PREVIEW || !startDate) {
+      setAvail({});
+      setChecking(false);
+      return;
+    }
+    let cancelled = false;
+    setChecking(true);
+    const t = setTimeout(async () => {
+      const r = await privatisationAvailability({ roomSlug, frequency, weekdays: WEEKDAYS.map((d) => d.id), startDate });
+      if (cancelled) return;
+      setChecking(false);
+      setAvail(r.ok && r.data.weekdays ? r.data.weekdays : {});
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [roomSlug, frequency, startDate]);
+
+  // Drop any selected weekday that has become taken (e.g. after switching room/date).
+  useEffect(() => {
+    setDays((cur) => cur.filter((d) => avail[d] !== 'taken'));
+  }, [avail]);
 
   async function toPayment() {
     setError(null);
@@ -108,7 +140,8 @@ export function Privatisation() {
       return setError(`${room.name} seats ${room.capacity} — reduce your team size${other ? ` or choose ${other.name}` : ''}.`);
     }
     if (!startDate) return setError(ERRORS['bad-date']);
-    if (!wholeWeek && days.length !== freq.daysPerWeek) return setError(ERRORS['days-mismatch']);
+    if (!wholeWeek && days.length !== freq.days) return setError(ERRORS['days-mismatch']);
+    if (days.some((d) => avail[d] === 'taken')) return setError(ERRORS['weekday-taken']);
     if (PREVIEW) {
       setError('Checkout opens on the live site — this is a preview.');
       return;
@@ -218,14 +251,29 @@ export function Privatisation() {
         {!wholeWeek ? (
           <div className={styles.field}>
             <span className={styles.label}>
-              Which day{freq.daysPerWeek > 1 ? 's' : ''}? <span className={styles.hint}>pick {freq.daysPerWeek}</span>
+              Which day{freq.days > 1 ? 's' : ''}? <span className={styles.hint}>pick {freq.days}</span>
+              {checking ? (
+                <span className={styles.hint}> · checking availability…</span>
+              ) : Object.values(avail).includes('taken') ? (
+                <span className={styles.hint}> · greyed days are taken on this room</span>
+              ) : null}
             </span>
             <div className={styles.dayRow}>
-              {WEEKDAYS.map((d) => (
-                <button key={d.id} type="button" className={`${styles.day} ${days.includes(d.id) ? styles.dayOn : ''}`} onClick={() => toggleDay(d.id)} disabled={disabled}>
-                  {d.short}
-                </button>
-              ))}
+              {WEEKDAYS.map((d) => {
+                const taken = avail[d.id] === 'taken';
+                return (
+                  <button
+                    key={d.id}
+                    type="button"
+                    className={`${styles.day} ${days.includes(d.id) ? styles.dayOn : ''}`}
+                    onClick={() => toggleDay(d.id)}
+                    disabled={disabled || taken}
+                    title={taken ? 'That day’s taken on this room' : undefined}
+                  >
+                    {d.short}
+                  </button>
+                );
+              })}
             </div>
           </div>
         ) : null}

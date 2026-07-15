@@ -18,14 +18,136 @@ import { listRecords, T, F, airtableReady, esc } from './_airtable.mjs';
 
 const STRIPE_SECRET = process.env.STRIPE_SECRET_KEY;
 
+// Mirror of lib/privatisation.ts — the monthly-cadence keys are perDay × days
+// (Hop Yard perDay £151, Vineyard perDay £130). Amounts are never trusted from the client.
 const ROOMS = {
-  'the-hop-yard': { name: 'The Hop Yard', capacity: 7, monthly: { one: 588, two: 966, all: 1806 } },
-  'the-vineyard': { name: 'The Vineyard', capacity: 6, monthly: { one: 504, two: 828, all: 1548 } },
+  'the-hop-yard': { name: 'The Hop Yard', capacity: 7, monthly: { one: 588, two: 966, all: 1806, 'month-one': 151, 'month-two': 302 } },
+  'the-vineyard': { name: 'The Vineyard', capacity: 6, monthly: { one: 504, two: 828, all: 1548, 'month-one': 130, 'month-two': 260 } },
 };
-const FREQ_DAYS = { one: 1, two: 2, all: 5 };
-const FREQ_LABEL = { one: 'one day a week', two: 'two days a week', all: 'every working day' };
+const FREQ_DAYS = { one: 1, two: 2, all: 5, 'month-one': 1, 'month-two': 2 };
+const FREQ_CADENCE = { one: 'week', two: 'week', all: 'week', 'month-one': 'month', 'month-two': 'month' };
+const FREQ_LABEL = {
+  one: 'one day a week',
+  two: 'two days a week',
+  all: 'every working day',
+  'month-one': 'one day a month',
+  'month-two': 'two days a month',
+};
 const QUARTERLY = 3;
 const MIN_MEMBERS = 5;
+const HORIZON_MONTHS = 3;
+
+/**
+ * Identical in logic to privatisationDates in lib/privatisation.ts (UTC date maths,
+ * weekdays 1..5). Returns sorted unique 'YYYY-MM-DD'. Kept byte-for-byte in step with the
+ * TS version so the client preview and this authoritative check agree on the exact dates.
+ */
+function privatisationDates(cadence, weekdays, startDate, months = HORIZON_MONTHS) {
+  if (!weekdays.length) return [];
+  const start = new Date(`${startDate}T00:00:00Z`);
+  if (Number.isNaN(start.getTime())) return [];
+  const iso = (d) => d.toISOString().slice(0, 10);
+  const out = new Set();
+  if (cadence === 'week') {
+    const wanted = new Set(weekdays);
+    const end = new Date(start);
+    end.setUTCMonth(end.getUTCMonth() + months);
+    const cur = new Date(start);
+    while (cur < end) {
+      if (wanted.has(cur.getUTCDay())) out.add(iso(cur));
+      cur.setUTCDate(cur.getUTCDate() + 1);
+    }
+  } else {
+    for (let mi = 0; mi < months; mi++) {
+      const y = start.getUTCFullYear();
+      const mo = start.getUTCMonth() + mi;
+      for (const wd of weekdays) {
+        for (let day = 1; day <= 31; day++) {
+          const d = new Date(Date.UTC(y, mo, day));
+          if (d.getUTCMonth() !== ((mo % 12) + 12) % 12) break; // rolled into next month
+          if (d.getUTCDay() !== wd) continue;
+          if (d >= start) {
+            out.add(iso(d));
+            break;
+          }
+        }
+      }
+    }
+  }
+  return [...out].sort();
+}
+
+const normWeekdays = (arr) => [...new Set((Array.isArray(arr) ? arr : []).map(Number).filter((n) => n >= 1 && n <= 5))];
+
+/**
+ * Recover the SET OF WEEKDAYS (numbers 1..5) a confirmed privatisation record occupies.
+ * Weekday-level exclusivity means cadence + dates are irrelevant to the lock, so we only
+ * extract the weekday numbers. Supports BOTH:
+ *   - the new token stripe-webhook.mjs appends to Notes: `slots=week:1-3` / `slots=month:1-3`
+ *     → the digits after the colon, split on '-'                            → [1,3]
+ *   - the LEGACY (pre-B19) Notes format with NO slots token: a parenthesised
+ *     day list like `one (1,3)` / `two (1,3)`                               → [1,3];
+ *     and a full-week form (`full week` / `all` / `(1,2,3,4,5)`)            → [1,2,3,4,5].
+ * Returns null (callers SKIP the record) only when genuinely unparseable — better to
+ * under-block a rare malformed row than to break availability for everyone.
+ */
+function parseSlots(rec) {
+  const notes = String(rec.fields[F.bookings.notes] || '');
+  // New token first: slots=<week|month>:<weekday>-<weekday>...
+  const tok = notes.match(/slots=(?:week|month):([\d-]+)/);
+  if (tok) {
+    const weekdays = normWeekdays(tok[1].split('-'));
+    if (weekdays.length) return weekdays;
+  }
+  // Legacy parenthesised digit list, e.g. `one (1,3)` / `(1,2,3,4,5)`.
+  const paren = notes.match(/\(([\d,\s]+)\)/);
+  if (paren) {
+    const weekdays = normWeekdays(paren[1].split(','));
+    if (weekdays.length) return weekdays;
+  }
+  // Legacy full-week form (webhook renders empty days as literal `(full week)`, freq `all`).
+  if (/\bfull week\b/i.test(notes) || /\ball\b/i.test(notes)) return [1, 2, 3, 4, 5];
+  return null;
+}
+
+const normName = (s) => String(s ?? '').toLowerCase().replace(/[‘’']/g, "'").replace(/\s+/g, ' ').trim();
+async function spaceIdByName(name) {
+  const recs = await listRecords(T.spaces, {});
+  const m = recs.find((r) => normName(r.fields[F.spaces.name]) === normName(name));
+  return m?.id || null;
+}
+
+/**
+ * The SET of weekdays (1..5) already exclusive on a room, unioned across every Confirmed
+ * privatisation (and Block) on that room's space. WEEKDAY-LEVEL EXCLUSIVITY: in the agreed
+ * monthly-is-the-first-occurrence model, any two bookings that share a weekday on the same
+ * room always collide (weekly∩weekly = every week; weekly∩monthly = the monthly date is one
+ * of the weekly dates; monthly∩monthly = both take the first occurrence). So a weekday is
+ * simply 'taken' if ANY confirmed record on the room includes it — no dates, no horizon.
+ * This also closes the legacy-record and past-the-horizon gaps of the old date-based lock.
+ * Fails OPEN (empty set) but logs when the room's space id can't be resolved.
+ */
+async function takenWeekdaysForRoom(roomSlug) {
+  const taken = new Set();
+  const room = ROOMS[roomSlug];
+  if (!room) return taken;
+  const spaceId = await spaceIdByName(room.name);
+  if (!spaceId) {
+    console.warn(`privatisation: could not resolve space id for room "${room.name}" (${roomSlug}); weekday lock fails open`);
+    return taken; // fail open, but logged
+  }
+  const recs = await listRecords(T.bookings, {
+    filterByFormula: `AND({Status}='Confirmed', OR({Kind}='Privatisation', {Kind}='Block'))`,
+  });
+  for (const rec of recs) {
+    const sp = rec.fields[F.bookings.space];
+    if (!Array.isArray(sp) || !sp.includes(spaceId)) continue;
+    const weekdays = parseSlots(rec);
+    if (!weekdays) continue; // unparseable → skip (see parseSlots note)
+    for (const wd of weekdays) taken.add(wd);
+  }
+  return taken;
+}
 
 const json = (b, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { 'content-type': 'application/json' } });
 
@@ -69,6 +191,20 @@ export default async function handler(req) {
     });
   }
 
+  // Real-time per-weekday availability for this room. The client calls this as the user
+  // changes room/weekdays to grey out weekdays already exclusive to another confirmed
+  // privatisation on the same room. Weekday-level exclusivity: a weekday is 'taken' iff any
+  // confirmed privatisation on the room includes it (cadence/dates/horizon are irrelevant).
+  if (action === 'availability') {
+    const taken = await takenWeekdaysForRoom(roomSlug);
+    // Report the requested subset if the client sent one; otherwise the full working week.
+    const requested = normWeekdays(body.weekdays);
+    const ids = requested.length ? requested : [1, 2, 3, 4, 5];
+    const map = {};
+    for (const wd of ids) map[wd] = taken.has(wd) ? 'taken' : 'free';
+    return json({ ok: true, weekdays: map });
+  }
+
   // Embedded (in-site) privatisation checkout — charges the first quarter now via the
   // Payment Element, no redirect, no trial. Access starts on startDate via room blocks.
   if (action === 'subscribe') {
@@ -90,8 +226,11 @@ export default async function handler(req) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate)) return json({ error: 'bad-date' }, 400);
     const need = FREQ_DAYS[frequency];
     if (days.length !== need) return json({ error: 'days-mismatch' }, 400);
-    const active = await activePrivatisation();
-    if (active) return json({ error: 'already-privatised' }, 409);
+    // Weekday-level clash check: refuse if ANY requested weekday is already exclusive to
+    // another confirmed privatisation on this room. Different companies can share a room only
+    // on different weekdays; sharing a weekday always collides, so no dates/horizon needed.
+    const taken = await takenWeekdaysForRoom(roomSlug);
+    if (normWeekdays(days).some((wd) => taken.has(wd))) return json({ error: 'weekday-taken' }, 400);
 
     const price = await stripe('/v1/prices', 'POST', {
       currency: 'gbp',

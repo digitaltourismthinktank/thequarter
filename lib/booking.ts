@@ -140,6 +140,14 @@ export interface PrivatisationQuote {
 }
 export const privatisationQuote = (b: { roomSlug: string; frequency: string }) =>
   call<PrivatisationQuote>('privatisation', { method: 'POST', auth: false, body: { action: 'quote', ...b } });
+// Real-time per-weekday availability for a room + cadence + start date (public, no auth).
+// Returns a { weekdayId: 'free' | 'taken' } map so the picker can grey out clashing days.
+export const privatisationAvailability = (b: { roomSlug: string; frequency: string; weekdays: number[]; startDate: string }) =>
+  call<{ ok: boolean; weekdays: Record<number, 'free' | 'taken'> }>('privatisation', {
+    method: 'POST',
+    auth: false,
+    body: { action: 'availability', ...b },
+  });
 export const privatisationCheckout = (b: {
   roomSlug: string;
   frequency: string;
