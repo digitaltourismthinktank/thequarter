@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ds/Button';
 import { Icon } from '@/components/ds/Icon';
 import { getTourSlots, bookTour, type TourSlot } from '@/lib/booking';
@@ -29,6 +29,12 @@ export function TourBooking() {
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);
+  const doneRef = useRef<HTMLDivElement>(null);
+
+  // Bring the confirmation into view — it can sit above the fold behind the header.
+  useEffect(() => {
+    if (done && typeof window !== 'undefined') doneRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [done]);
 
   const todayStr = useMemo(() => {
     const d = new Date();
@@ -89,7 +95,7 @@ export function TourBooking() {
       }
     })();
     return (
-      <div className={styles.done}>
+      <div className={styles.done} ref={doneRef}>
         <span className={styles.doneIcon}>
           <Icon name="check" size={26} color="var(--gold-700)" />
         </span>

@@ -123,6 +123,7 @@ export default async function handler(req) {
     // first invoice. Without this the default_incomplete sub can return no client_secret and the
     // browser shows "We couldn't set up the payment" (same fix as privatisation.mjs / B18).
     'payment_settings[payment_method_types][0]': 'card',
+    'payment_settings[payment_method_types][1]': 'bacs_debit',
     'payment_settings[save_default_payment_method]': 'on_subscription',
     'metadata[plan]': plan,
     'metadata[term]': term,

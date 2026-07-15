@@ -53,6 +53,16 @@ export function DashboardClient() {
       return 'newbie';
     }
   });
+  // How many rewards the member can redeem right now — a daily check-in nudge.
+  const [rewardsReady, setRewardsReady] = useState<number | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const c = JSON.parse(localStorage.getItem('q-card') || 'null');
+      return c && typeof c.rewards === 'number' ? c.rewards : null;
+    } catch {
+      return null;
+    }
+  });
 
   useEffect(() => {
     setToday(busyness(new Date()));
@@ -92,10 +102,12 @@ export function DashboardClient() {
       if (active && r.ok) {
         const pts = r.data.points;
         const lvl = levelForPoints(r.data.lifetimePoints ?? r.data.points).slug;
+        const rr = (r.data.catalogue || []).filter((x) => x.avail === 'ok' && (pts ?? 0) >= x.cost).length;
         setPoints(pts);
         setLevel(lvl);
+        setRewardsReady(rr);
         try {
-          localStorage.setItem('q-card', JSON.stringify({ points: pts, level: lvl }));
+          localStorage.setItem('q-card', JSON.stringify({ points: pts, level: lvl, rewards: rr }));
         } catch {
           /* ignore */
         }
@@ -297,6 +309,7 @@ export function DashboardClient() {
             cardId={cardId}
             level={level}
             points={points ?? undefined}
+            rewards={rewardsReady ?? undefined}
             logoSrc="/brand/logo-wordmark-black.png"
             style={{ maxWidth: '100%' }}
           />

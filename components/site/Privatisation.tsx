@@ -78,6 +78,7 @@ export function Privatisation() {
   const [avail, setAvail] = useState<Record<number, 'free' | 'taken'>>({});
   const [checking, setChecking] = useState(false);
 
+  const doneRef = useRef<HTMLDivElement>(null);
   const mountRef = useRef<HTMLDivElement | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const stripeRef = useRef<any>(null);
@@ -87,6 +88,11 @@ export function Privatisation() {
   useEffect(() => {
     if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('done') === '1') setDone(true);
   }, []);
+
+  // Bring the confirmation into view — it can sit above the fold behind the header.
+  useEffect(() => {
+    if (done && typeof window !== 'undefined') doneRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [done]);
 
   const room = useMemo(() => PRIVATISATION_ROOMS.find((r) => r.slug === roomSlug)!, [roomSlug]);
   const freq = useMemo(() => FREQUENCIES.find((f) => f.id === frequency)!, [frequency]);
@@ -198,7 +204,7 @@ export function Privatisation() {
 
   if (done) {
     return (
-      <div className={styles.done}>
+      <div className={styles.done} ref={doneRef}>
         <span className={styles.doneIcon}>
           <Icon name="check" size={26} color="var(--gold-700)" />
         </span>

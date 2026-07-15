@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Button } from '@/components/ds/Button';
 import { Icon } from '@/components/ds/Icon';
@@ -24,6 +24,12 @@ export interface EnquiryFormProps {
 
 export function EnquiryForm({ formName = 'room-enquiry', defaultRoom = '', withRoom = true, className }: EnquiryFormProps) {
   const [status, setStatus] = useState<'idle' | 'submitting' | 'done' | 'error'>('idle');
+  const doneRef = useRef<HTMLDivElement>(null);
+
+  // Bring the confirmation into view — it can sit above the fold behind the header.
+  useEffect(() => {
+    if (status === 'done' && typeof window !== 'undefined') doneRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [status]);
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -63,7 +69,7 @@ export function EnquiryForm({ formName = 'room-enquiry', defaultRoom = '', withR
 
   if (status === 'done') {
     return (
-      <div className={cn(styles.success, className)}>
+      <div className={cn(styles.success, className)} ref={doneRef}>
         <span className={styles.successIcon}>
           <Icon name="check" size={28} color="var(--gold-700)" strokeWidth={2.5} />
         </span>

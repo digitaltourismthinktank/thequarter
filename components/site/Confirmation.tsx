@@ -1,4 +1,6 @@
-import type { ReactNode } from 'react';
+'use client';
+
+import { useEffect, useRef, type ReactNode } from 'react';
 import { Button } from '@/components/ds/Button';
 import { Icon, type IconName } from '@/components/ds/Icon';
 import s from './Confirmation.module.css';
@@ -48,8 +50,13 @@ export function Confirmation({
   account?: ConfirmationAccount | null;
   footnote?: ReactNode;
 }) {
+  const ref = useRef<HTMLDivElement>(null);
+  // Confirmation only mounts on success — scroll it into view so buyers see it.
+  useEffect(() => {
+    if (typeof window !== 'undefined') ref.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, []);
   return (
-    <div className={s.wrap}>
+    <div className={s.wrap} ref={ref}>
       <span className={s.mark} aria-hidden="true">
         <Icon name="check" size={30} color="var(--pure-white)" />
       </span>

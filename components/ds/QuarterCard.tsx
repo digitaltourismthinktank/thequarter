@@ -14,6 +14,7 @@ export interface QuarterCardProps {
   sinceLabel?: string;
   level?: CardLevel;
   points?: number;
+  rewards?: number;
   logoSrc?: string;
   qr?: boolean;
   style?: CSSProperties;
@@ -38,6 +39,7 @@ export function QuarterCard({
   sinceLabel = 'Member since 2025',
   level = 'newbie',
   points,
+  rewards,
   logoSrc,
   qr = true,
   style,
@@ -116,9 +118,24 @@ export function QuarterCard({
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', position: 'relative', gap: 16 }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ fontSize: 'var(--text-lg)', fontWeight: 600, letterSpacing: '-0.01em', color: 'var(--sand-50)' }}>{memberName}</div>
-          <div style={{ display: 'flex', gap: 14, marginTop: 6, fontSize: 'var(--text-xs)', color: 'rgba(251,248,242,0.62)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 6, fontSize: 'var(--text-xs)', color: 'rgba(251,248,242,0.62)' }}>
             <span>No. {cardId}</span>
             {typeof points === 'number' ? <span style={{ color: 'var(--gold-300)', fontWeight: 600 }}>{points.toLocaleString('en-GB')} pts</span> : null}
+            {typeof rewards === 'number' && rewards > 0 ? (
+              <span
+                style={{
+                  padding: '2px 9px',
+                  borderRadius: 'var(--radius-pill)',
+                  background: 'rgba(210,181,118,0.16)',
+                  border: '1px solid var(--gold-500)',
+                  color: 'var(--gold-300)',
+                  fontWeight: 700,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {rewards} to redeem
+              </span>
+            ) : null}
             <span>{sinceLabel}</span>
           </div>
         </div>

@@ -48,6 +48,8 @@ export default async function handler(req) {
     mode: 'subscription',
     'line_items[0][price]': priceId,
     'line_items[0][quantity]': '1',
+    'payment_method_types[0]': 'card',
+    'payment_method_types[1]': 'bacs_debit',
     allow_promotion_codes: 'true',
     success_url: `${origin}/welcome/${plan}/?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${origin}/plans/`,
