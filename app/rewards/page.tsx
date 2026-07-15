@@ -1,37 +1,20 @@
 import type { Metadata } from 'next';
 import { Section, SectionHead, Eyebrow } from '@/components/site/primitives';
 import { Button } from '@/components/ds/Button';
-import { Icon, type IconName } from '@/components/ds/Icon';
+import { Icon } from '@/components/ds/Icon';
 import { RewardsClient } from '@/components/site/RewardsClient';
-import { LEVELS, CATALOGUE_SEED } from '@/lib/rewards';
+import { RewardShowcase } from '@/components/site/RewardShowcase';
+import { PerksGrid } from '@/components/site/PerksGrid';
+import { LEVELS, EARN_RULES, CATALOGUE_SEED, POINTS_PER_POUND_VALUE } from '@/lib/rewards';
 import { Breadcrumbs } from '@/components/site/Breadcrumbs';
 import styles from './rewards.module.css';
 
 export const metadata: Metadata = {
   title: 'Quarter Rewards',
   description:
-    'Work at The Quarter and earn rewards to spend with Canterbury’s independent shops, cafés and bars. Points for being here and for what you spend — our way of saying thank you and keeping trade local.',
+    'Work at The Quarter and earn points to spend with Canterbury’s independent shops, cafés and bars — plus always-on perks around the corner. Points for being here and for what you spend, our way of saying thank you and keeping trade local.',
   alternates: { canonical: '/rewards' },
 };
-
-/* Three-step how-it-works. */
-const STEPS: { icon: IconName; title: string; text: string }[] = [
-  {
-    icon: 'door-open',
-    title: 'Come in and work',
-    text: 'Every day you’re here earns points — a few more on our quieter days. Nothing to stamp; you check in and we do the rest.',
-  },
-  {
-    icon: 'sparkles',
-    title: 'Watch them add up',
-    text: 'You earn on what you spend with us too — day passes, the carnet, room hire. The longer you’re part of the place, the faster they build.',
-  },
-  {
-    icon: 'gift',
-    title: 'Spend them locally',
-    text: 'Turn points into a coffee down the road, a patisserie treat, a glass at Corkk or a Cathedral pass — redeemed in a moment from your member dashboard.',
-  },
-];
 
 /* A marketing line per earned tier (names/order come straight from LEVELS). */
 const LEVEL_LINES: Record<string, string> = {
@@ -43,6 +26,11 @@ const LEVEL_LINES: Record<string, string> = {
 
 /* A handful of the catalogue as a taste (real costs live in the member view). */
 const HIGHLIGHT_IDS = ['coffee', 'treat', 'refillery', 'cathedral', 'corkk-evening'];
+
+/* Earn-rate label per level, mirroring the member levels rail. */
+function earnRate(boost: number): string {
+  return boost === 1 ? 'Base earn rate' : `Earn ${Math.round((boost - 1) * 100)}% faster`;
+}
 
 export default function RewardsPage() {
   const highlights = HIGHLIGHT_IDS.map((id) => CATALOGUE_SEED.find((r) => r.id === id)).filter(
@@ -64,29 +52,47 @@ export default function RewardsPage() {
         </div>
       </Section>
 
-      {/* HOW IT WORKS */}
+      {/* SHOWCASE — the ring + the loyalty card at every level */}
+      <Section tone="ink">
+        <SectionHead
+          align="center"
+          dark
+          eyebrow="Your Quarter Card"
+          title="Every visit earns. Every level unlocks more."
+          intro="Watch your points ring fill and your card gild as you climb — from your very first morning to Ambassador."
+          max={640}
+        />
+        <RewardShowcase />
+      </Section>
+
+      {/* HOW YOU EARN — real earn rules */}
       <Section tone="page">
         <SectionHead
-          eyebrow="How it works"
-          title="Three steps, and you’re earning"
+          eyebrow="How you earn"
+          title="Points, just for being a regular"
           intro="No cards to carry, no small print. You earn from your very first visit — as a member or on a day pass."
           max={620}
         />
-        <div className={styles.steps}>
-          {STEPS.map((s, i) => (
-            <div key={s.title} className={styles.step}>
-              <span className={styles.stepNum}>{`0${i + 1}`}</span>
-              <span className={styles.stepIcon}>
-                <Icon name={s.icon} size={24} color="var(--gold-700)" />
+        <div className={styles.earnRows}>
+          {EARN_RULES.map((rule) => (
+            <div key={rule.title} className={`${styles.earnRow} ${rule.lead ? styles.earnLead : ''}`}>
+              <span className={`${styles.earnChip} ${rule.lead ? styles.earnChipLead : ''}`}>
+                <Icon name={rule.icon} size={20} color={rule.lead ? 'var(--ink-900)' : 'var(--gold-700)'} />
               </span>
-              <h3 className={styles.stepTitle}>{s.title}</h3>
-              <p className={styles.stepText}>{s.text}</p>
+              <div className={styles.earnText}>
+                <strong>{rule.title}</strong>
+                <span>{rule.note}</span>
+              </div>
+              <span className={`${styles.earnVal} ${rule.lead ? styles.earnValLead : ''}`}>{rule.value}</span>
             </div>
           ))}
         </div>
+        <p className={styles.anchor}>
+          Simple maths: <strong>{POINTS_PER_POUND_VALUE} points = £1</strong> to spend with our neighbours.
+        </p>
       </Section>
 
-      {/* LEVELS */}
+      {/* LEVELS — public variant of the member levels rail */}
       <Section tone="sunken">
         <SectionHead
           eyebrow="The more you’re around"
@@ -95,13 +101,19 @@ export default function RewardsPage() {
           max={640}
         />
         <div className={styles.levels}>
-          {LEVELS.map((lv, i) => (
+          {LEVELS.map((lv) => (
             <div key={lv.slug} className={styles.level}>
-              <div className={styles.levelTop}>
+              <div className={styles.levelHead}>
                 <span className={styles.levelName}>{lv.name}</span>
-                <span className={styles.levelRank}>{`Tier ${i + 1}`}</span>
+                <span className={styles.levelThresh}>{lv.min > 0 ? `${lv.min.toLocaleString('en-GB')} pts` : 'Start'}</span>
               </div>
+              <span className={styles.levelRate}>{earnRate(lv.boost)}</span>
               <p className={styles.levelLine}>{LEVEL_LINES[lv.slug]}</p>
+              <ul className={styles.levelPerks}>
+                {lv.perks.map((p) => (
+                  <li key={p}>{p}</li>
+                ))}
+              </ul>
             </div>
           ))}
         </div>
@@ -127,8 +139,19 @@ export default function RewardsPage() {
           ))}
         </div>
         <p className={styles.rewardsFoot}>
-          Members also get always-on perks with our neighbours — <a href="/perks">see who’s involved</a>.
+          Members also get always-on perks with our neighbours — <a href="#perks">see who’s involved</a>.
         </p>
+      </Section>
+
+      {/* LOCAL PERKS — the old /perks marketing, absorbed here */}
+      <Section tone="sunken" id="perks">
+        <SectionHead
+          eyebrow="Always-on"
+          title="Perks around the corner"
+          intro="Beyond points, being a member opens doors across the Cathedral Quarter — food, coffee, culture and the little favours that make a neighbourhood feel like yours. Here’s a taste; members redeem from the Quarter Card."
+          max={660}
+        />
+        <PerksGrid />
       </Section>
 
       {/* CTA */}
@@ -160,7 +183,7 @@ export default function RewardsPage() {
   return (
     <>
       <RewardsClient marketing={marketing} />
-      <Breadcrumbs trail={[{ name: 'Quarter Rewards', path: '/rewards' }]} />
+      <Breadcrumbs trail={[{ name: 'Rewards', path: '/rewards' }]} />
     </>
   );
 }

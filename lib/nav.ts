@@ -9,7 +9,7 @@ export const NAV_LINKS: NavLink[] = [
   { label: 'The Spaces', href: '/spaces' },
   { label: 'Plans', href: '/plans' },
   { label: 'Meeting rooms', href: '/meeting-rooms' },
-  { label: 'Perks', href: '/perks' },
+  { label: 'Rewards', href: '/rewards' },
   { label: 'Events', href: '/events' },
   { label: 'About', href: '/about' },
 ];
@@ -35,7 +35,7 @@ export const FOOTER_COLUMNS: FooterColumn[] = [
     title: 'Members',
     links: [
       { label: 'Plans & pricing', href: '/plans' },
-      { label: 'Perks', href: '/perks' },
+      { label: 'Rewards', href: '/rewards' },
       { label: 'Member login', href: '/login' },
       { label: 'Day Pass', href: '/day-pass' },
     ],

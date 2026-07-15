@@ -13,7 +13,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
     '/plans',
     '/meeting-rooms',
     '/privatise',
-    '/perks',
     '/rewards',
     '/tour',
     '/events',
