@@ -34,6 +34,7 @@ export function EnquiryForm({ formName = 'room-enquiry', defaultRoom = '', withR
       formName,
       name: String(data.get('name') || ''),
       email: String(data.get('email') || ''),
+      phone: String(data.get('phone') || ''),
       room: String(data.get('room') || ''),
       company: String(data.get('company') || ''),
       preferred: String(data.get('preferred') || ''),
@@ -95,6 +96,15 @@ export function EnquiryForm({ formName = 'room-enquiry', defaultRoom = '', withR
             Email
           </label>
           <input id="enq-email" className={styles.input} type="email" name="email" required placeholder="you@company.com" />
+        </div>
+      </div>
+
+      <div className={styles.row}>
+        <div className={styles.field}>
+          <label className={styles.label} htmlFor="enq-phone">
+            Contact number <span className={styles.optional}>(optional)</span>
+          </label>
+          <input id="enq-phone" className={styles.input} type="tel" name="phone" autoComplete="tel" placeholder="07700 900000" />
         </div>
       </div>
 

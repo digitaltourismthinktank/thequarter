@@ -30,6 +30,7 @@ export default async function handler(req) {
   const fields = [
     ['Name', name],
     ['Email', email],
+    ['Phone', b.phone],
     ['Room', b.room],
     ['Company', b.company],
     ['Preferred date & time', b.preferred],

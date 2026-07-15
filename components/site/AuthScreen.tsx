@@ -24,7 +24,8 @@ export function AuthScreen({ mode }: { mode: 'login' | 'signup' }) {
   const [view, setView] = useState<'main' | 'forgot'>('main');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
   const [status, setStatus] = useState<Status>('idle');
   const [error, setError] = useState('');
@@ -36,12 +37,24 @@ export function AuthScreen({ mode }: { mode: 'login' | 'signup' }) {
   // ?redirect param below) to stay compatible with the static export. Signup only.
   useEffect(() => {
     if (isLogin || typeof window === 'undefined') return;
-    const pre = new URLSearchParams(window.location.search).get('email');
+    const params = new URLSearchParams(window.location.search);
+    const pre = params.get('email');
     if (pre && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(pre)) setEmail(pre);
+    const first = params.get('first');
+    if (first && first.trim()) setFirstName(first);
+    const last = params.get('last');
+    if (last && last.trim()) setLastName(last);
+    const prefPhone = params.get('phone');
+    if (prefPhone && prefPhone.trim()) setPhone(prefPhone);
   }, [isLogin]);
 
   async function handleAuth(e: FormEvent) {
     e.preventDefault();
+    if (!isLogin && (!firstName.trim() || !lastName.trim())) {
+      setStatus('error');
+      setError('Please enter your first and last name.');
+      return;
+    }
     if (!isLogin && !phone.trim()) {
       setStatus('error');
       setError('Please add a phone number so we can reach you.');
@@ -67,7 +80,12 @@ export function AuthScreen({ mode }: { mode: 'login' | 'signup' }) {
         await ms.signupMemberEmailPassword({
           email,
           password,
-          metaData: { ...(name ? { name } : {}), phone: phone.trim(), termsAcceptedAt: new Date().toISOString() },
+          customFields: { 'first-name': firstName.trim() || undefined, 'last-name': lastName.trim() || undefined },
+          metaData: {
+            phone: phone.trim(),
+            termsAcceptedAt: new Date().toISOString(),
+            name: [firstName.trim(), lastName.trim()].filter(Boolean).join(' '),
+          },
         });
       }
       // Client-side navigation keeps the just-authenticated Memberstack instance
@@ -164,13 +182,22 @@ export function AuthScreen({ mode }: { mode: 'login' | 'signup' }) {
               </p>
               <form className={styles.fields} onSubmit={handleAuth}>
                 {!isLogin ? (
-                  <Input
-                    label="Full name"
-                    placeholder="Maya Holloway"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    autoComplete="name"
-                  />
+                  <div className={styles.row}>
+                    <Input
+                      label="First name"
+                      placeholder="Maya"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      autoComplete="given-name"
+                    />
+                    <Input
+                      label="Last name"
+                      placeholder="Holloway"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      autoComplete="family-name"
+                    />
+                  </div>
                 ) : null}
                 {!isLogin ? (
                   <Input

@@ -57,6 +57,7 @@ export function CarnetCheckout() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [company, setCompany] = useState('');
+  const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [step, setStep] = useState<'form' | 'pay' | 'done'>('form');
   const [busy, setBusy] = useState(false);
@@ -155,7 +156,7 @@ export function CarnetCheckout() {
             </>
           ),
           cta: 'Create your account',
-          href: signupHref(email),
+          href: signupHref(email, { firstName, lastName, phone }),
         }}
       />
     );
@@ -194,6 +195,10 @@ export function CarnetCheckout() {
           <label className={s.field}>
             <span>Company</span>
             <input value={company} onChange={(e) => setCompany(e.target.value)} autoComplete="organization" />
+          </label>
+          <label className={s.field}>
+            <span>Contact number</span>
+            <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="tel" placeholder="07700 900000" />
           </label>
           <label className={s.field}>
             <span>Email</span>

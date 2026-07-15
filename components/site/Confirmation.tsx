@@ -100,8 +100,20 @@ export function Confirmation({
   );
 }
 
-/** /signup with the buyer's email pre-filled (AuthScreen reads ?email=). Falls back to /signup. */
-export function signupHref(email?: string): string {
+/**
+ * /signup with the buyer's details pre-filled (AuthScreen reads ?email=&first=&last=&phone=).
+ * email is included when present; first/last/phone are appended only when non-empty. Always
+ * returns a `/signup?…` (or bare `/signup`) so existing email-only callers keep working.
+ */
+export function signupHref(email?: string, opts?: { firstName?: string; lastName?: string; phone?: string }): string {
+  const params: string[] = [];
   const e = (email || '').trim();
-  return e ? `/signup?email=${encodeURIComponent(e)}` : '/signup';
+  if (e) params.push(`email=${encodeURIComponent(e)}`);
+  const first = (opts?.firstName || '').trim();
+  if (first) params.push(`first=${encodeURIComponent(first)}`);
+  const last = (opts?.lastName || '').trim();
+  if (last) params.push(`last=${encodeURIComponent(last)}`);
+  const phone = (opts?.phone || '').trim();
+  if (phone) params.push(`phone=${encodeURIComponent(phone)}`);
+  return params.length ? `/signup?${params.join('&')}` : '/signup';
 }

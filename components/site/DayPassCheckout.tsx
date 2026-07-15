@@ -51,6 +51,7 @@ export function DayPassCheckout() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [company, setCompany] = useState('');
+  const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [date, setDate] = useState('');
   const [dateOpen, setDateOpen] = useState(false);
@@ -139,7 +140,7 @@ export function DayPassCheckout() {
             </>
           ),
           cta: 'Create your account',
-          href: signupHref(email),
+          href: signupHref(email, { firstName, lastName, phone }),
         }}
         footnote={<>Breakfast, coffee and a desk are waiting on the 1st &amp; 2nd floors, 27–28 Burgate.</>}
       />
@@ -163,6 +164,10 @@ export function DayPassCheckout() {
           <label className={s.field}>
             <span>Company</span>
             <input value={company} onChange={(e) => setCompany(e.target.value)} autoComplete="organization" />
+          </label>
+          <label className={s.field}>
+            <span>Contact number</span>
+            <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="tel" placeholder="07700 900000" />
           </label>
           <label className={s.field}>
             <span>Email</span>
