@@ -15,6 +15,7 @@
  * Env: STRIPE_SECRET_KEY (Prices/Checkout/Subscriptions: Write), Airtable.
  */
 import { listRecords, T, F, airtableReady, esc } from './_airtable.mjs';
+import { parsePrivatisationSlots, normWeekdays } from './_privatisation.mjs';
 
 const STRIPE_SECRET = process.env.STRIPE_SECRET_KEY;
 
@@ -77,38 +78,14 @@ function privatisationDates(cadence, weekdays, startDate, months = HORIZON_MONTH
   return [...out].sort();
 }
 
-const normWeekdays = (arr) => [...new Set((Array.isArray(arr) ? arr : []).map(Number).filter((n) => n >= 1 && n <= 5))];
-
 /**
- * Recover the SET OF WEEKDAYS (numbers 1..5) a confirmed privatisation record occupies.
- * Weekday-level exclusivity means cadence + dates are irrelevant to the lock, so we only
- * extract the weekday numbers. Supports BOTH:
- *   - the new token stripe-webhook.mjs appends to Notes: `slots=week:1-3` / `slots=month:1-3`
- *     → the digits after the colon, split on '-'                            → [1,3]
- *   - the LEGACY (pre-B19) Notes format with NO slots token: a parenthesised
- *     day list like `one (1,3)` / `two (1,3)`                               → [1,3];
- *     and a full-week form (`full week` / `all` / `(1,2,3,4,5)`)            → [1,2,3,4,5].
+ * The SET OF WEEKDAYS (numbers 1..5) a confirmed privatisation record occupies.
+ * Weekday-level exclusivity means cadence + dates are irrelevant to the lock, so we
+ * reduce the shared parser (which also recovers cadence) to just its weekdays.
  * Returns null (callers SKIP the record) only when genuinely unparseable — better to
  * under-block a rare malformed row than to break availability for everyone.
  */
-function parseSlots(rec) {
-  const notes = String(rec.fields[F.bookings.notes] || '');
-  // New token first: slots=<week|month>:<weekday>-<weekday>...
-  const tok = notes.match(/slots=(?:week|month):([\d-]+)/);
-  if (tok) {
-    const weekdays = normWeekdays(tok[1].split('-'));
-    if (weekdays.length) return weekdays;
-  }
-  // Legacy parenthesised digit list, e.g. `one (1,3)` / `(1,2,3,4,5)`.
-  const paren = notes.match(/\(([\d,\s]+)\)/);
-  if (paren) {
-    const weekdays = normWeekdays(paren[1].split(','));
-    if (weekdays.length) return weekdays;
-  }
-  // Legacy full-week form (webhook renders empty days as literal `(full week)`, freq `all`).
-  if (/\bfull week\b/i.test(notes) || /\ball\b/i.test(notes)) return [1, 2, 3, 4, 5];
-  return null;
-}
+const parseSlots = (rec) => parsePrivatisationSlots(rec)?.weekdays ?? null;
 
 const normName = (s) => String(s ?? '').toLowerCase().replace(/[‘’']/g, "'").replace(/\s+/g, ' ').trim();
 async function spaceIdByName(name) {

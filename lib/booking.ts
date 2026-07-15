@@ -296,6 +296,10 @@ export interface AdminBooking {
   releasable?: boolean;
   recurring?: string | null;
   released?: boolean;
+  // Synthetic all-day privatisation rows (no Start/End): admin.mjs emits these per occupied
+  // date from the Privatisation marker rows so a privatised room shows as occupied every day.
+  allDay?: boolean;
+  label?: string | null;
 }
 export interface AdminSpace {
   id: string;

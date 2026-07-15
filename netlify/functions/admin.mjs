@@ -18,6 +18,7 @@ import { PLAN_NAMES, allowanceForMember, setMemberPlan, renewMember } from './_q
 import { listRewards, listPerks, listFloats, floatStatus, awardPoints, redeemReward, partnerPayouts, markPartnerPaid } from './_rewards.mjs';
 import { sendEmail, emailShell, escapeHtml, OPS_EMAIL } from './_email.mjs';
 import { pushToEmail } from './_push.mjs';
+import { parsePrivatisationSlots, isPrivatisedOn } from './_privatisation.mjs';
 
 const PERK_TYPES = ['Discount', 'On the house', 'Upgrade', 'Extra', 'Bundle', 'Priority', 'Welcome gift', 'Experience'];
 const FUNDINGS = ['inventory', 'partner', 'quarter'];
@@ -132,7 +133,11 @@ async function bookingsForDate(date) {
     sort: [{ field: 'Start' }],
   });
   const now = londonNow();
-  return recs.map((r) => {
+  // Privatisation marker rows are excluded here (they carry no Start/End → would render as
+  // "NaN:NaN"). They surface instead as synthetic all-day rows via privatisationsForDate().
+  return recs
+    .filter((r) => r.fields[F.bookings.kind] !== 'Privatisation')
+    .map((r) => {
     const f = r.fields;
     const hold = { holdUntil: f[F.bookings.holdUntil], checkedIn: !!f[F.bookings.checkedIn], releasable: !!f[F.bookings.releasable] };
     return {
@@ -151,6 +156,43 @@ async function bookingsForDate(date) {
       released: holdReleased(hold, date, now.min, now.dateStr),
     };
   });
+}
+
+/**
+ * Synthetic all-day "Privatised" rows for `date`. Each confirmed Privatisation is stored as
+ * ONE marker row (Date=startDate, no Start/End, slots token in Notes). Rather than generate
+ * hundreds of dated block rows, we recompute — for the single date being viewed — whether the
+ * room is occupied (isPrivatisedOn) and, if so, emit one all-day entry the admin UI can render
+ * as "Privatised · <company>". This makes the room visible on EVERY occupied date and marks it
+ * not-free. Marker rows are few, so loading them all is cheap.
+ */
+async function privatisationsForDate(date) {
+  const recs = await listRecords(T.bookings, {
+    filterByFormula: `AND({Status}='Confirmed', {Kind}='Privatisation')`,
+  });
+  const out = [];
+  for (const r of recs) {
+    const f = r.fields;
+    const parsed = parsePrivatisationSlots(f[F.bookings.notes] || '');
+    if (!parsed) continue;
+    const startDate = isoToLondonDate(f[F.bookings.date]) || '';
+    if (!isPrivatisedOn(date, parsed.cadence, parsed.weekdays, startDate)) continue;
+    const company = f[F.bookings.company] || f[F.bookings.name] || 'Company';
+    out.push({
+      id: `priv-${r.id}`,
+      space: Array.isArray(f[F.bookings.space]) ? f[F.bookings.space][0] : null,
+      startMin: 0,
+      endMin: 0,
+      kind: 'Privatisation',
+      allDay: true,
+      name: company,
+      email: f[F.bookings.email] || null,
+      company,
+      label: `Privatised · ${company}`,
+      status: 'Confirmed',
+    });
+  }
+  return out;
 }
 
 async function checkinsForDate(date) {
@@ -203,12 +245,13 @@ export default async function handler(req) {
     if (action === 'calendar') {
       const date = new URL(req.url).searchParams.get('date');
       if (!date) return json({ error: 'missing-date' }, 400);
-      return json({ date, bookings: await bookingsForDate(date) });
+      const [bookings, privs] = await Promise.all([bookingsForDate(date), privatisationsForDate(date)]);
+      return json({ date, bookings: [...privs, ...bookings] });
     }
     if (action === 'today') {
       const date = new URL(req.url).searchParams.get('date') || londonNow().dateStr;
-      const [checkins, bookings] = await Promise.all([checkinsForDate(date), bookingsForDate(date)]);
-      return json({ date, checkins, bookings });
+      const [checkins, bookings, privs] = await Promise.all([checkinsForDate(date), bookingsForDate(date), privatisationsForDate(date)]);
+      return json({ date, checkins, bookings: [...privs, ...bookings] });
     }
     if (action === 'rewards') return json({ rewards: await listRewards({ liveOnly: false }) });
     if (action === 'perks') return json({ perks: await listPerks({ liveOnly: false }) });

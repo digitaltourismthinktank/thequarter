@@ -1066,19 +1066,21 @@ function RoomsPane() {
           {sorted.map((b) => (
             <div key={b.id} className={styles.bRow}>
               <span className={styles.bSpace}>{spaceName(b.space)}</span>
-              <span className={styles.bTime}>
-                {minToHHMM(b.startMin)}–{minToHHMM(b.endMin)}
+              <span className={styles.bTime}>{b.allDay ? 'All day' : `${minToHHMM(b.startMin)}–${minToHHMM(b.endMin)}`}</span>
+              <span className={`${styles.bKind} ${b.kind === 'Block' ? styles.kindBlock : ''}`}>
+                {b.allDay ? 'Privatised' : b.company ? 'Company' : b.kind}
               </span>
-              <span className={`${styles.bKind} ${b.kind === 'Block' ? styles.kindBlock : ''}`}>{b.company ? 'Company' : b.kind}</span>
               <span className={styles.bWho}>{b.company || b.name || b.email || ''}</span>
-              {b.company ? (
+              {b.allDay ? null : b.company ? (
                 <span className={styles.statusTag}>
                   {b.released ? 'Released' : b.checkedIn ? 'Checked in' : b.holdUntil ? `Held to ${b.holdUntil}` : 'Booked'}
                 </span>
               ) : null}
-              <button type="button" className={styles.smallBtn} onClick={() => cancel(b.id)} disabled={busy}>
-                Cancel
-              </button>
+              {b.allDay ? null : (
+                <button type="button" className={styles.smallBtn} onClick={() => cancel(b.id)} disabled={busy}>
+                  Cancel
+                </button>
+              )}
             </div>
           ))}
         </div>
@@ -1327,7 +1329,7 @@ function AdminTodayPane({ onAllBirthdays }: { onAllBirthdays: () => void }) {
             <strong className={styles.todayBig}>{roomBookings.length}</strong>
             <span className={styles.todayCardSub}>
               {roomBookings.length
-                ? roomBookings.map((x) => `${spaceName(x.space)} ${minToHHMM(x.startMin)}`).join(' · ')
+                ? roomBookings.map((x) => `${spaceName(x.space)} ${x.allDay ? 'all day' : minToHHMM(x.startMin)}`).join(' · ')
                 : 'Nothing booked.'}
             </span>
             {freeRooms.length ? (
