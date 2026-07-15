@@ -36,8 +36,16 @@
   gap: 4px;
   border-bottom: 1px solid var(--border-subtle);
   margin-bottom: 22px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.tabs::-webkit-scrollbar {
+  display: none;
 }
 .tab {
+  flex: none;
+  white-space: nowrap;
   padding: 10px 16px;
   border: none;
   background: none;
@@ -61,6 +69,7 @@
 
 .tableWrap {
   overflow-x: auto;
+  max-width: 100%;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   background: var(--surface-card);
@@ -1060,4 +1069,35 @@ select.input {
 .shortcut:hover {
   border-color: var(--gold-500);
   background: var(--sand-100);
+}
+
+/* ---- Mobile (~390px) usability pass — desktop untouched ---- */
+@media (max-width: 720px) {
+  /* Booking/summary rows: wrap instead of overflowing; long "who" column
+     drops to its own full-width line, fixed columns give up their min-widths. */
+  .bRow {
+    flex-wrap: wrap;
+  }
+  .bSpace,
+  .bTime {
+    min-width: 0;
+  }
+  .bWho {
+    flex: 1 0 100%;
+  }
+  /* Payout rows: let the name/notes columns give up their min-widths so they
+     stack cleanly rather than pushing the row wider than the viewport. */
+  .payName,
+  .payRow > .muted {
+    min-width: 0;
+    flex-basis: 100%;
+  }
+  /* Member profile pop-over: hug the viewport and ease the inner padding. */
+  .profOverlay {
+    padding: 12px;
+  }
+  .profCard {
+    max-width: 100%;
+    padding: 18px;
+  }
 }

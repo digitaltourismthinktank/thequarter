@@ -42,6 +42,7 @@
   font-weight: var(--fw-bold);
   letter-spacing: -0.02em;
   margin: 0;
+  color: var(--text-on-dark);
 }
 .sub {
   margin: 3px 0 0;
