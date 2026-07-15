@@ -482,8 +482,8 @@ export function RoomBooking({ roomName, price }: { roomName: string; price: { ha
           )}
 
           <div className={styles.outOfHours}>
-            <span>Need a time outside 09:00–17:40?</span>
-            <TalkToUs variant="ghost" label="Chat to us" prefill={`I’d like to book ${roomName} outside 09:00–17:40: `} />
+            <span>Need a time outside 09:00–17:30?</span>
+            <TalkToUs variant="ghost" label="Chat to us" prefill={`I’d like to book ${roomName} outside 09:00–17:30: `} />
           </div>
         </div>
 
@@ -513,7 +513,7 @@ export function RoomBooking({ roomName, price }: { roomName: string; price: { ha
         {!member ? (
           <div className={styles.contact}>
             <label className={styles.field}>
-              <span className={styles.label}>Company / organisation</span>
+              <span className={styles.label}>Company</span>
               <input className={styles.input} value={company} onChange={(e) => setCompany(e.target.value)} disabled={step === 'pay'} placeholder="Who’s the booking for?" />
             </label>
             <label className={styles.field}>
@@ -593,7 +593,7 @@ export function RoomBooking({ roomName, price }: { roomName: string; price: { ha
 
         {error ? <p className={styles.err}>{error}</p> : null}
         <p className={styles.note}>
-          Tea, coffee, pastries &amp; yoghurts are included with every booking. Prefer to talk it through? <a href="#enquire">Chat to us</a>.
+          Questions about your booking? <a href="#enquire">Chat to us</a>.
         </p>
       </aside>
     </div>

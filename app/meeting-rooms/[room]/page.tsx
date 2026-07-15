@@ -89,7 +89,7 @@ export default function RoomDetailPage({ params }: RoomParams) {
       <Section tone="card">
         <SectionHead
           eyebrow="While you’re here"
-          title="Refreshments included — lunch if you’d like it"
+          title="Fully inclusive meetings"
           intro="Every room booking comes with tea, coffee, pastries and yoghurts. Add a proper lunch from The Sandwich Bar for £12 a head."
           max={620}
         />

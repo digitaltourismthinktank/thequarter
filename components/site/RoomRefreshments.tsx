@@ -22,7 +22,7 @@ export function RoomRefreshments() {
             <Icon name="coffee" size={14} color="var(--gold-700)" />
             Included with every booking
           </span>
-          <h3 className={styles.title}>Refreshments, on us</h3>
+          <h3 className={styles.title}>Pastries, coffee and refreshments included</h3>
           <p className={styles.text}>
             Tea, coffee, pastries and yoghurts are laid on for every room booking — help yourself and keep the meeting
             flowing, at no extra cost.

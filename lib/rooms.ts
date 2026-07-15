@@ -50,6 +50,7 @@ export const MEETING_ROOMS: MeetingRoom[] = [
     features: [
       { icon: 'monitor', label: 'Hybrid-ready A/V' },
       { icon: 'users', label: 'Seats 8–10' },
+      { icon: 'coffee', label: 'Coffee, tea, filtered water, pastries & soft drinks included' },
     ],
     specs: [
       { label: 'Capacity', value: 'Up to 8–10 people' },
@@ -74,6 +75,7 @@ export const MEETING_ROOMS: MeetingRoom[] = [
     features: [
       { icon: 'users', label: 'Seats up to 4' },
       { icon: 'landmark', label: 'Cathedral view' },
+      { icon: 'coffee', label: 'Coffee, tea, filtered water, pastries & soft drinks included' },
     ],
     specs: [
       { label: 'Capacity', value: 'Up to 4 people' },
