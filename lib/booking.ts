@@ -158,7 +158,11 @@ export const privatisationSubscribe = (b: {
   days: number[];
   startDate: string;
   company: string;
-  name: string;
+  name?: string;
+  firstName?: string;
+  lastName?: string;
+  jobTitle?: string;
+  phone?: string;
   email: string;
   members: number;
 }) => call<{ clientSecret: string; subscriptionId: string }>('privatisation', { method: 'POST', auth: false, body: { action: 'subscribe', ...b } });

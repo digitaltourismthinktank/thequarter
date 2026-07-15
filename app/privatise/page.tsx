@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 };
 
 const STEPS = [
-  { title: 'Pick your room & days', text: 'Choose The Hop Yard or The Vineyard, how many days a week, and which ones. Only one room is ever privatised — so two open workspaces always stay free for everyone else.' },
+  { title: 'Choose your room and days', text: 'Pick The Hop Yard or The Vineyard and the days your team needs it — the whole room, everyone included, set up in minutes and invoiced quarterly.' },
   { title: 'Everyone’s set up', text: 'Your whole team get their own accounts and check in like any member — with all the usual: breakfast, coffee, fibre, the pods and the rewards.' },
   { title: 'One simple invoice', text: 'You pay for the full room at the pass rate for your frequency, invoiced quarterly from your start date. No per-desk admin, no surprises.' },
 ];

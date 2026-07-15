@@ -75,12 +75,18 @@ export default async function handler(req) {
     const days = Array.isArray(body.days) ? body.days : [];
     const startDate = String(body.startDate || '');
     const company = String(body.company || '').trim();
-    const name = String(body.name || '').trim();
+    const firstName = String(body.firstName || '').trim();
+    const lastName = String(body.lastName || '').trim();
+    const jobTitle = String(body.jobTitle || '').trim();
+    const phone = String(body.phone || '').trim();
+    // Back-compat: keep a single 'name' for anything downstream that reads it.
+    const name = String(body.name || '').trim() || `${firstName} ${lastName}`.trim();
     const email = String(body.email || '').trim().toLowerCase();
     const members = Number(body.members) || 0;
     if (!company) return json({ error: 'missing-company' }, 400);
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: 'bad-email' }, 400);
     if (members < MIN_MEMBERS) return json({ error: 'min-members' }, 400);
+    if (members > room.capacity) return json({ error: 'over-capacity' }, 400);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate)) return json({ error: 'bad-date' }, 400);
     const need = FREQ_DAYS[frequency];
     if (days.length !== need) return json({ error: 'days-mismatch' }, 400);
@@ -100,7 +106,7 @@ export default async function handler(req) {
     const found = await stripe(`/v1/customers?email=${encodeURIComponent(email)}&limit=1`, 'GET');
     if (found?.data?.[0]?.id) customerId = found.data[0].id;
     if (!customerId) {
-      const cust = await stripe('/v1/customers', 'POST', { email, ...(name ? { name } : {}) });
+      const cust = await stripe('/v1/customers', 'POST', { email, ...(name ? { name } : {}), ...(phone ? { phone } : {}) });
       if (cust?.error || !cust?.id) return json({ error: 'stripe', detail: cust?.error?.message }, 502);
       customerId = cust.id;
     }
@@ -109,6 +115,10 @@ export default async function handler(req) {
       customer: customerId,
       'items[0][price]': price.id,
       payment_behavior: 'default_incomplete',
+      // Declare card + BACS Direct Debit so Stripe always mints a PaymentIntent
+      // (and its client_secret). Both are enabled in the dashboard; currency is gbp.
+      'payment_settings[payment_method_types][0]': 'card',
+      'payment_settings[payment_method_types][1]': 'bacs_debit',
       'payment_settings[save_default_payment_method]': 'on_subscription',
       'expand[0]': 'latest_invoice.payment_intent',
       'metadata[kind]': 'privatisation',
@@ -119,6 +129,10 @@ export default async function handler(req) {
       'metadata[startDate]': startDate,
       'metadata[company]': company,
       'metadata[name]': name,
+      'metadata[firstName]': firstName,
+      'metadata[lastName]': lastName,
+      'metadata[jobTitle]': jobTitle,
+      'metadata[phone]': phone,
       'metadata[email]': email,
       'metadata[members]': String(members),
     });

@@ -7,6 +7,7 @@ import { Photo } from '@/components/site/primitives';
 import { STRIPE_PUBLISHABLE_KEY } from '@/lib/commerce';
 import { PRIVATISATION_ROOMS, FREQUENCIES, WEEKDAYS, PRIVATISATION_MIN_MEMBERS, quarterlyAmount, type FrequencyId } from '@/lib/privatisation';
 import { privatisationSubscribe } from '@/lib/booking';
+import { DatePickerModal } from './DatePickerModal';
 import { PREVIEW } from '@/lib/devMock';
 import styles from './Privatisation.module.css';
 import pay from './RoomBooking.module.css';
@@ -42,12 +43,16 @@ async function waitForNode(ref: { current: HTMLDivElement | null }): Promise<HTM
 }
 
 const ERRORS: Record<string, string> = {
-  'already-privatised': 'One team room is already privatised — only one runs at a time, so two stay open. Do get in touch and we’ll find you a date.',
+  'already-privatised': 'Our team rooms are fully booked out right now. Do get in touch and we’ll find you a date.',
   'min-members': `Privatisation is for teams of ${PRIVATISATION_MIN_MEMBERS} or more.`,
+  'over-capacity': 'That’s more people than this room seats — pick the larger room or reduce the team size.',
   'days-mismatch': 'Please pick the number of days that matches your chosen frequency.',
   'bad-email': 'Please enter a valid email address.',
   'missing-company': 'Please add your company name.',
   'bad-date': 'Please choose a start date.',
+  'stripe': 'We couldn’t set up the payment — please try again or enquire below.',
+  'stripe-price': 'We couldn’t set up the payment — please try again or enquire below.',
+  'no-client-secret': 'We couldn’t set up the payment — please try again or enquire below.',
   'not-configured': 'Online setup is being finalised — please enquire and we’ll set you up.',
 };
 
@@ -57,8 +62,12 @@ export function Privatisation() {
   const [frequency, setFrequency] = useState<FrequencyId>('one');
   const [days, setDays] = useState<number[]>([]);
   const [startDate, setStartDate] = useState('');
+  const [dateOpen, setDateOpen] = useState(false);
   const [company, setCompany] = useState('');
-  const [name, setName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [jobTitle, setJobTitle] = useState('');
+  const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [members, setMembers] = useState(PRIVATISATION_MIN_MEMBERS);
   const [step, setStep] = useState<'form' | 'pay'>('form');
@@ -81,11 +90,6 @@ export function Privatisation() {
   const quarterly = quarterlyAmount(monthly);
   const wholeWeek = frequency === 'all';
 
-  const todayStr = useMemo(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  }, []);
-
   function toggleDay(id: number) {
     setDays((cur) => {
       if (cur.includes(id)) return cur.filter((d) => d !== id);
@@ -99,6 +103,10 @@ export function Privatisation() {
     if (!company.trim()) return setError(ERRORS['missing-company']);
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return setError(ERRORS['bad-email']);
     if (members < PRIVATISATION_MIN_MEMBERS) return setError(ERRORS['min-members']);
+    if (members > room.capacity) {
+      const other = PRIVATISATION_ROOMS.find((r) => r.slug !== roomSlug);
+      return setError(`${room.name} seats ${room.capacity} — reduce your team size${other ? ` or choose ${other.name}` : ''}.`);
+    }
     if (!startDate) return setError(ERRORS['bad-date']);
     if (!wholeWeek && days.length !== freq.daysPerWeek) return setError(ERRORS['days-mismatch']);
     if (PREVIEW) {
@@ -112,7 +120,10 @@ export function Privatisation() {
       days: wholeWeek ? WEEKDAYS.map((d) => d.id) : days,
       startDate,
       company: company.trim(),
-      name: name.trim(),
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      jobTitle: jobTitle.trim(),
+      phone: phone.trim(),
       email: email.trim(),
       members,
     });
@@ -220,30 +231,50 @@ export function Privatisation() {
         ) : null}
 
         <div className={styles.grid2}>
-          <label className={styles.field}>
+          <div className={styles.field}>
             <span className={styles.label}>Start date</span>
-            <input type="date" className={styles.input} value={startDate} min={todayStr} onChange={(e) => setStartDate(e.target.value)} disabled={disabled} />
-          </label>
+            <button type="button" className={pay.dateTrigger} onClick={() => setDateOpen(true)} disabled={disabled}>
+              <Icon name="calendar" size={16} color="var(--gold-700)" />
+              {startDate
+                ? new Date(`${startDate}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'long' })
+                : 'Choose a start date'}
+            </button>
+            <DatePickerModal open={dateOpen} onClose={() => setDateOpen(false)} onPick={(d) => setStartDate(d)} single />
+          </div>
           <label className={styles.field}>
             <span className={styles.label}>Team size</span>
-            <input type="number" className={styles.input} min={PRIVATISATION_MIN_MEMBERS} max={30} value={members} onChange={(e) => setMembers(Math.max(1, Number(e.target.value) || 0))} disabled={disabled} />
+            <input type="number" className={styles.input} min={PRIVATISATION_MIN_MEMBERS} max={room.capacity} value={members} onChange={(e) => setMembers(Math.max(1, Number(e.target.value) || 0))} disabled={disabled} />
           </label>
         </div>
 
         <label className={styles.field}>
-          <span className={styles.label}>Company / organisation</span>
+          <span className={styles.label}>Company</span>
           <input className={styles.input} value={company} onChange={(e) => setCompany(e.target.value)} disabled={disabled} />
         </label>
         <div className={styles.grid2}>
           <label className={styles.field}>
-            <span className={styles.label}>Your name</span>
-            <input className={styles.input} value={name} onChange={(e) => setName(e.target.value)} disabled={disabled} />
+            <span className={styles.label}>First name</span>
+            <input className={styles.input} value={firstName} onChange={(e) => setFirstName(e.target.value)} autoComplete="given-name" disabled={disabled} />
           </label>
           <label className={styles.field}>
-            <span className={styles.label}>Email</span>
-            <input type="email" className={styles.input} value={email} onChange={(e) => setEmail(e.target.value)} disabled={disabled} />
+            <span className={styles.label}>Last name</span>
+            <input className={styles.input} value={lastName} onChange={(e) => setLastName(e.target.value)} autoComplete="family-name" disabled={disabled} />
           </label>
         </div>
+        <div className={styles.grid2}>
+          <label className={styles.field}>
+            <span className={styles.label}>Job title</span>
+            <input className={styles.input} value={jobTitle} onChange={(e) => setJobTitle(e.target.value)} autoComplete="organization-title" disabled={disabled} />
+          </label>
+          <label className={styles.field}>
+            <span className={styles.label}>Phone</span>
+            <input type="tel" className={styles.input} value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="tel" disabled={disabled} />
+          </label>
+        </div>
+        <label className={styles.field}>
+          <span className={styles.label}>Email</span>
+          <input type="email" className={styles.input} value={email} onChange={(e) => setEmail(e.target.value)} disabled={disabled} />
+        </label>
       </div>
 
       <aside className={styles.summary}>
