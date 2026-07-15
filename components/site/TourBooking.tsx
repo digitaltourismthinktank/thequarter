@@ -5,7 +5,9 @@ import { Button } from '@/components/ds/Button';
 import { Icon } from '@/components/ds/Icon';
 import { getTourSlots, bookTour, type TourSlot } from '@/lib/booking';
 import { PREVIEW } from '@/lib/devMock';
+import { DatePickerModal } from './DatePickerModal';
 import styles from './TourBooking.module.css';
+import pay from './RoomBooking.module.css';
 
 /** Sample slots for local preview (no Functions) so the layout is visible. */
 const PREVIEW_SLOTS: TourSlot[] = ['09:30', '10:00', '10:30', '11:00', '11:30', '13:00', '14:00', '15:00', '16:00', '16:30'].map((time, i) => ({
@@ -26,6 +28,7 @@ export function TourBooking() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  const [dateOpen, setDateOpen] = useState(false);
 
   const todayStr = useMemo(() => {
     const d = new Date();
@@ -103,10 +106,16 @@ export function TourBooking() {
   return (
     <div className={styles.wrap}>
       <div className={styles.col}>
-        <label className={styles.field}>
+        <div className={styles.field}>
           <span className={styles.label}>Pick a day</span>
-          <input type="date" className={styles.input} value={date} min={todayStr} onChange={(e) => setDate(e.target.value)} />
-        </label>
+          <button type="button" className={pay.dateTrigger} onClick={() => setDateOpen(true)}>
+            <Icon name="calendar" size={16} color="var(--gold-700)" />
+            {date
+              ? new Date(`${date}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'long' })
+              : 'Choose a day'}
+          </button>
+          <DatePickerModal open={dateOpen} onClose={() => setDateOpen(false)} onPick={(d) => setDate(d)} single />
+        </div>
 
         {date ? (
           <div className={styles.field}>
