@@ -68,11 +68,12 @@ async function setDays(memberId, value) {
 /** A member's check-in records for a given date (any status). */
 async function checkinsFor(email, dateStr) {
   return listRecords(T.checkins, {
-    filterByFormula: `AND({Member email}='${esc(email)}', DATETIME_FORMAT({Date}, 'YYYY-MM-DD')='${esc(dateStr)}')`,
+    filterByFormula: `AND(LOWER({Member email})='${esc(email)}', DATETIME_FORMAT({Date}, 'YYYY-MM-DD')='${esc(dateStr)}')`,
   });
 }
 
 export default async function handler(req) {
+  try {
   if (!airtableReady() || !MS_SECRET) return json({ error: 'not-configured' }, 503);
 
   if (req.method === 'GET') {
@@ -93,23 +94,23 @@ export default async function handler(req) {
     }
 
     if (action !== 'today') return json({ error: 'unknown-action' }, 400);
-    const email = memberEmail(vm.member);
+    const email = (memberEmail(vm.member) || '').toLowerCase();
     const today = londonNow().dateStr;
     const recs = await checkinsFor(email, today);
     const active = recs.find((r) => r.fields[F.checkins.status] === 'Checked-in');
     const planned = await listRecords(T.checkins, {
-      filterByFormula: `AND({Member email}='${esc(email)}', {Status}='Planned', DATETIME_FORMAT({Date}, 'YYYY-MM-DD')>='${today}')`,
+      filterByFormula: `AND(LOWER({Member email})='${esc(email)}', {Status}='Planned', DATETIME_FORMAT({Date}, 'YYYY-MM-DD')>='${today}')`,
       sort: [{ field: 'Date' }],
     });
     // A paid Day Pass (written by the Stripe webhook, keyed on the buyer's email) is a
     // reserved day too — once they create an account with the same email it should show
     // as already-booked, not vanish. Surface Status 'Paid' rows alongside Planned ones.
     const paidPasses = await listRecords(T.checkins, {
-      filterByFormula: `AND({Member email}='${esc(email)}', {Status}='Paid', DATETIME_FORMAT({Date}, 'YYYY-MM-DD')>='${today}')`,
+      filterByFormula: `AND(LOWER({Member email})='${esc(email)}', {Status}='Paid', DATETIME_FORMAT({Date}, 'YYYY-MM-DD')>='${today}')`,
       sort: [{ field: 'Date' }],
     });
     const requested = await listRecords(T.checkins, {
-      filterByFormula: `AND({Member email}='${esc(email)}', {Status}='Requested', DATETIME_FORMAT({Date}, 'YYYY-MM-DD')>='${today}')`,
+      filterByFormula: `AND(LOWER({Member email})='${esc(email)}', {Status}='Requested', DATETIME_FORMAT({Date}, 'YYYY-MM-DD')>='${today}')`,
       sort: [{ field: 'Date' }],
     });
     // Merge planned + paid into one upcoming list, de-duped by date (Planned wins if a
@@ -121,7 +122,7 @@ export default async function handler(req) {
       if (seenDates.has(d)) continue;
       if (d === today && active) continue;
       seenDates.add(d);
-      upcoming.push({ id: r.id, date: d, length: r.fields[F.checkins.length] });
+      upcoming.push({ id: r.id, date: d, length: r.fields[F.checkins.length], kind: r.fields[F.checkins.status] === 'Paid' ? 'pass' : 'reserved' });
     }
     upcoming.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
     return json({
@@ -140,7 +141,7 @@ export default async function handler(req) {
   const vm = await verifyMember(tokenFromRequest(req, body));
   if (!vm.ok) return json({ error: vm.reason }, 401);
   const me = vm.member;
-  const email = memberEmail(me);
+  const email = (memberEmail(me) || '').toLowerCase();
   const name = memberName(me);
   const length = body.length === 'Half' ? 'Half' : 'Full';
   const cost = length === 'Half' ? 0.5 : 1;
@@ -249,7 +250,7 @@ export default async function handler(req) {
     const recs = await listRecords(T.checkins, { filterByFormula: `RECORD_ID()='${esc(body.id)}'`, maxRecords: 1 });
     const r = recs[0];
     if (!r) return json({ error: 'not-found' }, 404);
-    if (r.fields[F.checkins.email] !== email) return json({ error: 'forbidden' }, 403);
+    if (String(r.fields[F.checkins.email] || '').toLowerCase() !== email) return json({ error: 'forbidden' }, 403);
     const st = r.fields[F.checkins.status];
     if (st !== 'Planned' && st !== 'Requested') return json({ error: 'only-planned-cancellable' }, 400);
     await updateRecord(T.checkins, body.id, { [F.checkins.status]: 'Cancelled' });
@@ -257,4 +258,7 @@ export default async function handler(req) {
   }
 
   return json({ error: 'unknown-action' }, 400);
+  } catch (e) {
+    return json({ error: 'server' }, 500);
+  }
 }

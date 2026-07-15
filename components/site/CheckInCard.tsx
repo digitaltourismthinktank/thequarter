@@ -151,6 +151,7 @@ export function CheckInCard({ className }: { className?: string }) {
             <span key={p.id} className={styles.chip}>
               {fmtDate(p.date)}
               {p.length === 'Half' ? ' · ½' : ''}
+              {p.kind === 'pass' ? <span className={styles.passTag}>Day Pass</span> : null}
               <button className={styles.chipX} onClick={() => doCancel(p.id)} aria-label="Cancel reservation" disabled={busy}>
                 ×
               </button>
@@ -202,6 +203,15 @@ function friendly(code?: string): string {
       return 'Weekends are by request — pick a weekend day and we’ll confirm.';
     case 'weekend-pending':
       return 'Your weekend request is in — we’ll confirm by email before the day.';
+    case 'no-token':
+    case 'invalid-token':
+    case 'verify-failed':
+    case 'no-member':
+      return 'Please sign in again to book.';
+    case 'server':
+      return 'We couldn’t reach bookings just now — please try again in a moment.';
+    case 'bad-date':
+      return 'Please choose a valid weekday.';
     case 'not-configured':
       return 'Check-in isn’t available just yet.';
     case 'network':

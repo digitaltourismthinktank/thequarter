@@ -64,7 +64,7 @@ export interface CheckinStatus {
   checkedIn: boolean;
   length: 'Full' | 'Half' | null;
   balance: string | null;
-  planned: { id: string; date: string; length: 'Full' | 'Half' }[];
+  planned: { id: string; date: string; length: 'Full' | 'Half'; kind?: 'pass' | 'reserved' }[];
   requested?: { id: string; date: string; length: 'Full' | 'Half' }[];
 }
 

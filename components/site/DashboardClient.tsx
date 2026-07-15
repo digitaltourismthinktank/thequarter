@@ -237,17 +237,36 @@ export function DashboardClient() {
 
       <div className={styles.layout}>
         <div className={styles.mainCol}>
-          <div className={styles.statRow}>
-            <StatTile label="Your days" tone="ink" icon="calendar" value={daysValue} unit={daysUnit} hint={daysHint} progress={daysProg} valueSize="var(--text-2xl)" />
-            <StatTile label="Your plan" tone="gold" icon="user" value={planLabel} hint={planMeta} valueSize="var(--text-2xl)" />
-            <StatTile
-              label="Door code"
-              icon="door-open"
-              value={doorCode ?? '—'}
-              hint={doorCode ? 'Keep it to yourself' : 'Ask the team'}
-              valueSize="var(--text-2xl)"
-            />
-          </div>
+          {hasPlan ? (
+            <div className={styles.statRow}>
+              <StatTile label="Your days" tone="ink" icon="calendar" value={daysValue} unit={daysUnit} hint={daysHint} progress={daysProg} valueSize="var(--text-2xl)" />
+              <StatTile label="Your plan" tone="gold" icon="user" value={planLabel} hint={planMeta} valueSize="var(--text-2xl)" />
+              <StatTile
+                label="Door code"
+                icon="door-open"
+                value={doorCode ?? '—'}
+                hint={doorCode ? 'Keep it to yourself' : 'Ask the team'}
+                valueSize="var(--text-2xl)"
+              />
+            </div>
+          ) : (
+            <div className={styles.payg}>
+              <span className={styles.paygEyebrow}>Pay-as-you-go</span>
+              <h2 className={styles.paygTitle}>You&rsquo;re on pay-as-you-go</h2>
+              <p className={styles.paygBody}>
+                You don&rsquo;t have a membership yet, so there are no monthly days and no door code to show. Any Day Pass you
+                book appears in your bookings just below.
+              </p>
+              <div className={styles.paygActions}>
+                <Button variant="primary" size="sm" href="/plans" iconAfter="arrow-right">
+                  See plans
+                </Button>
+                <Button variant="secondary" size="sm" href="/day-pass">
+                  Book a Day Pass
+                </Button>
+              </div>
+            </div>
+          )}
 
           {band ? (
             <div className={styles.busy}>

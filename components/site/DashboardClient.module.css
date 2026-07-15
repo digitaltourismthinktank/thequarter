@@ -93,6 +93,41 @@
   gap: 16px;
 }
 
+/* ---- Pay-as-you-go panel (no membership) — replaces the three StatTiles ---- */
+.payg {
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-left: 3px solid var(--gold-500);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  padding: 22px 24px;
+}
+.paygEyebrow {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  color: var(--gold-700);
+  font-weight: var(--fw-semibold);
+}
+.paygTitle {
+  font-size: var(--text-lg);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--tracking-snug);
+  color: var(--ink-900);
+  margin: 6px 0 8px;
+}
+.paygBody {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  max-width: 52ch;
+}
+.paygActions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+
 /* ---- Today at The Quarter — atmosphere strip (standard card) ---- */
 .busy {
   display: flex;
