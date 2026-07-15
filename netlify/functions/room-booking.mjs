@@ -31,6 +31,11 @@ import { verifyMember, memberEmail, memberName, tokenFromRequest } from './_memb
  *  member via metaData.meetingRoomHoursCap). Pods are free + never counted here. */
 const DEFAULT_FREE_HOURS = 4;
 
+/** Free meeting-room hours belong to a PLAN. A member with no plan connection (pay-as-you-go
+ *  account) earns no free hours — they pay (and earn the give-back) like a guest. Mirrors the
+ *  dashboard's `(member.planConnections?.length ?? 0) > 0` signal exactly. */
+const hasPlan = (m) => (m?.planConnections?.length ?? 0) > 0;
+
 const STRIPE_SECRET = process.env.STRIPE_SECRET_KEY;
 
 // --- Pricing (£, inc VAT). Names normalised so a straight/curly apostrophe or
@@ -189,6 +194,9 @@ export default async function handler(req) {
     if (!vm.ok) return json({ error: 'auth' }, 401);
     const me = vm.member;
     const cap = Number(me?.metaData?.meetingRoomHoursCap) || DEFAULT_FREE_HOURS;
+    // No plan → no free hours: report remaining:0 so the client's freeEligible is false and the
+    // member is routed to the paid path (where they still earn the give-back).
+    if (!hasPlan(me)) return json({ capHours: cap, usedHours: 0, remaining: 0 });
     const ref = /^\d{4}-\d{2}-\d{2}$/.test(date || '') ? date : new Date().toISOString().slice(0, 10);
     const used = await monthlyMeetingRoomHours(memberEmail(me), ref);
     return json({ capHours: cap, usedHours: round2(used), remaining: round2(Math.max(0, cap - used)) });
@@ -229,9 +237,16 @@ export default async function handler(req) {
     const name = String(body.name || '').trim();
     const company = String(body.company || '').trim();
     const jobTitle = String(body.jobTitle || '').trim();
+    const phone = String(body.phone || '').trim();
     if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: 'bad-email' }, 400);
     if (!company) return json({ error: 'missing-company' }, 400);
     if (priced.amountPence < 100) return json({ error: 'bad-amount' }, 400);
+
+    // Best-effort member resolution: attach the payer's member id/email to the PI metadata so
+    // the webhook awards the spend give-back and links the booking to them. NEVER hard-fails —
+    // a guest (no/invalid token) simply carries no member metadata and pays exactly as before.
+    const vm = await verifyMember(tokenFromRequest(req, body));
+    const memberMeta = vm.ok ? { 'metadata[memberId]': vm.member.id, 'metadata[memberEmail]': memberEmail(vm.member) || '' } : {};
 
     const pi = await stripe('/v1/payment_intents', 'POST', {
       amount: String(priced.amountPence),
@@ -250,7 +265,9 @@ export default async function handler(req) {
       'metadata[company]': company,
       'metadata[name]': name,
       'metadata[jobTitle]': jobTitle,
+      'metadata[phone]': phone,
       'metadata[email]': email,
+      ...memberMeta,
     });
     if (pi?.error || !pi?.client_secret) return json({ error: 'stripe', detail: pi?.error?.message }, 502);
     return json({ clientSecret: pi.client_secret, amountPence: priced.amountPence, lines: priced.lines, start: priced.start, end: priced.end });
@@ -262,6 +279,9 @@ export default async function handler(req) {
     const vm = await verifyMember(tokenFromRequest(req, body));
     if (!vm.ok) return json({ error: 'auth' }, 401);
     const me = vm.member;
+    // Free bookings (rooms and pods) are a membership benefit — a no-plan account can't take one.
+    // The client routes them to the paid intent instead (where they still earn the give-back).
+    if (!hasPlan(me)) return json({ error: 'no-plan' }, 400);
     const email = memberEmail(me);
     const hours = round2((hhmmToMin(priced.end) - hhmmToMin(priced.start)) / 60);
     // Pods are free + uncapped for members; meeting rooms enforce the monthly cap.

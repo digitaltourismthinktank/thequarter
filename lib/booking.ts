@@ -109,13 +109,18 @@ export interface RoomBookingInput {
   company?: string;
   name?: string;
   email?: string;
+  /** Contact's phone (paid/company bookings). Carried into the Stripe PI metadata. */
+  phone?: string;
   /** Contact's job title (paid/company bookings). Stored in the booking Notes. */
   jobTitle?: string;
 }
 export const roomQuote = (b: RoomBookingInput) =>
   call<RoomQuote>('room-booking', { method: 'POST', auth: false, body: { action: 'quote', ...b } });
+// Authed: attaches the member JWT when signed in so a PAYING member earns the give-back
+// and the booking is linked to them. getMemberToken() returns null for guests, so a
+// guest sends no token and still pays (and books) exactly as before.
 export const roomIntent = (b: RoomBookingInput) =>
-  call<RoomIntent>('room-booking', { method: 'POST', auth: false, body: { action: 'intent', ...b } });
+  call<RoomIntent>('room-booking', { method: 'POST', auth: true, body: { action: 'intent', ...b } });
 // Member free-booking (two main rooms, capped) — needs the member token (auth).
 export interface RoomMemberStatus {
   capHours: number;

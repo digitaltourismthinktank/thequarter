@@ -25,7 +25,10 @@ export function emailReady() {
  * @param {{ to: string|string[], subject: string, html: string, replyTo?: string }} opts
  */
 export async function sendEmail({ to, subject, html, replyTo }) {
-  if (!RESEND_API_KEY) return { ok: false, skipped: true };
+  if (!RESEND_API_KEY) {
+    console.warn('[email] RESEND_API_KEY unset — skipping', { to, subject });
+    return { ok: false, skipped: true };
+  }
   try {
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',

@@ -129,6 +129,7 @@ export function RoomBooking({ roomName, price }: { roomName: string; price: { ha
   const [name, setName] = useState('');
   const [jobTitle, setJobTitle] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [dateOpen, setDateOpen] = useState(false);
 
   // Range picker (mirrors BookingClient): pending start tap, hovered slot, committed range.
@@ -338,6 +339,7 @@ export function RoomBooking({ roomName, price }: { roomName: string; price: { ha
       company: (company || (member ? 'Member booking' : '')).trim(),
       name: name.trim(),
       jobTitle: jobTitle.trim(),
+      phone: phone.trim(),
       email: email.trim() || memberEmailOf(member),
     });
     setWorking(false);
@@ -414,7 +416,11 @@ export function RoomBooking({ roomName, price }: { roomName: string; price: { ha
                   </>
                 ),
                 cta: 'Create your account',
-                href: signupHref(guestEmail),
+                href: signupHref(guestEmail, {
+                  firstName: name.trim().split(/\s+/)[0],
+                  lastName: name.trim().split(/\s+/).slice(1).join(' '),
+                  phone,
+                }),
               }
         }
         footnote={member ? undefined : <>Booked for {company.trim() || 'your company'}.</>}
@@ -572,6 +578,10 @@ export function RoomBooking({ roomName, price }: { roomName: string; price: { ha
             <label className={styles.field}>
               <span className={styles.label}>Email</span>
               <input type="email" className={styles.input} value={email} onChange={(e) => setEmail(e.target.value)} disabled={step === 'pay'} />
+            </label>
+            <label className={styles.field}>
+              <span className={styles.label}>Contact number</span>
+              <input type="tel" className={styles.input} value={phone} onChange={(e) => setPhone(e.target.value)} disabled={step === 'pay'} placeholder="Optional — in case we need to reach you" />
             </label>
           </div>
         ) : null}

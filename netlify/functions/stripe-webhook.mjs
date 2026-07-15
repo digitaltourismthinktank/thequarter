@@ -148,6 +148,30 @@ async function finaliseRoomBooking(pi) {
     { typecast: true },
   );
 
+  // Quarter Rewards: if a member PAID for this room, award the spend give-back (mirrors the
+  // native-carnet earn — pointsForGBP + folded points/lifetimePoints write + a 'spend' ledger
+  // row). Idempotent by construction: we only reach here on a genuinely NEW booking record — a
+  // webhook retry hits the duplicate early-return above, so it never re-credits. Best-effort:
+  // a rewards hiccup must never block or 500 the booking (mirrors checkin.mjs).
+  if (m.memberEmail) {
+    try {
+      const { member, metaData } = await getMemberSync(MS_SECRET, m.memberEmail);
+      const spend = pointsForGBP(total);
+      if (member && spend > 0) {
+        const cur = Math.max(0, Math.round(Number(metaData?.points) || 0));
+        const life = Math.max(0, Math.round(Number(metaData?.lifetimePoints) || cur));
+        const admin = memberstackAdmin.init(MS_SECRET);
+        await admin.members.update({
+          id: member.id,
+          data: { metaData: { ...(metaData || {}), points: cur + spend, lifetimePoints: life + spend } },
+        });
+        await appendLedger(m.memberEmail, spend, 'spend', piId);
+      }
+    } catch {
+      /* rewards are best-effort — never block the booking */
+    }
+  }
+
   await sendRoomBookingEmails({ m, total, people, lunch });
   return { created: rec?.id || null };
 }
@@ -233,6 +257,35 @@ async function sendDayPassEmails({ email, name, date, total }) {
     to: OPS_EMAIL,
     subject: `New Day Pass — ${name || email || 'guest'} (${date})`,
     html: emailShell('New Day Pass', `${body}<p style="margin:12px 0 0;">Guest: ${escapeHtml(name || '—')} · ${escapeHtml(email || '—')}</p>`, 'A Day Pass was just paid'),
+  });
+}
+
+/**
+ * Buyer + ops confirmation for a day-pass carnet purchase (the only paid flow that had no
+ * email). Mirrors sendDayPassEmails' shape/conventions (FROM/replyTo, emailShell). Best-effort:
+ * sendEmail never throws, so a mail hiccup can't break carnet finalisation.
+ */
+async function sendCarnetEmails({ email, name, passes, total }) {
+  const body = `
+    <p style="margin:0 0 6px;"><strong>Day-pass carnet</strong> · ${passes} ${passes === 1 ? 'pass' : 'passes'}</p>
+    <p style="margin:0 0 6px;">Total paid: <strong>£${total.toFixed(2)}</strong> (inc VAT)</p>
+    <p style="margin:0 0 6px;">Valid for 12 months from today.</p>`;
+  if (email) {
+    await sendEmail({
+      to: email,
+      replyTo: OPS_EMAIL,
+      subject: `Your day-pass carnet — ${passes} ${passes === 1 ? 'pass' : 'passes'} (£${total.toFixed(2)})`,
+      html: emailShell(
+        'Your day-pass carnet is ready',
+        `<p>Thanks${name ? `, ${escapeHtml(name)}` : ''} — your book of ${passes} day ${passes === 1 ? 'pass' : 'passes'} is credited to your account.</p>${body}<p style="margin:12px 0 0;">Use a pass any day from your dashboard — just check in and we’ll take one off the book.</p>`,
+        'Your Quarter day-pass carnet is ready',
+      ),
+    });
+  }
+  await sendEmail({
+    to: OPS_EMAIL,
+    subject: `New carnet — ${name || email || 'member'} (${passes} passes)`,
+    html: emailShell('New carnet', `${body}<p style="margin:12px 0 0;">Buyer: ${escapeHtml(name || '—')} · ${escapeHtml(email || '—')}</p>`, 'A day-pass carnet was just bought'),
   });
 }
 
@@ -470,6 +523,9 @@ async function handleEvent(event) {
         /* ignore */
       }
     }
+    // Buyer + ops confirmation (best-effort — sendEmail never throws). Only on a first credit,
+    // never on the idempotent 'duplicate' early-return above, so a retry can't re-email.
+    await sendCarnetEmails({ email, name: obj.metadata?.name || '', passes, total: (obj.amount ?? 0) / 100 });
     return { ...base, email, carnetNative: passes, spend };
   }
 
@@ -544,6 +600,8 @@ async function handleEvent(event) {
       const cur = Math.max(0, Math.round(Number(metaData?.points) || 0));
       const life = Math.max(0, Math.round(Number(metaData?.lifetimePoints) || cur));
       earnMeta = { ...(metaData || {}), carnet: { remaining, total, expires }, points: cur + spend, lifetimePoints: life + spend };
+      // Buyer + ops confirmation (best-effort — sendEmail never throws). Same email as the native path.
+      await sendCarnetEmails({ email, name: memberFirstName(member), passes, total: amount / 100 });
       applied = { carnet: passes, spend };
     } else {
       applied = { checkout: 'no-carnet-match', amount };

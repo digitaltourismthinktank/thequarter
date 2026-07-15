@@ -322,6 +322,9 @@ export function DashboardClient() {
               <a className={styles.quickLink} href="/book">
                 Book a room or pod <Icon name="arrow-right" size={16} color="var(--gold-600)" />
               </a>
+              <a className={styles.quickLink} href="/meeting-rooms">
+                Book a meeting room <Icon name="arrow-right" size={16} color="var(--gold-600)" />
+              </a>
               <a className={styles.quickLink} href="/perks">
                 Member perks <Icon name="arrow-right" size={16} color="var(--gold-600)" />
               </a>
