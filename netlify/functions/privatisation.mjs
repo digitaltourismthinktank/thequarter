@@ -69,6 +69,64 @@ export default async function handler(req) {
     });
   }
 
+  // Embedded (in-site) privatisation checkout — charges the first quarter now via the
+  // Payment Element, no redirect, no trial. Access starts on startDate via room blocks.
+  if (action === 'subscribe') {
+    const days = Array.isArray(body.days) ? body.days : [];
+    const startDate = String(body.startDate || '');
+    const company = String(body.company || '').trim();
+    const name = String(body.name || '').trim();
+    const email = String(body.email || '').trim().toLowerCase();
+    const members = Number(body.members) || 0;
+    if (!company) return json({ error: 'missing-company' }, 400);
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: 'bad-email' }, 400);
+    if (members < MIN_MEMBERS) return json({ error: 'min-members' }, 400);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate)) return json({ error: 'bad-date' }, 400);
+    const need = FREQ_DAYS[frequency];
+    if (days.length !== need) return json({ error: 'days-mismatch' }, 400);
+    const active = await activePrivatisation();
+    if (active) return json({ error: 'already-privatised' }, 409);
+
+    const price = await stripe('/v1/prices', 'POST', {
+      currency: 'gbp',
+      unit_amount: String(Math.round(quarterly * 100)),
+      'recurring[interval]': 'month',
+      'recurring[interval_count]': '3',
+      'product_data[name]': `${room.name} privatisation — ${FREQ_LABEL[frequency]}`,
+    });
+    if (price?.error || !price?.id) return json({ error: 'stripe-price', detail: price?.error?.message }, 502);
+
+    let customerId = '';
+    const found = await stripe(`/v1/customers?email=${encodeURIComponent(email)}&limit=1`, 'GET');
+    if (found?.data?.[0]?.id) customerId = found.data[0].id;
+    if (!customerId) {
+      const cust = await stripe('/v1/customers', 'POST', { email, ...(name ? { name } : {}) });
+      if (cust?.error || !cust?.id) return json({ error: 'stripe', detail: cust?.error?.message }, 502);
+      customerId = cust.id;
+    }
+
+    const sub = await stripe('/v1/subscriptions', 'POST', {
+      customer: customerId,
+      'items[0][price]': price.id,
+      payment_behavior: 'default_incomplete',
+      'payment_settings[save_default_payment_method]': 'on_subscription',
+      'expand[0]': 'latest_invoice.payment_intent',
+      'metadata[kind]': 'privatisation',
+      'metadata[roomSlug]': roomSlug,
+      'metadata[roomName]': room.name,
+      'metadata[frequency]': frequency,
+      'metadata[days]': days.join(','),
+      'metadata[startDate]': startDate,
+      'metadata[company]': company,
+      'metadata[name]': name,
+      'metadata[email]': email,
+      'metadata[members]': String(members),
+    });
+    const clientSecret = sub?.latest_invoice?.payment_intent?.client_secret;
+    if (sub?.error || !clientSecret) return json({ error: 'stripe', detail: sub?.error?.message || 'no-client-secret' }, 502);
+    return json({ clientSecret, subscriptionId: sub.id });
+  }
+
   if (action === 'checkout') {
     const days = Array.isArray(body.days) ? body.days : [];
     const startDate = String(body.startDate || '');

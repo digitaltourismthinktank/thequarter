@@ -9,7 +9,6 @@ import { Checkbox } from '@/components/ds/Checkbox';
 import { Icon } from '@/components/ds/Icon';
 import { Photo } from '@/components/site/primitives';
 import { MEETING_ROOMS } from '@/lib/rooms';
-import { getWeeklyAvailability } from '@/lib/availability';
 import { getSpaces, getAvailability } from '@/lib/booking';
 import { PREVIEW } from '@/lib/devMock';
 import { cn } from '@/lib/cn';
@@ -17,6 +16,15 @@ import styles from './MeetingRoomsExplorer.module.css';
 
 const SLOTS = ['09:00', '10:00', '11:00', '12:00', '14:00', '15:00', '16:00'];
 const normName = (s: string) => s.toLowerCase().replace(/[‘’']/g, "'").replace(/\s+/g, ' ').trim();
+
+// A deterministic all-free seed (no fake busy slots, no hard-coded dates). Real
+// availability replaces it client-side; on preview/offline it stays honestly blank.
+const EMPTY_WEEK: { weekLabel: string; days: { label: string; date?: string }[]; slots: string[]; data: SlotStatus[][] } = {
+  weekLabel: 'This week',
+  days: [{ label: 'Mon' }, { label: 'Tue' }, { label: 'Wed' }, { label: 'Thu' }, { label: 'Fri' }],
+  slots: SLOTS,
+  data: SLOTS.map(() => [0, 1, 2, 3, 4].map(() => 'available' as SlotStatus)),
+};
 
 /** The next `n` weekdays (Mon–Fri) from today, with iso for fetching. */
 function upcomingWeekdays(n = 5) {
@@ -48,13 +56,13 @@ export function MeetingRoomsExplorer() {
   const [catering, setCatering] = useState(true);
 
   const room = MEETING_ROOMS[roomIdx];
-  const [week, setWeek] = useState(() => getWeeklyAvailability(MEETING_ROOMS[0].slug));
+  const [week, setWeek] = useState(EMPTY_WEEK);
   const selectedKey = selection ? `${selection.dayIndex}-${selection.slotIndex}` : '';
 
   // Mirror the real backend: reseed instantly, then resolve this room to its Airtable
   // space, read this week's confirmed bookings per day, and paint busy vs available.
   useEffect(() => {
-    setWeek(getWeeklyAvailability(room.slug));
+    setWeek(EMPTY_WEEK);
     if (PREVIEW) return;
     let cancelled = false;
     (async () => {
@@ -169,11 +177,11 @@ export function MeetingRoomsExplorer() {
             </span>
           </div>
 
-          <Button variant={selection ? 'accent' : 'primary'} fullWidth href="#enquire" iconAfter="arrow-right">
-            {selection ? 'Enquire to reserve this slot' : 'Enquire to reserve'}
+          <Button variant="accent" fullWidth href={`/meeting-rooms/${room.slug}#book`} iconAfter="arrow-right">
+            Book {room.name}
           </Button>
-          <Button variant="secondary" fullWidth href="#enquire" icon="phone">
-            Send an enquiry instead
+          <Button variant="secondary" fullWidth href="#enquire" icon="message-circle">
+            Have a question? Chat to us
           </Button>
         </aside>
       </div>

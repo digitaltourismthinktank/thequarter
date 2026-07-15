@@ -4,7 +4,7 @@ import { Button } from '@/components/ds/Button';
 import { Icon } from '@/components/ds/Icon';
 import { RoomCard } from '@/components/ds/RoomCard';
 import { MeetingRoomsExplorer } from '@/components/site/MeetingRoomsExplorer';
-import { EnquiryForm } from '@/components/site/EnquiryForm';
+import { TalkToUs } from '@/components/site/TalkToUs';
 import { MEETING_ROOMS } from '@/lib/rooms';
 import { PHOTOS } from '@/lib/media';
 import styles from './meeting-rooms.module.css';
@@ -30,7 +30,7 @@ export default function MeetingRoomsPage() {
           dark
           eyebrow="Meeting rooms"
           title="Check availability & reserve"
-          intro="Pick a room, find a free slot this week, and book in a couple of clicks — or send a note with your catering needs. Half-day and full-day packages, with a lunch add-on and a quiet-day discount."
+          intro="Pick a room, choose your time, and pay securely online — bookable 09:00–17:30, Monday to Friday. Half-day and full-day packages, with a lunch add-on and a quiet-day discount."
           max={620}
         />
       </Section>
@@ -62,30 +62,23 @@ export default function MeetingRoomsPage() {
       </Section>
 
       <Section tone="page" id="enquire">
-        <div className={styles.enquireGrid}>
-          <div>
-            <Eyebrow>Reserve or enquire</Eyebrow>
-            <SectionHead title="Tell us what you need" max={420} />
-            <p className={styles.enquireText}>
-              Send us the room, a rough date and time, and anything that would make it perfect. We&rsquo;ll come back to
-              confirm your booking.
-            </p>
-            <div className={styles.enquireList}>
-              {ASSURANCES.map((a) => (
-                <div key={a} className={styles.enquireItem}>
-                  <Icon name="check" size={18} color="var(--gold-600)" strokeWidth={2.25} />
-                  <span>{a}</span>
-                </div>
-              ))}
+        <SectionHead
+          align="center"
+          eyebrow="Here to help"
+          title="Questions? Chat to us now"
+          intro="Tell us the room, a date and time, and anything that would make it perfect — a bigger catering order, a time outside 09:00–17:30, or a hand with the A/V. We’ll sort it, no waiting on an email."
+          max={620}
+        />
+        <div className={styles.enquireList} style={{ maxWidth: 560, margin: '0 auto' }}>
+          {ASSURANCES.map((a) => (
+            <div key={a} className={styles.enquireItem}>
+              <Icon name="check" size={18} color="var(--gold-600)" strokeWidth={2.25} />
+              <span>{a}</span>
             </div>
-            <figure style={{ margin: '24px 0 0' }}>
-              <Photo src={PHOTOS.catering.src} alt={PHOTOS.catering.alt} ratio="16 / 9" sizes="(max-width: 900px) 100vw, 480px" />
-              <figcaption style={{ marginTop: 8, fontSize: 'var(--text-sm)', color: 'var(--stone-700)' }}>
-                Make it a hosted lunch — baguettes &amp; cake from The Sandwich Bar, £12 a head.
-              </figcaption>
-            </figure>
-          </div>
-          <EnquiryForm formName="room-enquiry" />
+          ))}
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 24 }}>
+          <TalkToUs variant="solid" label="Chat to us now" prefill="I’d like to book a meeting room: " />
         </div>
       </Section>
     </>

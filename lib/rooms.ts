@@ -73,7 +73,7 @@ export const MEETING_ROOMS: MeetingRoom[] = [
     photo: PHOTOS.meetingWindow,
     features: [
       { icon: 'users', label: 'Seats up to 4' },
-      { icon: 'leaf', label: 'Cathedral view' },
+      { icon: 'landmark', label: 'Cathedral view' },
     ],
     specs: [
       { label: 'Capacity', value: 'Up to 4 people' },

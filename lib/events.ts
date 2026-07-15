@@ -46,12 +46,4 @@ export const EVENTS: QuarterEvent[] = [
     kind: 'Workshop',
     blurb: 'Bring a tired plant or take one home. A hands-in-the-soil hour with our resident grower.',
   },
-  {
-    date: '10 Jul',
-    day: 'Fri',
-    title: 'Summer rooftop drinks',
-    time: '18:00 – late',
-    kind: 'Social',
-    blurb: 'The cathedral, golden hour and a glass of something. Our favourite evening of the month.',
-  },
 ];

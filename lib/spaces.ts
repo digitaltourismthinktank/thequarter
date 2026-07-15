@@ -21,9 +21,9 @@ export interface SpaceItem {
 export const SPACES: SpaceItem[] = [
   {
     id: 'open-workspace',
-    name: 'The Open Workspace',
+    name: 'The Open Workspaces',
     tag: 'Main desks',
-    blurb: 'Open desks in the light, with the hum of people finding their focus. Your day, your seat.',
+    blurb: 'Open desks across three bright, plant-filled rooms — the hum of people finding their focus. Your day, your seat.',
     photo: PHOTOS.mainSpace,
     meta: [
       { icon: 'users', label: 'Open seating' },
@@ -45,13 +45,13 @@ export const SPACES: SpaceItem[] = [
   },
   {
     id: 'cafe',
-    name: 'The Quarter Café',
+    name: 'The Kentish Pantry',
     tag: 'Open social space',
     blurb: 'The cathedral view, the natural light and the breakfast. Not bookable — just ours to share.',
-    photo: PHOTOS.cafe,
+    photo: PHOTOS.breakfast,
     meta: [
       { icon: 'coffee', label: 'Coffee & breakfast' },
-      { icon: 'leaf', label: 'Cathedral view' },
+      { icon: 'landmark', label: 'Cathedral view' },
     ],
     href: '/spaces#cafe',
   },

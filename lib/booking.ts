@@ -140,9 +140,33 @@ export const privatisationCheckout = (b: {
   members: number;
 }) => call<{ url: string }>('privatisation', { method: 'POST', auth: false, body: { action: 'checkout', ...b } });
 
+// Embedded (in-site) privatisation — Stripe Elements, charges the first quarter now.
+export const privatisationSubscribe = (b: {
+  roomSlug: string;
+  frequency: string;
+  days: number[];
+  startDate: string;
+  company: string;
+  name: string;
+  email: string;
+  members: number;
+}) => call<{ clientSecret: string; subscriptionId: string }>('privatisation', { method: 'POST', auth: false, body: { action: 'subscribe', ...b } });
+
 // Join with a chosen future start date (Stripe Checkout, trial-until start).
 export const joinWithStartDate = (b: { plan: string; term: 'monthly' | 'annual'; startDate?: string; email?: string }) =>
   call<{ url: string }>('join', { method: 'POST', auth: false, body: b });
+
+// Native in-site plan subscription (Stripe Elements — no Payment Links, no redirect out).
+export const subscribeToPlan = (b: { plan: string; term: 'monthly' | 'annual'; email: string; name?: string }) =>
+  call<{ clientSecret: string; subscriptionId: string; customerId: string }>('subscribe', { method: 'POST', auth: false, body: b });
+
+// Native Day Pass one-off checkout (£21.60 PaymentIntent — replaces the Typeform embed).
+export const dayPassIntent = (b: { email: string; name: string; date: string }) =>
+  call<{ clientSecret: string }>('day-pass', { method: 'POST', auth: false, body: b });
+
+// Native carnet purchase (member — in-site PaymentIntent for a bundle of day passes).
+export const carnetIntent = (passes: number) =>
+  call<{ clientSecret: string }>('carnet', { method: 'POST', body: { action: 'intent', passes } });
 
 // Public perks shopfront — the live Airtable perks (display fields only, no auth).
 export interface PublicPerk {

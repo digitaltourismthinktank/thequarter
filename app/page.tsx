@@ -190,8 +190,8 @@ export default function HomePage() {
       <Section tone="card">
         <div className={styles.split}>
           <Photo
-            src={PHOTOS.mainSpaceWide.src}
-            alt={PHOTOS.mainSpaceWide.alt}
+            src={PHOTOS.urbanFarm.src}
+            alt={PHOTOS.urbanFarm.alt}
             ratio="5 / 4"
             sizes="(max-width: 900px) 100vw, 600px"
           />

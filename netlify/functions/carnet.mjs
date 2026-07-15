@@ -21,11 +21,25 @@ import {
   CHECKIN_BONUS,
   CHECKIN_QUIET_BONUS,
   CHECKIN_BONUS_CAP,
+  CARNET_AMOUNT_TO_PASSES,
 } from './_rewards.mjs';
 import { isQuietDay } from './_busyness.mjs';
 
 const MS_SECRET = process.env.MEMBERSTACK_SECRET_KEY;
+const STRIPE_SECRET = process.env.STRIPE_SECRET_KEY;
 const json = (b, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { 'content-type': 'application/json' } });
+
+// passes → price in pence (reverse of CARNET_AMOUNT_TO_PASSES — one source of truth).
+const CARNET_PENCE = Object.fromEntries(Object.entries(CARNET_AMOUNT_TO_PASSES).map(([pence, passes]) => [passes, Number(pence)]));
+
+async function stripe(path, method, form) {
+  const res = await fetch(`https://api.stripe.com${path}`, {
+    method,
+    headers: { authorization: `Bearer ${STRIPE_SECRET}`, 'content-type': 'application/x-www-form-urlencoded' },
+    body: form ? new URLSearchParams(form).toString() : undefined,
+  });
+  return res.json();
+}
 
 function carnetOf(m) {
   const c = m?.metaData?.carnet || {};
@@ -42,6 +56,26 @@ export default async function handler(req) {
 
   if (req.method === 'GET') return json({ carnet: carnetOf(me) });
   if (req.method !== 'POST') return json({ error: 'method-not-allowed' }, 405);
+
+  // Native carnet purchase — in-site Stripe PaymentIntent (replaces the Payment Links).
+  if (body.action === 'intent') {
+    if (!STRIPE_SECRET) return json({ error: 'not-configured' }, 503);
+    const passes = Number(body.passes) || 0;
+    const pence = CARNET_PENCE[passes];
+    if (!pence) return json({ error: 'bad-bundle' }, 400);
+    const pi = await stripe('/v1/payment_intents', 'POST', {
+      amount: String(pence),
+      currency: 'gbp',
+      'automatic_payment_methods[enabled]': 'true',
+      receipt_email: email,
+      description: `The Quarter — carnet (${passes} day passes)`,
+      'metadata[kind]': 'carnet',
+      'metadata[email]': email,
+      'metadata[passes]': String(passes),
+    });
+    if (pi?.error || !pi?.client_secret) return json({ error: 'stripe', detail: pi?.error?.message }, 502);
+    return json({ clientSecret: pi.client_secret });
+  }
 
   if (body.action === 'use') {
     const c = carnetOf(me);

@@ -11,6 +11,7 @@
  * GET debug view of the most recent events this instance processed.
  */
 import crypto from 'node:crypto';
+import memberstackAdmin from '@memberstack/admin';
 import {
   renewMember,
   formatDate,
@@ -31,6 +32,21 @@ const MS_SECRET = process.env.MEMBERSTACK_SECRET_KEY;
 const STRIPE_SECRET = process.env.STRIPE_SECRET_KEY;
 const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
 const SIM_KEY = process.env.SIM_KEY;
+
+// New-member join bonus (Quarter Rewards) — scaled by plan, awarded ONCE per member.
+const JOIN_BONUS = { visitor: 250, resident: 500, citizen: 1000 };
+const PRICE_TO_PLAN = {
+  price_0PgRo1w5GSGOu4zJdycNlCpy: 'visitor',
+  price_0Tn4ucw5GSGOu4zJ7UqWhlO8: 'visitor',
+  price_0PgRphw5GSGOu4zJ0dnCFwjp: 'resident',
+  price_0Tn4Nmw5GSGOu4zJwV8L1Imz: 'resident',
+  price_0PgS1pw5GSGOu4zJQpVlN6Gm: 'citizen',
+  price_0Tn4MXw5GSGOu4zJLe6oAQEu: 'citizen',
+  // Hybrid Office (annual-only). No join bonus (deliberately absent from JOIN_BONUS), but it
+  // IS a native member join — listing it here lets the first-invoice "member-not-ready" retry
+  // cover a hybrid join that lost the account-creation race (it maps to no bonus, so welcome=0).
+  price_0OtrBRw5GSGOu4zJC3vsROvC: 'hybrid-office',
+};
 
 // Best-effort in-memory ring of recently processed events (per warm instance),
 // for debugging via GET ?key=SIM_KEY. Not durable — fine for live testing.
@@ -158,6 +174,60 @@ async function sendRoomBookingEmails({ m, total, people, lunch }) {
   });
 }
 
+/**
+ * Finalise a paid Day Pass (guest — no member record). Records a Check-in row for the
+ * chosen day (idempotent on the PaymentIntent id) and emails the guest + ops.
+ */
+async function finaliseDayPass(pi) {
+  if (!airtableReady()) return { skipped: 'no-airtable' };
+  const m = pi.metadata || {};
+  const piId = pi.id || '';
+  const date = m.date || '';
+  const email = m.email || pi.receipt_email || '';
+  if (!date) return { skipped: 'bad-metadata' };
+  const dayRecs = await listRecords(T.checkins, { filterByFormula: `DATETIME_FORMAT({Date}, 'YYYY-MM-DD')='${esc(date)}'` });
+  if (dayRecs.some((r) => String(r.fields[F.checkins.notes] || '').includes(piId))) return { skipped: 'duplicate' };
+  const total = (pi.amount ?? 0) / 100;
+  const rec = await createRecord(
+    T.checkins,
+    {
+      [F.checkins.email]: email,
+      [F.checkins.name]: m.name || '',
+      [F.checkins.date]: date,
+      [F.checkins.length]: 'Full',
+      [F.checkins.status]: 'Paid',
+      [F.checkins.source]: 'Web',
+      [F.checkins.notes]: `Day Pass · ${piId} · £${total.toFixed(2)}`,
+    },
+    { typecast: true },
+  );
+  await sendDayPassEmails({ email, name: m.name || '', date, total });
+  return { created: rec?.id || null };
+}
+
+async function sendDayPassEmails({ email, name, date, total }) {
+  const body = `
+    <p style="margin:0 0 6px;"><strong>Day Pass</strong> · ${escapeHtml(date)}</p>
+    <p style="margin:0 0 6px;">Total paid: <strong>£${total.toFixed(2)}</strong> (inc VAT)</p>`;
+  if (email) {
+    await sendEmail({
+      to: email,
+      replyTo: OPS_EMAIL,
+      subject: 'Your Day Pass is booked — The Quarter',
+      html: emailShell(
+        'Your Day Pass is booked',
+        `<p>Thanks${name ? `, ${escapeHtml(name)}` : ''} — you’re in for ${escapeHtml(date)}.</p>${body}<p style="margin:12px 0 0;">Come up to the 1st &amp; 2nd floors, 27–28 Burgate — breakfast, coffee and a desk are waiting. Just let the team know you have a Day Pass.</p>`,
+        'Your Quarter Day Pass is booked',
+      ),
+    });
+  }
+  await sendEmail({
+    to: OPS_EMAIL,
+    subject: `New Day Pass — ${name || email || 'guest'} (${date})`,
+    html: emailShell('New Day Pass', `${body}<p style="margin:12px 0 0;">Guest: ${escapeHtml(name || '—')} · ${escapeHtml(email || '—')}</p>`, 'A Day Pass was just paid'),
+  });
+}
+
 const normName = (s) => String(s ?? '').toLowerCase().replace(/[‘’']/g, "'").replace(/\s+/g, ' ').trim();
 async function spaceIdByName(name) {
   const recs = await listRecords(T.spaces, {});
@@ -171,20 +241,18 @@ async function spaceIdByName(name) {
  * single 'Privatisation' marker; generating the recurring weekly room blocks (so the
  * room reads as unavailable on those weekdays) is an admin/scheduled follow-up.
  */
-async function finalisePrivatisation(session) {
+async function finalisePrivatisation(m, refId, toEmail) {
   if (!airtableReady()) return { skipped: 'no-airtable' };
-  const m = session.metadata || {};
-  const sid = session.id || '';
   const existing = await listRecords(T.bookings, { filterByFormula: `AND({Status}='Confirmed', {Kind}='Privatisation')` });
-  if (existing.some((r) => String(r.fields[F.bookings.notes] || '').includes(sid))) return { skipped: 'duplicate' };
+  if (existing.some((r) => String(r.fields[F.bookings.notes] || '').includes(refId))) return { skipped: 'duplicate' };
 
   const spaceId = await spaceIdByName(m.roomName || '');
-  const notes = [`Privatisation · ${sid}`, `${m.frequency || ''} (${m.days || 'full week'})`, `${m.members || '?'} members`, `from ${m.startDate || ''}`].join(' · ');
+  const notes = [`Privatisation · ${refId}`, `${m.frequency || ''} (${m.days || 'full week'})`, `${m.members || '?'} members`, `from ${m.startDate || ''}`].join(' · ');
   const fields = {
     [F.bookings.title]: `Privatisation · ${m.company || m.roomName || ''}`,
     [F.bookings.kind]: 'Privatisation',
     [F.bookings.company]: m.company || '',
-    [F.bookings.email]: m.email || session.customer_details?.email || session.customer_email || '',
+    [F.bookings.email]: m.email || toEmail || '',
     [F.bookings.name]: m.name || '',
     [F.bookings.status]: 'Confirmed',
     [F.bookings.source]: 'Web',
@@ -194,12 +262,12 @@ async function finalisePrivatisation(session) {
   if (m.startDate) fields[F.bookings.date] = m.startDate;
   if (spaceId) fields[F.bookings.space] = [spaceId];
   const rec = await createRecord(T.bookings, fields, { typecast: true });
-  await sendPrivatisationEmails(m, session);
+  await sendPrivatisationEmails(m, m.email || toEmail || '');
   return { created: rec?.id || null, space: spaceId };
 }
 
-async function sendPrivatisationEmails(m, session) {
-  const to = m.email || session.customer_details?.email || session.customer_email || '';
+async function sendPrivatisationEmails(m, toEmail) {
+  const to = m.email || toEmail || '';
   const body = `
     <p style="margin:0 0 6px;"><strong>${escapeHtml(m.roomName || 'Team room')}</strong> · ${escapeHtml(m.frequency || '')}</p>
     <p style="margin:0 0 6px;">Days: ${escapeHtml(m.days || 'full week')}</p>
@@ -256,6 +324,19 @@ async function sendPaymentFailedEmail(email, member) {
 }
 
 /**
+ * Read a privatisation subscription's metadata off an invoice, tolerant of BOTH the
+ * pre-Basil shape (invoice.subscription_details) and the Basil+ shape
+ * (invoice.parent.subscription_details), so a Stripe API-version change can't silently
+ * stop privatisations finalising. Returns the metadata only when kind==='privatisation'.
+ */
+function invoicePrivatisationMeta(inv) {
+  const md = inv?.subscription_details?.metadata || inv?.parent?.subscription_details?.metadata || null;
+  return md && md.kind === 'privatisation' ? md : null;
+}
+/** The subscription id an invoice belongs to (both invoice shapes). */
+const invoiceSubscriptionId = (inv) => inv?.subscription || inv?.parent?.subscription_details?.subscription || '';
+
+/**
  * Process one Stripe event and return a compact summary (for the debug ring).
  *
  * Stale-event guard: Stripe doesn't guarantee delivery order and retries failed
@@ -276,9 +357,34 @@ async function handleEvent(event) {
     return { ...base, roomBooking: await finaliseRoomBooking(obj) };
   }
 
-  // Team-room privatisation subscription (public, company-led — no member record).
+  // Native Day Pass (guest — no member record). Record the day + email before the member path.
+  if (type === 'payment_intent.succeeded' && obj?.metadata?.kind === 'day-pass') {
+    return { ...base, dayPass: await finaliseDayPass(obj) };
+  }
+
+  // Team-room privatisation (public, company-led — no member record). Legacy Checkout
+  // session path…
   if (type === 'checkout.session.completed' && obj?.metadata?.kind === 'privatisation') {
-    return { ...base, privatisation: await finalisePrivatisation(obj) };
+    return { ...base, privatisation: await finalisePrivatisation(obj.metadata || {}, obj.id || '', obj.customer_details?.email || obj.customer_email || '') };
+  }
+  // …and the embedded (in-site) path. A privatisation subscription's invoices must NEVER
+  // fall through to the member path below: the buyer's Stripe customer may be shared with
+  // their own membership, and a privatisation invoice (or its failure) would then corrupt
+  // that member's plan/day balance. Finalise on the first paid invoice; swallow the rest.
+  if (type === 'invoice.paid' || type === 'invoice.payment_succeeded' || type === 'invoice.payment_failed') {
+    const pm = invoicePrivatisationMeta(obj);
+    if (pm) {
+      if (type === 'invoice.payment_failed') return { ...base, ignored: 'privatisation-invoice-failed' };
+      return { ...base, privatisation: await finalisePrivatisation(pm, invoiceSubscriptionId(obj) || obj.id || '', obj.customer_email || '') };
+    }
+  }
+  // Privatisation subscription lifecycle events (created/updated/deleted) — likewise never
+  // touch a member (same shared-customer hazard); the invoice branch above does the work.
+  if (
+    (type === 'customer.subscription.created' || type === 'customer.subscription.updated' || type === 'customer.subscription.deleted') &&
+    obj?.metadata?.kind === 'privatisation'
+  ) {
+    return { ...base, ignored: 'privatisation-subscription' };
   }
 
   // Resolve the member email for the event types we handle.
@@ -289,6 +395,8 @@ async function handleEvent(event) {
     email = await emailFromCustomer(obj.customer);
   } else if (type === 'checkout.session.completed') {
     email = obj.customer_details?.email || obj.customer_email || (await emailFromCustomer(obj.customer));
+  } else if (type === 'payment_intent.succeeded' && obj?.metadata?.kind === 'carnet') {
+    email = obj.metadata?.email || null;
   } else {
     return { ...base, ignored: true };
   }
@@ -296,7 +404,67 @@ async function handleEvent(event) {
 
   // Stale-event guard.
   const { member, lastSyncAt, lastEventId, metaData } = await getMemberSync(MS_SECRET, email);
-  if (!member) return { ...base, email, noMember: true };
+  if (!member) {
+    // Native member-plan join pays first, then creates the Memberstack account. If the
+    // first invoice lands before the account exists, retry (non-200) so Stripe redelivers
+    // once it does. Scope to KNOWN member-plan prices only — never retry for privatisation
+    // (a company, not a member) or any other non-member subscription.
+    const invPrice = obj.lines?.data?.[0]?.price?.id;
+    if (
+      (type === 'invoice.paid' || type === 'invoice.payment_succeeded') &&
+      obj.billing_reason === 'subscription_create' &&
+      invPrice &&
+      PRICE_TO_PLAN[invPrice]
+    ) {
+      throw new Error('member-not-ready');
+    }
+    // Buy-then-join carnet: passes can be bought before the account is created, so the PI may
+    // land before the member exists. Retry (non-200) so Stripe redelivers once the account (same
+    // email) is created — then the carnet block below credits the passes into their wallet.
+    if (type === 'payment_intent.succeeded' && obj?.metadata?.kind === 'carnet') {
+      throw new Error('member-not-ready-carnet');
+    }
+    return { ...base, email, noMember: true };
+  }
+
+  // Native carnet top-up (additive) — handled BEFORE the last-write-wins stale guard. That
+  // guard is correct for STATE syncs (plan/days) but would wrongly DROP an out-of-order
+  // additive credit (a carnet PI delivered after a later member event). Idempotency is by the
+  // PaymentIntent id, kept in a small scalar metaData marker so a redelivery can't double-
+  // credit. lastSyncAt/lastEventId are preserved untouched, so this out-of-order event never
+  // rewinds the state-sync stamp.
+  if (type === 'payment_intent.succeeded' && obj?.metadata?.kind === 'carnet') {
+    const piId = obj.id || '';
+    const passes = Number(obj.metadata?.passes) || 0;
+    if (passes <= 0) return { ...base, email, carnet: 'no-passes' };
+    const seen = String(metaData?.carnetRefs || '');
+    if (piId && seen.includes(piId)) return { ...base, email, carnet: 'duplicate' };
+    const c = metaData?.carnet || {};
+    const remaining = (Number(c.remaining) || 0) + passes;
+    const total = (Number(c.total) || 0) + passes;
+    const expires = new Date(Date.now() + 365 * 86400000).toISOString().slice(0, 10);
+    const spend = pointsForGBP((obj.amount ?? 0) / 100);
+    const cur = Math.max(0, Math.round(Number(metaData?.points) || 0));
+    const life = Math.max(0, Math.round(Number(metaData?.lifetimePoints) || cur));
+    const carnetRefs = ((seen ? seen + '|' : '') + piId).split('|').slice(-12).join('|');
+    // Money-critical write first (idempotent via the carnetRefs marker); if it throws we let
+    // Stripe retry — the marker wasn't written, so there is no double-credit.
+    const admin = memberstackAdmin.init(MS_SECRET);
+    await admin.members.update({
+      id: member.id,
+      data: { metaData: { ...(metaData || {}), carnet: { remaining, total, expires }, points: cur + spend, lifetimePoints: life + spend, carnetRefs } },
+    });
+    // Audit row is best-effort (it can never re-credit — the balance already moved above).
+    if (spend > 0) {
+      try {
+        await appendLedger(email, spend, 'spend', piId);
+      } catch {
+        /* ignore */
+      }
+    }
+    return { ...base, email, carnetNative: passes, spend };
+  }
+
   if (eventId && eventId === lastEventId) return { ...base, email, skipped: 'duplicate' };
   if (created < lastSyncAt) return { ...base, email, skipped: 'stale', lastSyncAt };
 
@@ -322,17 +490,22 @@ async function handleEvent(event) {
     // the stampSync below writes points + sync stamp in one go.
     const amount = (obj.amount_paid ?? obj.total ?? 0) / 100;
     const spend = pointsForGBP(amount);
-    const welcome = obj.billing_reason === 'subscription_create' ? WELCOME_BONUS : 0;
+    // New-member join bonus: scaled by plan, awarded ONCE per member (metaData flag guards it).
+    const isFirstInvoice = obj.billing_reason === 'subscription_create';
+    let welcome = 0;
+    if (isFirstInvoice && !metaData?.joinBonusAwarded) {
+      const joinPlan = PRICE_TO_PLAN[line?.price?.id] || '';
+      welcome = JOIN_BONUS[joinPlan] || 0;
+    }
     if (spend > 0) await appendLedger(email, spend, 'spend', obj.id || '');
     if (welcome > 0) await appendLedger(email, welcome, 'welcome', obj.id || '');
-    // First paid plan → credit whoever referred this member (no-op if not referred).
-    if (welcome > 0) await creditReferral(email);
-    // First paid plan → a warm welcome email (best-effort).
-    if (welcome > 0) await sendWelcomeEmail(email, member);
+    // First paid plan → credit whoever referred this member (no-op if not referred) + welcome email.
+    if (isFirstInvoice) await creditReferral(email);
+    if (isFirstInvoice) await sendWelcomeEmail(email, member);
     // A successful payment always clears any prior payment-issue flag.
     const cur = Math.max(0, Math.round(Number(metaData?.points) || 0));
     const life = Math.max(0, Math.round(Number(metaData?.lifetimePoints) || cur));
-    earnMeta = { ...(metaData || {}), paymentIssue: false, points: cur + spend + welcome, lifetimePoints: life + spend + welcome };
+    earnMeta = { ...(metaData || {}), paymentIssue: false, points: cur + spend + welcome, lifetimePoints: life + spend + welcome, ...(welcome > 0 ? { joinBonusAwarded: true } : {}) };
     applied = { billingReason: obj.billing_reason, resetDays: isRenewal, spend, welcome };
   } else if (type === 'invoice.payment_failed') {
     // Card declined / payment failed — flag the member so both they and admin see it,

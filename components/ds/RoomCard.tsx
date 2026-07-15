@@ -54,7 +54,6 @@ export function RoomCard({
   className,
   style,
 }: RoomCardProps) {
-  const statusText = statusLabel ?? STATUS_TEXT[status];
   return (
     <div className={cn(styles.card, className)} data-layout={layout} style={style}>
       <div className={styles.photo}>
@@ -65,11 +64,6 @@ export function RoomCard({
           sizes={layout === 'horizontal' ? '280px' : '(max-width: 700px) 100vw, 380px'}
           className={styles.img}
         />
-        <span className={styles.status}>
-          <Badge tone={status} dot>
-            {statusText}
-          </Badge>
-        </span>
       </div>
       <div className={styles.body}>
         <div className={styles.head}>

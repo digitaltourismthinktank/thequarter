@@ -1,10 +1,5 @@
-import {
-  STRIPE_VISITOR_URL,
-  STRIPE_RESIDENT_URL,
-  STRIPE_CITIZEN_URL,
-  STRIPE_HYBRID_OFFICE_URL,
-  checkoutHref,
-} from './commerce';
+/* Plan CTAs go to the native in-site checkout at /join/[plan] — Stripe Elements,
+   no Payment Links, no redirect out. Day Pass has its own one-off checkout. */
 
 /** The Quarter — membership plans. Prices include VAT. */
 
@@ -53,13 +48,15 @@ export const PLANS: Plan[] = [
       'Cancel any time',
     ],
     ctaLabel: 'Choose Visitor',
-    ctaHref: checkoutHref(STRIPE_VISITOR_URL),
+    ctaHref: '/join/visitor',
   },
   {
     id: 'resident',
     name: 'Resident',
     price: '£138',
     period: 'ten days',
+    featured: true,
+    badge: 'Most popular',
     summary: 'Ten days a month to call your own.',
     features: [
       'Everything in Visitor',
@@ -68,15 +65,13 @@ export const PLANS: Plan[] = [
       'A registered office address',
     ],
     ctaLabel: 'Choose Resident',
-    ctaHref: checkoutHref(STRIPE_RESIDENT_URL),
+    ctaHref: '/join/resident',
   },
   {
     id: 'citizen',
     name: 'Citizen',
     price: '£258',
     period: 'a month',
-    featured: true,
-    badge: 'Most loved',
     summary: 'Unrestricted. For those who are mostly here.',
     features: [
       'Everything in Resident',
@@ -85,7 +80,7 @@ export const PLANS: Plan[] = [
       'A registered office address',
     ],
     ctaLabel: 'Choose Citizen',
-    ctaHref: checkoutHref(STRIPE_CITIZEN_URL),
+    ctaHref: '/join/citizen',
   },
   {
     id: 'hybrid-office',
@@ -100,7 +95,7 @@ export const PLANS: Plan[] = [
       'Additional services as required',
     ],
     ctaLabel: 'Choose Hybrid Office',
-    ctaHref: checkoutHref(STRIPE_HYBRID_OFFICE_URL),
+    ctaHref: '/join/hybrid-office',
   },
 ];
 

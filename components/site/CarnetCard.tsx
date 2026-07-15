@@ -1,22 +1,37 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ds/Button';
-import { getCarnet, useCarnetPass, type CarnetState } from '@/lib/booking';
+import { STRIPE_PUBLISHABLE_KEY } from '@/lib/commerce';
+import { getCarnet, useCarnetPass, carnetIntent, type CarnetState } from '@/lib/booking';
 import { CARNET_BUNDLES, DAY_PASS_PRICE, carnetPerPass } from '@/lib/rewards';
-import { useMember } from './useMember';
+import { PREVIEW } from '@/lib/devMock';
 import styles from './CarnetCard.module.css';
+import pay from './RoomBooking.module.css';
 
-/** Stripe Payment Links per bundle (env overrides the live defaults). */
-const CARNET_LINKS: Record<number, string | undefined> = {
-  10: process.env.NEXT_PUBLIC_STRIPE_CARNET_10_URL || 'https://buy.stripe.com/dRm006aGyb8QcbUfwl2B21u',
-  30: process.env.NEXT_PUBLIC_STRIPE_CARNET_30_URL || 'https://buy.stripe.com/bJeaEKg0Sb8Q1xg4RH2B21v',
-};
-const buyUrl = (passes: number, email?: string | null) => {
-  const base = CARNET_LINKS[passes];
-  if (!base) return undefined;
-  return email ? `${base}?prefilled_email=${encodeURIComponent(email)}` : base;
-};
+/** A book of day passes — bought in-site with Stripe's Payment Element (no Payment Links).
+ *  The carnet webhook tops up the member's balance on payment_intent.succeeded. */
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let stripePromise: Promise<any> | null = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function loadStripe(): Promise<any> {
+  if (typeof window === 'undefined') return Promise.resolve(null);
+  const w = window as unknown as { Stripe?: (k: string) => unknown };
+  if (w.Stripe) return Promise.resolve(w.Stripe(STRIPE_PUBLISHABLE_KEY));
+  if (!stripePromise) {
+    stripePromise = new Promise((resolve, reject) => {
+      const el = document.createElement('script');
+      el.src = 'https://js.stripe.com/v3/';
+      el.async = true;
+      el.onload = () => resolve(w.Stripe ? w.Stripe(STRIPE_PUBLISHABLE_KEY) : null);
+      el.onerror = () => reject(new Error('stripe-load-failed'));
+      document.head.appendChild(el);
+    });
+  }
+  return stripePromise;
+}
+
 const gbp = (n: number) => `£${n.toFixed(2)}`;
 
 function friendly(code?: string): string {
@@ -36,12 +51,17 @@ function friendly(code?: string): string {
 }
 
 export function CarnetCard() {
-  const { member } = useMember();
-  const email = member?.auth?.email || null;
   const [carnet, setCarnet] = useState<CarnetState>({ remaining: 0, total: 0, expires: null });
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
-  const [thanks, setThanks] = useState(false);
+  const [buying, setBuying] = useState<number | null>(null); // passes currently being purchased
+  const [payErr, setPayErr] = useState<string | null>(null);
+
+  const mountRef = useRef<HTMLDivElement | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const stripeRef = useRef<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const elementsRef = useRef<any>(null);
 
   async function refresh() {
     const r = await getCarnet();
@@ -49,18 +69,6 @@ export function CarnetCard() {
   }
   useEffect(() => {
     refresh();
-  }, []);
-  // Returning from a carnet purchase — the webhook top-up can lag a moment, so poll briefly.
-  useEffect(() => {
-    if (new URLSearchParams(window.location.search).get('carnet') !== 'thanks') return;
-    setThanks(true);
-    let n = 0;
-    const t = setInterval(async () => {
-      const r = await getCarnet();
-      if (r.ok) setCarnet(r.data.carnet);
-      if ((n += 1) >= 4) clearInterval(t);
-    }, 2500);
-    return () => clearInterval(t);
   }, []);
 
   async function useOne() {
@@ -76,6 +84,61 @@ export function CarnetCard() {
     setBusy(false);
   }
 
+  async function startBuy(passes: number) {
+    setPayErr(null);
+    setMsg(null);
+    if (PREVIEW) {
+      setMsg('Checkout runs on the live site — this is a preview.');
+      return;
+    }
+    setBusy(true);
+    const r = await carnetIntent(passes);
+    setBusy(false);
+    if (!r.ok || !r.data.clientSecret) {
+      setPayErr('We couldn’t start checkout just now — please try again.');
+      return;
+    }
+    setBuying(passes);
+    try {
+      const stripe = await loadStripe();
+      if (!stripe || !mountRef.current) throw new Error('stripe');
+      stripeRef.current = stripe;
+      const elements = stripe.elements({ clientSecret: r.data.clientSecret, appearance: { theme: 'flat' } });
+      const payEl = elements.create('payment', { layout: 'tabs' });
+      payEl.mount(mountRef.current);
+      elementsRef.current = elements;
+    } catch {
+      setPayErr('Couldn’t load the secure payment form — please try again.');
+      setBuying(null);
+    }
+  }
+
+  async function payNow() {
+    if (!stripeRef.current || !elementsRef.current) return;
+    setBusy(true);
+    setPayErr(null);
+    const { error, paymentIntent } = await stripeRef.current.confirmPayment({
+      elements: elementsRef.current,
+      confirmParams: { return_url: window.location.href },
+      redirect: 'if_required',
+    });
+    setBusy(false);
+    if (error) return setPayErr(error.message || 'That payment didn’t go through — please try again.');
+    if (paymentIntent && (paymentIntent.status === 'succeeded' || paymentIntent.status === 'processing')) {
+      setBuying(null);
+      setMsg('Thanks — your passes are being added. This can take a moment to show.');
+      // The webhook top-up can lag a moment, so poll briefly.
+      let n = 0;
+      const t = setInterval(async () => {
+        const r = await getCarnet();
+        if (r.ok) setCarnet(r.data.carnet);
+        if ((n += 1) >= 5) clearInterval(t);
+      }, 2500);
+    } else {
+      setPayErr('Payment needs another step — please try again.');
+    }
+  }
+
   const pct = carnet.total > 0 ? Math.round((carnet.remaining / carnet.total) * 100) : 0;
   const validUntil = carnet.expires
     ? new Date(`${carnet.expires}T00:00:00`).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
@@ -86,7 +149,6 @@ export function CarnetCard() {
       <span className={styles.eyebrow}>Day passes</span>
       <h2 className={styles.title}>A book of day passes</h2>
       <p className={styles.body}>For days your plan doesn&rsquo;t cover, or to sign a friend in. Valid 12 months, use as you like.</p>
-      {thanks ? <p className={styles.thanks}>Thanks — your passes are being added. This can take a moment to show.</p> : null}
 
       <div className={styles.balanceRow}>
         <div className={styles.balance}>
@@ -101,7 +163,7 @@ export function CarnetCard() {
         </div>
       ) : null}
 
-      {carnet.remaining > 0 ? (
+      {carnet.remaining > 0 && buying === null ? (
         <div className={styles.useRow}>
           <Button variant="secondary" size="sm" onClick={useOne} disabled={busy}>
             {busy ? 'One moment…' : 'Use one for today'}
@@ -109,26 +171,35 @@ export function CarnetCard() {
         </div>
       ) : null}
 
-      <div className={styles.bundles}>
-        {CARNET_BUNDLES.map((b) => {
-          const url = buyUrl(b.passes, email);
-          return (
+      {buying === null ? (
+        <div className={styles.bundles}>
+          {CARNET_BUNDLES.map((b) => (
             <div key={b.passes} className={`${styles.bundle} ${b.bestValue ? styles.best : ''}`}>
               {b.bestValue ? <span className={styles.bestTag}>Best value</span> : null}
               <strong className={styles.bundlePasses}>{b.passes} passes</strong>
               <span className={styles.bundlePrice}>{gbp(b.price)}</span>
               <span className={styles.bundlePer}>{gbp(carnetPerPass(b))}/pass</span>
-              {url ? (
-                <a className={styles.buy} href={url}>
-                  Buy
-                </a>
-              ) : (
-                <span className={styles.buyOff}>Ask us</span>
-              )}
+              <button type="button" className={styles.buy} onClick={() => startBuy(b.passes)} disabled={busy}>
+                Buy
+              </button>
             </div>
-          );
-        })}
-      </div>
+          ))}
+        </div>
+      ) : (
+        <div className={pay.payBox}>
+          <p className={styles.body}>Buying {buying} day passes · {gbp(CARNET_BUNDLES.find((b) => b.passes === buying)?.price ?? 0)}</p>
+          <div ref={mountRef} className={pay.payEl} />
+          {payErr ? <p className={styles.msg}>{payErr}</p> : null}
+          <Button variant="accent" size="sm" onClick={payNow} disabled={busy}>
+            {busy ? 'Taking payment…' : 'Pay now'}
+          </Button>
+          <button type="button" className={styles.buyOff} onClick={() => setBuying(null)} disabled={busy}>
+            Cancel
+          </button>
+          <p className={pay.secure}>Paid securely with Stripe · Apple Pay &amp; cards.</p>
+        </div>
+      )}
+
       <p className={styles.single}>A single day pass is {gbp(DAY_PASS_PRICE)} — the book works out cheaper per day.</p>
       {msg ? <p className={styles.msg}>{msg}</p> : null}
     </div>

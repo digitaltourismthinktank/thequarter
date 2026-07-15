@@ -361,7 +361,7 @@ export function RoomBooking({ roomName, price }: { roomName: string; price: { ha
 
         {error ? <p className={styles.err}>{error}</p> : null}
         <p className={styles.note}>
-          Prefer to talk it through? <a href="#enquire">Send an enquiry</a> instead.
+          Prefer to talk it through? <a href="#enquire">Chat to us</a> instead.
         </p>
       </aside>
     </div>

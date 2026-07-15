@@ -27,7 +27,7 @@ export const FOOTER_COLUMNS: FooterColumn[] = [
       { label: 'Book a tour', href: '/tour' },
       { label: 'Meeting rooms', href: '/meeting-rooms' },
       { label: 'Privatise a room', href: '/privatise' },
-      { label: 'The Quarter Café', href: '/spaces#cafe' },
+      { label: 'The Kentish Pantry', href: '/spaces#cafe' },
       { label: 'Events', href: '/events' },
     ],
   },

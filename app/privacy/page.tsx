@@ -19,7 +19,7 @@ export default function PrivacyPage() {
         Wales (company number 05732153), which operates The Quarter.
       </p>
       <p>
-        <strong>Registered address</strong> 1st Floor, 27–28 Burgate, Canterbury, Kent, CT1 2HA, United Kingdom
+        <strong>Registered address</strong> 1st &amp; 2nd Floor, 27–28 Burgate, Canterbury, Kent, CT1 2HA, United Kingdom
         <br />
         <strong>Privacy contact</strong> <a href="mailto:info@thinkdigital.travel">info@thinkdigital.travel</a>
         <br />

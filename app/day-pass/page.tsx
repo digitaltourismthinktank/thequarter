@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { Section } from '@/components/site/primitives';
 import { Badge } from '@/components/ds/Badge';
 import { Icon } from '@/components/ds/Icon';
-import { DayPassEmbed } from '@/components/site/DayPassEmbed';
+import { DayPassCheckout } from '@/components/site/DayPassCheckout';
 import { getPlan } from '@/lib/plans';
 import styles from './day-pass.module.css';
 
@@ -50,8 +50,8 @@ export default function DayPassPage() {
           </div>
         </div>
 
-        {/* Booking embed (Typeform → swappable to Stripe) */}
-        <DayPassEmbed />
+        {/* Native Stripe Day Pass checkout (in-site Payment Element) */}
+        <DayPassCheckout />
       </div>
     </Section>
   );

@@ -4,11 +4,9 @@ import { Section, SectionHead, Eyebrow, Photo } from '@/components/site/primitiv
 import { Badge } from '@/components/ds/Badge';
 import { Button } from '@/components/ds/Button';
 import { Icon } from '@/components/ds/Icon';
-import { AvailabilityCalendar } from '@/components/ds/AvailabilityCalendar';
-import { EnquiryForm } from '@/components/site/EnquiryForm';
 import { RoomBooking } from '@/components/site/RoomBooking';
-import { MEETING_ROOMS, ROOM_SLUGS, getMeetingRoom } from '@/lib/rooms';
-import { getWeeklyAvailability } from '@/lib/availability';
+import { TalkToUs } from '@/components/site/TalkToUs';
+import { ROOM_SLUGS, getMeetingRoom } from '@/lib/rooms';
 import styles from './room.module.css';
 
 interface RoomParams {
@@ -29,18 +27,9 @@ export function generateMetadata({ params }: RoomParams): Metadata {
   };
 }
 
-const STATUS_TEXT: Record<string, string> = {
-  available: 'Available now',
-  busy: 'In use',
-  soon: 'Free soon',
-};
-
 export default function RoomDetailPage({ params }: RoomParams) {
   const room = getMeetingRoom(params.room);
   if (!room) notFound();
-
-  const week = getWeeklyAvailability(room.slug);
-  const statusText = room.statusLabel ?? STATUS_TEXT[room.status];
 
   return (
     <>
@@ -51,9 +40,6 @@ export default function RoomDetailPage({ params }: RoomParams) {
         </a>
         <h1 className={styles.h1}>{room.name}</h1>
         <div className={styles.badges}>
-          <Badge tone={room.status} dot>
-            {statusText}
-          </Badge>
           <Badge tone="gold" icon="users">
             Seats {room.capacity}
           </Badge>
@@ -98,39 +84,30 @@ export default function RoomDetailPage({ params }: RoomParams) {
         </div>
       </Section>
 
-      {/* Book & pay online */}
+      {/* Book & pay online — instant, in-site */}
       <Section tone="page" id="book">
         <SectionHead
           eyebrow="Book & pay online"
           title={`Reserve ${room.name}`}
-          intro="Choose your date and package, add lunch if you’d like it, and pay securely by card or Apple Pay. Quiet-day rate (20% off hire on Mon, Wed & Fri) is applied automatically."
+          intro="Pick your date and time, add lunch if you’d like it, and pay securely by card or Apple Pay — bookable 09:00–17:30, Monday to Friday. The quiet-day rate (20% off hire on Mon, Wed & Fri) is applied automatically."
           max={620}
         />
         <RoomBooking roomName={room.name} price={room.price} />
       </Section>
 
-      {/* This week's availability */}
-      <Section tone="card">
-        <SectionHead
-          eyebrow="This week"
-          title="When the room is free"
-          intro="A live-style view of this week. Spot a slot you like, then enquire below to reserve it."
-          max={560}
-        />
-        <AvailabilityCalendar roomName={room.name} days={week.days} slots={week.slots} data={week.data} />
-      </Section>
-
-      {/* Enquiry */}
-      <Section tone="page" id="enquire">
+      {/* Questions → chat (no enquiry-and-wait; booking is instant above) */}
+      <Section tone="card" id="enquire">
         <div className={styles.enquireWrap}>
           <SectionHead
             align="center"
-            eyebrow="Reserve or enquire"
-            title={`Enquire about ${room.name}`}
-            intro="Send your preferred date and time and any catering or A/V needs — we’ll confirm and quote within a working day."
+            eyebrow="Here to help"
+            title="Have questions? Chat to us now"
+            intro="Need a time outside 09:00–17:30, a larger catering order, or a hand with the A/V? Message the team and we’ll sort it — no waiting on an email."
             max={620}
           />
-          <EnquiryForm formName="room-enquiry" defaultRoom={room.name} />
+          <div style={{ display: 'flex', justifyContent: 'center' }}>
+            <TalkToUs variant="solid" label="Chat to us now" prefill={`I’ve got a question about the ${room.name}: `} />
+          </div>
         </div>
       </Section>
     </>

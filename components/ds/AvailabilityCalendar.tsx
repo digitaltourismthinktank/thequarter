@@ -83,10 +83,6 @@ export function AvailabilityCalendar({
             Free
           </span>
           <span className={styles.legendItem}>
-            <span className={cn(styles.swatch, styles.swatch_held)} />
-            Held
-          </span>
-          <span className={styles.legendItem}>
             <span className={cn(styles.swatch, styles.swatch_booked)} />
             Booked
           </span>
@@ -106,7 +102,8 @@ export function AvailabilityCalendar({
           <Fragment key={si}>
             <div className={styles.slotLabel}>{slot}</div>
             {days.map((day, di) => {
-              const status: SlotStatus = data[si]?.[di] ?? 'available';
+              // Free / Booked only — any interim ('soon') reads as Free, no middle state.
+              const status: SlotStatus = data[si]?.[di] === 'busy' ? 'busy' : 'available';
               const key = `${di}-${si}`;
               const isSel = sel === key;
               return (

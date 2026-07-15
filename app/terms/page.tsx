@@ -12,7 +12,7 @@ export default function TermsPage() {
     <Legal title="Terms of Membership" updated="Last updated June 2026">
       <p>
         The Quarter is operated by <strong>SE1 Media Ltd</strong>, trading as the Digital Tourism Think Tank, a company registered in England and
-        Wales (company number 05732153), registered office 1st Floor, 27–28 Burgate, Canterbury, Kent, CT1 2HA. In these terms, &ldquo;we&rdquo;,
+        Wales (company number 05732153), registered office 1st &amp; 2nd Floor, 27–28 Burgate, Canterbury, Kent, CT1 2HA. In these terms, &ldquo;we&rdquo;,
         &ldquo;us&rdquo; and &ldquo;the Quarter&rdquo; mean SE1 Media Ltd; &ldquo;you&rdquo; means a member, day guest or anyone booking or using the
         space. Please read these alongside our <a href="/code-of-conduct">Code of Conduct</a> and <a href="/privacy">Privacy Policy</a>.
       </p>

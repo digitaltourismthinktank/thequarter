@@ -57,10 +57,11 @@ export interface Frequency {
   daysPerWeek: number;
 }
 
+// Max 1–2 days a week per company — we privatise, we don't lease offices. (One room can
+// still fill to 5 weekdays across several companies; that's the availability lock's job.)
 export const FREQUENCIES: Frequency[] = [
   { id: 'one', label: 'One day a week', short: '1 day/wk', daysPerWeek: 1 },
   { id: 'two', label: 'Two days a week', short: '2 days/wk', daysPerWeek: 2 },
-  { id: 'all', label: 'Every working day', short: 'Full week', daysPerWeek: 5 },
 ];
 
 export const PRIVATISATION_MIN_MEMBERS = 5;

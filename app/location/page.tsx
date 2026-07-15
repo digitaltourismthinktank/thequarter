@@ -92,7 +92,7 @@ export default function LocationPage() {
               title="The Quarter on the map — Canterbury Cathedral Quarter"
               loading="lazy"
               referrerPolicy="no-referrer-when-downgrade"
-              src="https://www.google.com/maps?q=Canterbury%20Cathedral%2C%20Canterbury&output=embed"
+              src="https://www.google.com/maps?q=27-28%20Burgate%2C%20Canterbury%20CT1%202HA&output=embed"
             />
           </div>
 

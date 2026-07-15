@@ -14,7 +14,7 @@ import styles from './spaces.module.css';
 export const metadata: Metadata = {
   title: 'The Spaces',
   description:
-    'The open workspace, the phone pods, two meeting rooms and the Quarter Café with its Cathedral view — every corner of The Quarter in Canterbury’s Cathedral Quarter.',
+    'The open workspace, the phone pods, two meeting rooms and The Kentish Pantry with its Cathedral view — every corner of The Quarter in Canterbury’s Cathedral Quarter.',
   alternates: { canonical: '/spaces' },
 };
 
@@ -142,22 +142,22 @@ export default function SpacesPage() {
         </div>
       </Section>
 
-      {/* The Quarter Café */}
+      {/* The Kentish Pantry */}
       <Section tone="card" id="cafe">
         <Feature
-          eyebrow="The Quarter Café"
+          eyebrow="The Kentish Pantry"
           title="The Cathedral view, and the breakfast"
-          body="An open social space — not bookable, just ours to share. The day starts here: a daily breakfast with yoghurts, cereals and, when they’re going, complimentary pastries and cakes; a bean-to-cup machine for a coffee made just how you like it, a big range of teas, and Arke still & sparkling water. Snip your own herbs from the Auk urban farm on the windowsill. It’s where the community happens — with the Cathedral right there in the window."
+          body="An open social space — not bookable, just ours to share. The day starts here: a daily breakfast with yoghurts, cereals and, when they’re going, complimentary pastries and cakes; a bean-to-cup machine for a coffee made just how you like it, a big range of teas, and filtered & sparkling water by Arke. Snip your own herbs from our Auk Smart Garden on the windowsill. It’s where the community happens — with the Cathedral right there in the window."
           meta={[
             { icon: 'coffee', label: 'Bean-to-cup, made your way' },
-            { icon: 'leaf', label: 'Herbs from the Auk urban farm' },
+            { icon: 'leaf', label: 'Herbs from our Auk Smart Garden' },
             { icon: 'cake', label: 'Pastries & cakes, on us' },
           ]}
-          photo={PHOTOS.cafe}
+          photo={PHOTOS.breakfast}
         />
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginTop: 'clamp(20px, 3vw, 32px)' }}>
           {[
-            { p: PHOTOS.urbanFarm, cap: 'Our little Auk urban farm — help yourself to fresh herbs' },
+            { p: PHOTOS.urbanFarm, cap: 'Our Auk Smart Garden — help yourself to fresh herbs' },
             { p: PHOTOS.coffeeMachine, cap: 'Personalise your coffee, with syrups and cold drinks alongside' },
             { p: PHOTOS.pastries, cap: 'Pastries & cakes, complimentary and subject to availability' },
           ].map((it) => (

@@ -10,7 +10,7 @@ import styles from './events.module.css';
 export const metadata: Metadata = {
   title: 'Events',
   description:
-    'Member socials, business briefings and charity Friday access at The Quarter, Canterbury. People stay for the community — breakfasts, workshops, talks and the occasional rooftop drink.',
+    'Member socials, business briefings and charity Friday access at The Quarter, Canterbury. People stay for the community — breakfasts, workshops, talks and the occasional get-together.',
   alternates: { canonical: '/events' },
 };
 

@@ -1,53 +1,19 @@
 /**
- * The Quarter — commerce wiring (phase 1).
- *
- * ┌──────────────────────────────────────────────────────────────────────────┐
- * │  FILL THESE IN.                                                            │
- * │                                                                            │
- * │  Subscriptions (Visitor, Resident, Citizen) and the annual Hybrid Office   │
- * │  go through Stripe Checkout. Paste each plan's Stripe Checkout / Payment   │
- * │  Link URL below, or set the matching NEXT_PUBLIC_STRIPE_*_URL env var      │
- * │  (env wins). Until a URL is set, that plan's CTA falls back to the         │
- * │  contact page so nothing 404s.                                             │
- * │                                                                            │
- * │  The Day Pass (£21.60 one-off) is a Typeform embed for now — set           │
- * │  TYPEFORM_DAYPASS_URL. It's isolated in components/site/DayPassEmbed so it  │
- * │  can be swapped to Stripe Checkout later without touching the page.        │
- * └──────────────────────────────────────────────────────────────────────────┘
+ * The Quarter — commerce wiring. Everything is native, in-site Stripe now:
+ *   · Plans (Visitor / Resident / Citizen / Hybrid) → /join/[plan] (Stripe Elements subscription)
+ *   · Day Pass + carnet → in-site Stripe PaymentIntent (Payment Element)
+ *   · Meeting rooms / pods / privatisation → their own native flows
+ * No Stripe Payment Links, no Typeform. Only the public publishable key + the
+ * billing-portal fallback URL live here.
  */
 
-export const STRIPE_VISITOR_URL =
-  process.env.NEXT_PUBLIC_STRIPE_VISITOR_URL ?? 'https://buy.stripe.com/aEU4jF9MM62j9Gg4hj';
-export const STRIPE_RESIDENT_URL =
-  process.env.NEXT_PUBLIC_STRIPE_RESIDENT_URL ?? 'https://buy.stripe.com/4gw6rN1ggbmDbOo3dg';
-export const STRIPE_CITIZEN_URL =
-  process.env.NEXT_PUBLIC_STRIPE_CITIZEN_URL ?? 'https://buy.stripe.com/4gw4jFf760HZ4lWeVZ';
-export const STRIPE_HYBRID_OFFICE_URL =
-  process.env.NEXT_PUBLIC_STRIPE_HYBRID_OFFICE_URL ?? 'https://buy.stripe.com/fZe8zVf763UbcSs299';
-
-export const TYPEFORM_DAYPASS_URL =
-  process.env.NEXT_PUBLIC_TYPEFORM_DAYPASS_URL ?? 'https://dttt.typeform.com/to/VScIAjrW';
-
 /** Stripe publishable key (public by design) — used client-side by Stripe Elements
- *  so members can update their card without leaving the app. */
+ *  so payments happen in-site (rooms, plans, Day Pass, carnet, card updates). */
 export const STRIPE_PUBLISHABLE_KEY =
   process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? 'pk_live_eBhLPhjrDvYGMPBqUKlDNUN9';
 
-/** Stripe billing portal (members manage/switch plan). Used as the fallback for
- * the dashboard's "Manage plan" button until the one-click Netlify Function
- * (/.netlify/functions/billing-portal) is live with a Stripe key. */
+/** Stripe billing portal (members manage / switch plan) — the fallback for the
+ *  dashboard's "Manage plan" button until the one-click billing-portal Function
+ *  (/.netlify/functions/billing-portal) is live with a Stripe key. */
 export const STRIPE_BILLING_PORTAL_URL =
   process.env.NEXT_PUBLIC_STRIPE_BILLING_PORTAL_URL ?? 'https://billing.stripe.com/p/login/fZe0346QK2iQ3Wo4gg';
-
-/** Where a CTA points when its checkout URL isn't configured yet. */
-export const CHECKOUT_FALLBACK = '/location';
-
-/** Returns the checkout URL if set, otherwise a safe internal fallback. */
-export function checkoutHref(url: string): string {
-  return url && url.trim().length > 0 ? url : CHECKOUT_FALLBACK;
-}
-
-/** True when a checkout URL is still a placeholder (unconfigured). */
-export function isCheckoutConfigured(url: string): boolean {
-  return Boolean(url && url.trim().length > 0);
-}

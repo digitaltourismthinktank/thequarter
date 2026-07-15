@@ -121,13 +121,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* Cookiescript — GDPR consent banner (gates non-essential cookies). The
             cookie-policy report script lives on the privacy page. */}
         <Script src="https://cdn.cookie-script.com/s/064e38604f7ba35680d8f547f21c404a.js" strategy="afterInteractive" />
-        {/* Crisp chat. The default launcher bubble is hidden; our own "Talk to us" /
-            "Chat to our team" buttons open it (and it re-hides when closed). */}
+        {/* Crisp chat. The launcher bubble is visible so people can always reach us;
+            our own "Talk to us" / "Chat to our team" buttons also open it directly.
+            NOTE: Crisp only renders on its whitelisted domain(s) in the Crisp dashboard —
+            add www.thequarter.work AND any *.netlify.app deploy-preview domain there, or
+            the bubble won't appear on the preview URL. */}
         <Script id="crisp" strategy="afterInteractive">{`
           window.$crisp=[];window.CRISP_WEBSITE_ID="9a243419-809f-4f2a-9a77-56bdff85cd0d";
           window.$crisp.push(["safe", true]);
-          window.$crisp.push(["do", "chat:hide"]);
-          window.$crisp.push(["on", "chat:closed", function(){ window.$crisp.push(["do","chat:hide"]); }]);
           (function(){var d=document,s=d.createElement("script");s.src="https://client.crisp.chat/l.js";s.async=1;d.getElementsByTagName("head")[0].appendChild(s);})();
         `}</Script>
         <JsonLd data={LOCAL_BUSINESS} />

@@ -1,15 +1,37 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ds/Button';
 import { Icon } from '@/components/ds/Icon';
 import { Photo } from '@/components/site/primitives';
+import { STRIPE_PUBLISHABLE_KEY } from '@/lib/commerce';
 import { PRIVATISATION_ROOMS, FREQUENCIES, WEEKDAYS, PRIVATISATION_MIN_MEMBERS, quarterlyAmount, type FrequencyId } from '@/lib/privatisation';
-import { privatisationCheckout } from '@/lib/booking';
+import { privatisationSubscribe } from '@/lib/booking';
 import { PREVIEW } from '@/lib/devMock';
 import styles from './Privatisation.module.css';
+import pay from './RoomBooking.module.css';
 
 const money = (n: number) => `£${n.toLocaleString('en-GB')}`;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let stripePromise: Promise<any> | null = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function loadStripe(): Promise<any> {
+  if (typeof window === 'undefined') return Promise.resolve(null);
+  const w = window as unknown as { Stripe?: (k: string) => unknown };
+  if (w.Stripe) return Promise.resolve(w.Stripe(STRIPE_PUBLISHABLE_KEY));
+  if (!stripePromise) {
+    stripePromise = new Promise((resolve, reject) => {
+      const el = document.createElement('script');
+      el.src = 'https://js.stripe.com/v3/';
+      el.async = true;
+      el.onload = () => resolve(w.Stripe ? w.Stripe(STRIPE_PUBLISHABLE_KEY) : null);
+      el.onerror = () => reject(new Error('stripe-load-failed'));
+      document.head.appendChild(el);
+    });
+  }
+  return stripePromise;
+}
 
 const ERRORS: Record<string, string> = {
   'already-privatised': 'One team room is already privatised — only one runs at a time, so two stay open. Do get in touch and we’ll find you a date.',
@@ -31,8 +53,15 @@ export function Privatisation() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [members, setMembers] = useState(PRIVATISATION_MIN_MEMBERS);
+  const [step, setStep] = useState<'form' | 'pay'>('form');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const mountRef = useRef<HTMLDivElement | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const stripeRef = useRef<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const elementsRef = useRef<any>(null);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('done') === '1') setDone(true);
@@ -57,7 +86,7 @@ export function Privatisation() {
     });
   }
 
-  async function submit() {
+  async function toPayment() {
     setError(null);
     if (!company.trim()) return setError(ERRORS['missing-company']);
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return setError(ERRORS['bad-email']);
@@ -69,7 +98,7 @@ export function Privatisation() {
       return;
     }
     setBusy(true);
-    const r = await privatisationCheckout({
+    const r = await privatisationSubscribe({
       roomSlug,
       frequency,
       days: wholeWeek ? WEEKDAYS.map((d) => d.id) : days,
@@ -80,11 +109,38 @@ export function Privatisation() {
       members,
     });
     setBusy(false);
-    if (r.ok && r.data.url) {
-      window.location.href = r.data.url;
+    if (!r.ok || !r.data.clientSecret) {
+      setError(ERRORS[r.data?.error ?? ''] ?? 'We couldn’t start checkout just now — please try again or enquire below.');
       return;
     }
-    setError(ERRORS[r.data?.error ?? ''] ?? 'We couldn’t start checkout just now — please try again or enquire below.');
+    setStep('pay');
+    try {
+      const stripe = await loadStripe();
+      if (!stripe || !mountRef.current) throw new Error('stripe');
+      stripeRef.current = stripe;
+      const elements = stripe.elements({ clientSecret: r.data.clientSecret, appearance: { theme: 'flat' } });
+      const payEl = elements.create('payment', { layout: 'tabs' });
+      payEl.mount(mountRef.current);
+      elementsRef.current = elements;
+    } catch {
+      setError('Couldn’t load the secure payment form — please try again.');
+      setStep('form');
+    }
+  }
+
+  async function payNow() {
+    if (!stripeRef.current || !elementsRef.current) return;
+    setBusy(true);
+    setError(null);
+    const { error: payErr, paymentIntent } = await stripeRef.current.confirmPayment({
+      elements: elementsRef.current,
+      confirmParams: { return_url: window.location.href },
+      redirect: 'if_required',
+    });
+    setBusy(false);
+    if (payErr) return setError(payErr.message || 'That payment didn’t go through — please try again.');
+    if (paymentIntent && (paymentIntent.status === 'succeeded' || paymentIntent.status === 'processing')) setDone(true);
+    else setError('Payment needs another step — please try again.');
   }
 
   if (done) {
@@ -102,6 +158,8 @@ export function Privatisation() {
     );
   }
 
+  const disabled = step === 'pay';
+
   return (
     <div className={styles.wrap}>
       <div className={styles.formCol}>
@@ -109,7 +167,7 @@ export function Privatisation() {
           <span className={styles.label}>Which room?</span>
           <div className={styles.roomRow}>
             {PRIVATISATION_ROOMS.map((r) => (
-              <button key={r.slug} type="button" className={`${styles.room} ${roomSlug === r.slug ? styles.roomOn : ''}`} onClick={() => setRoomSlug(r.slug)}>
+              <button key={r.slug} type="button" className={`${styles.room} ${roomSlug === r.slug ? styles.roomOn : ''}`} onClick={() => setRoomSlug(r.slug)} disabled={disabled}>
                 <strong>{r.name}</strong>
                 <span>Seats {r.capacity}</span>
               </button>
@@ -129,6 +187,7 @@ export function Privatisation() {
                   setFrequency(f.id);
                   setDays([]);
                 }}
+                disabled={disabled}
               >
                 {f.label}
               </button>
@@ -143,7 +202,7 @@ export function Privatisation() {
             </span>
             <div className={styles.dayRow}>
               {WEEKDAYS.map((d) => (
-                <button key={d.id} type="button" className={`${styles.day} ${days.includes(d.id) ? styles.dayOn : ''}`} onClick={() => toggleDay(d.id)}>
+                <button key={d.id} type="button" className={`${styles.day} ${days.includes(d.id) ? styles.dayOn : ''}`} onClick={() => toggleDay(d.id)} disabled={disabled}>
                   {d.short}
                 </button>
               ))}
@@ -154,26 +213,26 @@ export function Privatisation() {
         <div className={styles.grid2}>
           <label className={styles.field}>
             <span className={styles.label}>Start date</span>
-            <input type="date" className={styles.input} value={startDate} min={todayStr} onChange={(e) => setStartDate(e.target.value)} />
+            <input type="date" className={styles.input} value={startDate} min={todayStr} onChange={(e) => setStartDate(e.target.value)} disabled={disabled} />
           </label>
           <label className={styles.field}>
             <span className={styles.label}>Team size</span>
-            <input type="number" className={styles.input} min={PRIVATISATION_MIN_MEMBERS} max={30} value={members} onChange={(e) => setMembers(Math.max(1, Number(e.target.value) || 0))} />
+            <input type="number" className={styles.input} min={PRIVATISATION_MIN_MEMBERS} max={30} value={members} onChange={(e) => setMembers(Math.max(1, Number(e.target.value) || 0))} disabled={disabled} />
           </label>
         </div>
 
         <label className={styles.field}>
           <span className={styles.label}>Company / organisation</span>
-          <input className={styles.input} value={company} onChange={(e) => setCompany(e.target.value)} />
+          <input className={styles.input} value={company} onChange={(e) => setCompany(e.target.value)} disabled={disabled} />
         </label>
         <div className={styles.grid2}>
           <label className={styles.field}>
             <span className={styles.label}>Your name</span>
-            <input className={styles.input} value={name} onChange={(e) => setName(e.target.value)} />
+            <input className={styles.input} value={name} onChange={(e) => setName(e.target.value)} disabled={disabled} />
           </label>
           <label className={styles.field}>
             <span className={styles.label}>Email</span>
-            <input type="email" className={styles.input} value={email} onChange={(e) => setEmail(e.target.value)} />
+            <input type="email" className={styles.input} value={email} onChange={(e) => setEmail(e.target.value)} disabled={disabled} />
           </label>
         </div>
       </div>
@@ -198,9 +257,23 @@ export function Privatisation() {
           <li>All the usual: breakfast, coffee, fibre, pods &amp; perks</li>
           <li>Minimum {PRIVATISATION_MIN_MEMBERS} members · invoiced quarterly</li>
         </ul>
-        <Button variant="accent" fullWidth onClick={submit} disabled={busy} iconAfter="arrow-right">
-          {busy ? 'Starting…' : 'Set up & pay'}
-        </Button>
+
+        {step === 'pay' ? (
+          <div className={pay.payBox}>
+            <div ref={mountRef} className={pay.payEl} />
+            <Button variant="accent" fullWidth onClick={payNow} disabled={busy} iconAfter="arrow-right">
+              {busy ? 'Taking payment…' : `Pay ${money(quarterly)}`}
+            </Button>
+            <button type="button" className={styles.note} onClick={() => setStep('form')} disabled={busy} style={{ background: 'none', border: 0, cursor: 'pointer' }}>
+              ‹ Back
+            </button>
+            <p className={pay.secure}>First quarter now, then billed quarterly · Apple Pay &amp; cards.</p>
+          </div>
+        ) : (
+          <Button variant="accent" fullWidth onClick={toPayment} disabled={busy} iconAfter="arrow-right">
+            {busy ? 'Starting…' : 'Set up & pay'}
+          </Button>
+        )}
         {error ? <p className={styles.err}>{error}</p> : null}
         <p className={styles.note}>
           Rather talk first? <a href="/location#contact">Get in touch</a> and we’ll walk you through it.
