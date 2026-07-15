@@ -144,12 +144,21 @@ export function RoomBooking({ roomName, price }: { roomName: string; price: { ha
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [serverLines, setServerLines] = useState<RoomQuoteLine[] | null>(null);
+  // TEST COMP: a secret ?test=<code> routes to the server's env-gated comp path (skips Stripe).
+  const [testCode, setTestCode] = useState('');
 
   const mountRef = useRef<HTMLDivElement | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const stripeRef = useRef<any>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const elementsRef = useRef<any>(null);
+
+  // TEST COMP: read the secret ?test=<code> once, client-side only (SSR-guarded).
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const t = new URLSearchParams(window.location.search).get('test');
+    if (t) setTestCode(t);
+  }, []);
 
   // Resolve this marketing room to its bookable Airtable space (match by name).
   useEffect(() => {
@@ -341,8 +350,15 @@ export function RoomBooking({ roomName, price }: { roomName: string; price: { ha
       jobTitle: jobTitle.trim(),
       phone: phone.trim(),
       email: email.trim() || memberEmailOf(member),
+      test: testCode || undefined,
     });
     setWorking(false);
+    // TEST COMP: server skipped Stripe and already recorded + emailed the £0 booking — jump
+    // straight to the done state without mounting the Payment Element.
+    if (r.ok && r.data.comped === true) {
+      setStep('done');
+      return;
+    }
     if (!r.ok || !r.data.clientSecret) {
       setError(ERRORS[r.data?.error ?? ''] ?? 'We couldn’t start the booking just now — please try again or enquire below.');
       return;

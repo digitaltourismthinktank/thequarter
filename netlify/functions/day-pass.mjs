@@ -7,6 +7,9 @@
  * on payment_intent.succeeded (metadata.kind='day-pass') — records the pass + emails
  * the confirmation. No account is created (it's a single guest day). Env: STRIPE_SECRET_KEY.
  */
+import { createRecord, T, F, airtableReady } from './_airtable.mjs';
+import { sendEmail, emailShell, escapeHtml, OPS_EMAIL } from './_email.mjs';
+
 const STRIPE_SECRET = process.env.STRIPE_SECRET_KEY;
 const DAY_PASS_PENCE = 2160; // £21.60 inc VAT — keep in step with DAY_PASS_PRICE (lib/rewards.ts)
 
@@ -36,6 +39,48 @@ export default async function handler(req) {
   const date = String(body.date || '').trim();
   if (!isEmail(email)) return json({ error: 'bad-email' }, 400);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return json({ error: 'bad-date' }, 400);
+
+  // TEST COMP (secret, env-gated): a smoke-test path for the LIVE one-off card flow. When
+  // TEST_COMP_CODE is set AND the request carries the exact same `test` value, SKIP Stripe and
+  // record + confirm this Day Pass at £0 exactly as a paid one would (mirroring finaliseDayPass
+  // in stripe-webhook.mjs) — so admin/dashboard/email are all exercised without a real charge.
+  // INERT (never taken) when TEST_COMP_CODE is unset/empty; the public can never trigger it, and
+  // the real PaymentIntent path below is 100% unchanged for non-comp requests.
+  const COMP = process.env.TEST_COMP_CODE;
+  if (COMP && body.test === COMP) {
+    if (airtableReady()) {
+      try {
+        await createRecord(
+          T.checkins,
+          {
+            [F.checkins.email]: email,
+            [F.checkins.name]: name,
+            [F.checkins.date]: date,
+            [F.checkins.length]: 'Full',
+            [F.checkins.status]: 'Paid',
+            [F.checkins.source]: 'Web',
+            [F.checkins.notes]: `Day Pass · TEST COMP · £0${company ? ' · ' + company : ''}`,
+          },
+          { typecast: true },
+        );
+      } catch {
+        /* record best-effort — never block the comp */
+      }
+    }
+    await sendEmail({
+      to: email,
+      replyTo: OPS_EMAIL,
+      subject: 'Your Day Pass (TEST) is booked',
+      html: emailShell(
+        'Your Day Pass (TEST) is booked',
+        `<p>Thanks${name ? `, ${escapeHtml(name)}` : ''} — this is a £0 test Day Pass for ${escapeHtml(date)}.</p>
+         <p style="margin:0 0 6px;"><strong>Day Pass</strong> · ${escapeHtml(date)}</p>
+         <p style="margin:0 0 6px;">Total: <strong>£0.00</strong> · TEST COMP</p>`,
+        'Your Quarter Day Pass (TEST) is booked',
+      ),
+    });
+    return json({ ok: true, comped: true });
+  }
 
   const pi = await stripe('/v1/payment_intents', 'POST', {
     amount: String(DAY_PASS_PENCE),

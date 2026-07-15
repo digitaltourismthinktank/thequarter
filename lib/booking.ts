@@ -96,6 +96,8 @@ export interface RoomQuote {
 }
 export interface RoomIntent extends RoomQuote {
   clientSecret: string;
+  /** TEST COMP: true when the server skipped Stripe and recorded the booking at £0. */
+  comped?: boolean;
 }
 export interface RoomBookingInput {
   spaceId: string;
@@ -115,6 +117,9 @@ export interface RoomBookingInput {
   phone?: string;
   /** Contact's job title (paid/company bookings). Stored in the booking Notes. */
   jobTitle?: string;
+  /** TEST COMP (secret, env-gated). When it matches the server's TEST_COMP_CODE the booking is
+   *  recorded + confirmed at £0 without Stripe; otherwise ignored. Never set for normal users. */
+  test?: string;
 }
 export const roomQuote = (b: RoomBookingInput) =>
   call<RoomQuote>('room-booking', { method: 'POST', auth: false, body: { action: 'quote', ...b } });
@@ -192,8 +197,8 @@ export const subscribeToPlan = (b: { plan: string; term: 'monthly' | 'annual'; e
   });
 
 // Native Day Pass one-off checkout (£21.60 PaymentIntent — replaces the Typeform embed).
-export const dayPassIntent = (b: { firstName: string; lastName: string; company?: string; email: string; date: string }) =>
-  call<{ clientSecret: string }>('day-pass', { method: 'POST', auth: false, body: b });
+export const dayPassIntent = (b: { firstName: string; lastName: string; company?: string; email: string; date: string; test?: string }) =>
+  call<{ clientSecret: string; comped?: boolean }>('day-pass', { method: 'POST', auth: false, body: b });
 
 // Native carnet purchase (member — in-site PaymentIntent for a bundle of day passes).
 export const carnetIntent = (passes: number) =>
@@ -201,8 +206,8 @@ export const carnetIntent = (passes: number) =>
 
 // Public carnet purchase (buy-then-join — no account yet). The guest's email rides in the
 // Stripe PI metadata; the webhook credits the passes once they create an account with it.
-export const carnetIntentPublic = (b: { passes: number; firstName: string; lastName: string; company?: string; email: string }) =>
-  call<{ clientSecret: string }>('carnet', { method: 'POST', auth: false, body: { action: 'intent', ...b } });
+export const carnetIntentPublic = (b: { passes: number; firstName: string; lastName: string; company?: string; email: string; test?: string }) =>
+  call<{ clientSecret: string; comped?: boolean }>('carnet', { method: 'POST', auth: false, body: { action: 'intent', ...b } });
 
 // Public perks shopfront — the live Airtable perks (display fields only, no auth).
 export interface PublicPerk {

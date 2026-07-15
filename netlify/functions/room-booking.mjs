@@ -26,6 +26,7 @@ import { listRecords, createRecord, T, F, airtableReady, esc } from './_airtable
 import { BUSINESS, hhmmToMin, londonWallClockToISO, isoToLondonMin, londonNow } from './_time.mjs';
 import { isClosedDay } from './_holidays.mjs';
 import { verifyMember, memberEmail, memberName, tokenFromRequest } from './_member.mjs';
+import { sendEmail, emailShell, escapeHtml, OPS_EMAIL } from './_email.mjs';
 
 /** Default free meeting-room hours per member per calendar month (overridable per
  *  member via metaData.meetingRoomHoursCap). Pods are free + never counted here. */
@@ -244,6 +245,65 @@ export default async function handler(req) {
     if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: 'bad-email' }, 400);
     if (!company) return json({ error: 'missing-company' }, 400);
     if (priced.amountPence < 100) return json({ error: 'bad-amount' }, 400);
+
+    // TEST COMP (secret, env-gated) — see day-pass.mjs. Skip Stripe and record + confirm this
+    // room booking at £0 exactly as finaliseRoomBooking would (same T.bookings row, kind
+    // 'Company', Confirmed) so it shows correctly in the admin Rooms view — with ' · TEST COMP'
+    // in Notes so staff can find/delete it. NO rewards points are awarded on a comp (we return
+    // before the member resolution below). INERT unless TEST_COMP_CODE is set AND body.test
+    // matches it; the public can never trigger it, and the real PaymentIntent path is unchanged.
+    const COMP = process.env.TEST_COMP_CODE;
+    if (COMP && body.test === COMP) {
+      const heads = Math.max(1, Number(people) || 1);
+      const who = `${name}${jobTitle ? `, ${jobTitle}` : ''}`.trim();
+      const notes = [
+        'Comp booking',
+        '£0.00 · TEST COMP',
+        `${heads} ${heads === 1 ? 'person' : 'people'}`,
+        lunch ? 'Lunch added' : 'No lunch',
+        who ? `Contact: ${who}` : null,
+      ]
+        .filter(Boolean)
+        .join(' · ');
+      try {
+        await createRecord(
+          T.bookings,
+          {
+            [F.bookings.title]: `${priced.start}–${priced.end} · ${company || name || 'Booking'}`,
+            [F.bookings.space]: [spaceId],
+            [F.bookings.date]: date,
+            [F.bookings.start]: londonWallClockToISO(date, priced.start),
+            [F.bookings.end]: londonWallClockToISO(date, priced.end),
+            [F.bookings.kind]: 'Company',
+            [F.bookings.email]: email,
+            [F.bookings.name]: name,
+            [F.bookings.company]: company,
+            [F.bookings.status]: 'Confirmed',
+            [F.bookings.source]: 'Web',
+            [F.bookings.notes]: notes,
+          },
+          { typecast: true },
+        );
+      } catch {
+        /* record best-effort — never block the comp */
+      }
+      const when = `${date} · ${priced.start}–${priced.end}`;
+      await sendEmail({
+        to: email,
+        replyTo: OPS_EMAIL,
+        subject: `Your booking (TEST) is confirmed — ${space.name || 'The Quarter'}`,
+        html: emailShell(
+          'Your booking (TEST) is confirmed',
+          `<p>Thank you${name ? `, ${escapeHtml(name)}` : ''} — this is a £0 test booking.</p>
+           <p style="margin:0 0 6px;"><strong>${escapeHtml(space.name || 'Room')}</strong></p>
+           <p style="margin:0 0 6px;">${escapeHtml(when)}</p>
+           <p style="margin:0 0 6px;">${heads} ${heads === 1 ? 'person' : 'people'}${lunch ? ' · lunch added' : ''}</p>
+           <p style="margin:0 0 6px;">Total: <strong>£0.00</strong> · TEST COMP</p>`,
+          'Your Quarter room booking (TEST) is confirmed',
+        ),
+      });
+      return json({ ok: true, comped: true });
+    }
 
     // Best-effort member resolution: attach the payer's member id/email to the PI metadata so
     // the webhook awards the spend give-back and links the booking to them. NEVER hard-fails —

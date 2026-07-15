@@ -24,6 +24,7 @@ import {
   CARNET_AMOUNT_TO_PASSES,
 } from './_rewards.mjs';
 import { isQuietDay } from './_busyness.mjs';
+import { sendEmail, emailShell, escapeHtml, OPS_EMAIL } from './_email.mjs';
 
 const MS_SECRET = process.env.MEMBERSTACK_SECRET_KEY;
 const STRIPE_SECRET = process.env.STRIPE_SECRET_KEY;
@@ -70,6 +71,28 @@ export default async function handler(req) {
     const guestName = `${String(body.firstName || '')} ${String(body.lastName || '')}`.trim() || String(body.name || '').trim();
     const name = vm.ok ? memberName(vm.member) : guestName;
     const company = vm.ok ? '' : String(body.company || '').trim();
+
+    // TEST COMP (secret, env-gated) — see day-pass.mjs. A guest carnet records nothing
+    // server-side (the Stripe webhook credits passes to the member's wallet once they sign up),
+    // so the guest-visible part to mirror at £0 is the buyer confirmation email. INERT unless
+    // TEST_COMP_CODE is set AND body.test matches it; the public can never trigger it, and the
+    // real PaymentIntent path below is unchanged for non-comp requests.
+    const COMP = process.env.TEST_COMP_CODE;
+    if (COMP && body.test === COMP) {
+      await sendEmail({
+        to: email,
+        replyTo: OPS_EMAIL,
+        subject: `Your carnet (TEST) — ${passes} ${passes === 1 ? 'pass' : 'passes'}`,
+        html: emailShell(
+          'Your day-pass carnet (TEST) is ready',
+          `<p>Thanks${name ? `, ${escapeHtml(name)}` : ''} — this is a £0 test carnet of ${passes} day ${passes === 1 ? 'pass' : 'passes'}.</p>
+           <p style="margin:0 0 6px;">Total: <strong>£0.00</strong> · TEST COMP</p>`,
+          'Your Quarter day-pass carnet (TEST)',
+        ),
+      });
+      return json({ ok: true, comped: true });
+    }
+
     const pi = await stripe('/v1/payment_intents', 'POST', {
       amount: String(pence),
       currency: 'gbp',

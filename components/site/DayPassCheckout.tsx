@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ds/Button';
 import { Icon } from '@/components/ds/Icon';
 import { STRIPE_PUBLISHABLE_KEY } from '@/lib/commerce';
@@ -58,6 +58,14 @@ export function DayPassCheckout() {
   const [step, setStep] = useState<'form' | 'pay' | 'done'>('form');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // TEST COMP: a secret ?test=<code> in the URL routes to the server's env-gated comp path
+  // (skips Stripe, £0). SSR-guarded — read only in the browser. Absent for normal users.
+  const [testCode, setTestCode] = useState('');
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const t = new URLSearchParams(window.location.search).get('test');
+    if (t) setTestCode(t);
+  }, []);
 
   const mountRef = useRef<HTMLDivElement | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -77,8 +85,10 @@ export function DayPassCheckout() {
     if (!date) return setError('Please choose which day.');
     if (PREVIEW) return setError('Checkout runs on the live site — this is a preview.');
     setBusy(true);
-    const r = await dayPassIntent({ firstName: firstName.trim(), lastName: lastName.trim(), company: company.trim(), email: email.trim().toLowerCase(), date });
+    const r = await dayPassIntent({ firstName: firstName.trim(), lastName: lastName.trim(), company: company.trim(), email: email.trim().toLowerCase(), date, test: testCode || undefined });
     setBusy(false);
+    // TEST COMP: server skipped Stripe and already recorded + emailed — jump straight to done.
+    if (r.ok && r.data.comped === true) return setStep('done');
     if (!r.ok || !r.data.clientSecret) {
       setError(r.data?.error === 'bad-date' ? 'Please choose a valid day.' : 'We couldn’t start checkout just now — please try again.');
       return;

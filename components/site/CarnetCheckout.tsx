@@ -62,6 +62,8 @@ export function CarnetCheckout() {
   const [step, setStep] = useState<'form' | 'pay' | 'done'>('form');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // TEST COMP: a secret ?test=<code> routes to the server's env-gated comp path (skips Stripe).
+  const [testCode, setTestCode] = useState('');
 
   const mountRef = useRef<HTMLDivElement | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -74,8 +76,11 @@ export function CarnetCheckout() {
   // export). Invalid/absent leaves the default (30). SSR-guarded.
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const n = Number(new URLSearchParams(window.location.search).get('bundle'));
+    const q = new URLSearchParams(window.location.search);
+    const n = Number(q.get('bundle'));
     if (CARNET_BUNDLES.some((b) => b.passes === n)) setPasses(n);
+    const t = q.get('test');
+    if (t) setTestCode(t);
   }, []);
 
   const bundle = CARNET_BUNDLES.find((b) => b.passes === passes) ?? CARNET_BUNDLES[0];
@@ -92,8 +97,11 @@ export function CarnetCheckout() {
       lastName: lastName.trim(),
       company: company.trim(),
       email: email.trim().toLowerCase(),
+      test: testCode || undefined,
     });
     setBusy(false);
+    // TEST COMP: server skipped Stripe and already emailed — jump straight to done.
+    if (r.ok && r.data.comped === true) return setStep('done');
     if (!r.ok || !r.data.clientSecret) {
       setError(r.data?.error === 'bad-bundle' ? 'Please choose a valid bundle.' : 'We couldn’t start checkout just now — please try again.');
       return;
