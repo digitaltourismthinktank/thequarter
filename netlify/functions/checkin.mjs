@@ -101,16 +101,35 @@ export default async function handler(req) {
       filterByFormula: `AND({Member email}='${esc(email)}', {Status}='Planned', DATETIME_FORMAT({Date}, 'YYYY-MM-DD')>='${today}')`,
       sort: [{ field: 'Date' }],
     });
+    // A paid Day Pass (written by the Stripe webhook, keyed on the buyer's email) is a
+    // reserved day too — once they create an account with the same email it should show
+    // as already-booked, not vanish. Surface Status 'Paid' rows alongside Planned ones.
+    const paidPasses = await listRecords(T.checkins, {
+      filterByFormula: `AND({Member email}='${esc(email)}', {Status}='Paid', DATETIME_FORMAT({Date}, 'YYYY-MM-DD')>='${today}')`,
+      sort: [{ field: 'Date' }],
+    });
     const requested = await listRecords(T.checkins, {
       filterByFormula: `AND({Member email}='${esc(email)}', {Status}='Requested', DATETIME_FORMAT({Date}, 'YYYY-MM-DD')>='${today}')`,
       sort: [{ field: 'Date' }],
     });
+    // Merge planned + paid into one upcoming list, de-duped by date (Planned wins if a
+    // date has both); skip today when they've already checked in so it isn't listed twice.
+    const upcoming = [];
+    const seenDates = new Set();
+    for (const r of [...planned, ...paidPasses]) {
+      const d = isoToLondonDate(r.fields[F.checkins.date]);
+      if (seenDates.has(d)) continue;
+      if (d === today && active) continue;
+      seenDates.add(d);
+      upcoming.push({ id: r.id, date: d, length: r.fields[F.checkins.length] });
+    }
+    upcoming.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
     return json({
       date: today,
       checkedIn: !!active,
       length: active ? active.fields[F.checkins.length] : null,
       balance: vm.member.customFields?.['days-remaining'] ?? null,
-      planned: planned.map((r) => ({ id: r.id, date: isoToLondonDate(r.fields[F.checkins.date]), length: r.fields[F.checkins.length] })),
+      planned: upcoming,
       requested: requested.map((r) => ({ id: r.id, date: isoToLondonDate(r.fields[F.checkins.date]), length: r.fields[F.checkins.length] })),
     });
   }
