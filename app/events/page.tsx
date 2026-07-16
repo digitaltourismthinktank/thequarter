@@ -1,11 +1,9 @@
 import type { Metadata } from 'next';
 import { Section, Eyebrow, Photo } from '@/components/site/primitives';
-import { Badge } from '@/components/ds/Badge';
 import { Button } from '@/components/ds/Button';
-import { Icon } from '@/components/ds/Icon';
-import { EVENTS } from '@/lib/events';
 import { PHOTOS } from '@/lib/media';
 import { Breadcrumbs } from '@/components/site/Breadcrumbs';
+import { PublicEventsList } from './PublicEventsList';
 import styles from './events.module.css';
 
 export const metadata: Metadata = {
@@ -41,36 +39,7 @@ export default function EventsPage() {
 
       <Section tone="page" style={{ paddingTop: 'clamp(40px, 6vw, 56px)' }}>
         <div className={styles.layout}>
-          <div className={styles.list}>
-            {EVENTS.map((e) => {
-              const [num, mon] = e.date.split(' ');
-              return (
-                <article key={e.title} className={styles.event}>
-                  <div className={styles.date}>
-                    <div className={styles.dateDay}>{e.day}</div>
-                    <div className={styles.dateNum}>{num}</div>
-                    <div className={styles.dateMon}>{mon}</div>
-                  </div>
-                  <div className={styles.eventBody}>
-                    <Badge tone="neutral" size="sm">
-                      {e.kind}
-                    </Badge>
-                    <h2 className={styles.eventTitle}>{e.title}</h2>
-                    <p className={styles.eventBlurb}>{e.blurb}</p>
-                    <div className={styles.eventTime}>
-                      <Icon name="clock" size={14} color="var(--gold-600)" />
-                      {e.time}
-                    </div>
-                  </div>
-                  <div className={styles.eventAction}>
-                    <Button size="sm" variant="secondary" href="/login">
-                      RSVP
-                    </Button>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
+          <PublicEventsList />
 
           <div className={styles.aside}>
             <Photo src={PHOTOS.breakfast.src} alt={PHOTOS.breakfast.alt} ratio="4 / 5" sizes="(max-width: 900px) 100vw, 460px" />

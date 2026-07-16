@@ -55,11 +55,18 @@
   font-size: var(--text-md);
   font-weight: var(--fw-semibold);
   margin: 8px 0 4px;
+  overflow-wrap: anywhere;
 }
 .eventBlurb {
   font-size: var(--text-sm);
   color: var(--text-body);
   line-height: 1.5;
+  white-space: pre-line;
+}
+.state {
+  color: var(--text-muted);
+  font-size: var(--text-base);
+  padding: 8px 0;
 }
 .eventTime {
   display: flex;

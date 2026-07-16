@@ -47,6 +47,7 @@
   font-weight: var(--fw-semibold);
   font-size: var(--text-base);
   color: var(--ink-900);
+  overflow-wrap: anywhere;
 }
 .eMeta {
   font-size: var(--text-sm);
