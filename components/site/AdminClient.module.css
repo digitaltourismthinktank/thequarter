@@ -250,6 +250,25 @@ select.input {
   font-size: var(--text-sm);
   color: var(--text-body);
 }
+/* Styled trigger button standing in for a native <input type=date> — opens the
+   shared DatePickerModal. Mirrors RoomBooking's .dateTrigger, sized like .select. */
+.dateTrigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+  font-size: var(--text-sm);
+  color: var(--ink-900);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.dateTrigger:hover:not(:disabled) {
+  border-color: var(--gold-600);
+}
 
 /* Tidy labelled grid for the event form (every control captioned + aligned). */
 .formGrid {
@@ -896,6 +915,25 @@ select.input {
   color: var(--gold-700);
   padding: 1px 6px;
   border-radius: var(--radius-pill);
+}
+/* Small "undo check-in" control on an attendee pill. */
+.whoUndo {
+  margin-left: 6px;
+  margin-right: -2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+  opacity: 0.6;
+  font-size: 13px;
+  line-height: 1;
+  padding: 0 2px;
+}
+.whoUndo:hover {
+  opacity: 1;
 }
 .bdayList {
   display: flex;

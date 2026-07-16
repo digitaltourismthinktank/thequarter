@@ -316,9 +316,9 @@ export interface AdminSpace {
 export const adminGetMembers = () => call<{ members: AdminMember[] }>('admin?action=members');
 export const adminGetSpaces = () => call<{ spaces: AdminSpace[] }>('admin?action=spaces');
 export const adminGetCalendar = (date: string) => call<{ date: string; bookings: AdminBooking[] }>(`admin?action=calendar&date=${date}`);
-export const adminBlock = (b: { spaceId: string; date: string; start: string; end: string; name?: string; notes?: string }) =>
+export const adminBlock = (b: { spaceId: string; date: string; start: string; end: string; name?: string; notes?: string; recurring?: boolean }) =>
   call<{ ok: boolean }>('admin', { method: 'POST', body: { action: 'block', ...b } });
-export const adminExternal = (b: { spaceId: string; date: string; start: string; end: string; name?: string; notes?: string }) =>
+export const adminExternal = (b: { spaceId: string; date: string; start: string; end: string; name?: string; notes?: string; recurring?: boolean }) =>
   call<{ ok: boolean }>('admin', { method: 'POST', body: { action: 'external', ...b } });
 export const adminCompanyBooking = (b: {
   spaceId: string;
@@ -326,9 +326,10 @@ export const adminCompanyBooking = (b: {
   start: string;
   end: string;
   company: string;
+  /** Optional. Absent → a firm booking that is never auto-released. */
   holdUntil?: string;
   releasable?: boolean;
-  recurring?: string;
+  recurring?: boolean;
   notes?: string;
 }) => call<{ ok: boolean; id: string }>('admin', { method: 'POST', body: { action: 'company', ...b } });
 export const adminCancel = (id: string) => call<{ ok: boolean }>('admin', { method: 'POST', body: { action: 'cancelBooking', id } });
@@ -391,6 +392,8 @@ export const adminMarkPaid = (partner: string, month?: string) =>
 export const adminTopUpFloat = (id: string, amount: number) =>
   call<{ ok: boolean; balance: number; floatTotal: number }>('admin', { method: 'POST', body: { action: 'topUpFloat', id, amount } });
 export interface AdminCheckin {
+  /** Airtable record id — present so the Today pane can undo/remove a check-in. */
+  id?: string;
   name: string;
   length: string;
   status?: string;
@@ -401,6 +404,9 @@ export interface AdminCheckin {
 }
 export const adminGetToday = (date: string) =>
   call<{ date: string; checkins: AdminCheckin[]; bookings: AdminBooking[] }>(`admin?action=today&date=${date}`);
+// Undo/remove a check-in (cancels the row; refunds the day if it cost one and the member isn't unlimited).
+export const adminRemoveCheckin = (id: string) =>
+  call<{ ok: boolean }>('admin', { method: 'POST', body: { action: 'removeCheckin', id } });
 export interface MemberProfile {
   id: string;
   email: string;

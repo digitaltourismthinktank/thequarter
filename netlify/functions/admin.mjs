@@ -216,6 +216,7 @@ async function checkinsForDate(date) {
       if (parts.length >= 4) company = parts.slice(3).join(' · ').trim();
     }
     return {
+      id: r.id,
       name: r.fields[F.checkins.name] || r.fields[F.checkins.email] || (dayPass ? 'Day guest' : 'Member'),
       length: r.fields[F.checkins.length] || 'Full',
       status,
@@ -299,24 +300,29 @@ export default async function handler(req) {
   const action = body?.action;
 
   if (action === 'block' || action === 'external') {
-    const { spaceId, date, start, end, name, notes } = body;
+    const { spaceId, date, start, end, name, notes, recurring } = body;
     if (!spaceId || !/^\d{4}-\d{2}-\d{2}$/.test(date || '') || !/^\d{2}:\d{2}$/.test(start || '') || !/^\d{2}:\d{2}$/.test(end || '')) {
       return json({ error: 'missing-or-bad-params' }, 400);
     }
     if (hhmmToMin(start) >= hhmmToMin(end)) return json({ error: 'bad-range' }, 400);
     const label = action === 'block' ? `Blocked${name ? ': ' + name : ''}` : name || 'External booking';
-    const rec = await createRecord(T.bookings, {
-      [F.bookings.title]: `${start}–${end} · ${label}`,
-      [F.bookings.space]: [spaceId],
-      [F.bookings.date]: date,
-      [F.bookings.start]: londonWallClockToISO(date, start),
-      [F.bookings.end]: londonWallClockToISO(date, end),
-      [F.bookings.kind]: action === 'block' ? 'Block' : 'External',
-      [F.bookings.name]: name || '',
-      [F.bookings.notes]: notes || '',
-      [F.bookings.status]: 'Confirmed',
-      [F.bookings.source]: 'Admin',
-    });
+    const rec = await createRecord(
+      T.bookings,
+      {
+        [F.bookings.title]: `${start}–${end} · ${label}`,
+        [F.bookings.space]: [spaceId],
+        [F.bookings.date]: date,
+        [F.bookings.start]: londonWallClockToISO(date, start),
+        [F.bookings.end]: londonWallClockToISO(date, end),
+        [F.bookings.kind]: action === 'block' ? 'Block' : 'External',
+        [F.bookings.name]: name || '',
+        [F.bookings.notes]: notes || '',
+        [F.bookings.status]: 'Confirmed',
+        [F.bookings.source]: 'Admin',
+        [F.bookings.recurring]: !!recurring,
+      },
+      { typecast: true },
+    );
     return json({ ok: true, id: rec.id });
   }
 
@@ -327,22 +333,28 @@ export default async function handler(req) {
     }
     if (hhmmToMin(start) >= hhmmToMin(end)) return json({ error: 'bad-range' }, 400);
     if (holdUntil && !/^\d{2}:\d{2}$/.test(holdUntil)) return json({ error: 'bad-hold' }, 400);
-    const rec = await createRecord(T.bookings, {
-      [F.bookings.title]: `${start}–${end} · ${company || 'Company'}`,
-      [F.bookings.space]: [spaceId],
-      [F.bookings.date]: date,
-      [F.bookings.start]: londonWallClockToISO(date, start),
-      [F.bookings.end]: londonWallClockToISO(date, end),
-      [F.bookings.kind]: 'External',
-      [F.bookings.name]: company || 'Company booking',
-      [F.bookings.company]: company || '',
-      [F.bookings.holdUntil]: holdUntil || '',
-      [F.bookings.releasable]: !!releasable,
-      [F.bookings.recurring]: recurring || '',
-      [F.bookings.notes]: notes || '',
-      [F.bookings.status]: 'Confirmed',
-      [F.bookings.source]: 'Admin',
-    });
+    const rec = await createRecord(
+      T.bookings,
+      {
+        [F.bookings.title]: `${start}–${end} · ${company || 'Company'}`,
+        [F.bookings.space]: [spaceId],
+        [F.bookings.date]: date,
+        [F.bookings.start]: londonWallClockToISO(date, start),
+        [F.bookings.end]: londonWallClockToISO(date, end),
+        [F.bookings.kind]: 'External',
+        [F.bookings.name]: company || 'Company booking',
+        [F.bookings.company]: company || '',
+        // Optional hold: absent holdUntil → a firm booking that is never auto-released
+        // (holdReleased() returns false without a holdUntil), just Confirmed.
+        [F.bookings.holdUntil]: holdUntil || '',
+        [F.bookings.releasable]: !!releasable,
+        [F.bookings.recurring]: !!recurring,
+        [F.bookings.notes]: notes || '',
+        [F.bookings.status]: 'Confirmed',
+        [F.bookings.source]: 'Admin',
+      },
+      { typecast: true },
+    );
     return json({ ok: true, id: rec.id });
   }
 
@@ -538,6 +550,40 @@ export default async function handler(req) {
       [F.checkins.status]: 'Checked-in',
       [F.checkins.source]: 'Admin',
     });
+    return json({ ok: true });
+  }
+
+  // Undo a check-in from the Today pane: cancel the row, and (unless the member is
+  // unlimited) refund the day it cost — mirror of the checkinMember deduction, inverted.
+  // The refund is best-effort/guarded so a hiccup can't fail the cancel itself.
+  if (action === 'removeCheckin') {
+    if (!body.id) return json({ error: 'missing-id' }, 400);
+    const recs = await listRecords(T.checkins, { filterByFormula: `RECORD_ID()='${esc(body.id)}'`, maxRecords: 1 });
+    const r = recs[0];
+    if (!r) return json({ error: 'not-found' }, 404);
+    // Idempotent: if it's already cancelled, don't cancel/refund again (prevents a double refund
+    // on a double-tap or endpoint retry).
+    if (r.fields[F.checkins.status] === 'Cancelled') return json({ ok: true, alreadyCancelled: true });
+    await updateRecord(T.checkins, body.id, { [F.checkins.status]: 'Cancelled' }, { typecast: true });
+    try {
+      const dayCost = Number(r.fields[F.checkins.dayCost]) || 0;
+      const email = r.fields[F.checkins.email];
+      if (dayCost > 0 && email) {
+        const admin = memberstackAdmin.init(MS_SECRET);
+        const mr = await admin.members.retrieve({ email });
+        const m = mr?.data;
+        // allowanceForMember === null means unlimited — nothing to refund.
+        if (m && allowanceForMember(m) !== null) {
+          const raw = m.customFields?.['days-remaining'];
+          const cur = String(raw).toLowerCase() === 'unlimited' ? null : Math.max(0, parseFloat(String(raw)) || 0);
+          if (cur !== null) {
+            await admin.members.update({ id: m.id, data: { customFields: { 'days-remaining': String(cur + dayCost) } } });
+          }
+        }
+      }
+    } catch {
+      /* refund is best-effort — the cancel already succeeded */
+    }
     return json({ ok: true });
   }
 

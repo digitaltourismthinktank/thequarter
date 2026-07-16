@@ -48,6 +48,7 @@ import {
   adminMarkPaid,
   type PayoutPartner,
   adminGetToday,
+  adminRemoveCheckin,
   getRoll,
   signOutGuest,
   adminGetMemberProfile,
@@ -233,6 +234,7 @@ function MembersPane() {
   const [members, setMembers] = useState<AdminMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [edits, setEdits] = useState<Record<string, string>>({});
+  const [passEdits, setPassEdits] = useState<Record<string, string>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [q, setQ] = useState('');
@@ -277,10 +279,23 @@ function MembersPane() {
     await refresh();
     setBusyId(null);
   }
-  async function checkIn(m: AdminMember) {
+  async function savePasses(m: AdminMember) {
+    // Passes are additive server-side (adminGrantPasses) — send the DELTA from the
+    // current balance so the input reads as an absolute value, like the days field.
+    const target = Math.round(Number(passEdits[m.id] ?? m.carnet ?? 0) || 0);
+    const delta = target - (Number(m.carnet) || 0);
+    if (delta === 0) return; // no-op guard
     setBusyId(m.id);
     setMsg(null);
-    const r = await adminCheckinMember(m.id, 'Full');
+    const r = await adminGrantPasses(m.id, delta);
+    if (!r.ok) setMsg(r.data?.error || 'Save failed');
+    await refresh();
+    setBusyId(null);
+  }
+  async function checkIn(m: AdminMember, length: 'Full' | 'Half') {
+    setBusyId(m.id);
+    setMsg(null);
+    const r = await adminCheckinMember(m.id, length);
     if (!r.ok) setMsg(r.data?.error || 'Check-in failed');
     await refresh();
     setBusyId(null);
@@ -392,16 +407,31 @@ function MembersPane() {
                     Save
                   </button>
                 </td>
-                <td className={styles.muted}>{m.carnet || '—'}</td>
+                <td>
+                  <input
+                    className={styles.dayInput}
+                    value={passEdits[m.id] ?? (m.carnet ? String(m.carnet) : '')}
+                    onChange={(e) => setPassEdits({ ...passEdits, [m.id]: e.target.value })}
+                    aria-label={`Day passes for ${m.name || m.email}`}
+                  />
+                  <button type="button" className={styles.smallBtn} onClick={() => savePasses(m)} disabled={busyId === m.id}>
+                    Save
+                  </button>
+                </td>
                 <td className={styles.muted}>{m.points.toLocaleString('en-GB')}</td>
                 <td className={styles.muted}>{m.renewal || '—'}</td>
                 <td>
                   <button type="button" className={styles.smallBtn} onClick={() => setProfileId(m.id)}>
                     Profile
                   </button>{' '}
-                  <button type="button" className={styles.smallBtn} onClick={() => checkIn(m)} disabled={busyId === m.id}>
-                    Check in
-                  </button>
+                  <span className={styles.seg}>
+                    <button type="button" className={styles.segBtn} onClick={() => checkIn(m, 'Full')} disabled={busyId === m.id}>
+                      Check in
+                    </button>
+                    <button type="button" className={styles.segBtn} onClick={() => checkIn(m, 'Half')} disabled={busyId === m.id} title="Half day (½ day cost)">
+                      ½
+                    </button>
+                  </span>
                 </td>
               </tr>
             ))}
@@ -775,6 +805,7 @@ const TOUR_TIMES = (() => {
 function TourClosePanel() {
   const [blocks, setBlocks] = useState<TourBlock[]>([]);
   const [date, setDate] = useState('');
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [allDay, setAllDay] = useState(true);
   const [start, setStart] = useState('09:30');
   const [end, setEnd] = useState('17:00');
@@ -813,7 +844,10 @@ function TourClosePanel() {
     <div className={styles.panel}>
       <span className={styles.panelTitle}>Close tours (independent of room blocks)</span>
       <div className={styles.formRow}>
-        <input type="date" className={styles.select} value={date} onChange={(e) => setDate(e.target.value)} aria-label="Date" />
+        <button type="button" className={styles.dateTrigger} onClick={() => setPickerOpen(true)} aria-label="Date">
+          <Icon name="calendar" size={15} color="var(--gold-700)" />
+          {date ? new Date(`${date}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }) : 'Pick a date'}
+        </button>
         <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 'var(--text-sm)' }}>
           <input type="checkbox" checked={allDay} onChange={() => setAllDay((v) => !v)} /> All day
         </label>
@@ -858,6 +892,16 @@ function TourClosePanel() {
       ) : (
         <p className={styles.muted}>Tours are open on all upcoming weekdays.</p>
       )}
+      <DatePickerModal
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        onPick={(d) => {
+          setDate(d);
+          setPickerOpen(false);
+        }}
+        single
+        planned={date ? [date] : []}
+      />
     </div>
   );
 }
@@ -872,10 +916,12 @@ function RoomsPane() {
   const [start, setStart] = useState<string>('09:00');
   const [end, setEnd] = useState<string>('17:00');
   const [label, setLabel] = useState<string>('');
+  const [holdOn, setHoldOn] = useState(true);
   const [holdUntil, setHoldUntil] = useState<string>('11:00');
   const [releasable, setReleasable] = useState(true);
   const [repeat, setRepeat] = useState<'none' | 'weekly'>('none');
   const [until, setUntil] = useState<string>('');
+  const [untilOpen, setUntilOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
@@ -902,10 +948,20 @@ function RoomsPane() {
   const spaceName = (id: string | null) => spaces.find((s) => s.id === id)?.name ?? 'Space';
 
   async function createOne(dateStr: string) {
+    const recurring = repeat === 'weekly';
     if (kind === 'company') {
-      return adminCompanyBooking({ spaceId, date: dateStr, start, end, company: label, holdUntil, releasable });
+      return adminCompanyBooking({
+        spaceId,
+        date: dateStr,
+        start,
+        end,
+        company: label,
+        // Hold toggle OFF → firm booking: send no holdUntil (never auto-released).
+        ...(holdOn ? { holdUntil, releasable } : {}),
+        recurring,
+      });
     }
-    const payload = { spaceId, date: dateStr, start, end, name: label };
+    const payload = { spaceId, date: dateStr, start, end, name: label, recurring };
     return kind === 'block' ? adminBlock(payload) : adminExternal(payload);
   }
 
@@ -936,7 +992,11 @@ function RoomsPane() {
       // Conflict detection — never double-book a room. Re-use the loaded list for the
       // current day; fetch the calendar for each future recurrence date.
       const dayBookings = dt === date ? bookings : (await adminGetCalendar(dt)).data?.bookings || [];
-      const clash = dayBookings.some((b) => b.space === spaceId && overlaps(sMin, eMin, b.startMin, b.endMin));
+      // Ignore all-day / privatisation rows (no real Start/End window) — they'd otherwise
+      // falsely clash with every timed booking and silently skip a legitimate add.
+      const clash = dayBookings.some(
+        (b) => b.space === spaceId && !(b.allDay || b.endMin <= b.startMin) && overlaps(sMin, eMin, b.startMin, b.endMin),
+      );
       if (clash) {
         skipped.push(dt);
         continue;
@@ -946,10 +1006,15 @@ function RoomsPane() {
       else skipped.push(dt);
     }
 
+    // Reset the form on any success so it's clear the add landed…
     if (added > 0) {
       setLabel('');
-      await loadCalendar();
+      setStart('09:00');
+      setEnd('17:00');
+      setHoldUntil('11:00');
     }
+    // …and ALWAYS refresh the list, so it can't go stale even in edge cases.
+    await loadCalendar();
     if (dates.length === 1) {
       setMsg(added ? 'Added' : `That room is already booked ${start}–${end} that day — cancel the existing booking first.`);
     } else {
@@ -1020,19 +1085,28 @@ function RoomsPane() {
           )}
           {kind === 'company' ? (
             <>
-              <label className={styles.field}>
-                <span>Hold until</span>
-                <select className={styles.select} value={holdUntil} onChange={(e) => setHoldUntil(e.target.value)} aria-label="Hold until">
-                  {TIMES.map((t) => (
-                    <option key={t} value={t}>
-                      {t}
-                    </option>
-                  ))}
-                </select>
-              </label>
               <label className={styles.check}>
-                <input type="checkbox" checked={releasable} onChange={(e) => setReleasable(e.target.checked)} /> Release if no-show
+                <input type="checkbox" checked={holdOn} onChange={(e) => setHoldOn(e.target.checked)} /> Hold this room
               </label>
+              {holdOn ? (
+                <>
+                  <label className={styles.field}>
+                    <span>Hold until</span>
+                    <select className={styles.select} value={holdUntil} onChange={(e) => setHoldUntil(e.target.value)} aria-label="Hold until">
+                      {TIMES.map((t) => (
+                        <option key={t} value={t}>
+                          {t}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className={styles.check}>
+                    <input type="checkbox" checked={releasable} onChange={(e) => setReleasable(e.target.checked)} /> Release if no-show
+                  </label>
+                </>
+              ) : (
+                <span className={styles.muted}>Firm booking — held all day, never auto-released.</span>
+              )}
             </>
           ) : null}
           <Button variant="primary" size="sm" onClick={add} disabled={busy}>
@@ -1050,7 +1124,10 @@ function RoomsPane() {
           {repeat === 'weekly' ? (
             <label className={styles.field}>
               <span>Until</span>
-              <input type="date" className={styles.select} value={until} min={date} onChange={(e) => setUntil(e.target.value)} aria-label="Repeat until" />
+              <button type="button" className={styles.dateTrigger} onClick={() => setUntilOpen(true)} aria-label="Repeat until">
+                <Icon name="calendar" size={15} color="var(--gold-700)" />
+                {until ? new Date(`${until}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }) : 'Pick an end date'}
+              </button>
             </label>
           ) : null}
           {repeat === 'weekly' ? <span className={styles.muted}>Creates a weekly booking on this weekday, skipping any clashes.</span> : null}
@@ -1071,6 +1148,9 @@ function RoomsPane() {
                 {b.allDay ? 'Privatised' : b.company ? 'Company' : b.kind}
               </span>
               <span className={styles.bWho}>{b.company || b.name || b.email || ''}</span>
+              {b.recurring && !b.allDay ? (
+                <span className={styles.muted}>every {new Date(`${date}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'long' })}</span>
+              ) : null}
               {b.allDay ? null : b.company ? (
                 <span className={styles.statusTag}>
                   {b.released ? 'Released' : b.checkedIn ? 'Checked in' : b.holdUntil ? `Held to ${b.holdUntil}` : 'Booked'}
@@ -1086,6 +1166,17 @@ function RoomsPane() {
         </div>
       )}
       {msg ? <p className={styles.msg}>{msg}</p> : null}
+      <DatePickerModal
+        open={untilOpen}
+        onClose={() => setUntilOpen(false)}
+        onPick={(d) => {
+          setUntil(d);
+          setUntilOpen(false);
+        }}
+        single
+        allowWeekend
+        planned={until ? [until] : []}
+      />
     </div>
   );
 }
@@ -1190,18 +1281,26 @@ function AdminTodayPane({ onAllBirthdays }: { onAllBirthdays: () => void }) {
     setMembers((ms) => ms.filter((m) => m.id !== id));
   }
 
-  useEffect(() => {
+  const loadToday = useCallback(async () => {
     if (!date) return;
     setLoading(true);
-    (async () => {
-      const r = await adminGetToday(date);
-      if (r.ok) {
-        setCheckins(r.data.checkins);
-        setBookings(r.data.bookings);
-      }
-      setLoading(false);
-    })();
+    const r = await adminGetToday(date);
+    if (r.ok) {
+      setCheckins(r.data.checkins);
+      setBookings(r.data.bookings);
+    }
+    setLoading(false);
   }, [date]);
+  useEffect(() => {
+    loadToday();
+  }, [loadToday]);
+
+  async function undoCheckin(c: AdminCheckin) {
+    if (!c.id) return;
+    if (!window.confirm(`Undo check-in for ${c.name}? Any day it cost is refunded.`)) return;
+    await adminRemoveCheckin(c.id);
+    await loadToday();
+  }
 
   const dObj = date ? new Date(`${date}T12:00:00`) : new Date();
   const b = busyness(dObj);
@@ -1295,6 +1394,17 @@ function AdminTodayPane({ onAllBirthdays }: { onAllBirthdays: () => void }) {
                   >
                     {c.name}
                     {c.dayPass ? <span className={styles.whoTag}>Day Pass · Paid</span> : c.length === 'Half' ? ' · ½' : ''}
+                    {c.id ? (
+                      <button
+                        type="button"
+                        className={styles.whoUndo}
+                        onClick={() => undoCheckin(c)}
+                        aria-label={`Undo check-in for ${c.name}`}
+                        title="Undo check-in"
+                      >
+                        ✕
+                      </button>
+                    ) : null}
                   </span>
                 ))}
               </div>
