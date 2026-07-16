@@ -12,6 +12,7 @@
  * so it agrees byte-for-byte with privatisationDates()/lib/privatisation.ts.
  */
 import { F } from './_airtable.mjs';
+import { isoToLondonMin, isoToLondonDate } from './_time.mjs';
 
 /** Normalise a loose list to sorted-unique weekday numbers 1..5. */
 export const normWeekdays = (arr) =>
@@ -75,4 +76,39 @@ export function isPrivatisedOn(dateStr, cadence, weekdays, startDate) {
     if (prev.getUTCMonth() === d.getUTCMonth() && (!startDate || prevIso >= startDate)) return false;
   }
   return true;
+}
+
+/**
+ * Is `record` an INDEFINITE recurring Block RULE (not a concrete dated row)? A rule is one
+ * Block row with Recurring=true whose Notes carry a `slots=` cadence token (the same token
+ * privatisations use). Concrete weekly rows created up to an end date are also Recurring=true
+ * but carry NO token, so they are NOT rules — they surface on their own date like any booking.
+ */
+export function isRecurringBlockRule(record) {
+  const f = record?.fields || {};
+  if (f[F.bookings.kind] !== 'Block') return false;
+  if (!f[F.bookings.recurring]) return false;
+  return !!parsePrivatisationSlots(f[F.bookings.notes] || '');
+}
+
+/**
+ * Expand a set of Airtable booking records into the recurring-Block occurrences that fall on
+ * `dateStr`. Mirrors privatisationsForDate() but for timed Block RULES: each matching rule emits
+ * ONE occurrence carrying the rule's stored start/end minutes (time-of-day is date-independent,
+ * so the rule row's ISO Start/End give the right window on every occupied date). Returns
+ * `{ record, startMin, endMin }` so each caller can shape it (admin list row vs. busy range).
+ * Cancelling the single rule row (Status≠Confirmed) makes it vanish from every future date.
+ */
+export function recurringBlockOccurrences(records, dateStr) {
+  const out = [];
+  for (const r of records) {
+    if (!isRecurringBlockRule(r)) continue;
+    const f = r.fields;
+    const parsed = parsePrivatisationSlots(f[F.bookings.notes] || '');
+    if (!parsed) continue;
+    const startDate = isoToLondonDate(f[F.bookings.date]) || '';
+    if (!isPrivatisedOn(dateStr, parsed.cadence, parsed.weekdays, startDate)) continue;
+    out.push({ record: r, startMin: isoToLondonMin(f[F.bookings.start]), endMin: isoToLondonMin(f[F.bookings.end]) });
+  }
+  return out;
 }

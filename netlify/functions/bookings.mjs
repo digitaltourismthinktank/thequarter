@@ -14,6 +14,7 @@ import { verifyMember, memberEmail, memberName, isAdmin, tokenFromRequest } from
 import { listRecords, createRecord, updateRecord, T, F, airtableReady, esc } from './_airtable.mjs';
 import { BUSINESS, hhmmToMin, isWeekday, londonWallClockToISO, isoToLondonMin, isoToLondonDate, londonNow, holdReleased } from './_time.mjs';
 import { isClosedDay } from './_holidays.mjs';
+import { isRecurringBlockRule, recurringBlockOccurrences } from './_privatisation.mjs';
 
 /** A released company hold no longer blocks the room. */
 const isReleased = (r, dateStr, nowMin, todayStr) =>
@@ -49,15 +50,35 @@ function validateSlot(dateStr, start, end) {
   return null;
 }
 
-/** Confirmed bookings for a space on a date (filters by date+status in Airtable, space in JS). */
+/**
+ * Confirmed bookings occupying a space on a date. Concrete dated rows are filtered by date+status
+ * in Airtable (space matched in JS). Indefinite recurring-Block RULE rows live only on their start
+ * date, so they're excluded here and expanded separately (recurringBlockOccurrences) — this makes
+ * a recurring block occupy the room on EVERY future weekday, blocking member double-booking too.
+ */
 async function bookingsForSpaceDate(spaceId, dateStr) {
   const recs = await listRecords(T.bookings, {
     filterByFormula: `AND(DATETIME_FORMAT({Date}, 'YYYY-MM-DD')='${esc(dateStr)}', {Status}='Confirmed')`,
   });
-  return recs.filter((r) => {
+  const dated = recs.filter((r) => {
+    if (isRecurringBlockRule(r)) return false; // rule rows expand via recurringBlockOccurrences
     const sp = r.fields[F.bookings.space];
     return Array.isArray(sp) && sp.includes(spaceId);
   });
+  // Expand indefinite recurring blocks falling on this date. Block rules are few, so fetching all
+  // Confirmed blocks (mirrors admin's privatisation approach) is cheap. Each occurrence is the
+  // rule's own record: isoToLondonMin(Start/End) gives the right window on any date, and it carries
+  // no holdUntil so isReleased() treats it as firmly busy.
+  const blockRecs = await listRecords(T.bookings, {
+    filterByFormula: `AND({Status}='Confirmed', {Kind}='Block')`,
+  });
+  const occ = recurringBlockOccurrences(blockRecs, dateStr)
+    .map((o) => o.record)
+    .filter((r) => {
+      const sp = r.fields[F.bookings.space];
+      return Array.isArray(sp) && sp.includes(spaceId);
+    });
+  return [...dated, ...occ];
 }
 
 export default async function handler(req) {
@@ -113,8 +134,16 @@ export default async function handler(req) {
       const recs = await listRecords(T.bookings, {
         filterByFormula: `AND(DATETIME_FORMAT({Date}, 'YYYY-MM-DD')='${today.dateStr}', {Status}='Confirmed')`,
       });
+      // Expand indefinite recurring-Block rules so a block that started on an earlier date still
+      // shows the room as occupied today. Rules live on their start date (so they're absent from
+      // `recs` and excluded below); fetch all Confirmed blocks and re-add today's occurrences.
+      const blockRecs = await listRecords(T.bookings, {
+        filterByFormula: `AND({Status}='Confirmed', {Kind}='Block')`,
+      });
+      const occRecs = recurringBlockOccurrences(blockRecs, today.dateStr).map((o) => o.record);
       const bookings = recs
-        .filter((r) => !isReleased(r, today.dateStr, today.min, today.dateStr))
+        .filter((r) => !isRecurringBlockRule(r) && !isReleased(r, today.dateStr, today.min, today.dateStr))
+        .concat(occRecs)
         .map((r) => ({
           space: Array.isArray(r.fields[F.bookings.space]) ? r.fields[F.bookings.space][0] : null,
           startMin: isoToLondonMin(r.fields[F.bookings.start]),

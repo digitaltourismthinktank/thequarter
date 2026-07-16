@@ -1086,6 +1086,10 @@ function RoomsPane() {
   const [loading, setLoading] = useState(true);
   const [kind, setKind] = useState<'block' | 'external' | 'company'>('block');
   const [spaceId, setSpaceId] = useState<string>('');
+  // The block's OWN date — picked right in the form (defaults to the WeekStrip day, but can be
+  // overridden here). The WeekStrip still drives the day list below.
+  const [formDate, setFormDate] = useState<string>(() => firstWeekday());
+  const [formDateOpen, setFormDateOpen] = useState(false);
   const [start, setStart] = useState<string>('09:00');
   const [end, setEnd] = useState<string>('17:00');
   const [label, setLabel] = useState<string>('');
@@ -1093,10 +1097,23 @@ function RoomsPane() {
   const [holdUntil, setHoldUntil] = useState<string>('11:00');
   const [releasable, setReleasable] = useState(true);
   const [repeat, setRepeat] = useState<'none' | 'weekly'>('none');
+  // How a weekly repeat ends: on a fixed date (dated rows) or never (one indefinite RULE row).
+  const [ends, setEnds] = useState<'date' | 'never'>('date');
   const [until, setUntil] = useState<string>('');
   const [untilOpen, setUntilOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+
+  // Indefinite ("no end date") is a Block-only rule — external/company weekly needs an end date.
+  const canIndefinite = kind === 'block';
+  // Selecting a WeekStrip day pre-fills the form's date; the in-form picker can still override it.
+  useEffect(() => {
+    setFormDate(date);
+  }, [date]);
+  // Keep "ends" valid when the type can't be indefinite.
+  useEffect(() => {
+    if (!canIndefinite && ends === 'never') setEnds('date');
+  }, [canIndefinite, ends]);
 
   useEffect(() => {
     (async () => {
@@ -1120,6 +1137,9 @@ function RoomsPane() {
 
   const spaceName = (id: string | null) => spaces.find((s) => s.id === id)?.name ?? 'Space';
 
+  // Weekly + no end date (Block only) = ONE indefinite RULE row the calendar expands.
+  const indefinite = repeat === 'weekly' && ends === 'never' && canIndefinite;
+
   async function createOne(dateStr: string) {
     const recurring = repeat === 'weekly';
     if (kind === 'company') {
@@ -1134,7 +1154,7 @@ function RoomsPane() {
         recurring,
       });
     }
-    const payload = { spaceId, date: dateStr, start, end, name: label, recurring };
+    const payload = { spaceId, date: dateStr, start, end, name: label, recurring, indefinite };
     return kind === 'block' ? adminBlock(payload) : adminExternal(payload);
   }
 
@@ -1149,10 +1169,11 @@ function RoomsPane() {
     setBusy(true);
     setMsg(null);
 
-    // The dates to create: just this day, or a weekly series up to the "until" date.
-    const dates: string[] = [date];
-    if (repeat === 'weekly' && until && until >= date) {
-      let d = addDaysISO(date, 7);
+    // The dates to create. An indefinite rule is a SINGLE row (no series). Otherwise: just the
+    // form's day, or — for a dated weekly repeat — a series up to the "until" date.
+    const dates: string[] = [formDate];
+    if (repeat === 'weekly' && ends === 'date' && !indefinite && until && until >= formDate) {
+      let d = addDaysISO(formDate, 7);
       while (d <= until && dates.length < 60) {
         dates.push(d);
         d = addDaysISO(d, 7);
@@ -1160,10 +1181,13 @@ function RoomsPane() {
     }
 
     let added = 0;
-    const skipped: string[] = [];
+    const skipped: string[] = []; // client-detected clashes (room already booked)
+    const failed: string[] = []; // genuine server save failures (Airtable rejected the write)
+    let firstError = '';
     for (const dt of dates) {
-      // Conflict detection — never double-book a room. Re-use the loaded list for the
-      // current day; fetch the calendar for each future recurrence date.
+      // Conflict detection — never double-book a room. Re-use the loaded list only when the
+      // form's date matches the WeekStrip day; otherwise fetch that date's calendar. Expanded
+      // recurring blocks + privatisations come back in this list, so they block correctly.
       const dayBookings = dt === date ? bookings : (await adminGetCalendar(dt)).data?.bookings || [];
       // Ignore all-day / privatisation rows (no real Start/End window) — they'd otherwise
       // falsely clash with every timed booking and silently skip a legitimate add.
@@ -1175,8 +1199,14 @@ function RoomsPane() {
         continue;
       }
       const r = await createOne(dt);
-      if (r.ok) added += 1;
-      else skipped.push(dt);
+      if (r.ok) {
+        added += 1;
+      } else {
+        // A non-ok here is a SERVER SAVE FAILURE, not a clash (clashes are caught above). Capture
+        // the real Airtable reason so we can show it instead of a misleading "already booked".
+        failed.push(dt);
+        if (!firstError) firstError = r.data?.detail || r.data?.error || '';
+      }
     }
 
     // Reset the form on any success so it's clear the add landed…
@@ -1189,15 +1219,31 @@ function RoomsPane() {
     // …and ALWAYS refresh the list, so it can't go stale even in edge cases.
     await loadCalendar();
     if (dates.length === 1) {
-      setMsg(added ? 'Added' : `That room is already booked ${start}–${end} that day — cancel the existing booking first.`);
+      if (added) {
+        setMsg(indefinite ? 'Recurring block added — repeats every week with no end date.' : 'Added');
+      } else if (skipped.length) {
+        setMsg(`That room is already booked ${start}–${end} that day — cancel the existing booking first.`);
+      } else {
+        setMsg(`Couldn't save the booking — ${firstError || 'please try again'}.`);
+      }
     } else {
-      setMsg(`Added ${added} of ${dates.length} weekly bookings${skipped.length ? ` — ${skipped.length} skipped (already booked)` : ''}.`);
+      const parts = [`Added ${added} of ${dates.length} weekly bookings`];
+      if (skipped.length) parts.push(`${skipped.length} skipped (already booked)`);
+      if (failed.length) parts.push(`${failed.length} failed${firstError ? ` — ${firstError}` : ''}`);
+      setMsg(`${parts.join(' · ')}.`);
     }
     setBusy(false);
   }
   async function cancel(id: string) {
+    // Recurring-block occurrences carry a synthetic `rblock-<recordId>` id — cancelling maps back
+    // to the single RULE row, which removes it from every future date. Confirm the wider effect.
+    const isRule = id.startsWith('rblock-');
+    const realId = isRule ? id.slice('rblock-'.length) : id;
+    if (isRule && typeof window !== 'undefined' && !window.confirm('Cancel this recurring block? It will be removed on every future date.')) {
+      return;
+    }
     setBusy(true);
-    await adminCancel(id);
+    await adminCancel(realId);
     await loadCalendar();
     setBusy(false);
   }
@@ -1212,81 +1258,71 @@ function RoomsPane() {
 
       <div className={styles.panel}>
         <span className={styles.panelTitle}>Add a block, external or company booking</span>
-        <div className={styles.formRow}>
-          <div className={styles.seg}>
-            <button type="button" className={`${styles.segBtn} ${kind === 'block' ? styles.segOn : ''}`} onClick={() => setKind('block')}>
-              Block
+        <div className={styles.formGrid}>
+          <label className={styles.field}>
+            <span>Type</span>
+            <div className={styles.seg}>
+              <button type="button" className={`${styles.segBtn} ${kind === 'block' ? styles.segOn : ''}`} onClick={() => setKind('block')}>
+                Block
+              </button>
+              <button type="button" className={`${styles.segBtn} ${kind === 'external' ? styles.segOn : ''}`} onClick={() => setKind('external')}>
+                External
+              </button>
+              <button type="button" className={`${styles.segBtn} ${kind === 'company' ? styles.segOn : ''}`} onClick={() => setKind('company')}>
+                Company
+              </button>
+            </div>
+          </label>
+          <label className={styles.field}>
+            <span>Date</span>
+            <button type="button" className={styles.dateTrigger} onClick={() => setFormDateOpen(true)} aria-label="Booking date">
+              <Icon name="calendar" size={15} color="var(--gold-700)" />
+              {formDate ? new Date(`${formDate}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }) : 'Pick a date'}
             </button>
-            <button type="button" className={`${styles.segBtn} ${kind === 'external' ? styles.segOn : ''}`} onClick={() => setKind('external')}>
-              External
-            </button>
-            <button type="button" className={`${styles.segBtn} ${kind === 'company' ? styles.segOn : ''}`} onClick={() => setKind('company')}>
-              Company
-            </button>
-          </div>
-          <select className={styles.select} value={spaceId} onChange={(e) => setSpaceId(e.target.value)} aria-label="Space">
-            {spaces.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-          <select className={styles.select} value={start} onChange={(e) => setStart(e.target.value)} aria-label="Start">
-            {TIMES.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
-          <span className={styles.to}>to</span>
-          <select className={styles.select} value={end} onChange={(e) => setEnd(e.target.value)} aria-label="End">
-            {TIMES.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
-          {kind === 'company' ? (
-            <CompanyInput className={styles.label} value={label} onChange={setLabel} placeholder="Company name" />
-          ) : (
-            <input
-              className={styles.label}
-              placeholder={kind === 'block' ? 'Reason (optional)' : 'Who for'}
-              value={label}
-              onChange={(e) => setLabel(e.target.value)}
-            />
-          )}
-          {kind === 'company' ? (
-            <>
-              <label className={styles.check}>
-                <input type="checkbox" checked={holdOn} onChange={(e) => setHoldOn(e.target.checked)} /> Hold this room
-              </label>
-              {holdOn ? (
-                <>
-                  <label className={styles.field}>
-                    <span>Hold until</span>
-                    <select className={styles.select} value={holdUntil} onChange={(e) => setHoldUntil(e.target.value)} aria-label="Hold until">
-                      {TIMES.map((t) => (
-                        <option key={t} value={t}>
-                          {t}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className={styles.check}>
-                    <input type="checkbox" checked={releasable} onChange={(e) => setReleasable(e.target.checked)} /> Release if no-show
-                  </label>
-                </>
-              ) : (
-                <span className={styles.muted}>Firm booking — held all day, never auto-released.</span>
-              )}
-            </>
-          ) : null}
-          <Button variant="primary" size="sm" onClick={add} disabled={busy}>
-            Add
-          </Button>
-        </div>
-        <div className={styles.formRow}>
+          </label>
+          <label className={styles.field}>
+            <span>Room</span>
+            <select className={styles.select} value={spaceId} onChange={(e) => setSpaceId(e.target.value)} aria-label="Room">
+              {spaces.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className={styles.field}>
+            <span>Time</span>
+            <div className={styles.timeRange}>
+              <select className={styles.select} value={start} onChange={(e) => setStart(e.target.value)} aria-label="Start">
+                {TIMES.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+              <span className={styles.to}>to</span>
+              <select className={styles.select} value={end} onChange={(e) => setEnd(e.target.value)} aria-label="End">
+                {TIMES.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </label>
+          <label className={styles.field}>
+            <span>{kind === 'company' ? 'Company' : kind === 'block' ? 'Reason' : 'Who for'}</span>
+            {kind === 'company' ? (
+              <CompanyInput className={styles.input} value={label} onChange={setLabel} placeholder="Company name" />
+            ) : (
+              <input
+                className={styles.input}
+                placeholder={kind === 'block' ? 'Optional' : 'Guest / booking name'}
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+              />
+            )}
+          </label>
           <label className={styles.field}>
             <span>Repeat</span>
             <select className={styles.select} value={repeat} onChange={(e) => setRepeat(e.target.value as 'none' | 'weekly')} aria-label="Repeat">
@@ -1296,14 +1332,63 @@ function RoomsPane() {
           </label>
           {repeat === 'weekly' ? (
             <label className={styles.field}>
-              <span>Until</span>
+              <span>Ends</span>
+              <select className={styles.select} value={ends} onChange={(e) => setEnds(e.target.value as 'date' | 'never')} aria-label="Ends">
+                <option value="date">On a date</option>
+                {canIndefinite ? <option value="never">No end date</option> : null}
+              </select>
+            </label>
+          ) : null}
+          {repeat === 'weekly' && ends === 'date' ? (
+            <label className={styles.field}>
+              <span>End date</span>
               <button type="button" className={styles.dateTrigger} onClick={() => setUntilOpen(true)} aria-label="Repeat until">
                 <Icon name="calendar" size={15} color="var(--gold-700)" />
                 {until ? new Date(`${until}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }) : 'Pick an end date'}
               </button>
             </label>
           ) : null}
-          {repeat === 'weekly' ? <span className={styles.muted}>Creates a weekly booking on this weekday, skipping any clashes.</span> : null}
+          {kind === 'company' ? (
+            <div className={`${styles.field} ${styles.fieldWide}`}>
+              <span>Hold</span>
+              <div className={styles.holdRow}>
+                <label className={styles.check}>
+                  <input type="checkbox" checked={holdOn} onChange={(e) => setHoldOn(e.target.checked)} /> Hold this room
+                </label>
+                {holdOn ? (
+                  <>
+                    <label className={styles.checkInline}>
+                      <span className={styles.to}>until</span>
+                      <select className={styles.select} value={holdUntil} onChange={(e) => setHoldUntil(e.target.value)} aria-label="Hold until">
+                        {TIMES.map((t) => (
+                          <option key={t} value={t}>
+                            {t}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className={styles.check}>
+                      <input type="checkbox" checked={releasable} onChange={(e) => setReleasable(e.target.checked)} /> Release if no-show
+                    </label>
+                  </>
+                ) : (
+                  <span className={styles.muted}>Firm booking — held all day, never auto-released.</span>
+                )}
+              </div>
+            </div>
+          ) : null}
+        </div>
+        <div className={styles.formActions}>
+          <Button variant="primary" size="sm" onClick={add} disabled={busy}>
+            Add
+          </Button>
+          {repeat === 'weekly' ? (
+            <span className={styles.muted}>
+              {indefinite
+                ? 'One recurring block on this weekday — repeats every week with no end date.'
+                : 'Creates a weekly booking on this weekday up to the end date, skipping any clashes.'}
+            </span>
+          ) : null}
         </div>
       </div>
 
@@ -1339,6 +1424,17 @@ function RoomsPane() {
         </div>
       )}
       {msg ? <p className={styles.msg}>{msg}</p> : null}
+      <DatePickerModal
+        open={formDateOpen}
+        onClose={() => setFormDateOpen(false)}
+        onPick={(d) => {
+          setFormDate(d);
+          setFormDateOpen(false);
+        }}
+        single
+        allowWeekend
+        planned={formDate ? [formDate] : []}
+      />
       <DatePickerModal
         open={untilOpen}
         onClose={() => setUntilOpen(false)}

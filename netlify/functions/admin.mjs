@@ -18,7 +18,7 @@ import { PLAN_NAMES, allowanceForMember, setMemberPlan, renewMember, formatDate 
 import { listRewards, listPerks, listFloats, floatStatus, awardPoints, redeemReward, partnerPayouts, markPartnerPaid } from './_rewards.mjs';
 import { sendEmail, emailShell, escapeHtml, OPS_EMAIL } from './_email.mjs';
 import { pushToEmail } from './_push.mjs';
-import { parsePrivatisationSlots, isPrivatisedOn } from './_privatisation.mjs';
+import { parsePrivatisationSlots, isPrivatisedOn, isRecurringBlockRule, recurringBlockOccurrences } from './_privatisation.mjs';
 
 const PERK_TYPES = ['Discount', 'On the house', 'Upgrade', 'Extra', 'Bundle', 'Priority', 'Welcome gift', 'Experience'];
 const FUNDINGS = ['inventory', 'partner', 'quarter'];
@@ -146,8 +146,11 @@ async function bookingsForDate(date) {
   const now = londonNow();
   // Privatisation marker rows are excluded here (they carry no Start/End → would render as
   // "NaN:NaN"). They surface instead as synthetic all-day rows via privatisationsForDate().
+  // Indefinite recurring-Block RULE rows are excluded too — they surface (on their start date
+  // AND every future occupied date) via recurringBlocksForDate(); leaving them here would
+  // double-count them on the start date.
   return recs
-    .filter((r) => r.fields[F.bookings.kind] !== 'Privatisation')
+    .filter((r) => r.fields[F.bookings.kind] !== 'Privatisation' && !isRecurringBlockRule(r))
     .map((r) => {
     const f = r.fields;
     const hold = { holdUntil: f[F.bookings.holdUntil], checkedIn: !!f[F.bookings.checkedIn], releasable: !!f[F.bookings.releasable] };
@@ -204,6 +207,31 @@ async function privatisationsForDate(date) {
     });
   }
   return out;
+}
+
+/**
+ * Synthetic timed occurrences for `date` of every INDEFINITE recurring-Block RULE. Each rule is
+ * ONE Block row (Date=start date, Recurring=true, a `slots=` weekday token in Notes) — rather
+ * than exploding hundreds of dated rows, we recompute for the viewed date whether the rule fires
+ * (isPrivatisedOn) and, if so, emit one occurrence carrying the rule's start/end window. The id is
+ * `rblock-<recordId>` (stable, derivable back to the rule) so the admin UI can render + cancel it;
+ * cancelling the single rule row removes it from every future date. These occurrences feed the day
+ * list AND the client clash-check, so a recurring block both shows and blocks double-booking.
+ */
+async function recurringBlocksForDate(date) {
+  const recs = await listRecords(T.bookings, {
+    filterByFormula: `AND({Status}='Confirmed', {Kind}='Block')`,
+  });
+  return recurringBlockOccurrences(recs, date).map(({ record: r, startMin, endMin }) => ({
+    id: `rblock-${r.id}`,
+    space: Array.isArray(r.fields[F.bookings.space]) ? r.fields[F.bookings.space][0] : null,
+    startMin,
+    endMin,
+    kind: 'Block',
+    name: r.fields[F.bookings.name] || null,
+    email: null,
+    recurring: true,
+  }));
 }
 
 /** A single member's check-in records for a given date (mirrors checkin.mjs's checkinsFor). */
@@ -264,13 +292,13 @@ export default async function handler(req) {
     if (action === 'calendar') {
       const date = new URL(req.url).searchParams.get('date');
       if (!date) return json({ error: 'missing-date' }, 400);
-      const [bookings, privs] = await Promise.all([bookingsForDate(date), privatisationsForDate(date)]);
-      return json({ date, bookings: [...privs, ...bookings] });
+      const [bookings, privs, rblocks] = await Promise.all([bookingsForDate(date), privatisationsForDate(date), recurringBlocksForDate(date)]);
+      return json({ date, bookings: [...privs, ...rblocks, ...bookings] });
     }
     if (action === 'today') {
       const date = new URL(req.url).searchParams.get('date') || londonNow().dateStr;
-      const [checkins, bookings, privs] = await Promise.all([checkinsForDate(date), bookingsForDate(date), privatisationsForDate(date)]);
-      return json({ date, checkins, bookings: [...privs, ...bookings] });
+      const [checkins, bookings, privs, rblocks] = await Promise.all([checkinsForDate(date), bookingsForDate(date), privatisationsForDate(date), recurringBlocksForDate(date)]);
+      return json({ date, checkins, bookings: [...privs, ...rblocks, ...bookings] });
     }
     if (action === 'rewards') return json({ rewards: await listRewards({ liveOnly: false }) });
     if (action === 'perks') return json({ perks: await listPerks({ liveOnly: false }) });
@@ -318,30 +346,45 @@ export default async function handler(req) {
   const action = body?.action;
 
   if (action === 'block' || action === 'external') {
-    const { spaceId, date, start, end, name, notes, recurring } = body;
+    const { spaceId, date, start, end, name, notes, recurring, indefinite } = body;
     if (!spaceId || !/^\d{4}-\d{2}-\d{2}$/.test(date || '') || !/^\d{2}:\d{2}$/.test(start || '') || !/^\d{2}:\d{2}$/.test(end || '')) {
       return json({ error: 'missing-or-bad-params' }, 400);
     }
     if (hhmmToMin(start) >= hhmmToMin(end)) return json({ error: 'bad-range' }, 400);
     const label = action === 'block' ? `Blocked${name ? ': ' + name : ''}` : name || 'External booking';
-    const rec = await createRecord(
-      T.bookings,
-      {
-        [F.bookings.title]: `${start}–${end} · ${label}`,
-        [F.bookings.space]: [spaceId],
-        [F.bookings.date]: date,
-        [F.bookings.start]: londonWallClockToISO(date, start),
-        [F.bookings.end]: londonWallClockToISO(date, end),
-        [F.bookings.kind]: action === 'block' ? 'Block' : 'External',
-        [F.bookings.name]: name || '',
-        [F.bookings.notes]: notes || '',
-        [F.bookings.status]: 'Confirmed',
-        [F.bookings.source]: 'Admin',
-        [F.bookings.recurring]: !!recurring,
-      },
-      { typecast: true },
-    );
-    return json({ ok: true, id: rec.id });
+    // Indefinite weekly BLOCK = one RULE row (no row explosion): store its weekday in a `slots=`
+    // token so parsePrivatisationSlots/recurringBlockOccurrences can expand it on every future
+    // weekday. Only Blocks recur indefinitely; weekend starts (weekday ∉ 1..5) fall back to a
+    // plain one-off row (token omitted → not treated as a rule).
+    let noteVal = notes || '';
+    if (action === 'block' && recurring && indefinite) {
+      const wd = new Date(`${date}T00:00:00Z`).getUTCDay();
+      if (wd >= 1 && wd <= 5) noteVal = `${noteVal ? `${noteVal} ` : ''}slots=week:${wd}`.trim();
+    }
+    try {
+      const rec = await createRecord(
+        T.bookings,
+        {
+          [F.bookings.title]: `${start}–${end} · ${label}`,
+          [F.bookings.space]: [spaceId],
+          [F.bookings.date]: date,
+          [F.bookings.start]: londonWallClockToISO(date, start),
+          [F.bookings.end]: londonWallClockToISO(date, end),
+          [F.bookings.kind]: action === 'block' ? 'Block' : 'External',
+          [F.bookings.name]: name || '',
+          [F.bookings.notes]: noteVal,
+          [F.bookings.status]: 'Confirmed',
+          [F.bookings.source]: 'Admin',
+          [F.bookings.recurring]: !!recurring,
+        },
+        { typecast: true },
+      );
+      return json({ ok: true, id: rec.id });
+    } catch (e) {
+      // Surface the REAL Airtable failure (e.g. a renamed/removed field after a table reset)
+      // instead of letting the function 500 and the client mislabel it as "already booked".
+      return json({ error: 'save-failed', detail: String(e?.message || e).slice(0, 300) }, 502);
+    }
   }
 
   if (action === 'company') {
@@ -351,29 +394,34 @@ export default async function handler(req) {
     }
     if (hhmmToMin(start) >= hhmmToMin(end)) return json({ error: 'bad-range' }, 400);
     if (holdUntil && !/^\d{2}:\d{2}$/.test(holdUntil)) return json({ error: 'bad-hold' }, 400);
-    const rec = await createRecord(
-      T.bookings,
-      {
-        [F.bookings.title]: `${start}–${end} · ${company || 'Company'}`,
-        [F.bookings.space]: [spaceId],
-        [F.bookings.date]: date,
-        [F.bookings.start]: londonWallClockToISO(date, start),
-        [F.bookings.end]: londonWallClockToISO(date, end),
-        [F.bookings.kind]: 'External',
-        [F.bookings.name]: company || 'Company booking',
-        [F.bookings.company]: company || '',
-        // Optional hold: absent holdUntil → a firm booking that is never auto-released
-        // (holdReleased() returns false without a holdUntil), just Confirmed.
-        [F.bookings.holdUntil]: holdUntil || '',
-        [F.bookings.releasable]: !!releasable,
-        [F.bookings.recurring]: !!recurring,
-        [F.bookings.notes]: notes || '',
-        [F.bookings.status]: 'Confirmed',
-        [F.bookings.source]: 'Admin',
-      },
-      { typecast: true },
-    );
-    return json({ ok: true, id: rec.id });
+    try {
+      const rec = await createRecord(
+        T.bookings,
+        {
+          [F.bookings.title]: `${start}–${end} · ${company || 'Company'}`,
+          [F.bookings.space]: [spaceId],
+          [F.bookings.date]: date,
+          [F.bookings.start]: londonWallClockToISO(date, start),
+          [F.bookings.end]: londonWallClockToISO(date, end),
+          [F.bookings.kind]: 'External',
+          [F.bookings.name]: company || 'Company booking',
+          [F.bookings.company]: company || '',
+          // Optional hold: absent holdUntil → a firm booking that is never auto-released
+          // (holdReleased() returns false without a holdUntil), just Confirmed.
+          [F.bookings.holdUntil]: holdUntil || '',
+          [F.bookings.releasable]: !!releasable,
+          [F.bookings.recurring]: !!recurring,
+          [F.bookings.notes]: notes || '',
+          [F.bookings.status]: 'Confirmed',
+          [F.bookings.source]: 'Admin',
+        },
+        { typecast: true },
+      );
+      return json({ ok: true, id: rec.id });
+    } catch (e) {
+      // Surface the REAL Airtable failure instead of a 500 the client mislabels as "already booked".
+      return json({ error: 'save-failed', detail: String(e?.message || e).slice(0, 300) }, 502);
+    }
   }
 
   if (action === 'cancelBooking') {

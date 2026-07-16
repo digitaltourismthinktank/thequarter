@@ -250,7 +250,7 @@ select.input {
   font-size: var(--text-2xs);
   color: var(--text-muted);
 }
-.field span {
+.field > span {
   text-transform: uppercase;
   letter-spacing: var(--tracking-caps);
   font-weight: var(--fw-semibold);
@@ -280,6 +280,32 @@ select.input {
 }
 .dateTrigger:hover:not(:disabled) {
   border-color: var(--gold-600);
+}
+
+/* Segmented Type control filling its labelled grid cell (equal-width, deliberate). */
+.field .seg {
+  width: 100%;
+}
+.field .seg .segBtn {
+  flex: 1;
+  text-align: center;
+}
+/* Start–End pair sitting under one "Time" caption in the labelled grid. */
+.timeRange {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.timeRange .select {
+  flex: 1;
+  min-width: 0;
+}
+/* Company "Hold" controls on their own full-width row — wraps tidily, never squashes. */
+.holdRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
 }
 
 /* Tidy labelled grid for the event form (every control captioned + aligned). */

@@ -338,10 +338,27 @@ export interface AdminSpace {
 export const adminGetMembers = () => call<{ members: AdminMember[] }>('admin?action=members');
 export const adminGetSpaces = () => call<{ spaces: AdminSpace[] }>('admin?action=spaces');
 export const adminGetCalendar = (date: string) => call<{ date: string; bookings: AdminBooking[] }>(`admin?action=calendar&date=${date}`);
-export const adminBlock = (b: { spaceId: string; date: string; start: string; end: string; name?: string; notes?: string; recurring?: boolean }) =>
-  call<{ ok: boolean }>('admin', { method: 'POST', body: { action: 'block', ...b } });
-export const adminExternal = (b: { spaceId: string; date: string; start: string; end: string; name?: string; notes?: string; recurring?: boolean }) =>
-  call<{ ok: boolean }>('admin', { method: 'POST', body: { action: 'external', ...b } });
+export const adminBlock = (b: {
+  spaceId: string;
+  date: string;
+  start: string;
+  end: string;
+  name?: string;
+  notes?: string;
+  recurring?: boolean;
+  /** Weekly + no end date → one indefinite RULE row (calendar-expanded), not many dated rows. */
+  indefinite?: boolean;
+}) => call<{ ok: boolean; id?: string; detail?: string }>('admin', { method: 'POST', body: { action: 'block', ...b } });
+export const adminExternal = (b: {
+  spaceId: string;
+  date: string;
+  start: string;
+  end: string;
+  name?: string;
+  notes?: string;
+  recurring?: boolean;
+  indefinite?: boolean;
+}) => call<{ ok: boolean; id?: string; detail?: string }>('admin', { method: 'POST', body: { action: 'external', ...b } });
 export const adminCompanyBooking = (b: {
   spaceId: string;
   date: string;
@@ -353,7 +370,7 @@ export const adminCompanyBooking = (b: {
   releasable?: boolean;
   recurring?: boolean;
   notes?: string;
-}) => call<{ ok: boolean; id: string }>('admin', { method: 'POST', body: { action: 'company', ...b } });
+}) => call<{ ok: boolean; id?: string; detail?: string }>('admin', { method: 'POST', body: { action: 'company', ...b } });
 export const adminCancel = (id: string) => call<{ ok: boolean }>('admin', { method: 'POST', body: { action: 'cancelBooking', id } });
 // Close tours (independent of room blocks). Reopen via adminCancel(id).
 export interface TourBlock {

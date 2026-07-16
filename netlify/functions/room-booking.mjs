@@ -28,6 +28,7 @@ import { isClosedDay } from './_holidays.mjs';
 import { verifyMember, memberEmail, memberName, tokenFromRequest } from './_member.mjs';
 import { sendEmail, emailShell, escapeHtml, OPS_EMAIL } from './_email.mjs';
 import { pushToEmail } from './_push.mjs';
+import { isRecurringBlockRule, recurringBlockOccurrences } from './_privatisation.mjs';
 
 /** Default free meeting-room hours per member per calendar month (overridable per
  *  member via metaData.meetingRoomHoursCap). Pods are free + never counted here. */
@@ -84,15 +85,31 @@ async function getSpace(spaceId) {
   };
 }
 
-/** Confirmed bookings for a space on a date (date+status in Airtable, space in JS). */
+/**
+ * Confirmed bookings occupying a space on a date. Concrete dated rows come straight from Airtable;
+ * indefinite recurring-Block RULE rows (which live only on their start date) are excluded here and
+ * re-added as expanded occurrences, so a recurring block keeps a room un-bookable on every future
+ * weekday — a paid booking can't slip past it.
+ */
 async function bookingsForSpaceDate(spaceId, dateStr) {
   const recs = await listRecords(T.bookings, {
     filterByFormula: `AND(DATETIME_FORMAT({Date}, 'YYYY-MM-DD')='${esc(dateStr)}', {Status}='Confirmed')`,
   });
-  return recs.filter((r) => {
+  const dated = recs.filter((r) => {
+    if (isRecurringBlockRule(r)) return false;
     const sp = r.fields[F.bookings.space];
     return Array.isArray(sp) && sp.includes(spaceId);
   });
+  const blockRecs = await listRecords(T.bookings, {
+    filterByFormula: `AND({Status}='Confirmed', {Kind}='Block')`,
+  });
+  const occ = recurringBlockOccurrences(blockRecs, dateStr)
+    .map((o) => o.record)
+    .filter((r) => {
+      const sp = r.fields[F.bookings.space];
+      return Array.isArray(sp) && sp.includes(spaceId);
+    });
+  return [...dated, ...occ];
 }
 
 /**
