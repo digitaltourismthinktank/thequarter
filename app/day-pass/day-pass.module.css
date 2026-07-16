@@ -69,3 +69,132 @@
   font-size: var(--text-sm);
   color: var(--text-muted);
 }
+
+/* ---- Arrival-time picker (mirrors the DatePickerModal aesthetic) ---- */
+/* "by request" pill inside the trigger button when a pre-open time is chosen. */
+.timeReqPill {
+  margin-left: auto;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--gold-100);
+  border: 1px solid var(--gold-200);
+  color: var(--gold-700);
+  font-size: var(--text-2xs);
+  font-weight: var(--fw-semibold);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+}
+/* Inline note shown under the field for an out-of-hours request. */
+.arrivalNote {
+  margin: 2px 0 0;
+  font-size: var(--text-xs);
+  color: var(--gold-700);
+  line-height: 1.5;
+}
+
+.timeOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(20, 17, 13, 0.6);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.timeModal {
+  width: 100%;
+  max-width: 340px;
+  max-height: 80vh;
+  overflow-y: auto;
+  background: var(--surface-card);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  animation: dpTimeIn var(--duration-base) var(--ease-out);
+}
+.timeHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.timeTitle {
+  font-size: var(--text-base);
+  font-weight: var(--fw-bold);
+  color: var(--ink-900);
+}
+.timeSub {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+.timeList {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.timeOpt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 13px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--sand-50);
+  color: var(--ink-900);
+  font-size: var(--text-base);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard);
+}
+.timeOpt:hover {
+  background: var(--gold-100);
+  border-color: var(--gold-400);
+}
+.timeOptSel {
+  background: var(--gold-500);
+  border-color: var(--gold-500);
+  color: var(--ink-900);
+  font-weight: var(--fw-semibold);
+}
+.timeOptSel:hover {
+  background: var(--gold-500);
+}
+/* Pre-open (08:00 / 08:30) — muted, tagged "by request" but still selectable. */
+.timeOptReq {
+  background: transparent;
+  border-style: dashed;
+  color: var(--text-body);
+}
+.timeReqTag {
+  margin-left: auto;
+  font-size: var(--text-2xs);
+  color: var(--text-muted);
+  font-weight: var(--fw-semibold);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+}
+.timeOptSel .timeReqTag {
+  color: var(--ink-900);
+}
+.timeFoot {
+  margin: 14px 0 0;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+@keyframes dpTimeIn {
+  from {
+    transform: translateY(12px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}

@@ -225,6 +225,11 @@ async function finaliseDayPass(pi) {
   const date = m.date || '';
   const email = m.email || pi.receipt_email || '';
   if (!date) return { skipped: 'bad-metadata' };
+  // Arrival rides in the PI metadata (set by day-pass.mjs). Default to 09:00 for older PIs that
+  // predate the field; anything before 09:00 is an out-of-hours REQUEST to flag for staff.
+  const arrival = /^\d{2}:\d{2}$/.test(String(m.arrival || '')) ? m.arrival : '09:00';
+  const outOfHours = m.arrivalStatus === 'requested' || arrival < '09:00';
+  const arrivalNote = outOfHours ? `${arrival} (before we open — requested)` : arrival;
   const dayRecs = await listRecords(T.checkins, { filterByFormula: `DATETIME_FORMAT({Date}, 'YYYY-MM-DD')='${esc(date)}'` });
   if (dayRecs.some((r) => String(r.fields[F.checkins.notes] || '').includes(piId))) return { skipped: 'duplicate' };
   const total = (pi.amount ?? 0) / 100;
@@ -237,17 +242,18 @@ async function finaliseDayPass(pi) {
       [F.checkins.length]: 'Full',
       [F.checkins.status]: 'Paid',
       [F.checkins.source]: 'Web',
-      [F.checkins.notes]: `Day Pass · ${piId} · £${total.toFixed(2)}${m.company ? ' · ' + m.company : ''}`,
+      [F.checkins.notes]: `Day Pass · ${piId} · £${total.toFixed(2)} · Arrival ${arrivalNote}${m.company ? ' · ' + m.company : ''}`,
     },
     { typecast: true },
   );
-  await sendDayPassEmails({ email, name: m.name || '', date, total });
+  await sendDayPassEmails({ email, name: m.name || '', date, total, arrival, outOfHours });
   return { created: rec?.id || null };
 }
 
-async function sendDayPassEmails({ email, name, date, total }) {
+async function sendDayPassEmails({ email, name, date, total, arrival = '09:00', outOfHours = false }) {
   const body = `
     <p style="margin:0 0 6px;"><strong>Day Pass</strong> · ${escapeHtml(date)}</p>
+    <p style="margin:0 0 6px;">Arrival: <strong>${escapeHtml(arrival)}</strong>${outOfHours ? ' — requested, we’ll confirm this early start with you' : ''}</p>
     <p style="margin:0 0 6px;">Total paid: <strong>£${total.toFixed(2)}</strong> (inc VAT)</p>`;
   if (email) {
     await sendEmail({
@@ -264,10 +270,14 @@ async function sendDayPassEmails({ email, name, date, total }) {
   }
   await sendEmail({
     to: OPS_EMAIL,
-    subject: `New Day Pass — ${name || email || 'guest'} (${date})`,
-    html: emailShell('New Day Pass', `${body}<p style="margin:12px 0 0;">Guest: ${escapeHtml(name || '—')} · ${escapeHtml(email || '—')}</p>`, 'A Day Pass was just paid'),
+    subject: `${outOfHours ? '⏰ Early-arrival request · ' : ''}New Day Pass — ${name || email || 'guest'} (${date})`,
+    html: emailShell(
+      'New Day Pass',
+      `${body}${outOfHours ? '<p style="margin:0 0 6px;color:#b45309;"><strong>Out-of-hours arrival requested</strong> — booked, pending your approval.</p>' : ''}<p style="margin:12px 0 0;">Guest: ${escapeHtml(name || '—')} · ${escapeHtml(email || '—')}</p>`,
+      'A Day Pass was just paid',
+    ),
   });
-  await pushToEmail(OPS_EMAIL, { title: 'New Day Pass', body: `${name || email || 'guest'} · ${date}`, url: '/dashboard/' });
+  await pushToEmail(OPS_EMAIL, { title: outOfHours ? 'New Day Pass · early-arrival request' : 'New Day Pass', body: `${name || email || 'guest'} · ${date} · ${arrival}`, url: '/dashboard/' });
 }
 
 /**

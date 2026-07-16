@@ -10,6 +10,7 @@ import { DatePickerModal } from './DatePickerModal';
 import { PREVIEW } from '@/lib/devMock';
 import s from './WelcomeClient.module.css';
 import pay from './RoomBooking.module.css';
+import dp from '@/app/day-pass/day-pass.module.css';
 
 /**
  * Native Day Pass checkout — £21.60, paid in-site with Stripe's Payment Element
@@ -47,6 +48,17 @@ async function waitForNode(ref: { current: HTMLDivElement | null }): Promise<HTM
 
 const isEmail = (e: string) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e);
 
+// We open at 9am. Arrivals can be requested from 08:00; anything before 09:00 is an
+// out-of-hours REQUEST (booked anyway, flagged for staff to confirm). 30-min steps to 17:30.
+const OPEN_TIME = '09:00';
+const ARRIVAL_TIMES: string[] = (() => {
+  const out: string[] = [];
+  for (let m = 8 * 60; m <= 17 * 60 + 30; m += 30) {
+    out.push(`${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`);
+  }
+  return out;
+})();
+
 export function DayPassCheckout() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -55,6 +67,10 @@ export function DayPassCheckout() {
   const [email, setEmail] = useState('');
   const [date, setDate] = useState('');
   const [dateOpen, setDateOpen] = useState(false);
+  const [arrival, setArrival] = useState('09:00');
+  const [arrivalOpen, setArrivalOpen] = useState(false);
+  // Times sort correctly as zero-padded 'HH:MM' strings, so a plain compare flags pre-open.
+  const outOfHours = arrival < OPEN_TIME;
   const [step, setStep] = useState<'form' | 'pay' | 'done'>('form');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -85,7 +101,7 @@ export function DayPassCheckout() {
     if (!date) return setError('Please choose which day.');
     if (PREVIEW) return setError('Checkout runs on the live site — this is a preview.');
     setBusy(true);
-    const r = await dayPassIntent({ firstName: firstName.trim(), lastName: lastName.trim(), company: company.trim(), email: email.trim().toLowerCase(), date, test: testCode || undefined });
+    const r = await dayPassIntent({ firstName: firstName.trim(), lastName: lastName.trim(), company: company.trim(), email: email.trim().toLowerCase(), date, arrival, test: testCode || undefined });
     setBusy(false);
     // TEST COMP: server skipped Stripe and already recorded + emailed — jump straight to done.
     if (r.ok && r.data.comped === true) return setStep('done');
@@ -134,11 +150,15 @@ export function DayPassCheckout() {
         title="Your day is reserved"
         intro={
           <>
-            You’re all set for {prettyDate || 'your chosen day'}. Your day is already held against your email — no account needed to walk
-            in. Just tell the team you have a Day Pass.
+            You’re all set for {prettyDate || 'your chosen day'}, arriving around {arrival}
+            {outOfHours ? ' (requested — we’ll confirm this early start with you)' : ''}. Your day is already held against your email — no
+            account needed to walk in. Just tell the team you have a Day Pass.
           </>
         }
-        rows={[{ icon: 'ticket', label: 'Day Pass', value: prettyDate || '—' }]}
+        rows={[
+          { icon: 'ticket', label: 'Day Pass', value: prettyDate || '—' },
+          { icon: 'clock', label: 'Arrival', value: outOfHours ? `${arrival} · requested — pending confirmation` : arrival },
+        ]}
         amount="£21.60"
         email={email}
         account={{
@@ -191,6 +211,48 @@ export function DayPassCheckout() {
             </button>
           </div>
           <DatePickerModal open={dateOpen} onClose={() => setDateOpen(false)} onPick={(d) => setDate(d)} single />
+          <div className={s.field}>
+            <span>Arrival time</span>
+            <button type="button" className={pay.dateTrigger} onClick={() => setArrivalOpen(true)}>
+              <Icon name="clock" size={16} color="var(--gold-700)" />
+              {arrival}
+              {outOfHours ? <span className={dp.timeReqPill}>by request</span> : null}
+            </button>
+            {outOfHours ? (
+              <p className={dp.arrivalNote}>That’s before we open at 9am — we’ll book it as a request and confirm with you.</p>
+            ) : null}
+          </div>
+          {arrivalOpen ? (
+            <div className={dp.timeOverlay} role="dialog" aria-modal="true" aria-label="Choose an arrival time" onClick={() => setArrivalOpen(false)}>
+              <div className={dp.timeModal} onClick={(e) => e.stopPropagation()}>
+                <div className={dp.timeHead}>
+                  <span className={dp.timeTitle}>Arrival time</span>
+                  <span className={dp.timeSub}>We open at 9am</span>
+                </div>
+                <div className={dp.timeList}>
+                  {ARRIVAL_TIMES.map((t) => {
+                    const req = t < OPEN_TIME;
+                    const sel = t === arrival;
+                    return (
+                      <button
+                        key={t}
+                        type="button"
+                        className={`${dp.timeOpt} ${sel ? dp.timeOptSel : ''} ${req ? dp.timeOptReq : ''}`}
+                        onClick={() => {
+                          setArrival(t);
+                          setArrivalOpen(false);
+                        }}
+                      >
+                        <span>{t}</span>
+                        {req ? <span className={dp.timeReqTag}>before we open — by request</span> : null}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className={dp.timeFoot}>Pick when you plan to arrive. Anything before 9am is booked as a request and confirmed with you.</p>
+              </div>
+            </div>
+          ) : null}
           {error ? <p className={s.error}>{error}</p> : null}
           <Button variant="accent" onClick={toPayment} disabled={busy}>
             {busy ? 'Starting…' : 'Continue to payment · £21.60'}

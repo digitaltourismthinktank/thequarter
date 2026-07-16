@@ -198,7 +198,7 @@ export const subscribeToPlan = (b: { plan: string; term: 'monthly' | 'annual'; e
   });
 
 // Native Day Pass one-off checkout (£21.60 PaymentIntent — replaces the Typeform embed).
-export const dayPassIntent = (b: { firstName: string; lastName: string; company?: string; email: string; date: string; test?: string }) =>
+export const dayPassIntent = (b: { firstName: string; lastName: string; company?: string; email: string; date: string; arrival?: string; test?: string }) =>
   call<{ clientSecret: string; comped?: boolean }>('day-pass', { method: 'POST', auth: false, body: b });
 
 // Native carnet purchase (member — in-site PaymentIntent for a bundle of day passes).

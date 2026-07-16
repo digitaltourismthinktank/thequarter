@@ -27,6 +27,18 @@ async function stripe(path, method, form) {
 
 const isEmail = (e) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e);
 
+// We open at 09:00. An arrival may be requested from 08:00; the picker offers 30-min steps
+// to 17:30. Normalise to a valid 'HH:MM' inside 08:00–17:30, defaulting to 09:00 when the
+// value is missing/malformed/out of range. Anything before 09:00 is an out-of-hours request
+// (booked anyway, flagged for staff) — never a blocker. 'HH:MM' strings compare chronologically.
+const OPEN_TIME = '09:00';
+function normArrival(v) {
+  const s = String(v || '').trim();
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(s)) return OPEN_TIME;
+  if (s < '08:00' || s > '17:30') return OPEN_TIME;
+  return s;
+}
+
 export default async function handler(req) {
   if (req.method !== 'POST') return json({ error: 'method-not-allowed' }, 405);
   if (!STRIPE_SECRET) return json({ error: 'not-configured' }, 503);
@@ -40,6 +52,11 @@ export default async function handler(req) {
   const date = String(body.date || '').trim();
   if (!isEmail(email)) return json({ error: 'bad-email' }, 400);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return json({ error: 'bad-date' }, 400);
+  // Arrival never blocks the booking — it's normalised, and a pre-09:00 pick is just flagged.
+  const arrival = normArrival(body.arrival);
+  const outOfHours = arrival < OPEN_TIME;
+  const arrivalStatus = outOfHours ? 'requested' : 'confirmed';
+  const arrivalNote = outOfHours ? `${arrival} (before we open — requested)` : arrival;
 
   // TEST COMP (secret, env-gated): a smoke-test path for the LIVE one-off card flow. When
   // TEST_COMP_CODE is set AND the request carries the exact same `test` value, SKIP Stripe and
@@ -60,7 +77,7 @@ export default async function handler(req) {
             [F.checkins.length]: 'Full',
             [F.checkins.status]: 'Paid',
             [F.checkins.source]: 'Web',
-            [F.checkins.notes]: `Day Pass · TEST COMP · £0${company ? ' · ' + company : ''}`,
+            [F.checkins.notes]: `Day Pass · TEST COMP · £0 · Arrival ${arrivalNote}${company ? ' · ' + company : ''}`,
           },
           { typecast: true },
         );
@@ -76,6 +93,7 @@ export default async function handler(req) {
         'Your Day Pass (TEST) is booked',
         `<p>Thanks${name ? `, ${escapeHtml(name)}` : ''} — this is a £0 test Day Pass for ${escapeHtml(date)}.</p>
          <p style="margin:0 0 6px;"><strong>Day Pass</strong> · ${escapeHtml(date)}</p>
+         <p style="margin:0 0 6px;">Arrival: <strong>${escapeHtml(arrival)}</strong>${outOfHours ? ' — requested, we’ll confirm this early start with you' : ''}</p>
          <p style="margin:0 0 6px;">Total: <strong>£0.00</strong> · TEST COMP</p>`,
         'Your Quarter Day Pass (TEST) is booked',
       ),
@@ -95,6 +113,8 @@ export default async function handler(req) {
     'metadata[name]': name,
     'metadata[company]': company,
     'metadata[date]': date,
+    'metadata[arrival]': arrival,
+    'metadata[arrivalStatus]': arrivalStatus,
   });
   if (pi?.error || !pi?.client_secret) return json({ error: 'stripe', detail: pi?.error?.message }, 502);
   return json({ clientSecret: pi.client_secret });
