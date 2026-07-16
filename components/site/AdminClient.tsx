@@ -1113,6 +1113,8 @@ function RoomsPane() {
   const [untilOpen, setUntilOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  // Cancelling a recurring-rule occurrence: pick "this week only" vs "the whole series".
+  const [cancelChoice, setCancelChoice] = useState<{ realId: string; date: string; room: string } | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -1248,16 +1250,24 @@ function RoomsPane() {
     }
     setBusy(false);
   }
-  async function cancel(id: string) {
+  async function cancel(id: string, day: string, room: string) {
     // Recurring-block occurrences carry a synthetic `rblock-<recordId>` id — cancelling maps back
-    // to the single RULE row, which removes it from every future date. Confirm the wider effect.
-    const isRule = id.startsWith('rblock-');
-    const realId = isRule ? id.slice('rblock-'.length) : id;
-    if (isRule && typeof window !== 'undefined' && !window.confirm('Cancel this recurring block? It will be removed on every future date.')) {
+    // to the single RULE row. Offer a choice: drop just THIS week (record a skip date on the rule)
+    // or the WHOLE series (cancel the rule row). One-off bookings cancel straight away.
+    if (id.startsWith('rblock-')) {
+      setCancelChoice({ realId: id.slice('rblock-'.length), date: day, room });
       return;
     }
     setBusy(true);
-    await adminCancel(realId);
+    await adminCancel(id);
+    await loadWeek();
+    setBusy(false);
+  }
+  async function runCancel(scope: 'occurrence' | 'series') {
+    if (!cancelChoice) return;
+    setBusy(true);
+    await adminCancel(cancelChoice.realId, scope === 'occurrence' ? { scope: 'occurrence', date: cancelChoice.date } : { scope: 'series' });
+    setCancelChoice(null);
     await loadWeek();
     setBusy(false);
   }
@@ -1295,7 +1305,7 @@ function RoomsPane() {
         ) : null}
         {status ? <span className={styles.statusTag}>{status}</span> : null}
         {b.allDay ? null : (
-          <button type="button" className={styles.bCancel} onClick={() => cancel(b.id)} disabled={busy}>
+          <button type="button" className={styles.bCancel} onClick={() => cancel(b.id, day, spaceName(b.space))} disabled={busy}>
             Cancel
           </button>
         )}
@@ -1503,6 +1513,30 @@ function RoomsPane() {
         allowWeekend
         planned={until ? [until] : []}
       />
+
+      {cancelChoice ? (
+        <div className={styles.profOverlay} role="dialog" aria-modal="true" onClick={() => !busy && setCancelChoice(null)}>
+          <div className={styles.confirmCard} onClick={(e) => e.stopPropagation()}>
+            <h3 className={styles.confirmTitle}>Cancel recurring block</h3>
+            <p className={styles.confirmText}>
+              {cancelChoice.room} on{' '}
+              {new Date(`${cancelChoice.date}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}. Cancel just this
+              week, or the whole repeating series?
+            </p>
+            <div className={styles.confirmActions}>
+              <Button variant="secondary" size="sm" onClick={() => runCancel('occurrence')} disabled={busy}>
+                This week only
+              </Button>
+              <Button variant="primary" size="sm" onClick={() => runCancel('series')} disabled={busy}>
+                Whole series
+              </Button>
+            </div>
+            <button type="button" className={styles.smallBtn} onClick={() => setCancelChoice(null)} disabled={busy} style={{ marginTop: 4 }}>
+              Keep it
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -1954,14 +1988,22 @@ function ContentPane() {
   }, [refresh]);
 
   const set = (k: string, v: any) => setEditing((e: any) => ({ ...e, [k]: v }));
-  function newItem() {
+  const blankItem = (kind: 'perks' | 'rewards') =>
+    kind === 'rewards'
+      ? { kind: 'rewards', partner: '', title: '', cost: 300, funding: 'inventory', category: '', icon: 'gift', pos: '', hero: false, image: '', status: 'draft' }
+      : { kind: 'perks', partner: '', offer: '', category: '', type: 'Discount', days: 'Always on', pos: '', authorisedBy: 'The Quarter', ref: '', contact: '', icon: 'gift', image: '', status: 'draft' };
+  function newItem(kind: 'perks' | 'rewards' = sub) {
     // Seed the £-value helper from the reward's default cost (300 pts → £3.00); blank for perks.
-    setValueGbp(sub === 'rewards' ? String(300 / POINTS_PER_POUND_VALUE) : '');
-    setEditing(
-      sub === 'rewards'
-        ? { kind: 'rewards', partner: '', title: '', cost: 300, funding: 'inventory', category: '', icon: 'gift', pos: '', hero: false, image: '', status: 'draft' }
-        : { kind: 'perks', partner: '', offer: '', category: '', type: 'Discount', days: 'Always on', pos: '', authorisedBy: 'The Quarter', ref: '', contact: '', icon: 'gift', image: '', status: 'draft' },
-    );
+    setValueGbp(kind === 'rewards' ? String(300 / POINTS_PER_POUND_VALUE) : '');
+    setEditing(blankItem(kind));
+  }
+  // Switching the sub-tab switches the OPEN form to that kind too, so the Perks/Rewards pills
+  // act as form switchers. (Previously a pill changed the list + "Add" label but left an open
+  // form on the other kind — so you could sit on "Perks" yet still see the Rewards form.)
+  function chooseSub(next: 'perks' | 'rewards') {
+    setSub(next);
+    setMsg(null);
+    if (editing) newItem(next);
   }
   async function save() {
     if (!editing) return;
@@ -2008,13 +2050,13 @@ function ContentPane() {
   return (
     <div>
       <div className={styles.subTabs}>
-        <button type="button" className={`${styles.subTab} ${sub === 'perks' ? styles.subTabOn : ''}`} onClick={() => setSub('perks')}>
+        <button type="button" className={`${styles.subTab} ${sub === 'perks' ? styles.subTabOn : ''}`} onClick={() => chooseSub('perks')}>
           Perks
         </button>
-        <button type="button" className={`${styles.subTab} ${sub === 'rewards' ? styles.subTabOn : ''}`} onClick={() => setSub('rewards')}>
+        <button type="button" className={`${styles.subTab} ${sub === 'rewards' ? styles.subTabOn : ''}`} onClick={() => chooseSub('rewards')}>
           Rewards
         </button>
-        <button type="button" className={styles.smallBtn} onClick={newItem} style={{ marginLeft: 'auto' }}>
+        <button type="button" className={styles.smallBtn} onClick={() => newItem()} style={{ marginLeft: 'auto' }}>
           + Add {sub === 'rewards' ? 'reward' : 'perk'}
         </button>
       </div>
@@ -2565,6 +2607,7 @@ function EventsPane() {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [location, setLocation] = useState('The Kentish Pantry');
   const [category, setCategory] = useState('Social & drinks');
+  const [description, setDescription] = useState('');
   const [published, setPublished] = useState(true);
 
   const refresh = useCallback(async () => {
@@ -2584,6 +2627,7 @@ function EventsPane() {
     setEndTime('');
     setLocation('The Kentish Pantry');
     setCategory('Social & drinks');
+    setDescription('');
     setPublished(true);
   }
   function edit(e: QuarterEvent) {
@@ -2595,6 +2639,7 @@ function EventsPane() {
     setEndTime(e.end ? toLocalInput(e.end).split('T')[1] : '');
     setLocation(e.location || 'The Kentish Pantry');
     setCategory(e.category || 'Social & drinks');
+    setDescription(e.description || '');
     setPublished(e.published !== false);
   }
   async function save() {
@@ -2610,6 +2655,7 @@ function EventsPane() {
       end: endTime ? new Date(`${date}T${endTime}`).toISOString() : undefined,
       location,
       category,
+      description,
       published,
     };
     const r = editingId ? await adminUpdateEvent(editingId, payload) : await adminCreateEvent(payload);
@@ -2637,6 +2683,16 @@ function EventsPane() {
           <label className={`${styles.field} ${styles.fieldWide}`}>
             <span>Title</span>
             <input className={styles.input} placeholder="e.g. Summer Friday social" value={title} onChange={(e) => setTitle(e.target.value)} />
+          </label>
+          <label className={`${styles.field} ${styles.fieldWide}`}>
+            <span>Description</span>
+            <textarea
+              className={styles.textarea}
+              placeholder="What's it about? Line breaks are kept. Shows on the website, member events tab and entrance screen."
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={3}
+            />
           </label>
           <label className={styles.field}>
             <span>Date</span>

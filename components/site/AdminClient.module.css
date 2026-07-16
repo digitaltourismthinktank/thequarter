@@ -368,6 +368,7 @@ select.input {
   font-weight: var(--fw-semibold);
   color: var(--ink-900);
   min-width: 150px;
+  overflow-wrap: anywhere;
 }
 .bTime {
   color: var(--text-body);
@@ -1163,6 +1164,34 @@ select.input {
   font-size: var(--text-sm);
   font-weight: var(--fw-semibold);
   cursor: pointer;
+}
+
+/* ---- Cancel-recurring choice dialog ---- */
+.confirmCard {
+  width: 100%;
+  max-width: 400px;
+  background: var(--surface-card);
+  border-radius: var(--radius-lg);
+  padding: 22px 22px 18px;
+  animation: profIn var(--duration-base) var(--ease-out);
+  text-align: center;
+}
+.confirmTitle {
+  font-size: var(--text-md);
+  font-weight: var(--fw-bold);
+  color: var(--ink-900);
+}
+.confirmText {
+  margin-top: 8px;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--text-body);
+}
+.confirmActions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 18px;
 }
 
 /* ---- Member profile pop-over ---- */

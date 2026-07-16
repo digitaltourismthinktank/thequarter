@@ -18,7 +18,7 @@ import { PLAN_NAMES, allowanceForMember, setMemberPlan, renewMember, formatDate 
 import { listRewards, listPerks, listFloats, floatStatus, awardPoints, redeemReward, partnerPayouts, markPartnerPaid } from './_rewards.mjs';
 import { sendEmail, emailShell, escapeHtml, OPS_EMAIL } from './_email.mjs';
 import { pushToEmail } from './_push.mjs';
-import { parsePrivatisationSlots, isPrivatisedOn, isRecurringBlockRule, recurringBlockOccurrences } from './_privatisation.mjs';
+import { parsePrivatisationSlots, isPrivatisedOn, isRecurringBlockRule, recurringBlockOccurrences, parseSkipDates } from './_privatisation.mjs';
 
 const PERK_TYPES = ['Discount', 'On the house', 'Upgrade', 'Extra', 'Bundle', 'Priority', 'Welcome gift', 'Experience'];
 const FUNDINGS = ['inventory', 'partner', 'quarter'];
@@ -444,6 +444,23 @@ export default async function handler(req) {
 
   if (action === 'cancelBooking') {
     if (!body.id) return json({ error: 'missing-id' }, 400);
+    // "This week only" for a recurring RULE: don't delete the rule — record the occurrence's
+    // date as a skip in its Notes, so just that week is freed (across admin, screens and
+    // member/paid availability, which all expand the rule via recurringBlockOccurrences) and
+    // the series keeps running on every other week. "Whole series" / one-off bookings fall
+    // through to a normal cancel.
+    if (body.scope === 'occurrence' && /^\d{4}-\d{2}-\d{2}$/.test(body.date || '')) {
+      const recs = await listRecords(T.bookings, { filterByFormula: `RECORD_ID()='${esc(body.id)}'` });
+      const rec = recs[0];
+      if (!rec) return json({ error: 'not-found' }, 404);
+      const notes = String(rec.fields[F.bookings.notes] || '');
+      const skips = parseSkipDates(notes);
+      if (!skips.includes(body.date)) skips.push(body.date);
+      const withoutSkip = notes.replace(/\s*skip=[\d,-]+/, '').trim();
+      const newNotes = `${withoutSkip}${withoutSkip ? ' ' : ''}skip=${skips.sort().join(',')}`.trim();
+      await updateRecord(T.bookings, body.id, { [F.bookings.notes]: newNotes });
+      return json({ ok: true, scope: 'occurrence' });
+    }
     await updateRecord(T.bookings, body.id, { [F.bookings.status]: 'Cancelled' });
     return json({ ok: true });
   }

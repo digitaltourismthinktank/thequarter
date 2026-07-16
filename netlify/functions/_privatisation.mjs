@@ -53,6 +53,22 @@ export function parsePrivatisationSlots(notesOrRecord) {
 }
 
 /**
+ * Exception dates an admin has cancelled for a SINGLE week of a recurring rule, stored as a
+ * `skip=<YYYY-MM-DD>,<YYYY-MM-DD>` token in the rule's Notes. Cancelling "this week only" adds
+ * the occurrence's date here rather than deleting the whole rule, so the series keeps running.
+ */
+export function parseSkipDates(notesOrRecord) {
+  const notes =
+    typeof notesOrRecord === 'string' ? notesOrRecord : String(notesOrRecord?.fields?.[F.bookings.notes] || '');
+  const m = notes.match(/skip=([\d,-]+)/);
+  if (!m) return [];
+  return m[1]
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => /^\d{4}-\d{2}-\d{2}$/.test(s));
+}
+
+/**
  * Does `dateStr` (YYYY-MM-DD) fall inside a privatisation of the given cadence/weekdays,
  * starting on/after `startDate` (YYYY-MM-DD)? Mirrors privatisationDates():
  *   - WEEKLY: date's UTC weekday ∈ weekdays AND dateStr >= startDate.
@@ -113,6 +129,7 @@ export function recurringBlockOccurrences(records, dateStr) {
     if (!parsed) continue;
     const startDate = isoToLondonDate(f[F.bookings.date]) || '';
     if (!isPrivatisedOn(dateStr, parsed.cadence, parsed.weekdays, startDate)) continue;
+    if (parseSkipDates(f[F.bookings.notes] || '').includes(dateStr)) continue; // "cancel this week only" exception
     out.push({ record: r, startMin: isoToLondonMin(f[F.bookings.start]), endMin: isoToLondonMin(f[F.bookings.end]) });
   }
   return out;

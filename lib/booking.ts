@@ -373,7 +373,8 @@ export const adminCompanyBooking = (b: {
   indefinite?: boolean;
   notes?: string;
 }) => call<{ ok: boolean; id?: string; detail?: string }>('admin', { method: 'POST', body: { action: 'company', ...b } });
-export const adminCancel = (id: string) => call<{ ok: boolean }>('admin', { method: 'POST', body: { action: 'cancelBooking', id } });
+export const adminCancel = (id: string, opts?: { scope?: 'occurrence' | 'series'; date?: string }) =>
+  call<{ ok: boolean }>('admin', { method: 'POST', body: { action: 'cancelBooking', id, ...(opts || {}) } });
 // Close tours (independent of room blocks). Reopen via adminCancel(id).
 export interface TourBlock {
   id: string;
