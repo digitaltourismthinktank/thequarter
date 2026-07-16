@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ds/Button';
+import { Checkbox } from '@/components/ds/Checkbox';
 import { getMemberstack, memberstackError } from '@/lib/memberstack';
 import { PLANS, PLAN_MEMBERSTACK_ID, PLAN_DAY_ALLOWANCE, type PlanId } from '@/lib/plans';
 import { getWelcomeSession, saveProfile, registerReferral } from '@/lib/booking';
@@ -197,9 +198,9 @@ export function WelcomeClient({ plan }: { plan: string }) {
         </label>
         <p className={styles.hint}>Leave blank if you&rsquo;re here on your own — most members do. It just links colleagues who work together.</p>
 
-        <label className={styles.agree}>
-          <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
-          <span>
+        <div className={styles.agree}>
+          <Checkbox id="welcome-agree" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
+          <label htmlFor="welcome-agree">
             I agree to the{' '}
             <a href="/terms" target="_blank" rel="noreferrer">
               Terms of Membership
@@ -209,8 +210,8 @@ export function WelcomeClient({ plan }: { plan: string }) {
               Code of Conduct
             </a>
             .
-          </span>
-        </label>
+          </label>
+        </div>
         {error ? <p className={styles.error}>{error}</p> : null}
         <Button variant="primary" onClick={submit} disabled={busy || !agree}>
           {busy ? 'Creating your account…' : 'Create my account'}

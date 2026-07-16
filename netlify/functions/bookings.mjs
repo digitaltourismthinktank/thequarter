@@ -97,7 +97,7 @@ async function bookingsForSpaceDate(spaceId, dateStr) {
   // rule's own record: isoToLondonMin(Start/End) gives the right window on any date, and it carries
   // no holdUntil so isReleased() treats it as firmly busy.
   const blockRecs = await listRecords(T.bookings, {
-    filterByFormula: `AND({Status}='Confirmed', {Kind}='Block')`,
+    filterByFormula: `AND({Status}='Confirmed', OR({Kind}='Block', {Kind}='External'))`,
   });
   const occ = recurringBlockOccurrences(blockRecs, dateStr)
     .map((o) => o.record)
@@ -169,7 +169,7 @@ export default async function handler(req) {
       // shows the room as occupied today. Rules live on their start date (so they're absent from
       // `recs` and excluded below); fetch all Confirmed blocks and re-add today's occurrences.
       const blockRecs = await listRecords(T.bookings, {
-        filterByFormula: `AND({Status}='Confirmed', {Kind}='Block')`,
+        filterByFormula: `AND({Status}='Confirmed', OR({Kind}='Block', {Kind}='External'))`,
       });
       const occRecs = recurringBlockOccurrences(blockRecs, today.dateStr).map((o) => o.record);
       const bookings = recs
@@ -212,7 +212,7 @@ export default async function handler(req) {
         sort: [{ field: 'Start' }],
       });
       const blockRecs = await listRecords(T.bookings, {
-        filterByFormula: `AND({Status}='Confirmed', {Kind}='Block')`,
+        filterByFormula: `AND({Status}='Confirmed', OR({Kind}='Block', {Kind}='External'))`,
       });
       const occRecs = recurringBlockOccurrences(blockRecs, today.dateStr).map((o) => o.record);
       const bookings = recs

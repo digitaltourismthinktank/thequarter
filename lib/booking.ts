@@ -369,6 +369,8 @@ export const adminCompanyBooking = (b: {
   holdUntil?: string;
   releasable?: boolean;
   recurring?: boolean;
+  /** Weekly + no end date → one indefinite RULE row (calendar-expanded), not many dated rows. */
+  indefinite?: boolean;
   notes?: string;
 }) => call<{ ok: boolean; id?: string; detail?: string }>('admin', { method: 'POST', body: { action: 'company', ...b } });
 export const adminCancel = (id: string) => call<{ ok: boolean }>('admin', { method: 'POST', body: { action: 'cancelBooking', id } });

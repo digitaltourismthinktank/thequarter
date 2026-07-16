@@ -114,7 +114,7 @@ async function takenWeekdaysForRoom(roomSlug) {
     return taken; // fail open, but logged
   }
   const recs = await listRecords(T.bookings, {
-    filterByFormula: `AND({Status}='Confirmed', OR({Kind}='Privatisation', {Kind}='Block'))`,
+    filterByFormula: `AND({Status}='Confirmed', OR({Kind}='Privatisation', {Kind}='Block', {Kind}='External'))`,
   });
   for (const rec of recs) {
     const sp = rec.fields[F.bookings.space];

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import styles from './WeekStrip.module.css';
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -32,11 +32,15 @@ function parseLocalDate(iso: string): Date {
 export function WeekStrip({
   value,
   onSelect,
+  onWeekChange,
   label,
   booked = [],
 }: {
   value?: string | null;
   onSelect: (iso: string) => void;
+  /** Fires with the visible week's Monday (YYYY-MM-DD) whenever the week changes — lets a
+   *  parent drive a whole-week view off the strip's prev/next navigation. */
+  onWeekChange?: (mondayISO: string) => void;
   label?: string;
   /** Days already booked/reserved — shown tinted so they read as "already yours". */
   booked?: string[];
@@ -47,6 +51,11 @@ export function WeekStrip({
   // Start on the week of the selected value, or — at weekends — next week.
   const initial = value ? parseLocalDate(value) : today.getDay() === 0 || today.getDay() === 6 ? addDays(today, 7) : today;
   const [weekStart, setWeekStart] = useState<Date>(() => mondayOf(initial));
+
+  // Report the visible week to the parent whenever it changes (stable callback expected).
+  useEffect(() => {
+    onWeekChange?.(toISO(weekStart));
+  }, [weekStart, onWeekChange]);
 
   const week = Array.from({ length: 5 }, (_, i) => addDays(weekStart, i)); // Mon–Fri
   const canPrev = mondayOf(today).getTime() < weekStart.getTime();

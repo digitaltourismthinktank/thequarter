@@ -219,19 +219,31 @@ async function privatisationsForDate(date) {
  * list AND the client clash-check, so a recurring block both shows and blocks double-booking.
  */
 async function recurringBlocksForDate(date) {
+  // Block AND External rules recur indefinitely (company bookings store Kind='External'), so fetch
+  // both kinds; recurringBlockOccurrences filters to genuine rule rows (token-bearing) among them.
   const recs = await listRecords(T.bookings, {
-    filterByFormula: `AND({Status}='Confirmed', {Kind}='Block')`,
+    filterByFormula: `AND({Status}='Confirmed', OR({Kind}='Block', {Kind}='External'))`,
   });
-  return recurringBlockOccurrences(recs, date).map(({ record: r, startMin, endMin }) => ({
-    id: `rblock-${r.id}`,
-    space: Array.isArray(r.fields[F.bookings.space]) ? r.fields[F.bookings.space][0] : null,
-    startMin,
-    endMin,
-    kind: 'Block',
-    name: r.fields[F.bookings.name] || null,
-    email: null,
-    recurring: true,
-  }));
+  const now = londonNow();
+  return recurringBlockOccurrences(recs, date).map(({ record: r, startMin, endMin }) => {
+    const f = r.fields;
+    const hold = { holdUntil: f[F.bookings.holdUntil], checkedIn: !!f[F.bookings.checkedIn], releasable: !!f[F.bookings.releasable] };
+    return {
+      id: `rblock-${r.id}`,
+      space: Array.isArray(f[F.bookings.space]) ? f[F.bookings.space][0] : null,
+      startMin,
+      endMin,
+      kind: f[F.bookings.kind],
+      name: f[F.bookings.name] || null,
+      email: f[F.bookings.email] || null,
+      company: f[F.bookings.company] || null,
+      holdUntil: f[F.bookings.holdUntil] || null,
+      checkedIn: hold.checkedIn,
+      releasable: hold.releasable,
+      recurring: true,
+      released: holdReleased(hold, date, now.min, now.dateStr),
+    };
+  });
 }
 
 /** A single member's check-in records for a given date (mirrors checkin.mjs's checkinsFor). */
@@ -352,12 +364,12 @@ export default async function handler(req) {
     }
     if (hhmmToMin(start) >= hhmmToMin(end)) return json({ error: 'bad-range' }, 400);
     const label = action === 'block' ? `Blocked${name ? ': ' + name : ''}` : name || 'External booking';
-    // Indefinite weekly BLOCK = one RULE row (no row explosion): store its weekday in a `slots=`
-    // token so parsePrivatisationSlots/recurringBlockOccurrences can expand it on every future
-    // weekday. Only Blocks recur indefinitely; weekend starts (weekday ∉ 1..5) fall back to a
+    // Indefinite weekly Block OR External = one RULE row (no row explosion): store its weekday in a
+    // `slots=` token so parsePrivatisationSlots/recurringBlockOccurrences can expand it on every
+    // future weekday. Both kinds recur indefinitely; weekend starts (weekday ∉ 1..5) fall back to a
     // plain one-off row (token omitted → not treated as a rule).
     let noteVal = notes || '';
-    if (action === 'block' && recurring && indefinite) {
+    if (recurring && indefinite) {
       const wd = new Date(`${date}T00:00:00Z`).getUTCDay();
       if (wd >= 1 && wd <= 5) noteVal = `${noteVal ? `${noteVal} ` : ''}slots=week:${wd}`.trim();
     }
@@ -388,12 +400,20 @@ export default async function handler(req) {
   }
 
   if (action === 'company') {
-    const { spaceId, date, start, end, company, holdUntil, releasable, recurring, notes } = body;
+    const { spaceId, date, start, end, company, holdUntil, releasable, recurring, indefinite, notes } = body;
     if (!spaceId || !/^\d{4}-\d{2}-\d{2}$/.test(date || '') || !/^\d{2}:\d{2}$/.test(start || '') || !/^\d{2}:\d{2}$/.test(end || '')) {
       return json({ error: 'missing-or-bad-params' }, 400);
     }
     if (hhmmToMin(start) >= hhmmToMin(end)) return json({ error: 'bad-range' }, 400);
     if (holdUntil && !/^\d{2}:\d{2}$/.test(holdUntil)) return json({ error: 'bad-hold' }, 400);
+    // A company booking is stored as Kind='External'. Indefinite weekly = one RULE row carrying a
+    // `slots=` weekday token (like Block/External above), so it occupies the room every future
+    // weekday rather than exploding into dated rows.
+    let noteVal = notes || '';
+    if (recurring && indefinite) {
+      const wd = new Date(`${date}T00:00:00Z`).getUTCDay();
+      if (wd >= 1 && wd <= 5) noteVal = `${noteVal ? `${noteVal} ` : ''}slots=week:${wd}`.trim();
+    }
     try {
       const rec = await createRecord(
         T.bookings,
@@ -411,7 +431,7 @@ export default async function handler(req) {
           [F.bookings.holdUntil]: holdUntil || '',
           [F.bookings.releasable]: !!releasable,
           [F.bookings.recurring]: !!recurring,
-          [F.bookings.notes]: notes || '',
+          [F.bookings.notes]: noteVal,
           [F.bookings.status]: 'Confirmed',
           [F.bookings.source]: 'Admin',
         },

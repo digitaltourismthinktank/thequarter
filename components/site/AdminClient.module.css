@@ -397,6 +397,159 @@ select.input {
   color: var(--gold-700);
 }
 
+/* ---- Rooms & bookings: reflowed add-form (tidy labelled rows, never overflows) ---- */
+.bookForm {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.formLine {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 12px;
+  align-items: flex-end;
+}
+.formLine .field {
+  min-width: 0; /* let fields shrink + wrap rather than pushing the row wider than the panel */
+}
+/* Per-field widths (flex-basis) so the row wraps cleanly; the Type control is given plenty of
+   room so "Block · External · Company" never clips. */
+.fType {
+  flex: 2 1 280px;
+}
+.fDate {
+  flex: 1 1 168px;
+}
+.fRoom {
+  flex: 1 1 168px;
+}
+.fTime {
+  flex: 1.4 1 230px;
+}
+.fWho {
+  flex: 1.6 1 240px;
+}
+.fRepeat {
+  flex: 1 1 160px;
+}
+.fEnds {
+  flex: 1 1 190px;
+}
+.fEndDate {
+  flex: 1 1 180px;
+}
+
+/* ---- Rooms & bookings: whole-week view (Mon–Fri columns, stacks on narrow admin widths) ---- */
+.weekSection {
+  margin-bottom: 20px;
+}
+.weekGrid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+.weekCol {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  min-height: 96px;
+}
+.weekColOn {
+  border-color: var(--gold-500);
+  background: var(--gold-100);
+}
+.weekColHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.weekColDow {
+  font-size: var(--text-2xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  font-weight: var(--fw-semibold);
+  color: var(--text-muted);
+}
+.weekColDate {
+  font-size: var(--text-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--ink-900);
+}
+.weekEmpty {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  text-align: center;
+  padding: 10px 0;
+}
+.bCard {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 9px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-card);
+  font-size: var(--text-sm);
+}
+.bCardTop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.bCardTime {
+  font-weight: var(--fw-semibold);
+  color: var(--ink-900);
+}
+.bCardRoom {
+  color: var(--text-body);
+}
+.bCardWho {
+  color: var(--text-muted);
+}
+.bCardMeta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--text-xs);
+  color: var(--gold-700);
+}
+.bCancel {
+  margin-top: 2px;
+  padding: 3px 11px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill);
+  background: var(--surface-card);
+  cursor: pointer;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+.bCancel:hover:not(:disabled) {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+.bCancel:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+@media (max-width: 860px) {
+  .weekGrid {
+    grid-template-columns: 1fr;
+  }
+  .weekCol {
+    min-height: 0;
+  }
+}
+
 /* ---- Members filter/search ---- */
 .mFilters {
   display: flex;

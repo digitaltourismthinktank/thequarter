@@ -101,7 +101,7 @@ async function bookingsForSpaceDate(spaceId, dateStr) {
     return Array.isArray(sp) && sp.includes(spaceId);
   });
   const blockRecs = await listRecords(T.bookings, {
-    filterByFormula: `AND({Status}='Confirmed', {Kind}='Block')`,
+    filterByFormula: `AND({Status}='Confirmed', OR({Kind}='Block', {Kind}='External'))`,
   });
   const occ = recurringBlockOccurrences(blockRecs, dateStr)
     .map((o) => o.record)

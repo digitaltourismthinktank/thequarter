@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ds/Button';
+import { Checkbox } from '@/components/ds/Checkbox';
 import { Icon } from '@/components/ds/Icon';
 import { STRIPE_PUBLISHABLE_KEY } from '@/lib/commerce';
 import {
@@ -568,13 +569,13 @@ export function RoomBooking({ roomName, price }: { roomName: string; price: { ha
         </label>
 
         {!freeEligible ? (
-          <label className={styles.checkRow}>
-            <input type="checkbox" checked={lunch} onChange={() => setLunch((v) => !v)} disabled={step === 'pay'} />
-            <span>
+          <div className={styles.checkRow}>
+            <Checkbox id="rb-lunch" checked={lunch} onChange={() => setLunch((v) => !v)} disabled={step === 'pay'} />
+            <label htmlFor="rb-lunch">
               Add lunch — baguettes &amp; cake from The Sandwich Bar
               <span className={styles.checkSub}>£{LUNCH_PER_HEAD} a head</span>
-            </span>
-          </label>
+            </label>
+          </div>
         ) : null}
 
         {!member ? (

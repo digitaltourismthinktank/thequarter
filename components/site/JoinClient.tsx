@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ds/Button';
+import { Checkbox } from '@/components/ds/Checkbox';
 import { Icon } from '@/components/ds/Icon';
 import { STRIPE_PUBLISHABLE_KEY } from '@/lib/commerce';
 import { getMemberstack, memberstackError } from '@/lib/memberstack';
@@ -408,9 +409,9 @@ export function JoinClient({ plan }: { plan: string }) {
                 </select>
               </div>
             </div>
-            <label className={s.agree}>
-              <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
-              <span>
+            <div className={s.agree}>
+              <Checkbox id="join-agree" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
+              <label htmlFor="join-agree">
                 I agree to the{' '}
                 <a href="/terms" target="_blank" rel="noreferrer">
                   Terms of Membership
@@ -420,8 +421,8 @@ export function JoinClient({ plan }: { plan: string }) {
                   Code of Conduct
                 </a>
                 .
-              </span>
-            </label>
+              </label>
+            </div>
             {error ? <p className={s.error}>{error}</p> : null}
             <Button variant="primary" onClick={createAccount} disabled={busy || !agree}>
               {busy ? 'Creating your account…' : 'Create my account'}

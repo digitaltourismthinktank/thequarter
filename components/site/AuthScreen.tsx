@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Input } from '@/components/ds/Input';
 import { Button } from '@/components/ds/Button';
+import { Checkbox } from '@/components/ds/Checkbox';
 import { Badge } from '@/components/ds/Badge';
 import { Icon } from '@/components/ds/Icon';
 import { PHOTOS } from '@/lib/media';
@@ -282,9 +283,9 @@ export function AuthScreen({
                   </div>
                 ) : null}
                 {!isLogin ? (
-                  <label className={styles.agree}>
-                    <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
-                    <span>
+                  <div className={styles.agree}>
+                    <Checkbox id="auth-agree" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
+                    <label htmlFor="auth-agree">
                       I agree to the{' '}
                       <a href="/terms" target="_blank" rel="noreferrer">
                         Terms of Membership
@@ -294,8 +295,8 @@ export function AuthScreen({
                         Code of Conduct
                       </a>
                       .
-                    </span>
-                  </label>
+                    </label>
+                  </div>
                 ) : null}
                 {status === 'error' ? <p className={styles.error}>{error}</p> : null}
                 <Button type="submit" variant="primary" fullWidth disabled={status === 'submitting' || (!isLogin && !agree)} iconAfter="arrow-right">
