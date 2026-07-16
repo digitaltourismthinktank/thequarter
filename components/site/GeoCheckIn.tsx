@@ -120,6 +120,27 @@ export function GeoCheckIn({ doorCode, busyBand }: GeoCheckInProps) {
       };
     }
 
+    // Preview/test override: `?here=1` forces the on-site hero from anywhere, so the on-site
+    // experience can be demoed/tested without physically standing at the venue. Real proximity
+    // detection (below) still fires automatically when actually within RADIUS_M of The Quarter.
+    let forced = false;
+    try {
+      forced = new URLSearchParams(window.location.search).has('here');
+    } catch {
+      /* ignore */
+    }
+    if (forced) {
+      (async () => {
+        const r = await getCheckinToday();
+        if (!alive.current) return;
+        if (r.ok) setCheckin(r.data);
+        setPhase('onsite');
+      })();
+      return () => {
+        alive.current = false;
+      };
+    }
+
     if (typeof navigator === 'undefined' || !('geolocation' in navigator)) return;
 
     // Respect a prior dismissal of the opt-in strip — truly zero nagging.
