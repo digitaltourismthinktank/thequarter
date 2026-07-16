@@ -62,6 +62,38 @@ export function ScreenClient() {
     setFloor(n === 1 || n === 2 ? n : null);
     setReady(true);
   }, []);
+  // Lock the page to the viewport for the /screen kiosk ONLY — no rubber-band, no page
+  // scroll behind the fixed display. Scoped to this route: styles are restored on unmount
+  // so normal site pages are untouched.
+  useEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    const prev = {
+      htmlOverflow: html.style.overflow,
+      htmlOverscroll: html.style.overscrollBehavior,
+      bodyOverflow: body.style.overflow,
+      bodyOverscroll: body.style.overscrollBehavior,
+      bodyPosition: body.style.position,
+      bodyWidth: body.style.width,
+      bodyHeight: body.style.height,
+    };
+    html.style.overflow = 'hidden';
+    html.style.overscrollBehavior = 'none';
+    body.style.overflow = 'hidden';
+    body.style.overscrollBehavior = 'none';
+    body.style.position = 'fixed';
+    body.style.width = '100%';
+    body.style.height = '100%';
+    return () => {
+      html.style.overflow = prev.htmlOverflow;
+      html.style.overscrollBehavior = prev.htmlOverscroll;
+      body.style.overflow = prev.bodyOverflow;
+      body.style.overscrollBehavior = prev.bodyOverscroll;
+      body.style.position = prev.bodyPosition;
+      body.style.width = prev.bodyWidth;
+      body.style.height = prev.bodyHeight;
+    };
+  }, []);
   if (!ready) return null;
   return floor ? <FloorScreen floor={floor} /> : <EntranceScreen />;
 }

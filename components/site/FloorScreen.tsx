@@ -18,6 +18,7 @@ import styles from './FloorScreen.module.css';
 const pad = (n: number) => String(n).padStart(2, '0');
 const minToHHMM = (m: number) => `${pad(Math.floor(m / 60))}:${pad(m % 60)}`;
 
+/** Minutes since midnight in Europe/London — timezone-safe for the "now / soon" tint. */
 function londonNowMin(): number {
   const p = Object.fromEntries(
     new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit', hour12: false })
@@ -27,6 +28,9 @@ function londonNowMin(): number {
   const h = p.hour === '24' ? 0 : Number(p.hour);
   return h * 60 + Number(p.minute);
 }
+
+/** A room counts as "hot" (pastel-red) when occupied now OR a booking starts within 30 min. */
+const SOON_MIN = 30;
 
 const normName = (s: string) =>
   String(s || '')
@@ -43,31 +47,47 @@ function roomMeta(s: FloorSpace): string {
   return `Meeting room${cap ? ` · up to ${cap}` : ''}`;
 }
 
-interface RoomStatus {
-  busy: boolean;
-  text: string;
-  sub: string | null;
+interface RoomView {
+  hot: boolean;
+  current: FloorBooking | null;
+  next: FloorBooking | null;
+  schedule: FloorBooking[];
 }
 
-function roomStatus(space: FloorSpace, bookings: FloorBooking[], nowMin: number): RoomStatus {
+function roomView(space: FloorSpace, bookings: FloorBooking[], nowMin: number): RoomView {
   const active = bookings.filter((b) => b.space === space.id && !b.released);
-  const current = active.find((b) => b.startMin <= nowMin && nowMin < b.endMin);
-  if (current) {
-    const who = current.name ? ` for ${current.name}` : '';
-    return { busy: true, text: `Reserved${who}`, sub: `Until ${minToHHMM(current.endMin)}` };
-  }
-  const next = active.filter((b) => b.startMin > nowMin).sort((a, b) => a.startMin - b.startMin)[0];
-  return {
-    busy: false,
-    text: 'Available',
-    sub: next ? `Next${next.name ? ` · ${next.name}` : ''} at ${minToHHMM(next.startMin)}` : null,
-  };
+  const schedule = active.filter((b) => b.endMin > nowMin).sort((a, b) => a.startMin - b.startMin);
+  const current = active.find((b) => b.startMin <= nowMin && nowMin < b.endMin) || null;
+  const next = active.filter((b) => b.startMin > nowMin).sort((a, b) => a.startMin - b.startMin)[0] || null;
+  const soon = !current && !!next && next.startMin - nowMin <= SOON_MIN;
+  return { hot: !!current || soon, current, next, schedule };
+}
+
+function Schedule({ items, nowMin }: { items: FloorBooking[]; nowMin: number }) {
+  if (!items.length) return <p className={styles.schedNone}>No bookings today</p>;
+  return (
+    <ul className={styles.schedList}>
+      {items.map((b) => {
+        const live = b.startMin <= nowMin && nowMin < b.endMin;
+        return (
+          <li key={b.id} className={`${styles.schedRow} ${live ? styles.schedRowNow : ''}`}>
+            <span className={styles.schedTime}>
+              {minToHHMM(b.startMin)}–{minToHHMM(b.endMin)}
+            </span>
+            <span className={styles.schedName}>{b.name || 'Reserved'}</span>
+            {live ? <span className={styles.schedNow}>Now</span> : null}
+          </li>
+        );
+      })}
+    </ul>
+  );
 }
 
 /**
  * On-screen reserve / check-in panel (rooms & pods only). Offers BOTH an hour picker to
  * book the room now AND a check-in for an existing booking today — each attributed via a
  * privacy-safe member name lookup (kioskMemberSearch → { id, name }, no browsable list).
+ * Rendered as a fitted, self-scrolling fixed overlay so opening it never scrolls the page.
  */
 function ReservePanel({
   space,
@@ -297,40 +317,74 @@ function ReservePanel({
 
 function RoomCard({
   s,
-  big,
+  hero,
   bookings,
   nowMin,
   origin,
   onOpen,
 }: {
   s: FloorSpace;
-  big: boolean;
+  hero: boolean;
   bookings: FloorBooking[];
   nowMin: number;
   origin: string;
   onOpen: (id: string) => void;
 }) {
-  const st = roomStatus(s, bookings, nowMin);
+  const v = roomView(s, bookings, nowMin);
+  const sub = v.current
+    ? `${v.current.name ? `for ${v.current.name} · ` : ''}until ${minToHHMM(v.current.endMin)}`
+    : v.next
+      ? `Next ${minToHHMM(v.next.startMin)}${v.next.name ? ` · ${v.next.name}` : ''}`
+      : 'Free all day';
   return (
-    <button
-      className={`${styles.roomCard} ${big ? styles.roomCardBig : ''} ${st.busy ? styles.busy : styles.free}`}
-      onClick={() => onOpen(s.id)}
-    >
-      <div className={styles.roomHead}>
+    <article className={`${styles.card} ${hero ? styles.cardHero : ''} ${v.hot ? styles.hot : styles.calm}`}>
+      {s.bookable ? (
+        <div className={styles.qrChip}>
+          <Qr value={`${origin}/kiosk?room=${encodeURIComponent(s.id)}`} size={hero ? 88 : 62} />
+          <span className={styles.qrChipCaption}>Scan to reserve</span>
+        </div>
+      ) : null}
+
+      <div className={styles.cardHead}>
         <span className={styles.roomName}>{s.name}</span>
         <span className={styles.roomMeta}>{roomMeta(s)}</span>
       </div>
-      <div className={styles.statusWrap}>
-        <span className={`${styles.status} ${st.busy ? styles.statusBusy : styles.statusFree}`}>{st.text}</span>
-        {st.sub ? <span className={styles.statusSub}>{st.sub}</span> : null}
+
+      <div className={`${styles.statusPane} ${v.current ? styles.paneBusy : styles.paneFree}`}>
+        <span className={styles.statusWord}>{v.current ? 'Reserved' : 'Available'}</span>
+        <span className={styles.statusSub}>{sub}</span>
       </div>
-      {s.bookable ? (
-        <div className={styles.qrWrap}>
-          <Qr value={`${origin}/kiosk?room=${encodeURIComponent(s.id)}`} size={big ? 168 : 128} />
-          <span className={styles.qrCaption}>Scan to reserve · tap to book</span>
+
+      <div className={styles.schedWrap}>
+        <span className={styles.schedLabel}>
+          <Icon name="calendar" size={hero ? 20 : 17} /> Today
+        </span>
+        <div className={styles.schedScroll}>
+          <Schedule items={v.schedule} nowMin={nowMin} />
         </div>
+      </div>
+
+      {s.bookable ? (
+        <button className={styles.tapBtn} onClick={() => onOpen(s.id)}>
+          <Icon name="door-open" size={hero ? 26 : 22} /> Tap to book / check in
+        </button>
       ) : null}
-    </button>
+    </article>
+  );
+}
+
+function WorkspaceCard({ s, name, privatised }: { s: FloorSpace; name: string | null; privatised: boolean }) {
+  return (
+    <article className={`${styles.card} ${styles.wsCard} ${privatised ? styles.hot : styles.calm}`}>
+      <div className={styles.cardHead}>
+        <span className={styles.roomName}>{s.name}</span>
+        <span className={styles.roomMeta}>Workspace</span>
+      </div>
+      <div className={`${styles.statusPane} ${privatised ? styles.paneBusy : styles.paneFree}`}>
+        <span className={styles.statusWord}>{privatised ? 'Privatised' : 'Available'}</span>
+        <span className={styles.statusSub}>{privatised ? (name ? `for ${name}` : 'Reserved today') : 'Open to all members'}</span>
+      </div>
+    </article>
   );
 }
 
@@ -346,17 +400,30 @@ export function FloorScreen({ floor }: { floor: number }) {
     setLoaded(true);
   }, [floor]);
 
+  // Poll every 30s, and re-fetch immediately whenever the kiosk regains focus /
+  // becomes visible (wake from Guided Access, tab switch) so it's never stale.
   useEffect(() => {
     load();
-    const t = setInterval(load, 45000);
-    return () => clearInterval(t);
+    const t = setInterval(load, 30000);
+    const onWake = () => {
+      if (document.visibilityState === 'visible') load();
+    };
+    document.addEventListener('visibilitychange', onWake);
+    window.addEventListener('focus', onWake);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener('visibilitychange', onWake);
+      window.removeEventListener('focus', onWake);
+    };
   }, [load]);
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 30000);
     return () => clearInterval(t);
   }, []);
 
-  const nowMin = now.getHours() * 60 + now.getMinutes();
+  // `now` ticks every 30s (below): it re-renders the clock AND re-evaluates londonNowMin()
+  // so the pastel-red "now / soon" tint stays current.
+  const nowMin = londonNowMin();
   const dateLabel = now.toLocaleDateString('en-GB', { timeZone: 'Europe/London', weekday: 'long', day: 'numeric', month: 'long' });
   const timeLabel = now.toLocaleTimeString('en-GB', { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit', hour12: false });
   const floorLabel = floor === 1 ? 'First floor' : 'Second floor';
@@ -387,48 +454,34 @@ export function FloorScreen({ floor }: { floor: number }) {
           <span className={styles.closedLabel}>Closed today</span>
           <p className={styles.closedLine}>We’re a weekday space — see you Monday to Friday.</p>
         </section>
-      ) : null}
+      ) : (
+        <div className={styles.body}>
+          <section className={styles.roomsBlock}>
+            <h2 className={styles.h2}>Rooms &amp; pods</h2>
+            <div className={`${styles.roomGrid} ${hero ? styles.hasHero : ''}`}>
+              {hero ? (
+                <RoomCard s={hero} hero bookings={bookings} nowMin={nowMin} origin={origin} onOpen={setOpenRoom} />
+              ) : null}
+              {otherRooms.map((s) => (
+                <RoomCard key={s.id} s={s} hero={false} bookings={bookings} nowMin={nowMin} origin={origin} onOpen={setOpenRoom} />
+              ))}
+              {!rooms.length && loaded ? <p className={styles.empty}>No rooms on this floor.</p> : null}
+            </div>
+          </section>
 
-      <section className={styles.block}>
-        <h2 className={styles.h2}>Rooms &amp; pods</h2>
-        {hero ? (
-          <div className={styles.heroRow}>
-            <RoomCard s={hero} big bookings={bookings} nowMin={nowMin} origin={origin} onOpen={setOpenRoom} />
-          </div>
-        ) : null}
-        {otherRooms.length ? (
-          <div className={styles.roomGrid}>
-            {otherRooms.map((s) => (
-              <RoomCard key={s.id} s={s} big={false} bookings={bookings} nowMin={nowMin} origin={origin} onOpen={setOpenRoom} />
-            ))}
-          </div>
-        ) : null}
-        {!rooms.length && loaded ? <p className={styles.empty}>No rooms on this floor.</p> : null}
-      </section>
-
-      {workspaces.length ? (
-        <section className={styles.block}>
-          <h2 className={styles.h2}>Workspaces</h2>
-          <div className={styles.roomGrid}>
-            {workspaces.map((s) => {
-              const priv = privatisations.find((p) => p.space === s.id);
-              return (
-                <div key={s.id} className={`${styles.roomCard} ${priv ? styles.busy : styles.free}`}>
-                  <div className={styles.roomHead}>
-                    <span className={styles.roomName}>{s.name}</span>
-                    <span className={styles.roomMeta}>Workspace</span>
-                  </div>
-                  <div className={styles.statusWrap}>
-                    <span className={`${styles.status} ${priv ? styles.statusBusy : styles.statusFree}`}>
-                      {priv ? `Privatised${priv.name ? ` for ${priv.name}` : ''}` : 'Available'}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-      ) : null}
+          {workspaces.length ? (
+            <section className={styles.wsBlock}>
+              <h2 className={styles.h2}>Workspaces</h2>
+              <div className={styles.wsGrid}>
+                {workspaces.map((s) => {
+                  const priv = privatisations.find((p) => p.space === s.id);
+                  return <WorkspaceCard key={s.id} s={s} name={priv?.name ?? null} privatised={!!priv} />;
+                })}
+              </div>
+            </section>
+          ) : null}
+        </div>
+      )}
 
       {!loaded ? <p className={styles.loading}>Loading…</p> : null}
 
