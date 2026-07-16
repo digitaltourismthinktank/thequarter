@@ -86,3 +86,28 @@ export function holdReleased({ holdUntil, checkedIn, releasable }, dateStr, nowM
   if (dateStr > todayStr) return false;
   return nowMin >= hhmmToMin(holdUntil);
 }
+
+/** Default grace after a room/pod booking's start before an un-checked-in booking auto-releases. */
+export const ROOM_HOLD_GRACE_MIN = 15;
+
+/**
+ * Is a ROOM/POD booking "released" (room free again to everyone)? Every timed room/pod
+ * booking is treated as hold-and-release: if it isn't checked in by its release time, the
+ * room frees up. Rules:
+ *   - Firm reservations (Kind 'Block' / 'Privatisation') never auto-release.
+ *   - A booking carrying an explicit company holdUntil keeps its existing semantics
+ *     (releasable holds free at holdUntil; contracted/firm holds never release).
+ *   - Any other booking (member / kiosk, no explicit hold) releases ROOM_HOLD_GRACE_MIN
+ *     after its start time when un-checked-in.
+ * Field-agnostic so both bookings.mjs and kiosk.mjs can call it with plain values.
+ */
+export function roomBookingReleased({ kind, holdUntil, checkedIn, releasable, startMin }, dateStr, nowMin, todayStr) {
+  if (kind === 'Block' || kind === 'Privatisation') return false;
+  if (holdUntil) return holdReleased({ holdUntil, checkedIn, releasable }, dateStr, nowMin, todayStr);
+  // ONLY opt-in reservations auto-release. Paid (Company) and regular member/app bookings
+  // have no hold and are NOT releasable → firm. Auto-releasing them would free a paid room the
+  // moment the customer walked in without tapping a screen, letting it be double-booked.
+  if (!releasable) return false;
+  const defaultHold = minToHHMM((Number(startMin) || 0) + ROOM_HOLD_GRACE_MIN);
+  return holdReleased({ holdUntil: defaultHold, checkedIn, releasable: true }, dateStr, nowMin, todayStr);
+}

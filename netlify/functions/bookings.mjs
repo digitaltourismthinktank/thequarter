@@ -12,9 +12,9 @@
  */
 import { verifyMember, memberEmail, memberName, isAdmin, tokenFromRequest } from './_member.mjs';
 import { listRecords, createRecord, updateRecord, T, F, airtableReady, esc } from './_airtable.mjs';
-import { BUSINESS, hhmmToMin, isWeekday, londonWallClockToISO, isoToLondonMin, isoToLondonDate, londonNow, holdReleased } from './_time.mjs';
+import { BUSINESS, hhmmToMin, isWeekday, londonWallClockToISO, isoToLondonMin, isoToLondonDate, londonNow, holdReleased, roomBookingReleased } from './_time.mjs';
 import { isClosedDay } from './_holidays.mjs';
-import { isRecurringBlockRule, recurringBlockOccurrences } from './_privatisation.mjs';
+import { isRecurringBlockRule, recurringBlockOccurrences, parsePrivatisationSlots, isPrivatisedOn } from './_privatisation.mjs';
 
 /** A released company hold no longer blocks the room. */
 const isReleased = (r, dateStr, nowMin, todayStr) =>
@@ -28,15 +28,42 @@ const isReleased = (r, dateStr, nowMin, todayStr) =>
 const json = (b, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { 'content-type': 'application/json' } });
 
 /**
- * Per-floor screen map for /screen?floor=1|2. Keyed by the exact Space name in
- * Airtable, matched case- and whitespace-insensitively. Leave empty and both
- * floor screens simply show every room (identical to the entrance screen) — a
- * safe default. Populate once the room→floor split is confirmed, e.g.
- *   'the knight’s tale': 1, 'the chapter house': 1, 'the open workspaces': 2
- * (keys lowercased; curly apostrophes as they appear in the Space name).
+ * Per-floor screen map for /screen?floor=1|2. Keyed by the Space name in Airtable,
+ * matched case-, whitespace- AND apostrophe-insensitively (curly ’ and straight '
+ * both normalise to a straight quote — see normSpaceName). A name absent from the
+ * map resolves to floor null and is excluded from BOTH floor screens (e.g. the
+ * downstairs/outdoor "Dane John Gardens").
  */
-const SPACE_FLOORS = {};
-const floorForName = (name) => SPACE_FLOORS[String(name || '').trim().toLowerCase().replace(/\s+/g, ' ')] ?? null;
+const SPACE_FLOORS = {
+  "the knight's tale": 1,
+  'the chapter house': 2,
+  'the bell tower': 2,
+  'the scriptorium': 2,
+  'the hop yard': 2,
+  'the vineyard': 2,
+};
+const normSpaceName = (name) =>
+  String(name || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[‘’ʼ′]/g, "'") // curly / modifier / prime apostrophes → straight '
+    .replace(/\s+/g, ' ');
+const floorForName = (name) => SPACE_FLOORS[normSpaceName(name)] ?? null;
+
+/** Field-agnostic room/pod auto-release check for an Airtable booking record. */
+const roomReleased = (r, dateStr, nowMin, todayStr) =>
+  roomBookingReleased(
+    {
+      kind: r.fields[F.bookings.kind],
+      holdUntil: r.fields[F.bookings.holdUntil],
+      checkedIn: !!r.fields[F.bookings.checkedIn],
+      releasable: !!r.fields[F.bookings.releasable],
+      startMin: isoToLondonMin(r.fields[F.bookings.start]),
+    },
+    dateStr,
+    nowMin,
+    todayStr,
+  );
 
 function validateSlot(dateStr, start, end) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr || '')) return 'bad-date';
@@ -110,10 +137,14 @@ export default async function handler(req) {
       const dateStr = url.searchParams.get('date');
       if (!spaceId || !dateStr) return json({ error: 'missing-params' }, 400);
       const recs = await bookingsForSpaceDate(spaceId, dateStr);
-      const busy = recs.map((r) => ({
-        startMin: isoToLondonMin(r.fields[F.bookings.start]),
-        endMin: isoToLondonMin(r.fields[F.bookings.end]),
-      }));
+      const nowA = londonNow();
+      const busy = recs
+        // A released, un-checked-in room/pod hold frees the slot for everyone.
+        .filter((r) => !roomReleased(r, dateStr, nowA.min, nowA.dateStr))
+        .map((r) => ({
+          startMin: isoToLondonMin(r.fields[F.bookings.start]),
+          endMin: isoToLondonMin(r.fields[F.bookings.end]),
+        }));
       return json({ date: dateStr, space: spaceId, openMin: BUSINESS.openMin, closeMin: BUSINESS.closeMin, slotMin: BUSINESS.slotMin, busy });
     }
 
@@ -151,6 +182,81 @@ export default async function handler(req) {
           kind: r.fields[F.bookings.kind],
         }));
       return json({ date: today.dateStr, nowMin: today.min, spaces, bookings });
+    }
+
+    if (action === 'floor') {
+      // Dedicated per-floor room-availability display (/screen?floor=1|2). Unlike the
+      // entrance `today` snapshot, this INCLUDES booker names (on-site wall display) so
+      // rooms can show "Reserved for <name>" and workspaces "Privatised for <name>".
+      const floorNum = Number(url.searchParams.get('floor'));
+      if (floorNum !== 1 && floorNum !== 2) return json({ error: 'bad-floor' }, 400);
+      const today = londonNow();
+      const spaceRecs = await listRecords(T.spaces, { sort: [{ field: 'Order' }] });
+      const spaces = spaceRecs
+        .map((r) => ({
+          id: r.id,
+          name: r.fields[F.spaces.name],
+          type: r.fields[F.spaces.type],
+          capacity: r.fields[F.spaces.capacity] ?? null,
+          capacityLabel: r.fields[F.spaces.capacityLabel] ?? null,
+          bookable: !!r.fields[F.spaces.bookable],
+          floor: floorForName(r.fields[F.spaces.name]),
+        }))
+        .filter((s) => s.floor === floorNum);
+      const spaceIds = new Set(spaces.map((s) => s.id));
+
+      // Today's timed room/pod bookings (+ expanded indefinite recurring-Block occurrences),
+      // scoped to this floor. Privatisation markers + recurring-rule rows are handled separately.
+      const recs = await listRecords(T.bookings, {
+        filterByFormula: `AND(DATETIME_FORMAT({Date}, 'YYYY-MM-DD')='${today.dateStr}', {Status}='Confirmed')`,
+        sort: [{ field: 'Start' }],
+      });
+      const blockRecs = await listRecords(T.bookings, {
+        filterByFormula: `AND({Status}='Confirmed', {Kind}='Block')`,
+      });
+      const occRecs = recurringBlockOccurrences(blockRecs, today.dateStr).map((o) => o.record);
+      const bookings = recs
+        .filter((r) => r.fields[F.bookings.kind] !== 'Privatisation' && !isRecurringBlockRule(r))
+        .concat(occRecs)
+        .map((r) => ({ r, sp: Array.isArray(r.fields[F.bookings.space]) ? r.fields[F.bookings.space][0] : null }))
+        .filter(({ sp }) => sp && spaceIds.has(sp))
+        .map(({ r, sp }) => ({
+          id: r.id,
+          space: sp,
+          startMin: isoToLondonMin(r.fields[F.bookings.start]),
+          endMin: isoToLondonMin(r.fields[F.bookings.end]),
+          kind: r.fields[F.bookings.kind],
+          name: r.fields[F.bookings.name] || r.fields[F.bookings.company] || null,
+          released: roomReleased(r, today.dateStr, today.min, today.dateStr),
+        }));
+
+      // All-day workspace privatisations occupying a floor space today (carry the company/name).
+      const privRecs = await listRecords(T.bookings, {
+        filterByFormula: `AND({Status}='Confirmed', {Kind}='Privatisation')`,
+      });
+      const privatisations = [];
+      for (const r of privRecs) {
+        const f = r.fields;
+        const parsed = parsePrivatisationSlots(f[F.bookings.notes] || '');
+        if (!parsed) continue;
+        const startDate = isoToLondonDate(f[F.bookings.date]) || '';
+        if (!isPrivatisedOn(today.dateStr, parsed.cadence, parsed.weekdays, startDate)) continue;
+        const sp = Array.isArray(f[F.bookings.space]) ? f[F.bookings.space][0] : null;
+        if (!sp || !spaceIds.has(sp)) continue;
+        privatisations.push({ space: sp, name: f[F.bookings.company] || f[F.bookings.name] || null });
+      }
+
+      return json({
+        date: today.dateStr,
+        nowMin: today.min,
+        weekday: isWeekday(today.dateStr),
+        openMin: BUSINESS.openMin,
+        closeMin: BUSINESS.closeMin,
+        slotMin: BUSINESS.slotMin,
+        spaces,
+        bookings,
+        privatisations,
+      });
     }
 
     if (action === 'mine') {
@@ -199,7 +305,7 @@ export default async function handler(req) {
     const nowC = londonNow();
     const existing = await bookingsForSpaceDate(spaceId, date);
     const clash = existing.some((r) => {
-      if (isReleased(r, date, nowC.min, nowC.dateStr)) return false; // a released no-show hold frees the slot
+      if (roomReleased(r, date, nowC.min, nowC.dateStr)) return false; // a released no-show hold frees the slot
       const rs = isoToLondonMin(r.fields[F.bookings.start]);
       const re = isoToLondonMin(r.fields[F.bookings.end]);
       return s < re && e > rs;

@@ -559,6 +559,46 @@ export interface ScreenBooking {
 export const getTodayScreen = () =>
   call<{ date: string; nowMin: number; spaces: ScreenSpace[]; bookings: ScreenBooking[] }>('bookings?action=today', { auth: false });
 
+// ---- Per-floor room-availability display (/screen?floor=1|2) — public, no auth ----
+export interface FloorSpace {
+  id: string;
+  name: string;
+  type: string;
+  capacity: number | null;
+  capacityLabel: string | null;
+  bookable: boolean;
+  floor: number | null;
+}
+export interface FloorBooking {
+  id: string;
+  space: string | null;
+  startMin: number;
+  endMin: number;
+  kind: string;
+  /** Booker/company name for the on-site wall display; null → show "Reserved". */
+  name: string | null;
+  /** True when an un-checked-in room/pod hold has passed its release time (room free again). */
+  released: boolean;
+}
+export interface FloorPrivatisation {
+  space: string | null;
+  /** Company/name a workspace is privatised for today; null → generic "Privatised". */
+  name: string | null;
+}
+export interface FloorScreenData {
+  date: string;
+  nowMin: number;
+  weekday: boolean;
+  openMin: number;
+  closeMin: number;
+  slotMin: number;
+  spaces: FloorSpace[];
+  bookings: FloorBooking[];
+  privatisations: FloorPrivatisation[];
+}
+export const getFloorScreen = (floor: number) =>
+  call<FloorScreenData>(`bookings?action=floor&floor=${floor}`, { auth: false });
+
 // ---- Kiosk (per-room iPad) ----
 export const getMyPin = () => call<{ pin: string }>('checkin?action=pin');
 
@@ -586,6 +626,18 @@ export const kioskBook = (b: { spaceId: string; date: string; start: string; end
   call<{ ok: boolean; member?: string }>('kiosk', { method: 'POST', body: { action: 'book', ...b }, auth: false });
 export const kioskCheckinBooking = (bookingId: string) =>
   call<{ ok: boolean }>('kiosk', { method: 'POST', body: { action: 'checkinBooking', bookingId }, auth: false });
+
+// Privacy-safe member name lookup for the on-screen reserve/check-in picker (>=2 chars,
+// capped, returns only { id, name } — never a browsable full list).
+export interface MemberMatch {
+  id: string;
+  name: string;
+}
+export const kioskMemberSearch = (q: string) =>
+  call<{ members: MemberMatch[] }>(`kiosk?action=memberSearch&q=${encodeURIComponent(q)}`, { auth: false });
+// On-screen reserve attributed by member lookup (no PIN) — used by the floor-screen panel.
+export const kioskBookFor = (b: { spaceId: string; date: string; start: string; end: string; memberId: string }) =>
+  call<{ ok: boolean; member?: string }>('kiosk', { method: 'POST', body: { action: 'bookFor', ...b }, auth: false });
 
 // ---- Welcome (post-payment) ----
 export const getWelcomeSession = (sessionId: string) =>

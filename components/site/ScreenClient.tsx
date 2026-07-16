@@ -11,6 +11,7 @@ import {
 import { busyness, meetingRoomLine, type Band } from '@/lib/busyness';
 import { Icon } from '@/components/ds/Icon';
 import { eventThemeIcon } from '@/lib/eventThemes';
+import { FloorScreen } from './FloorScreen';
 import styles from './ScreenClient.module.css';
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -46,7 +47,26 @@ function eventWhen(start: string): string {
   });
 }
 
+/**
+ * Top-level screen router. /screen (no floor) → the entrance busyness display below;
+ * /screen?floor=1|2 → the dedicated per-floor room-availability display (FloorScreen).
+ * Rendering `null` until the floor is read avoids a hydration mismatch and an entrance-view
+ * flash before delegating to the floor screen.
+ */
 export function ScreenClient() {
+  const [floor, setFloor] = useState<number | null>(null);
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    const raw = new URLSearchParams(window.location.search).get('floor');
+    const n = raw ? Number(raw) : NaN;
+    setFloor(n === 1 || n === 2 ? n : null);
+    setReady(true);
+  }, []);
+  if (!ready) return null;
+  return floor ? <FloorScreen floor={floor} /> : <EntranceScreen />;
+}
+
+function EntranceScreen() {
   const [data, setData] = useState<ScreenData | null>(null);
   const [events, setEvents] = useState<QuarterEvent[]>([]);
   const [now, setNow] = useState<Date>(() => new Date());
