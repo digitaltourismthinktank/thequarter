@@ -206,6 +206,14 @@
   letter-spacing: -0.015em;
   margin: 0;
 }
+.rewardsEmpty {
+  text-align: center;
+  font-size: var(--text-lg);
+  color: var(--stone-700);
+  max-width: 460px;
+  margin: 8px auto 0;
+  line-height: 1.5;
+}
 .rewardsFoot {
   margin-top: 22px;
   font-size: var(--text-body);

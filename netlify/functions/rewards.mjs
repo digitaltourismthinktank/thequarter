@@ -31,6 +31,13 @@ export default async function handler(req) {
   if (!airtableReady() || !MS_SECRET) return json({ error: 'not-configured' }, 503);
 
   if (req.method === 'GET') {
+    // Public, no-auth teaser for the marketing /rewards page — the LIVE reward
+    // catalogue from admin (partner/title/icon/category/hero, no member data), so
+    // editing rewards in the back end updates the public site. Mirrors perks?public=1.
+    if (new URL(req.url).searchParams.get('public') === '1') {
+      const live = await listRewards({ liveOnly: true });
+      return json({ rewards: live.map(publicReward) });
+    }
     const vm = await verifyMember(tokenFromRequest(req, null));
     if (!vm.ok) return json({ error: vm.reason }, 401);
     const email = memberEmail(vm.member);

@@ -5,7 +5,8 @@ import { Icon } from '@/components/ds/Icon';
 import { RewardsClient } from '@/components/site/RewardsClient';
 import { RewardShowcase } from '@/components/site/RewardShowcase';
 import { PerksGrid } from '@/components/site/PerksGrid';
-import { LEVELS, EARN_RULES, CATALOGUE_SEED, POINTS_PER_POUND_VALUE } from '@/lib/rewards';
+import { TreatsGrid } from '@/components/site/TreatsGrid';
+import { LEVELS, EARN_RULES, POINTS_PER_POUND_VALUE } from '@/lib/rewards';
 import { Breadcrumbs } from '@/components/site/Breadcrumbs';
 import styles from './rewards.module.css';
 
@@ -24,19 +25,12 @@ const LEVEL_LINES: Record<string, string> = {
   ambassador: 'Our regulars’ regulars. The fastest earning, guest passes when you need them, and first to know what’s on.',
 };
 
-/* A handful of the catalogue as a taste (real costs live in the member view). */
-const HIGHLIGHT_IDS = ['coffee', 'treat', 'refillery', 'cathedral', 'corkk-evening'];
-
 /* Earn-rate label per level, mirroring the member levels rail. */
 function earnRate(boost: number): string {
   return boost === 1 ? 'Base earn rate' : `Earn ${Math.round((boost - 1) * 100)}% faster`;
 }
 
 export default function RewardsPage() {
-  const highlights = HIGHLIGHT_IDS.map((id) => CATALOGUE_SEED.find((r) => r.id === id)).filter(
-    (r): r is (typeof CATALOGUE_SEED)[number] => Boolean(r),
-  );
-
   const marketing = (
     <>
       {/* HERO */}
@@ -127,17 +121,7 @@ export default function RewardsPage() {
           intro="A taste of what’s on the board. We refresh it with our partners through the year — and every redemption puts a little trade back into a local independent."
           max={640}
         />
-        <div className={styles.rewards}>
-          {highlights.map((r) => (
-            <article key={r.id} className={`${styles.reward} ${r.hero ? styles.rewardHero : ''}`}>
-              <span className={styles.rewardChip}>
-                <Icon name={r.icon} size={22} color="var(--gold-700)" />
-              </span>
-              <span className={styles.rewardPartner}>{r.partner}</span>
-              <h3 className={styles.rewardTitle}>{r.title}</h3>
-            </article>
-          ))}
-        </div>
+        <TreatsGrid />
         <p className={styles.rewardsFoot}>
           Members also get always-on perks with our neighbours — <a href="#perks">see who’s involved</a>.
         </p>

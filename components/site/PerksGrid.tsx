@@ -15,14 +15,19 @@ import styles from './PerksGrid.module.css';
 
 export function PerksGrid() {
   const [cat, setCat] = useState('All');
-  const [perks, setPerks] = useState<Perk[]>(PERKS);
+  // Live perks from the admin back end are the source of truth, so the public page
+  // reflects exactly what's on the board. Local preview has no Functions → keep the
+  // seed to preview the design; production starts empty and fills from Airtable.
+  const [perks, setPerks] = useState<Perk[]>(PREVIEW ? PERKS : []);
+  const [loaded, setLoaded] = useState(PREVIEW);
 
   useEffect(() => {
-    if (PREVIEW) return; // no Functions in local preview — keep the static seed
+    if (PREVIEW) return;
     let cancelled = false;
     (async () => {
       const r = await getPublicPerks();
-      if (!cancelled && r.ok && r.data.perks?.length) {
+      if (cancelled) return;
+      if (r.ok && r.data.perks?.length) {
         setPerks(
           r.data.perks.map((p) => ({
             partner: p.partner,
@@ -32,6 +37,7 @@ export function PerksGrid() {
           })),
         );
       }
+      setLoaded(true);
     })();
     return () => {
       cancelled = true;
@@ -40,6 +46,12 @@ export function PerksGrid() {
 
   const categories = ['All', ...Array.from(new Set(perks.map((p) => p.category).filter(Boolean)))];
   const list = cat === 'All' ? perks : perks.filter((p) => p.category === cat);
+
+  if (!perks.length) {
+    // Nothing on the board yet → an on-brand placeholder, not stale example perks.
+    if (!loaded) return null;
+    return <p className={styles.empty}>We’re lining up perks with our neighbours — watch this space.</p>;
+  }
 
   return (
     <div>

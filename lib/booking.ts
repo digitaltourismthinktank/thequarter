@@ -220,6 +220,19 @@ export interface PublicPerk {
 }
 export const getPublicPerks = () => call<{ perks: PublicPerk[] }>('perks?public=1', { auth: false });
 
+// Public rewards shopfront — the live Airtable reward catalogue (display fields only,
+// no member data). Powers the marketing /rewards "Treats" teaser.
+export interface PublicReward {
+  id: string;
+  partner: string;
+  title: string;
+  cost: number;
+  category: string;
+  icon: string;
+  hero: boolean;
+}
+export const getPublicRewards = () => call<{ rewards: PublicReward[] }>('rewards?public=1', { auth: false });
+
 // Push notifications (member).
 export const pushSubscribe = (subscription: unknown) =>
   call<{ ok: boolean; configured?: boolean }>('push', { method: 'POST', body: { action: 'subscribe', subscription } });
