@@ -34,6 +34,29 @@
   line-height: 1.55;
   margin-bottom: 28px;
 }
+/* Branded intro block (e.g. the team-enrolment reassurance list). */
+.intro {
+  margin: -12px 0 24px;
+  padding: 14px 16px;
+  border: 1px solid var(--gold-300);
+  background: var(--gold-100);
+  border-radius: var(--radius-lg);
+  font-size: var(--text-sm);
+  color: var(--ink-800, var(--text-body));
+  line-height: 1.5;
+}
+.intro ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.intro li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
 .fields {
   display: flex;
   flex-direction: column;

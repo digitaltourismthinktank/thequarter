@@ -254,6 +254,14 @@ export interface AdminMember {
   plan: string | null;
   days: string | null;
   renewal: string | null;
+  /** Per-member numeric allowance override (customFields['allowance-override']); null = none. */
+  allowanceOverride: string | null;
+  /** Effective monthly day allowance (override-aware); null = unlimited. */
+  allowance: number | null;
+  /** Admin-managed (non-Stripe): the renewal cron owns renewals, not the Stripe webhook. */
+  manualBilling: boolean;
+  /** Holds no managed plan tag (needs a plan assigned). */
+  unassigned: boolean;
   doorCode: string | null;
   paused: boolean;
   bday: string | null;
@@ -433,6 +441,15 @@ export interface MemberProfile {
   paused: boolean;
   since: string | null;
   days: string | null;
+  renewal: string | null;
+  /** Per-member numeric allowance override (customFields['allowance-override']); null = none. */
+  allowanceOverride: string | null;
+  /** Effective monthly day allowance (override-aware); null = unlimited. */
+  allowance: number | null;
+  /** Admin-managed (non-Stripe): the renewal cron owns renewals, not the Stripe webhook. */
+  manualBilling: boolean;
+  /** Holds no managed plan tag. */
+  unassigned: boolean;
   company: string | null;
   phone: string | null;
   bday: string | null;
@@ -457,6 +474,20 @@ export const adminUpdateMember = (
 ) => call<{ ok: boolean }>('admin', { method: 'POST', body: { action: 'updateMember', memberId, ...fields } });
 export const adminAssignPlan = (memberId: string, planId: string) =>
   call<{ ok: boolean }>('admin', { method: 'POST', body: { action: 'assignPlan', memberId, planId } });
+// Manually-managed (non-Stripe) membership: apply any subset of plan / renewal date /
+// allowance-override / day balance, and mark the member manualBilling (renewal cron owns them).
+// allowance: a number sets the per-member override; '' clears it back to the plan default.
+export const adminUpdateMembership = (input: {
+  memberId: string;
+  planId?: string;
+  renewalDate?: string;
+  allowance?: number | '';
+  days?: number | string;
+}) => call<{ ok: boolean }>('admin', { method: 'POST', body: { action: 'updateMembership', ...input } });
+// Renew a manually-managed member now: reset days (override-aware, with rollover) + advance the
+// renewal date to one month from today.
+export const adminRenewNow = (memberId: string) =>
+  call<{ ok: boolean }>('admin', { method: 'POST', body: { action: 'renewNow', memberId } });
 
 // ---- Events ----
 export interface QuarterEvent {

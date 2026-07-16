@@ -10,7 +10,7 @@ import { Icon, type IconName } from '@/components/ds/Icon';
 import { Qr } from '@/components/ds/Qr';
 import { EVENT_THEMES } from '@/lib/eventThemes';
 import { busyness } from '@/lib/busyness';
-import { PLANS, PLAN_MEMBERSTACK_ID } from '@/lib/plans';
+import { PLANS, PLAN_MEMBERSTACK_ID, PLAN_DAY_ALLOWANCE } from '@/lib/plans';
 import { POINTS_PER_POUND_VALUE, POINTS_PER_GBP, LEVELS } from '@/lib/rewards';
 import {
   adminGetMembers,
@@ -56,7 +56,8 @@ import {
   adminGetMemberProfile,
   adminAdjustPoints,
   adminRedeemForMember,
-  adminAssignPlan,
+  adminUpdateMembership,
+  adminRenewNow,
   adminUpdateMember,
   type AdminMember,
   type AdminBooking,
@@ -305,10 +306,18 @@ function MembersPane() {
 
   if (loading) return <p className={styles.state}>Loading members…</p>;
 
-  const FILTERS = ['All', 'Day Pass', 'Visitor', 'Resident', 'Citizen', 'Hybrid Office', 'Paused'];
+  const FILTERS = ['All', 'Unassigned', 'Day Pass', 'Visitor', 'Resident', 'Citizen', 'Hybrid Office', 'Paused'];
   const companyCount = (c: string) => members.filter((x) => x.company === c).length;
+  const unassignedCount = members.filter((m) => m.unassigned).length;
   const filtered = members.filter((m) => {
-    const matchesPlan = planFilter === 'All' ? true : planFilter === 'Paused' ? m.paused : m.plan === planFilter && !m.paused;
+    const matchesPlan =
+      planFilter === 'All'
+        ? true
+        : planFilter === 'Unassigned'
+          ? m.unassigned
+          : planFilter === 'Paused'
+            ? m.paused
+            : m.plan === planFilter && !m.paused;
     if (!matchesPlan) return false;
     if (!q) return true;
     return `${m.name || ''} ${m.email || ''} ${m.company || ''}`.toLowerCase().includes(q.toLowerCase());
@@ -360,6 +369,18 @@ function MembersPane() {
               </span>
             ))}
           </div>
+        </div>
+      ) : null}
+
+      {unassignedCount > 0 && planFilter !== 'Unassigned' ? (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', border: '1px solid var(--gold-300)', background: 'var(--gold-100)', borderRadius: 'var(--radius-lg)', padding: '12px 16px', marginBottom: 16 }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 'var(--text-sm)', color: 'var(--ink-900)' }}>
+            <Icon name="user" size={16} color="var(--gold-700)" />
+            <strong>{unassignedCount}</strong> {unassignedCount === 1 ? 'member is' : 'members are'} awaiting a plan — set them up from their profile.
+          </span>
+          <button type="button" className={styles.smallBtn} onClick={() => setPlanFilter('Unassigned')}>
+            View
+          </button>
         </div>
       ) : null}
 
@@ -471,6 +492,10 @@ function MemberProfileModal({
   const [reason, setReason] = useState('');
   const [rewardId, setRewardId] = useState('');
   const [planSel, setPlanSel] = useState('');
+  const [allowanceEdit, setAllowanceEdit] = useState('');
+  const [daysEdit, setDaysEdit] = useState('');
+  const [renewalPickerOpen, setRenewalPickerOpen] = useState(false);
+  const [confirmRenew, setConfirmRenew] = useState(false);
   const [passes, setPasses] = useState('');
   const [door, setDoor] = useState('');
   const [firstName, setFirstName] = useState('');
@@ -488,6 +513,12 @@ function MemberProfileModal({
     setFirstName(parts[0] || '');
     setLastName(parts.slice(1).join(' '));
     setCapOverride(p?.roomHoursCap != null ? String(p.roomHoursCap) : '');
+    // Membership section — seed from the loaded profile.
+    const curPlan = PLANS.find((x) => x.name.toLowerCase() === (p?.plan || '').toLowerCase());
+    setPlanSel(curPlan ? PLAN_MEMBERSTACK_ID[curPlan.id] : '');
+    setAllowanceEdit(p?.allowanceOverride != null ? String(p.allowanceOverride) : '');
+    setDaysEdit(p?.days != null ? String(p.days) : '');
+    setConfirmRenew(false);
   }, [p]);
 
   const load = useCallback(async () => {
@@ -579,18 +610,72 @@ function MemberProfileModal({
     }
   }
 
-  async function assignPlan() {
+  // ---- Membership (manually-managed / admin-set) ----
+  async function saveMembershipPlan() {
     if (!planSel || !id) return;
     setBusy(true);
     setMsg(null);
-    const r = await adminAssignPlan(id, planSel);
+    const r = await adminUpdateMembership({ memberId: id, planId: planSel });
     setBusy(false);
     if (r.ok) {
-      setPlanSel('');
-      setMsg('Plan assigned');
+      setMsg('Plan updated.');
       await load();
       onChanged();
-    } else setMsg('Could not assign plan.');
+    } else setMsg('Could not update the plan.');
+  }
+  async function saveRenewal(isoDate: string) {
+    if (!id) return;
+    // DatePickerModal yields YYYY-MM-DD; the backend stores renewal-date as DD/MM/YYYY.
+    const [y, mo, d] = isoDate.split('-');
+    const renewalDate = `${d}/${mo}/${y}`;
+    setBusy(true);
+    setMsg(null);
+    const r = await adminUpdateMembership({ memberId: id, renewalDate });
+    setBusy(false);
+    if (r.ok) {
+      setMsg(`Renewal date set to ${renewalDate}.`);
+      await load();
+      onChanged();
+    } else setMsg('Could not set the renewal date.');
+  }
+  async function saveAllowance() {
+    if (!id) return;
+    const raw = allowanceEdit.trim();
+    const allowance: number | '' = raw === '' ? '' : Math.max(0, Math.round(Number(raw) || 0));
+    setBusy(true);
+    setMsg(null);
+    const r = await adminUpdateMembership({ memberId: id, allowance });
+    setBusy(false);
+    if (r.ok) {
+      setMsg(raw === '' ? 'Custom days cleared — back to the plan default.' : `Custom monthly days set to ${allowance}.`);
+      await load();
+      onChanged();
+    } else setMsg('Could not update the day allowance.');
+  }
+  async function saveDaysBalance() {
+    if (!id) return;
+    setBusy(true);
+    setMsg(null);
+    const r = await adminAdjustDays(id, daysEdit.trim());
+    setBusy(false);
+    if (r.ok) {
+      setMsg('Days remaining updated.');
+      await load();
+      onChanged();
+    } else setMsg('Could not update days remaining.');
+  }
+  async function renewNow() {
+    if (!id) return;
+    setBusy(true);
+    setMsg(null);
+    const r = await adminRenewNow(id);
+    setBusy(false);
+    if (r.ok) {
+      setConfirmRenew(false);
+      setMsg('Renewed — days reset and the renewal date rolled forward a month.');
+      await load();
+      onChanged();
+    } else setMsg('Could not renew.');
   }
 
   const since = p?.since ? new Date(p.since).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }) : '—';
@@ -602,6 +687,10 @@ function MemberProfileModal({
         })()
       : null;
   const d = Math.round(Number(delta) || 0);
+  // Plan default day allowance (for the "overrides plan" hint): null = unlimited.
+  const curPlanId = PLANS.find((x) => x.name.toLowerCase() === (p?.plan || '').toLowerCase())?.id;
+  const planDefaultDays = curPlanId ? PLAN_DAY_ALLOWANCE[curPlanId] : undefined;
+  const planDefaultLabel = planDefaultDays === null ? 'unlimited' : typeof planDefaultDays === 'number' ? `${planDefaultDays}/mo` : null;
 
   return (
     <div className={styles.profOverlay} onClick={onClose} role="dialog" aria-modal="true">
@@ -677,7 +766,12 @@ function MemberProfileModal({
             </div>
 
             <div className={styles.profSection}>
-              <span className={styles.profSectionTitle}>Assign / change plan</span>
+              <span className={styles.profSectionTitle}>
+                Membership
+                <span className={p.manualBilling ? styles.pausedTag : styles.billTag}>{p.manualBilling ? 'Manual billing' : 'Stripe'}</span>
+              </span>
+
+              {/* Plan */}
               <div className={styles.formRow}>
                 <select className={styles.select} value={planSel} onChange={(e) => setPlanSel(e.target.value)} aria-label="Plan">
                   <option value="">Choose a plan…</option>
@@ -687,9 +781,75 @@ function MemberProfileModal({
                     </option>
                   ))}
                 </select>
-                <button type="button" className={styles.smallBtn} onClick={assignPlan} disabled={busy || !planSel}>
-                  Assign
+                <button type="button" className={styles.smallBtn} onClick={saveMembershipPlan} disabled={busy || !planSel}>
+                  Assign / change plan
                 </button>
+              </div>
+              <span className={styles.muted}>Current plan: {p.plan || 'None yet'}.</span>
+
+              {/* Renewal / reset date */}
+              <div className={styles.formRow} style={{ marginTop: 12 }}>
+                <button type="button" className={styles.dateTrigger} onClick={() => setRenewalPickerOpen(true)} aria-label="Renewal date">
+                  <Icon name="calendar" size={15} color="var(--gold-700)" />
+                  {p.renewal ? `Renews ${p.renewal}` : 'Set renewal date'}
+                </button>
+                <span className={styles.muted}>Resets their days on this date (manual members).</span>
+              </div>
+
+              {/* Custom monthly days (overrides the plan) */}
+              <div className={styles.formRow} style={{ marginTop: 12 }}>
+                <input
+                  className={styles.dayInput}
+                  type="number"
+                  min={0}
+                  placeholder="—"
+                  value={allowanceEdit}
+                  onChange={(e) => setAllowanceEdit(e.target.value)}
+                  aria-label="Custom monthly days"
+                />
+                <button type="button" className={styles.smallBtn} onClick={saveAllowance} disabled={busy}>
+                  Save days/mo
+                </button>
+                <span className={styles.muted}>
+                  Custom monthly days (overrides plan).{' '}
+                  {p.allowanceOverride != null ? `Currently ${p.allowanceOverride}` : 'Using plan default'}
+                  {planDefaultLabel ? ` · plan default ${planDefaultLabel}` : ''}. Empty clears the override.
+                </span>
+              </div>
+
+              {/* Days remaining this cycle */}
+              <div className={styles.formRow} style={{ marginTop: 12 }}>
+                <input
+                  className={styles.dayInput}
+                  type="number"
+                  placeholder="days"
+                  value={daysEdit}
+                  onChange={(e) => setDaysEdit(e.target.value)}
+                  aria-label="Days remaining"
+                />
+                <button type="button" className={styles.smallBtn} onClick={saveDaysBalance} disabled={busy}>
+                  Save balance
+                </button>
+                <span className={styles.muted}>Days remaining this cycle.</span>
+              </div>
+
+              {/* Renew now */}
+              <div className={styles.formRow} style={{ marginTop: 12 }}>
+                {confirmRenew ? (
+                  <>
+                    <span className={styles.caution}>Reset days &amp; roll the renewal date forward a month?</span>
+                    <button type="button" className={styles.smallBtn} onClick={renewNow} disabled={busy}>
+                      Confirm renew
+                    </button>
+                    <button type="button" className={styles.smallBtn} onClick={() => setConfirmRenew(false)}>
+                      Cancel
+                    </button>
+                  </>
+                ) : (
+                  <button type="button" className={styles.smallBtn} onClick={() => setConfirmRenew(true)} disabled={busy}>
+                    Renew now
+                  </button>
+                )}
               </div>
             </div>
 
@@ -793,6 +953,17 @@ function MemberProfileModal({
           </>
         )}
       </div>
+      <DatePickerModal
+        open={renewalPickerOpen}
+        onClose={() => setRenewalPickerOpen(false)}
+        onPick={(picked) => {
+          setRenewalPickerOpen(false);
+          saveRenewal(picked);
+        }}
+        single
+        allowWeekend
+        planned={[]}
+      />
     </div>
   );
 }
@@ -1536,6 +1707,9 @@ function ScreensPane() {
           </a>
           <a className={styles.shortcut} href="/guest" target="_blank" rel="noreferrer">
             <Icon name="users" size={16} color="var(--gold-700)" /> Guest sign-in
+          </a>
+          <a className={styles.shortcut} href="/enrol" target="_blank" rel="noreferrer">
+            <Icon name="users" size={16} color="var(--gold-700)" /> Team enrolment link
           </a>
           <a className={styles.shortcut} href="/dashboard">
             <Icon name="user" size={16} color="var(--gold-700)" /> My member view

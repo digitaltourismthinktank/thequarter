@@ -14,7 +14,7 @@ import memberstackAdmin from '@memberstack/admin';
 import { verifyMember, isAdmin, tokenFromRequest } from './_member.mjs';
 import { listRecords, createRecord, updateRecord, deleteRecord, T, F, airtableReady, esc } from './_airtable.mjs';
 import { londonWallClockToISO, isoToLondonMin, isoToLondonDate, hhmmToMin, londonNow, holdReleased } from './_time.mjs';
-import { PLAN_NAMES, allowanceForMember, setMemberPlan, renewMember } from './_quarter-sync.mjs';
+import { PLAN_NAMES, allowanceForMember, setMemberPlan, renewMember, formatDate } from './_quarter-sync.mjs';
 import { listRewards, listPerks, listFloats, floatStatus, awardPoints, redeemReward, partnerPayouts, markPartnerPaid } from './_rewards.mjs';
 import { sendEmail, emailShell, escapeHtml, OPS_EMAIL } from './_email.mjs';
 import { pushToEmail } from './_push.mjs';
@@ -39,6 +39,7 @@ async function listAllMembers() {
     for (const m of data) {
       const cf = m.customFields || {};
       const md = m.metaData || {};
+      const managedPlanId = (m.planConnections || []).map(planIdOf).filter((p) => p in PLAN_NAMES)[0] || null;
       const planId = (m.planConnections || []).map(planIdOf).filter(Boolean)[0] || null;
       out.push({
         id: m.id,
@@ -47,8 +48,12 @@ async function listAllMembers() {
         plan: planId ? PLAN_NAMES[planId] || planId : null,
         days: cf['days-remaining'] ?? null,
         renewal: cf['renewal-date'] ?? null,
+        allowanceOverride: cf['allowance-override'] || null,
+        allowance: allowanceForMember(m), // effective allowance (override-aware); null = unlimited
         doorCode: cf['door-code'] ?? null,
         paused: planId === PAUSED,
+        manualBilling: !!md.manualBilling, // admin-managed (renewal cron owns them, not Stripe)
+        unassigned: !managedPlanId, // holds no managed plan tag
         bday: md.bday || null,
         bdayClaimed: md.bdayClaimed || null,
         points: Math.max(0, Math.round(Number(md.points) || 0)),
@@ -81,6 +86,7 @@ async function memberProfile(id) {
   const cf = m.customFields || {};
   const md = m.metaData || {};
   const planId = (m.planConnections || []).map(planIdOf).filter(Boolean)[0] || null;
+  const managedPlanId = (m.planConnections || []).map(planIdOf).filter((p) => p in PLAN_NAMES)[0] || null;
   const [checkins, redemptions, ledger, scans] = await Promise.all([
     listRecords(T.checkins, { filterByFormula: `AND({Member email}='${esc(email)}', {Status}='Checked-in')` }),
     listRecords(T.redemptions, { filterByFormula: `{Member email}='${esc(email)}'`, sort: [{ field: 'At', direction: 'desc' }] }),
@@ -95,6 +101,11 @@ async function memberProfile(id) {
     paused: planId === PAUSED,
     since: m.createdAt || null,
     days: cf['days-remaining'] ?? null,
+    renewal: cf['renewal-date'] ?? null,
+    allowanceOverride: cf['allowance-override'] || null,
+    allowance: allowanceForMember(m), // effective allowance (override-aware); null = unlimited
+    manualBilling: !!md.manualBilling,
+    unassigned: !managedPlanId,
     company: md.company || null,
     phone: md.phone || null,
     bday: md.bday || null,
@@ -695,6 +706,57 @@ export default async function handler(req) {
     await setMemberPlan(MS_SECRET, email, body.planId);
     await renewMember(MS_SECRET, email, { resetDays: true, flat: true });
     return json({ ok: true });
+  }
+
+  // Manually-managed (non-Stripe) membership: apply any subset of plan / renewal date /
+  // allowance-override / day balance to an admin-managed member, and mark them manualBilling
+  // so the renewal cron owns their renewals and the Stripe webhook leaves them alone. Only the
+  // provided fields are touched. setMemberPlan does its own Memberstack update(s); the
+  // customFields writes + the metaData.manualBilling merge are batched into ONE update.
+  if (action === 'updateMembership') {
+    if (!body.memberId) return json({ error: 'missing-member' }, 400);
+    const admin = memberstackAdmin.init(MS_SECRET);
+    const r = await admin.members.retrieve({ id: body.memberId });
+    const m = r?.data;
+    if (!m) return json({ error: 'not-found' }, 404);
+    const email = m.auth?.email || m.email || null;
+    if (!email) return json({ error: 'no-email' }, 400);
+
+    // Plan change first (it runs its own add/remove-free-plan updates).
+    if (body.planId) await setMemberPlan(MS_SECRET, email, body.planId);
+
+    const cf = {};
+    // renewalDate: a 'DD/MM/YYYY' string, or '' to clear.
+    if (body.renewalDate !== undefined) cf['renewal-date'] = String(body.renewalDate);
+    // allowance: a number to set the per-member override, or '' to clear it back to plan default.
+    if (body.allowance !== undefined) cf['allowance-override'] = body.allowance === '' ? '' : String(body.allowance);
+    // days: the day balance (days-remaining).
+    if (body.days !== undefined) cf['days-remaining'] = String(body.days);
+
+    // Merge manualBilling=true into metaData (this member is now admin-managed).
+    const md = { ...(m.metaData || {}), manualBilling: true };
+    const data = { metaData: md };
+    if (Object.keys(cf).length) data.customFields = cf;
+    await admin.members.update({ id: body.memberId, data });
+    return json({ ok: true });
+  }
+
+  // Renew a manually-managed member now: reset their day balance to the (override-aware)
+  // allowance with rollover, and advance their renewal date to one month from today.
+  if (action === 'renewNow') {
+    if (!body.memberId) return json({ error: 'missing-member' }, 400);
+    const admin = memberstackAdmin.init(MS_SECRET);
+    const r = await admin.members.retrieve({ id: body.memberId });
+    const m = r?.data;
+    if (!m) return json({ error: 'not-found' }, 404);
+    const email = m.auth?.email || m.email || null;
+    if (!email) return json({ error: 'no-email' }, 400);
+    // One month from today, formatted DD/MM/YYYY via the shared helper (unix-seconds in).
+    const next = new Date();
+    next.setMonth(next.getMonth() + 1);
+    const renewalDate = formatDate(Math.floor(next.getTime() / 1000));
+    const result = await renewMember(MS_SECRET, email, { renewalDate, resetDays: true });
+    return json({ ok: true, ...result });
   }
 
   // ---- Partner float top-up ----

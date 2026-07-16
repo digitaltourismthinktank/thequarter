@@ -615,10 +615,12 @@ async function handleEvent(event) {
     // First paid plan → credit whoever referred this member (no-op if not referred) + welcome email.
     if (isFirstInvoice) await creditReferral(email);
     if (isFirstInvoice) await sendWelcomeEmail(email, member);
-    // A successful payment always clears any prior payment-issue flag.
+    // A successful payment always clears any prior payment-issue flag. It also clears
+    // manualBilling: once a member pays via Stripe, Stripe owns their renewals again and the
+    // manual renewal cron must stop managing them (folded into this one metaData write).
     const cur = Math.max(0, Math.round(Number(metaData?.points) || 0));
     const life = Math.max(0, Math.round(Number(metaData?.lifetimePoints) || cur));
-    earnMeta = { ...(metaData || {}), paymentIssue: false, points: cur + spend + welcome, lifetimePoints: life + spend + welcome, ...(welcome > 0 ? { joinBonusAwarded: true } : {}) };
+    earnMeta = { ...(metaData || {}), paymentIssue: false, manualBilling: false, points: cur + spend + welcome, lifetimePoints: life + spend + welcome, ...(welcome > 0 ? { joinBonusAwarded: true } : {}) };
     applied = { billingReason: obj.billing_reason, resetDays: isRenewal, spend, welcome };
   } else if (type === 'invoice.payment_failed') {
     // Card declined / payment failed — flag the member so both they and admin see it,

@@ -263,15 +263,16 @@ export function DashboardClient() {
             </div>
           ) : (
             <div className={styles.payg}>
-              <span className={styles.paygEyebrow}>Pay-as-you-go</span>
-              <h2 className={styles.paygTitle}>You&rsquo;re on pay-as-you-go</h2>
+              <span className={styles.paygEyebrow}>Welcome to The Quarter</span>
+              <h2 className={styles.paygTitle}>Your account&rsquo;s all set</h2>
               <p className={styles.paygBody}>
-                You don&rsquo;t have a membership yet, so there are no monthly days and no door code to show. Any Day Pass you
-                book appears in your bookings just below.
+                We&rsquo;ll assign your plan shortly — there&rsquo;s nothing you need to do. In the meantime you can browse the
+                plans to see what&rsquo;s included, or book a Day Pass if you&rsquo;d like to come in sooner. Any Day Pass you book
+                appears in your bookings just below.
               </p>
               <div className={styles.paygActions}>
                 <Button variant="primary" size="sm" href="/plans" iconAfter="arrow-right">
-                  See plans
+                  Browse plans
                 </Button>
                 <Button variant="secondary" size="sm" href="/day-pass">
                   Book a Day Pass

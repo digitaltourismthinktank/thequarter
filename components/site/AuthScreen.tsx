@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { FormEvent } from 'react';
+import type { FormEvent, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Input } from '@/components/ds/Input';
@@ -18,7 +18,26 @@ import styles from './AuthScreen.module.css';
 
 type Status = 'idle' | 'submitting' | 'error' | 'sent';
 
-export function AuthScreen({ mode }: { mode: 'login' | 'signup' }) {
+export function AuthScreen({
+  mode,
+  badge,
+  heading,
+  subtitle,
+  intro,
+  collectCompany = false,
+}: {
+  mode: 'login' | 'signup';
+  /** Override the gold eyebrow badge (e.g. the team-enrolment page). */
+  badge?: string;
+  /** Override the H1. */
+  heading?: string;
+  /** Override the subtitle line. */
+  subtitle?: string;
+  /** Optional branded intro node rendered between the subtitle and the form. */
+  intro?: ReactNode;
+  /** Signup only: also capture the member's company so admin can group their team. */
+  collectCompany?: boolean;
+}) {
   const isLogin = mode === 'login';
   const router = useRouter();
   const [view, setView] = useState<'main' | 'forgot'>('main');
@@ -26,6 +45,7 @@ export function AuthScreen({ mode }: { mode: 'login' | 'signup' }) {
   const [password, setPassword] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [company, setCompany] = useState('');
   const [phone, setPhone] = useState('');
   const [status, setStatus] = useState<Status>('idle');
   const [error, setError] = useState('');
@@ -46,6 +66,9 @@ export function AuthScreen({ mode }: { mode: 'login' | 'signup' }) {
     if (last && last.trim()) setLastName(last);
     const prefPhone = params.get('phone');
     if (prefPhone && prefPhone.trim()) setPhone(prefPhone);
+    // Team-enrolment links can pre-fill the company (e.g. /enrol?company=Acme).
+    const prefCompany = params.get('company');
+    if (prefCompany && prefCompany.trim()) setCompany(prefCompany);
   }, [isLogin]);
 
   async function handleAuth(e: FormEvent) {
@@ -85,6 +108,8 @@ export function AuthScreen({ mode }: { mode: 'login' | 'signup' }) {
             phone: phone.trim(),
             termsAcceptedAt: new Date().toISOString(),
             name: [firstName.trim(), lastName.trim()].filter(Boolean).join(' '),
+            // Soft team grouping — stored on metaData.company (read by admin + member-profile).
+            ...(collectCompany && company.trim() ? { company: company.trim() } : {}),
           },
         });
       }
@@ -173,13 +198,15 @@ export function AuthScreen({ mode }: { mode: 'login' | 'signup' }) {
             </>
           ) : (
             <>
-              <Badge tone="gold">{isLogin ? 'Welcome back' : 'Join The Quarter'}</Badge>
-              <h1 className={styles.title}>{isLogin ? 'Member login' : 'Create your account'}</h1>
+              <Badge tone="gold">{badge ?? (isLogin ? 'Welcome back' : 'Join The Quarter')}</Badge>
+              <h1 className={styles.title}>{heading ?? (isLogin ? 'Member login' : 'Create your account')}</h1>
               <p className={styles.subtitle}>
-                {isLogin
-                  ? 'Sign in to see your plan, book a room and redeem your perks.'
-                  : 'Set up your member account to manage your plan, bookings and perks.'}
+                {subtitle ??
+                  (isLogin
+                    ? 'Sign in to see your plan, book a room and redeem your perks.'
+                    : 'Set up your member account to manage your plan, bookings and perks.')}
               </p>
+              {intro ? <div className={styles.intro}>{intro}</div> : null}
               <form className={styles.fields} onSubmit={handleAuth}>
                 {!isLogin ? (
                   <div className={styles.row}>
@@ -198,6 +225,16 @@ export function AuthScreen({ mode }: { mode: 'login' | 'signup' }) {
                       autoComplete="family-name"
                     />
                   </div>
+                ) : null}
+                {!isLogin && collectCompany ? (
+                  <Input
+                    label="Company"
+                    icon="building"
+                    placeholder="Acme Studios"
+                    value={company}
+                    onChange={(e) => setCompany(e.target.value)}
+                    autoComplete="organization"
+                  />
                 ) : null}
                 {!isLogin ? (
                   <Input

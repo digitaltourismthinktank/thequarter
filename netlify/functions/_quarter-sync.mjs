@@ -89,8 +89,24 @@ export function formatDate(unixSeconds) {
   return `${dd}/${mm}/${d.getUTCFullYear()}`;
 }
 
-/** Day allowance for a member from their Memberstack plan(s); null = unlimited. */
+/**
+ * Day allowance for a member; null = unlimited.
+ *
+ * Per-member override FIRST: a manually-managed member can carry customFields
+ * ['allowance-override'] — a numeric string set by the admin. When present and it
+ * parses to a finite number ≥ 0, it wins outright over the plan default (so e.g. a
+ * Resident on a bespoke deal can be given 20 days/month without changing their plan).
+ * The override is numeric only — "unlimited" stays plan-driven (leave the override
+ * blank and put the member on the Citizen plan for unlimited). Because renewMember's
+ * flat/rollover reset and daysUsedThisCycle both call this, the override automatically
+ * flows through the dashboard display, usage maths AND every renewal reset.
+ */
 export function allowanceForMember(member) {
+  const ov = member?.customFields?.['allowance-override'];
+  if (ov !== undefined && ov !== null && String(ov).trim() !== '') {
+    const n = Number(ov);
+    if (Number.isFinite(n) && n >= 0) return n;
+  }
   let found;
   for (const c of member?.planConnections || []) {
     if (c.planId in PLAN_ALLOWANCE) {
