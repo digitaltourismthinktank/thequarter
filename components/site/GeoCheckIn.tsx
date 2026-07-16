@@ -26,6 +26,7 @@ import styles from './GeoCheckIn.module.css';
 const QUARTER = { lat: 51.2798, lng: 1.0817 };
 const RADIUS_M = 180;
 const DISMISS_KEY = 'q-geo-offer-dismissed';
+const GRANTED_KEY = 'q-geo-granted';
 
 function distanceM(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371000;
@@ -81,6 +82,13 @@ export function GeoCheckIn({ doorCode, busyBand }: GeoCheckInProps) {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         if (!alive.current) return;
+        // A successful read means location is granted — remember it so return visits auto-detect
+        // silently (iOS Safari's Permissions API doesn't report 'granted' reliably).
+        try {
+          window.localStorage.setItem(GRANTED_KEY, '1');
+        } catch {
+          /* ignore */
+        }
         const d = distanceM(pos.coords.latitude, pos.coords.longitude, QUARTER.lat, QUARTER.lng);
         if (d > RADIUS_M) {
           setLocating(false);
@@ -142,6 +150,23 @@ export function GeoCheckIn({ doorCode, busyBand }: GeoCheckInProps) {
     }
 
     if (typeof navigator === 'undefined' || !('geolocation' in navigator)) return;
+
+    // Already granted once? Auto-detect silently on every return visit instead of re-showing the
+    // "use my location" strip. iOS Safari's Permissions API doesn't report 'granted' reliably, so
+    // we remember the grant ourselves; iOS reuses the session permission with no prompt, and if
+    // they're not near it simply hides. (Fixes the strip re-appearing on every reload.)
+    let grantedBefore = false;
+    try {
+      grantedBefore = window.localStorage.getItem(GRANTED_KEY) === '1';
+    } catch {
+      /* storage blocked */
+    }
+    if (grantedBefore) {
+      locate();
+      return () => {
+        alive.current = false;
+      };
+    }
 
     // Respect a prior dismissal of the opt-in strip — truly zero nagging.
     let dismissed = false;
