@@ -47,21 +47,97 @@ function eventWhen(start: string): string {
   });
 }
 
+/** One installed /screen app can BE any of these displays — persisted so a reopen returns to it. */
+type ScreenChoice = 'entrance' | 'floor1' | 'floor2';
+type ScreenView = ScreenChoice | 'chooser';
+const SCREEN_KEY = 'q-screen';
+const isChoice = (v: unknown): v is ScreenChoice => v === 'entrance' || v === 'floor1' || v === 'floor2';
+
+const CHOICES: { id: ScreenChoice; label: string; hint: string }[] = [
+  { id: 'entrance', label: 'Entrance', hint: 'Lobby busyness & what’s on' },
+  { id: 'floor1', label: 'First floor', hint: 'Rooms, pods & workspaces' },
+  { id: 'floor2', label: 'Second floor', hint: 'Rooms, pods & workspaces' },
+];
+
 /**
- * Top-level screen router. /screen (no floor) → the entrance busyness display below;
- * /screen?floor=1|2 → the dedicated per-floor room-availability display (FloorScreen).
- * Rendering `null` until the floor is read avoids a hydration mismatch and an entrance-view
- * flash before delegating to the floor screen.
+ * Full-screen "Choose a display" picker. Shown on first open (no saved choice); also
+ * reachable any time via the discreet corner switch control. Picking saves the choice and
+ * swaps the rendered screen in client state — no navigation, so the app stays standalone.
+ */
+function Chooser({ current, onPick }: { current: ScreenChoice | null; onPick: (v: ScreenChoice) => void }) {
+  return (
+    <div className={styles.chooser}>
+      <div className={styles.chooserInner}>
+        <img className={styles.chooserLogo} src="/brand/logo-wordmark-black.png" alt="The Quarter" />
+        <h1 className={styles.chooserTitle}>Choose a display</h1>
+        <p className={styles.chooserSub}>Pick which screen this device should show. It’ll be remembered next time.</p>
+        <div className={styles.chooserGrid}>
+          {CHOICES.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              className={`${styles.choiceBtn} ${current === c.id ? styles.choiceCurrent : ''}`}
+              onClick={() => onPick(c.id)}
+            >
+              <span className={styles.choiceLabel}>{c.label}</span>
+              <span className={styles.choiceHint}>{c.hint}</span>
+              {current === c.id ? <span className={styles.choiceTag}>Current</span> : null}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Top-level screen router for the single installed /screen app.
+ * - ?floor=1|2 in the URL always wins (and updates the saved choice).
+ * - Otherwise a saved choice ('entrance'|'floor1'|'floor2') reopens straight to that screen.
+ * - With no saved choice, the Chooser is shown. Picking swaps screens in client state (no
+ *   reload → stays standalone/fullscreen). A discreet corner control reopens the Chooser.
+ * Rendering `null` until ready avoids a hydration mismatch / entrance-view flash.
  */
 export function ScreenClient() {
-  const [floor, setFloor] = useState<number | null>(null);
-  const [ready, setReady] = useState(false);
+  const [view, setView] = useState<ScreenView | null>(null);
+  const [saved, setSaved] = useState<ScreenChoice | null>(null);
+
   useEffect(() => {
     const raw = new URLSearchParams(window.location.search).get('floor');
     const n = raw ? Number(raw) : NaN;
-    setFloor(n === 1 || n === 2 ? n : null);
-    setReady(true);
+    let stored: string | null = null;
+    try {
+      stored = window.localStorage.getItem(SCREEN_KEY);
+    } catch {
+      /* private mode / storage blocked — fall back to the chooser */
+    }
+    if (n === 1 || n === 2) {
+      const v: ScreenChoice = n === 1 ? 'floor1' : 'floor2';
+      try {
+        window.localStorage.setItem(SCREEN_KEY, v);
+      } catch {
+        /* ignore */
+      }
+      setSaved(v);
+      setView(v);
+      return;
+    }
+    const s = isChoice(stored) ? stored : null;
+    setSaved(s);
+    setView(s ?? 'chooser');
   }, []);
+
+  const choose = useCallback((v: ScreenChoice) => {
+    try {
+      window.localStorage.setItem(SCREEN_KEY, v);
+    } catch {
+      /* ignore */
+    }
+    setSaved(v);
+    setView(v);
+  }, []);
+  const openChooser = useCallback(() => setView('chooser'), []);
+
   // Lock the page to the viewport for the /screen kiosk ONLY — no rubber-band, no page
   // scroll behind the fixed display. Scoped to this route: styles are restored on unmount
   // so normal site pages are untouched.
@@ -94,8 +170,22 @@ export function ScreenClient() {
       body.style.height = prev.bodyHeight;
     };
   }, []);
-  if (!ready) return null;
-  return floor ? <FloorScreen floor={floor} /> : <EntranceScreen />;
+  if (view === null) return null;
+  if (view === 'chooser') return <Chooser current={saved} onPick={choose} />;
+
+  const screen =
+    view === 'floor1' ? <FloorScreen floor={1} /> : view === 'floor2' ? <FloorScreen floor={2} /> : <EntranceScreen />;
+
+  return (
+    <>
+      {screen}
+      {/* Discreet corner control — reopens the chooser so staff can exit and switch displays,
+          all within /screen (no navigation away). Sits below the reserve overlay (z 1100). */}
+      <button type="button" className={styles.switchBtn} onClick={openChooser} aria-label="Switch display" title="Switch display">
+        <span aria-hidden="true">⋯</span>
+      </button>
+    </>
+  );
 }
 
 function EntranceScreen() {

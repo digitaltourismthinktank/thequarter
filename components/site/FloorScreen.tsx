@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   getFloorScreen,
   kioskMemberSearch,
@@ -17,6 +18,18 @@ import styles from './FloorScreen.module.css';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const minToHHMM = (m: number) => `${pad(Math.floor(m / 60))}:${pad(m % 60)}`;
+
+/**
+ * Public-screen privacy: render a stored full name as "First L" (first name + last-name
+ * initial, e.g. "Nicholas H"). Stored data is untouched — only the on-wall display is
+ * shortened so a member's surname is never shown on a public floor screen.
+ */
+function shortName(full: string | null | undefined): string {
+  const parts = String(full || '').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return '';
+  if (parts.length === 1) return parts[0];
+  return `${parts[0]} ${parts[parts.length - 1][0].toUpperCase()}`;
+}
 
 /** Minutes since midnight in Europe/London — timezone-safe for the "now / soon" tint. */
 function londonNowMin(): number {
@@ -74,7 +87,7 @@ function Schedule({ items, nowMin }: { items: FloorBooking[]; nowMin: number }) 
             <span className={styles.schedTime}>
               {minToHHMM(b.startMin)}–{minToHHMM(b.endMin)}
             </span>
-            <span className={styles.schedName}>{b.name || 'Reserved'}</span>
+            <span className={styles.schedName}>{shortName(b.name) || 'Reserved'}</span>
             {live ? <span className={styles.schedNow}>Now</span> : null}
           </li>
         );
@@ -172,7 +185,7 @@ function ReservePanel({
     });
     setBusy(false);
     if (r.ok && r.data.ok) {
-      setMsg(`Booked ${minToHHMM(start)}–${minToHHMM(end)} for ${r.data.member || picked.name}.`);
+      setMsg(`Booked ${minToHHMM(start)}–${minToHHMM(end)} for ${shortName(r.data.member || picked.name)}.`);
       onDone();
       setTimeout(onClose, 1400);
     } else {
@@ -191,7 +204,8 @@ function ReservePanel({
     setBusy(false);
   }
 
-  return (
+  if (typeof document === 'undefined') return null;
+  return createPortal(
     <div className={styles.overlay} role="dialog" aria-modal="true" onClick={onClose}>
       <div className={styles.panel} onClick={(e) => e.stopPropagation()}>
         <button className={styles.close} onClick={onClose} aria-label="Close">
@@ -294,7 +308,7 @@ function ReservePanel({
                 <li key={b.id} className={styles.checkRow}>
                   <span>
                     {minToHHMM(b.startMin)}–{minToHHMM(b.endMin)}
-                    {b.name ? ` · ${b.name}` : ''}
+                    {b.name ? ` · ${shortName(b.name)}` : ''}
                   </span>
                   {b.kind === 'Block' || b.kind === 'Privatisation' ? (
                     <span className={styles.checkKind}>Reserved</span>
@@ -311,7 +325,8 @@ function ReservePanel({
 
         {msg ? <p className={styles.msg}>{msg}</p> : null}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -332,9 +347,9 @@ function RoomCard({
 }) {
   const v = roomView(s, bookings, nowMin);
   const sub = v.current
-    ? `${v.current.name ? `for ${v.current.name} · ` : ''}until ${minToHHMM(v.current.endMin)}`
+    ? `${v.current.name ? `for ${shortName(v.current.name)} · ` : ''}until ${minToHHMM(v.current.endMin)}`
     : v.next
-      ? `Next ${minToHHMM(v.next.startMin)}${v.next.name ? ` · ${v.next.name}` : ''}`
+      ? `Next ${minToHHMM(v.next.startMin)}${v.next.name ? ` · ${shortName(v.next.name)}` : ''}`
       : 'Free all day';
   return (
     <article className={`${styles.card} ${hero ? styles.cardHero : ''} ${v.hot ? styles.hot : styles.calm}`}>
@@ -374,6 +389,7 @@ function RoomCard({
 }
 
 function WorkspaceCard({ s, name, privatised }: { s: FloorSpace; name: string | null; privatised: boolean }) {
+  const disp = shortName(name);
   return (
     <article className={`${styles.card} ${styles.wsCard} ${privatised ? styles.hot : styles.calm}`}>
       <div className={styles.cardHead}>
@@ -382,7 +398,7 @@ function WorkspaceCard({ s, name, privatised }: { s: FloorSpace; name: string | 
       </div>
       <div className={`${styles.statusPane} ${privatised ? styles.paneBusy : styles.paneFree}`}>
         <span className={styles.statusWord}>{privatised ? 'Privatised' : 'Available'}</span>
-        <span className={styles.statusSub}>{privatised ? (name ? `for ${name}` : 'Reserved today') : 'Open to all members'}</span>
+        <span className={styles.statusSub}>{privatised ? (disp ? `for ${disp}` : 'Reserved today') : 'Open to all members'}</span>
       </div>
     </article>
   );

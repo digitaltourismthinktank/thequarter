@@ -608,3 +608,76 @@
     grid-auto-rows: minmax(0, 1fr);
   }
 }
+
+/* ---- Large displays (wall TVs / big monitors) ----
+   iPad portrait/landscape (≤~1366px) is untouched — the clamp()s already fit it perfectly.
+   Beyond that the display centres inside a comfortable max-width column so cards scale up
+   instead of stretching flat on ultra-wide screens, and type steps up for across-the-room
+   legibility. Sizes are fixed (not vw) so they always fit the capped column — never overflow
+   the non-scrolling layout. */
+@media (min-width: 1600px) {
+  .top,
+  .body,
+  .closed {
+    width: 100%;
+    max-width: 1680px;
+    margin-inline: auto;
+  }
+  .floorTag {
+    font-size: 34px;
+  }
+  .date {
+    font-size: 32px;
+  }
+  .time {
+    font-size: 80px;
+  }
+  .h2 {
+    font-size: 40px;
+  }
+  .roomName {
+    font-size: 50px;
+  }
+  .cardHero .roomName {
+    font-size: 76px;
+  }
+  .roomMeta {
+    font-size: 24px;
+  }
+  .statusWord {
+    font-size: 42px;
+  }
+  .cardHero .statusWord {
+    font-size: 56px;
+  }
+  .statusSub {
+    font-size: 26px;
+  }
+  .schedLabel {
+    font-size: 20px;
+  }
+  .schedRow {
+    font-size: 27px;
+  }
+  .cardHero .schedRow {
+    font-size: 30px;
+  }
+  .tapBtn {
+    font-size: 30px;
+  }
+  .closedLabel {
+    font-size: 120px;
+  }
+  .closedLine {
+    font-size: 34px;
+  }
+}
+
+/* Very large / 4K wall screens: a touch wider column so the display fills more of the wall. */
+@media (min-width: 2400px) {
+  .top,
+  .body,
+  .closed {
+    max-width: 2100px;
+  }
+}

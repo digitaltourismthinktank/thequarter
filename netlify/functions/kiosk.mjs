@@ -19,6 +19,18 @@ import { londonNow, isoToLondonMin, londonWallClockToISO, hhmmToMin, minToHHMM, 
 const MS_SECRET = process.env.MEMBERSTACK_SECRET_KEY;
 const json = (b, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { 'content-type': 'application/json' } });
 
+/**
+ * Public-screen privacy helper: render a full name as "First L" (first name + last-name
+ * initial, e.g. "Nicholas H"). Search still matches on the full name/email — only the
+ * DISPLAYED value is shortened, so kiosk/floor screens never expose a member's surname.
+ */
+const shortName = (full) => {
+  const parts = String(full || '').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return '';
+  if (parts.length === 1) return parts[0];
+  return `${parts[0]} ${parts[parts.length - 1][0].toUpperCase()}`;
+};
+
 async function memberByPin(pin) {
   if (!MS_SECRET || !pin) return null;
   const admin = memberstackAdmin.init(MS_SECRET);
@@ -75,7 +87,7 @@ async function searchMembers(q, cap = 8) {
       if (!name) continue;
       const email = m.auth?.email || m.email || '';
       if (`${name} ${email}`.toLowerCase().includes(needle)) {
-        out.push({ id: m.id, name });
+        out.push({ id: m.id, name: shortName(name) });
         if (out.length >= cap) break;
       }
     }
