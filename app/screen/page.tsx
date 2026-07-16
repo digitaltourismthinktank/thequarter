@@ -8,6 +8,10 @@ export const metadata: Metadata = {
   // Standalone / "Add to Home Screen": launches full-screen (no Safari chrome), edge-to-edge
   // status bar so the ink header sits under it. Scoped to the /screen route only.
   appleWebApp: { capable: true, statusBarStyle: 'black-translucent', title: 'The Quarter' },
+  // A SEPARATE manifest for the screens (not the member portal's, whose start_url is
+  // /dashboard and bounces to sign-in). This one is standalone, any-orientation, and
+  // stays on /screen — so an installed floor screen opens straight to the display.
+  manifest: '/screen.webmanifest',
 };
 
 // Fixed kiosk viewport — cover the safe areas (notch/home-indicator) so the display goes
