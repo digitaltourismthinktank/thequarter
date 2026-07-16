@@ -294,7 +294,7 @@ function EntranceScreen() {
       ) : null}
 
       {!closed ? (
-        <>
+        <div className={styles.entranceMain}>
           <section className={styles.block}>
             <h2 className={styles.h2}>Meeting rooms &amp; pods</h2>
             <div className={styles.spaceGrid}>
@@ -332,7 +332,7 @@ function EntranceScreen() {
               </div>
             </section>
           ) : null}
-        </>
+        </div>
       ) : null}
 
       {featured ? (

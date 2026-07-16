@@ -4,14 +4,45 @@
   position: fixed;
   inset: 0;
   z-index: 1000;
-  overflow-y: auto;
+  height: 100vh;
+  height: 100svh;
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+  overscroll-behavior: none;
   background: var(--surface-page);
   color: var(--ink-900);
-  padding: clamp(24px, 4vw, 56px);
+  padding: clamp(20px, 3vw, 48px);
+  padding-top: max(clamp(20px, 3vw, 48px), env(safe-area-inset-top));
+  padding-bottom: max(clamp(20px, 3vw, 48px), env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
-  gap: clamp(20px, 3vh, 40px);
+  gap: clamp(14px, 2vh, 30px);
   font-family: var(--font-sans);
+}
+/* Entrance overview: rooms + workspaces flex to fill the space between the hero and the
+   What's-on footer, so the wall display is contained to one screen (never scrolls). */
+.entranceMain {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(14px, 2vh, 30px);
+}
+/* Rooms block absorbs the slack; its grid rows shrink so cards compress to fit rather than
+   overflow. Workspaces (and the What's-on footer, a sibling of .entranceMain) stay natural. */
+.entranceMain .block:first-child {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.entranceMain .block:first-child .spaceGrid {
+  flex: 1 1 auto;
+  grid-auto-rows: minmax(0, 1fr);
+  min-height: 0;
+}
+.entranceMain .spaceCard {
+  overflow: hidden;
 }
 
 .top {

@@ -136,6 +136,38 @@
 .hasHero .cardHero {
   grid-column: 1 / -1;
 }
+/* Solo floor (one room, no workspaces): the single card fills the whole rooms area and lays
+   its content out across two columns so the big display isn't mostly empty. */
+.roomGrid.soloWrap {
+  display: block;
+}
+.soloCard {
+  height: 100%;
+}
+.soloGrid {
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(20px, 3vw, 52px);
+}
+.soloMain {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(14px, 2.4vh, 30px);
+  min-height: 0;
+}
+.soloSide {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+@media (orientation: portrait) {
+  .soloGrid {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+}
 .wsGrid {
   display: grid;
   gap: clamp(12px, 1.4vw, 22px);
@@ -167,12 +199,20 @@
   padding: clamp(22px, 2.4vw, 40px);
 }
 
-.cardHead {
+/* Card top row: name/meta on the left, QR chip in flow on the right (no overlap). */
+.cardTop {
   flex: none;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: clamp(10px, 1.4vw, 20px);
+}
+.cardHead {
+  flex: 1 1 auto;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding-right: clamp(78px, 12%, 130px); /* clears the corner QR chip */
 }
 .roomName {
   font-size: clamp(22px, 2.6vw, 40px);
@@ -310,12 +350,9 @@
   color: var(--text-muted);
 }
 
-/* Discrete corner QR chip */
+/* QR chip — sits in flow at the top-right of the card head (never overlaps the status bar) */
 .qrChip {
-  position: absolute;
-  top: clamp(12px, 1.4vw, 22px);
-  right: clamp(12px, 1.4vw, 22px);
-  z-index: 2;
+  flex: none;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -448,6 +485,35 @@
   gap: 8px;
   font-size: clamp(18px, 2.4vw, 24px);
   font-weight: var(--fw-bold);
+}
+/* Discreet "book another day" control (defaults to Today) */
+.dayRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.dayBtn {
+  appearance: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  border: 1.5px solid var(--gold-300);
+  border-radius: var(--radius-pill, 999px);
+  background: var(--surface-card);
+  color: var(--ink-900);
+  font: inherit;
+  font-weight: var(--fw-semibold);
+  font-size: clamp(15px, 1.7vw, 20px);
+}
+.dayBtnHint {
+  color: var(--gold-700);
+  font-weight: var(--fw-bold);
+  font-size: 0.82em;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 .pickRow {
   display: flex;

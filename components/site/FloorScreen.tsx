@@ -13,6 +13,7 @@ import {
   type MemberMatch,
 } from '@/lib/booking';
 import { Qr } from '@/components/ds/Qr';
+import { DatePickerModal } from './DatePickerModal';
 import { Icon } from '@/components/ds/Icon';
 import styles from './FloorScreen.module.css';
 
@@ -121,9 +122,15 @@ function ReservePanel({
   }, [openMin, closeMin, slotMin]);
 
   const nowMin = londonNowMin();
-  const firstStart = startOptions.find((m) => m >= nowMin) ?? startOptions[0] ?? openMin;
+  // Default to the slot the current time falls IN (e.g. 16:00 at 16:01) so a walk-up books
+  // "now"; before opening → the first slot; after the last start → the last slot.
+  const firstStart = [...startOptions].reverse().find((m) => m <= nowMin) ?? startOptions[0] ?? openMin;
   const [start, setStart] = useState<number>(firstStart);
   const [end, setEnd] = useState<number>(Math.min(firstStart + 60, closeMin));
+  // Defaults to today; a discreet "another day" picker lets a walk-up book ahead without the app.
+  const [bookDate, setBookDate] = useState<string>(date);
+  const [dateOpen, setDateOpen] = useState(false);
+  const isToday = bookDate === date;
   const endOptions = useMemo(() => {
     const out: number[] = [];
     for (let m = start + slotMin; m <= closeMin; m += slotMin) out.push(m);
@@ -178,14 +185,15 @@ function ReservePanel({
     setMsg(null);
     const r = await kioskBookFor({
       spaceId: space.id,
-      date,
+      date: bookDate,
       start: minToHHMM(start),
       end: minToHHMM(end),
       memberId: picked.id,
     });
     setBusy(false);
     if (r.ok && r.data.ok) {
-      setMsg(`Booked ${minToHHMM(start)}–${minToHHMM(end)} for ${shortName(r.data.member || picked.name)}.`);
+      const dayTxt = isToday ? '' : ` on ${new Date(`${bookDate}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}`;
+      setMsg(`Booked ${minToHHMM(start)}–${minToHHMM(end)}${dayTxt} for ${shortName(r.data.member || picked.name)}.`);
       onDone();
       setTimeout(onClose, 1400);
     } else {
@@ -216,8 +224,21 @@ function ReservePanel({
 
         <section className={styles.panelBlock}>
           <h4 className={styles.panelH4}>
-            <Icon name="clock" size={22} /> Reserve now
+            <Icon name="clock" size={22} /> Reserve {isToday ? 'now' : 'ahead'}
           </h4>
+          <div className={styles.dayRow}>
+            <span className={styles.pickLabel}>Day</span>
+            <button type="button" className={styles.dayBtn} onClick={() => setDateOpen(true)}>
+              <Icon name="calendar" size={18} />
+              {isToday ? 'Today' : new Date(`${bookDate}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
+              <span className={styles.dayBtnHint}>Change</span>
+            </button>
+            {!isToday ? (
+              <button type="button" className={styles.linkBtn} onClick={() => setBookDate(date)}>
+                Back to today
+              </button>
+            ) : null}
+          </div>
           <div className={styles.pickRow}>
             <label className={styles.pickField}>
               <span className={styles.pickLabel}>From</span>
@@ -324,6 +345,17 @@ function ReservePanel({
         ) : null}
 
         {msg ? <p className={styles.msg}>{msg}</p> : null}
+
+        <DatePickerModal
+          open={dateOpen}
+          onClose={() => setDateOpen(false)}
+          onPick={(d) => {
+            setBookDate(d);
+            setDateOpen(false);
+          }}
+          single
+          planned={isToday ? [] : [bookDate]}
+        />
       </div>
     </div>,
     document.body,
@@ -333,6 +365,7 @@ function ReservePanel({
 function RoomCard({
   s,
   hero,
+  solo = false,
   bookings,
   nowMin,
   origin,
@@ -340,6 +373,7 @@ function RoomCard({
 }: {
   s: FloorSpace;
   hero: boolean;
+  solo?: boolean;
   bookings: FloorBooking[];
   nowMin: number;
   origin: string;
@@ -351,39 +385,70 @@ function RoomCard({
     : v.next
       ? `Next ${minToHHMM(v.next.startMin)}${v.next.name ? ` · ${shortName(v.next.name)}` : ''}`
       : 'Free all day';
-  return (
-    <article className={`${styles.card} ${hero ? styles.cardHero : ''} ${v.hot ? styles.hot : styles.calm}`}>
-      {s.bookable ? (
-        <div className={styles.qrChip}>
-          <Qr value={`${origin}/kiosk?room=${encodeURIComponent(s.id)}`} size={hero ? 88 : 62} />
-          <span className={styles.qrChipCaption}>Scan to reserve</span>
-        </div>
-      ) : null}
+  const qrSize = solo ? 150 : hero ? 88 : 62;
 
+  // The QR now sits IN FLOW beside the name (a flex row), not as an absolute corner chip, so the
+  // full-width status pane below can never slide under it.
+  const head = (
+    <div className={styles.cardTop}>
       <div className={styles.cardHead}>
         <span className={styles.roomName}>{s.name}</span>
         <span className={styles.roomMeta}>{roomMeta(s)}</span>
       </div>
-
-      <div className={`${styles.statusPane} ${v.current ? styles.paneBusy : styles.paneFree}`}>
-        <span className={styles.statusWord}>{v.current ? 'Reserved' : 'Available'}</span>
-        <span className={styles.statusSub}>{sub}</span>
-      </div>
-
-      <div className={styles.schedWrap}>
-        <span className={styles.schedLabel}>
-          <Icon name="calendar" size={hero ? 20 : 17} /> Today
-        </span>
-        <div className={styles.schedScroll}>
-          <Schedule items={v.schedule} nowMin={nowMin} />
-        </div>
-      </div>
-
       {s.bookable ? (
-        <button className={styles.tapBtn} onClick={() => onOpen(s.id)}>
-          <Icon name="door-open" size={hero ? 26 : 22} /> Tap to book / check in
-        </button>
+        <div className={styles.qrChip}>
+          <Qr value={`${origin}/kiosk?room=${encodeURIComponent(s.id)}`} size={qrSize} />
+          <span className={styles.qrChipCaption}>Scan to reserve</span>
+        </div>
       ) : null}
+    </div>
+  );
+  const statusPane = (
+    <div className={`${styles.statusPane} ${v.current ? styles.paneBusy : styles.paneFree}`}>
+      <span className={styles.statusWord}>{v.current ? 'Reserved' : 'Available'}</span>
+      <span className={styles.statusSub}>{sub}</span>
+    </div>
+  );
+  const schedule = (
+    <div className={styles.schedWrap}>
+      <span className={styles.schedLabel}>
+        <Icon name="calendar" size={hero ? 20 : 17} /> Today
+      </span>
+      <div className={styles.schedScroll}>
+        <Schedule items={v.schedule} nowMin={nowMin} />
+      </div>
+    </div>
+  );
+  const tapBtn = s.bookable ? (
+    <button className={styles.tapBtn} onClick={() => onOpen(s.id)}>
+      <Icon name="door-open" size={hero ? 26 : 22} /> Tap to book / check in
+    </button>
+  ) : null;
+
+  // Solo floor (a single room, no workspaces): spread the content across a 2-column layout so
+  // the big screen isn't mostly empty — identity + booking on one side, the day's schedule on the
+  // other (stacks on portrait).
+  if (solo) {
+    return (
+      <article className={`${styles.card} ${styles.cardHero} ${styles.soloCard} ${v.hot ? styles.hot : styles.calm}`}>
+        <div className={styles.soloGrid}>
+          <div className={styles.soloMain}>
+            {head}
+            {statusPane}
+            {tapBtn}
+          </div>
+          <div className={styles.soloSide}>{schedule}</div>
+        </div>
+      </article>
+    );
+  }
+
+  return (
+    <article className={`${styles.card} ${hero ? styles.cardHero : ''} ${v.hot ? styles.hot : styles.calm}`}>
+      {head}
+      {statusPane}
+      {schedule}
+      {tapBtn}
     </article>
   );
 }
@@ -451,6 +516,9 @@ export function FloorScreen({ floor }: { floor: number }) {
   const workspaces = spaces.filter((s) => s.type === 'Workspace');
   const hero = rooms.find((s) => isChapterHouse(s.name)) || (rooms.length === 1 ? rooms[0] : null);
   const otherRooms = rooms.filter((s) => s !== hero);
+  // A floor with a single room and no workspaces (e.g. first floor = Knight's Tale) gets a
+  // spread-out solo layout so the large display isn't left mostly empty.
+  const solo = rooms.length === 1 && workspaces.length === 0;
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
   const openSpace = openRoom ? rooms.find((s) => s.id === openRoom) || null : null;
 
@@ -474,9 +542,9 @@ export function FloorScreen({ floor }: { floor: number }) {
         <div className={styles.body}>
           <section className={styles.roomsBlock}>
             <h2 className={styles.h2}>Rooms &amp; pods</h2>
-            <div className={`${styles.roomGrid} ${hero ? styles.hasHero : ''}`}>
+            <div className={`${styles.roomGrid} ${hero ? styles.hasHero : ''} ${solo ? styles.soloWrap : ''}`}>
               {hero ? (
-                <RoomCard s={hero} hero bookings={bookings} nowMin={nowMin} origin={origin} onOpen={setOpenRoom} />
+                <RoomCard s={hero} hero solo={solo} bookings={bookings} nowMin={nowMin} origin={origin} onOpen={setOpenRoom} />
               ) : null}
               {otherRooms.map((s) => (
                 <RoomCard key={s.id} s={s} hero={false} bookings={bookings} nowMin={nowMin} origin={origin} onOpen={setOpenRoom} />
