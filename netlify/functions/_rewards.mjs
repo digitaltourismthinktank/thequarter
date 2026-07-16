@@ -11,8 +11,13 @@
  */
 import memberstackAdmin from '@memberstack/admin';
 import { listRecords, createRecord, updateRecord, T, F, esc } from './_airtable.mjs';
+import { sendEmail, emailShell, escapeHtml } from './_email.mjs';
+import { partnerToken } from './_partner.mjs';
 
 const MS_SECRET = process.env.MEMBERSTACK_SECRET_KEY;
+// Server equivalent of lib/site.ts SITE.url — same env + same default, so links in
+// partner emails point at the real domain and never hardcode it here.
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://www.thequarter.work').replace(/\/$/, '');
 
 // --- Economy (mirror of lib/rewards.ts — keep in sync) --------------------------
 export const POINTS_PER_POUND_VALUE = 100; // 100 points = £1 of reward value
@@ -282,6 +287,58 @@ export async function markPartnerPaid(partner, month) {
   return { settled };
 }
 
+// --- Partner activity email (best-effort, never blocks the redemption) -----------
+
+/**
+ * Email the partner's Contact when a member redeems one of their rewards. Loads the
+ * partner's float row for the Contact email + current balance, then sends the "a
+ * member just redeemed …" note with the £ value, updated balance, the monthly-payout
+ * reassurance and a link to their self-service balance page. Guarded end-to-end:
+ * sendEmail never throws, and any Airtable hiccup is swallowed — a redemption must
+ * never fail because of an email. Silently no-ops for inventory rewards / partners
+ * with no Contact email on file.
+ */
+async function notifyPartnerOfRedemption(reward) {
+  try {
+    if (!reward || !reward.partner) return;
+    const rows = await listRecords(T.partners, { filterByFormula: `{Partner}='${esc(reward.partner)}'`, maxRecords: 1 });
+    const row = rows[0];
+    if (!row) return;
+    const contactEmail = String(row.fields[F.partners.contactEmail] || '').trim();
+    if (!contactEmail) return; // e.g. our own inventory rewards — nobody to notify.
+
+    const value = poundsValue(reward.cost);
+    const balance = Number(row.fields[F.partners.balance]) || 0;
+    const total = Number(row.fields[F.partners.floatTotal]) || 0;
+    const gbp = (n) => `£${(Math.round((Number(n) || 0) * 100) / 100).toFixed(2)}`;
+    const link = `${SITE_URL}/partner/${partnerToken(reward.partner)}`;
+    const funded = reward.funding !== 'inventory' && total > 0;
+
+    const body = `
+      <p style="margin:0 0 14px;">Good news — a Quarter member has just redeemed a reward with you.</p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #ece3d2;border-radius:12px;overflow:hidden;margin:0 0 16px;">
+        <tr><td style="padding:12px 16px;border-bottom:1px solid #f0e8d8;font-size:13px;color:#8a8172;">Reward</td><td style="padding:12px 16px;border-bottom:1px solid #f0e8d8;text-align:right;font-weight:700;">${escapeHtml(reward.title)}</td></tr>
+        <tr><td style="padding:12px 16px;border-bottom:1px solid #f0e8d8;font-size:13px;color:#8a8172;">Value</td><td style="padding:12px 16px;border-bottom:1px solid #f0e8d8;text-align:right;font-weight:700;">${gbp(value)}</td></tr>
+        ${funded ? `<tr><td style="padding:12px 16px;font-size:13px;color:#8a8172;">Float balance</td><td style="padding:12px 16px;text-align:right;font-weight:700;">${gbp(balance)}</td></tr>` : ''}
+      </table>
+      ${funded ? `<p style="margin:0 0 16px;font-size:13px;line-height:1.6;color:#8a8172;">This ${gbp(value)} is drawn from your float when the member's voucher is scanned at the till, so your balance updates then. The live figure is always on your balance page.</p>` : ''}
+      <p style="margin:0 0 16px;">
+        <a href="${link}" style="display:inline-block;background:#b08a3e;color:#fff;text-decoration:none;font-weight:700;padding:11px 20px;border-radius:10px;">View your balance</a>
+      </p>
+      <p style="margin:0;font-size:13px;line-height:1.6;color:#8a8172;">
+        The Quarter settles partner payouts monthly — you don't need to invoice; we reconcile and pay per our agreement. Bookmark the balance link above to check in any time.
+      </p>`;
+
+    await sendEmail({
+      to: contactEmail,
+      subject: `A member just redeemed ${reward.title} at The Quarter`,
+      html: emailShell('A member just redeemed a reward', body, `${reward.title} — ${gbp(value)}`),
+    });
+  } catch {
+    /* best-effort — never block or fail the redemption */
+  }
+}
+
 // --- Redeem a reward (deduct points + log; the voucher token is minted by caller) -
 
 export async function redeemReward(member, rewardId) {
@@ -304,6 +361,9 @@ export async function redeemReward(member, rewardId) {
     [F.redemptions.status]: 'redeemed',
     [F.redemptions.at]: new Date().toISOString(),
   });
+  // Tell the partner (best-effort). Awaited-but-guarded so it completes within the
+  // serverless lifecycle yet can never throw or block the redemption result.
+  await notifyPartnerOfRedemption(reward);
   return { ok: true, balance, reward };
 }
 

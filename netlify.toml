@@ -34,6 +34,13 @@
   to = "/i/"
   status = 200
 
+# Partner self-service balance is the same shape: one shell served for any
+# /partner/<token>, reading the token from the path client-side (no login).
+[[redirects]]
+  from = "/partner/*"
+  to = "/partner/"
+  status = 200
+
 # --- Canonical host: apex → www (www is the primary domain), matching SITE.url +
 #     every page's canonical, so search engines consolidate on one host. ---
 [[redirects]]

@@ -645,6 +645,25 @@ export interface VerifyResult {
 export const verifyToken = (token: string) =>
   call<VerifyResult>(`verify?token=${encodeURIComponent(token)}`, { auth: false });
 
+// ---- Partner self-service balance (public, no auth — token in the URL) ----
+export interface PartnerRedemption {
+  reward: string;
+  /** £ value = points cost ÷ 100. */
+  value: number;
+  at: string | null;
+}
+export interface PartnerBalance {
+  partner: string;
+  balance: number;
+  floatTotal: number;
+  status: string;
+  usesThisMonth: number;
+  lastUsed: string | null;
+  redemptions: PartnerRedemption[];
+}
+export const getPartnerBalance = (token: string) =>
+  call<PartnerBalance>(`partner?token=${encodeURIComponent(token)}`, { auth: false });
+
 // ---- Refer a friend ----
 export interface ReferralFriend {
   name: string;

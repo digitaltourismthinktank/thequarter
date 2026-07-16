@@ -1534,6 +1534,9 @@ function ScreensPane() {
           <a className={styles.shortcut} href="/dashboard">
             <Icon name="user" size={16} color="var(--gold-700)" /> My member view
           </a>
+          <a className={styles.shortcut} href="/admin-guide">
+            <Icon name="book" size={16} color="var(--gold-700)" /> How it works (rewards &amp; partners)
+          </a>
           {spaces
             .filter((s) => s.bookable)
             .map((s) => (
@@ -2016,6 +2019,13 @@ function PartnersPane() {
 
   return (
     <div>
+      <a href="/admin-guide" className={styles.guideCallout}>
+        <Icon name="book" size={18} color="var(--gold-700)" />
+        <span>
+          <strong>New to partners &amp; floats?</strong> Read how it all works — enrolling a partner, how points map to pounds, and how payouts settle.
+        </span>
+        <span className={styles.guideCalloutGo} aria-hidden="true">→</span>
+      </a>
       {/* Payouts — what we owe each partner for rewards we settle. Pick a month, pay
           from Starling, then mark it paid (the balance resets). */}
       <div className={styles.payouts}>

@@ -1120,6 +1120,36 @@ select.input {
   background: var(--sand-100);
 }
 
+/* "How it works" callout at the top of the Partners pane */
+.guideCallout {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  margin: 0 0 18px;
+  border-radius: var(--radius-lg, 14px);
+  border: 1px solid var(--gold-300);
+  background: var(--gold-100);
+  color: var(--ink-900);
+  text-decoration: none;
+}
+.guideCallout:hover {
+  border-color: var(--gold-500);
+}
+.guideCallout span {
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+.guideCallout strong {
+  font-weight: var(--fw-semibold);
+}
+.guideCalloutGo {
+  margin-left: auto;
+  color: var(--gold-700);
+  font-weight: var(--fw-semibold);
+  font-size: var(--text-lg);
+}
+
 /* ---- Mobile (~390px) usability pass — desktop untouched ---- */
 @media (max-width: 720px) {
   /* Booking/summary rows: wrap instead of overflowing; long "who" column
