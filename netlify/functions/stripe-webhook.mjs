@@ -27,6 +27,7 @@ import { pointsForGBP, appendLedger, WELCOME_BONUS, creditReferral, CARNET_AMOUN
 import { listRecords, createRecord, T, F, airtableReady, esc } from './_airtable.mjs';
 import { londonWallClockToISO } from './_time.mjs';
 import { sendEmail, emailShell, escapeHtml, OPS_EMAIL } from './_email.mjs';
+import { pushToEmail } from './_push.mjs';
 
 const MS_SECRET = process.env.MEMBERSTACK_SECRET_KEY;
 const STRIPE_SECRET = process.env.STRIPE_SECRET_KEY;
@@ -199,6 +200,7 @@ async function sendRoomBookingEmails({ m, total, people, lunch }) {
         'Your Quarter room booking is confirmed',
       ),
     });
+    await pushToEmail(m.email, { title: 'Booking confirmed', body: `${m.spaceName || 'Room'} · ${when}`, url: '/dashboard/' });
   }
   await sendEmail({
     to: OPS_EMAIL,
@@ -209,6 +211,7 @@ async function sendRoomBookingEmails({ m, total, people, lunch }) {
       'A new room booking was just paid',
     ),
   });
+  await pushToEmail(OPS_EMAIL, { title: 'New room booking', body: `${m.spaceName || 'Room'} · ${m.company || m.name || 'guest'}`, url: '/dashboard/' });
 }
 
 /**
@@ -257,12 +260,14 @@ async function sendDayPassEmails({ email, name, date, total }) {
         'Your Quarter Day Pass is booked',
       ),
     });
+    await pushToEmail(email, { title: 'Day Pass booked', body: `You're in for ${date}.`, url: '/dashboard/' });
   }
   await sendEmail({
     to: OPS_EMAIL,
     subject: `New Day Pass — ${name || email || 'guest'} (${date})`,
     html: emailShell('New Day Pass', `${body}<p style="margin:12px 0 0;">Guest: ${escapeHtml(name || '—')} · ${escapeHtml(email || '—')}</p>`, 'A Day Pass was just paid'),
   });
+  await pushToEmail(OPS_EMAIL, { title: 'New Day Pass', body: `${name || email || 'guest'} · ${date}`, url: '/dashboard/' });
 }
 
 /**
@@ -286,12 +291,14 @@ async function sendCarnetEmails({ email, name, passes, total }) {
         'Your Quarter day-pass carnet is ready',
       ),
     });
+    await pushToEmail(email, { title: 'Passes added', body: `${passes} day ${passes === 1 ? 'pass is' : 'passes are'} on your account.`, url: '/dashboard/' });
   }
   await sendEmail({
     to: OPS_EMAIL,
     subject: `New carnet — ${name || email || 'member'} (${passes} passes)`,
     html: emailShell('New carnet', `${body}<p style="margin:12px 0 0;">Buyer: ${escapeHtml(name || '—')} · ${escapeHtml(email || '—')}</p>`, 'A day-pass carnet was just bought'),
   });
+  await pushToEmail(OPS_EMAIL, { title: 'New carnet', body: `${name || email || 'member'} · ${passes} passes`, url: '/dashboard/' });
 }
 
 const normName = (s) => String(s ?? '').toLowerCase().replace(/[‘’']/g, "'").replace(/\s+/g, ' ').trim();
@@ -366,12 +373,14 @@ async function sendPrivatisationEmails(m, toEmail) {
         'Your Quarter team room is reserved',
       ),
     });
+    await pushToEmail(to, { title: 'Team room reserved', body: `${m.roomName || 'Your team room'} is set up.`, url: '/dashboard/' });
   }
   await sendEmail({
     to: OPS_EMAIL,
     subject: `New privatisation — ${m.roomName || ''} (${m.company || ''})`,
     html: emailShell('New privatisation', `${body}<p style="margin:12px 0 0;">Company: ${escapeHtml(m.company || '')}<br/>Contact: ${escapeHtml(m.name || '')} · ${escapeHtml(to)}</p>`, 'A team room was just privatised'),
   });
+  await pushToEmail(OPS_EMAIL, { title: 'New privatisation', body: `${m.roomName || 'Team room'} · ${m.company || ''}`, url: '/dashboard/' });
 }
 
 const memberFirstName = (member) => String(member?.customFields?.['first-name'] || '').trim();
@@ -388,6 +397,7 @@ async function sendWelcomeEmail(email, member) {
       'Welcome to The Quarter',
     ),
   });
+  await pushToEmail(email, { title: 'Welcome to The Quarter', body: 'Your membership is live — pop in any time.', url: '/dashboard/' });
 }
 
 async function sendPaymentFailedEmail(email, member) {
@@ -402,6 +412,7 @@ async function sendPaymentFailedEmail(email, member) {
       'Please update your payment card',
     ),
   });
+  await pushToEmail(email, { title: 'Action needed: payment', body: "We couldn't take your last payment — update your card.", url: '/plan/' });
 }
 
 /**

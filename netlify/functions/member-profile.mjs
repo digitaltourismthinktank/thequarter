@@ -10,6 +10,7 @@
 import memberstackAdmin from '@memberstack/admin';
 import { verifyMember, tokenFromRequest, memberEmail } from './_member.mjs';
 import { sendEmail, emailShell, escapeHtml, OPS_EMAIL } from './_email.mjs';
+import { pushToEmail } from './_push.mjs';
 
 const MS_SECRET = process.env.MEMBERSTACK_SECRET_KEY;
 const json = (b, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { 'content-type': 'application/json' } });
@@ -52,12 +53,14 @@ export default async function handler(req) {
           'We’ve logged your VAT invoice request',
         ),
       });
+      await pushToEmail(email, { title: 'Invoice request received', body: "We'll issue your VAT invoice within a business day.", url: '/plan/' });
     }
     await sendEmail({
       to: OPS_EMAIL,
       subject: `VAT invoice requested — ${email || vm.member.id}`,
       html: emailShell('VAT invoice requested', `<p><strong>${escapeHtml(email || '')}</strong> has requested a VAT invoice.</p>`, 'A member requested a VAT invoice'),
     });
+    await pushToEmail(OPS_EMAIL, { title: 'VAT invoice requested', body: `${email || vm.member.id}`, url: '/admin/' });
   }
 
   return json({ ok: true, bday: meta.bday || null, company: meta.company || null, vatRequested: meta.vatRequested || null });

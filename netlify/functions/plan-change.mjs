@@ -17,6 +17,7 @@
  */
 import memberstackAdmin from '@memberstack/admin';
 import { sendEmail, emailShell, escapeHtml, OPS_EMAIL } from './_email.mjs';
+import { pushToEmail } from './_push.mjs';
 
 const MS_SECRET = process.env.MEMBERSTACK_SECRET_KEY;
 const STRIPE_SECRET = process.env.STRIPE_SECRET_KEY;
@@ -35,6 +36,7 @@ async function notifyPlanChange(member, email, what) {
     subject: `Plan change — ${what} (${email})`,
     html: emailShell('Plan change', `<p><strong>${escapeHtml(email)}</strong> — ${escapeHtml(what)} their plan.</p>`, `A member ${what} their plan`),
   });
+  await pushToEmail(OPS_EMAIL, { title: 'Plan change', body: `${email} · ${what}`, url: '/admin/' });
   await sendEmail({
     to: email,
     replyTo: OPS_EMAIL,

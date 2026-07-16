@@ -25,6 +25,7 @@ import {
 } from './_rewards.mjs';
 import { isQuietDay } from './_busyness.mjs';
 import { sendEmail, emailShell, escapeHtml, OPS_EMAIL } from './_email.mjs';
+import { pushToEmail } from './_push.mjs';
 
 const MS_SECRET = process.env.MEMBERSTACK_SECRET_KEY;
 const STRIPE_SECRET = process.env.STRIPE_SECRET_KEY;
@@ -90,6 +91,7 @@ export default async function handler(req) {
           'Your Quarter day-pass carnet (TEST)',
         ),
       });
+      await pushToEmail(email, { title: 'Passes added', body: `${passes} day ${passes === 1 ? 'pass is' : 'passes are'} on your account.`, url: '/dashboard/' });
       return json({ ok: true, comped: true });
     }
 

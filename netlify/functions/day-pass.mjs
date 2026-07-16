@@ -9,6 +9,7 @@
  */
 import { createRecord, T, F, airtableReady } from './_airtable.mjs';
 import { sendEmail, emailShell, escapeHtml, OPS_EMAIL } from './_email.mjs';
+import { pushToEmail } from './_push.mjs';
 
 const STRIPE_SECRET = process.env.STRIPE_SECRET_KEY;
 const DAY_PASS_PENCE = 2160; // £21.60 inc VAT — keep in step with DAY_PASS_PRICE (lib/rewards.ts)
@@ -79,6 +80,7 @@ export default async function handler(req) {
         'Your Quarter Day Pass (TEST) is booked',
       ),
     });
+    await pushToEmail(email, { title: 'Day Pass booked', body: `You're in for ${date}.`, url: '/dashboard/' });
     return json({ ok: true, comped: true });
   }
 

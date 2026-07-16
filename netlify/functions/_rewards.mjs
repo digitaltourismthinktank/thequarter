@@ -13,6 +13,7 @@ import memberstackAdmin from '@memberstack/admin';
 import { listRecords, createRecord, updateRecord, T, F, esc } from './_airtable.mjs';
 import { sendEmail, emailShell, escapeHtml } from './_email.mjs';
 import { partnerToken } from './_partner.mjs';
+import { pushToEmail } from './_push.mjs';
 
 const MS_SECRET = process.env.MEMBERSTACK_SECRET_KEY;
 // Server equivalent of lib/site.ts SITE.url — same env + same default, so links in
@@ -40,11 +41,20 @@ export const LEVEL_TIERS = [
   { min: 2500, boost: 1.3 }, // Family
   { min: 6000, boost: 1.5 }, // Ambassador
 ];
+// Display names aligned 1:1 with LEVEL_TIERS (for the level-up push copy).
+export const LEVEL_NAMES = ['Newbie', 'Regular', 'Family', 'Ambassador'];
 export function levelBoost(lifetime) {
   let b = 1;
   const n = Number(lifetime) || 0;
   for (const l of LEVEL_TIERS) if (n >= l.min) b = l.boost;
   return b;
+}
+/** Index of the highest LEVEL_TIERS band a lifetime total has reached (0-based). */
+export function levelIndex(lifetime) {
+  const n = Number(lifetime) || 0;
+  let idx = 0;
+  for (let i = 0; i < LEVEL_TIERS.length; i++) if (n >= LEVEL_TIERS[i].min) idx = i;
+  return idx;
 }
 /** Lifetime points earned. Back-fills from the current balance for members from
  *  before lifetime tracking, so nobody is demoted to Newcomer on rollout. */
@@ -94,9 +104,23 @@ export async function awardPoints(member, delta, reason, ref = '') {
   await appendLedger(email, d, reason, ref);
   const next = Math.max(0, memberPoints(member) + d);
   // Lifetime only ever grows (earning), so redemptions don't demote a member's level.
-  const life = memberLifetimePoints(member) + (d > 0 ? d : 0);
+  const oldLife = memberLifetimePoints(member);
+  const life = oldLife + (d > 0 ? d : 0);
   const admin = memberstackAdmin.init(MS_SECRET);
   await admin.members.update({ id: member.id, data: { metaData: { ...(member.metaData || {}), points: next, lifetimePoints: life } } });
+  // Level-up push (best-effort). Only on a genuine earn (d>0) that crosses a tier boundary.
+  // Guarded end-to-end so the index math + push can never change awardPoints' return or throw.
+  if (d > 0 && email) {
+    try {
+      const oldIdx = levelIndex(oldLife);
+      const newIdx = levelIndex(life);
+      if (newIdx > oldIdx) {
+        await pushToEmail(email, { title: 'You reached a new level', body: `You're now ${LEVEL_NAMES[newIdx]} at The Quarter.`, url: '/rewards/' });
+      }
+    } catch {
+      /* level-up push is best-effort — never affect the award */
+    }
+  }
   return next;
 }
 
@@ -361,6 +385,8 @@ export async function redeemReward(member, rewardId) {
     [F.redemptions.status]: 'redeemed',
     [F.redemptions.at]: new Date().toISOString(),
   });
+  // Nudge the member their voucher is live (best-effort — pushToEmail can't throw).
+  await pushToEmail(email, { title: 'Your reward is ready', body: `Show your QR at the till for ${reward.title}.`, url: '/rewards/' });
   // Tell the partner (best-effort). Awaited-but-guarded so it completes within the
   // serverless lifecycle yet can never throw or block the redemption result.
   await notifyPartnerOfRedemption(reward);

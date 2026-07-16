@@ -27,6 +27,7 @@ import { BUSINESS, hhmmToMin, londonWallClockToISO, isoToLondonMin, londonNow } 
 import { isClosedDay } from './_holidays.mjs';
 import { verifyMember, memberEmail, memberName, tokenFromRequest } from './_member.mjs';
 import { sendEmail, emailShell, escapeHtml, OPS_EMAIL } from './_email.mjs';
+import { pushToEmail } from './_push.mjs';
 
 /** Default free meeting-room hours per member per calendar month (overridable per
  *  member via metaData.meetingRoomHoursCap). Pods are free + never counted here. */
@@ -302,6 +303,7 @@ export default async function handler(req) {
           'Your Quarter room booking (TEST) is confirmed',
         ),
       });
+      await pushToEmail(email, { title: 'Booking confirmed', body: `${space.name || 'Room'} · ${when}`, url: '/dashboard/' });
       return json({ ok: true, comped: true });
     }
 
