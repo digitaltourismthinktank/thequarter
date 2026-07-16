@@ -18,7 +18,7 @@ import { pushToEmail } from './_push.mjs';
 const MS_SECRET = process.env.MEMBERSTACK_SECRET_KEY;
 // Server equivalent of lib/site.ts SITE.url — same env + same default, so links in
 // partner emails point at the real domain and never hardcode it here.
-const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://www.thequarter.work').replace(/\/$/, '');
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://thequarter.work').replace(/\/$/, '');
 
 // --- Economy (mirror of lib/rewards.ts — keep in sync) --------------------------
 export const POINTS_PER_POUND_VALUE = 100; // 100 points = £1 of reward value

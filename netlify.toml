@@ -41,13 +41,9 @@
   to = "/partner/"
   status = 200
 
-# --- Canonical host: apex → www (www is the primary domain), matching SITE.url +
-#     every page's canonical, so search engines consolidate on one host. ---
-[[redirects]]
-  from = "https://thequarter.work/*"
-  to = "https://www.thequarter.work/:splat"
-  status = 301
-  force = true
+# --- Canonical host = the bare apex thequarter.work (set as the PRIMARY domain in
+#     Netlify, which auto-301s www → apex). No app-level host redirect here — one would
+#     fight Netlify's primary-domain redirect and cause an apex⇄www loop. ---
 
 # --- Legacy paths from the previous site → the new structure (301, so indexed old
 #     URLs + link equity carry over). Mapped from the OLD site's own sitemap.xml

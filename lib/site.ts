@@ -8,7 +8,7 @@ export const SITE = {
   tagline: 'So much more than a workspace',
   description:
     'A boutique co-working space right next to Canterbury Cathedral, with incredible Cathedral views, great workspaces and free coffee and snacks throughout the day.',
-  url: process.env.NEXT_PUBLIC_SITE_URL ?? 'https://www.thequarter.work',
+  url: process.env.NEXT_PUBLIC_SITE_URL ?? 'https://thequarter.work',
   locale: 'en_GB',
   address: '1st & 2nd Floor, 27–28 Burgate, Canterbury, Kent, CT1 2HA',
   // Operating entity (use everywhere — footer, schema, legal pages).
