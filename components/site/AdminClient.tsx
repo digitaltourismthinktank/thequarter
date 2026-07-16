@@ -163,9 +163,34 @@ function daysToBirthday(bday: string | null): number | null {
   return Math.round((next.getTime() - today.getTime()) / 86400000);
 }
 
+const ADMIN_TABS = ['today', 'members', 'rooms', 'events', 'content', 'partners', 'birthdays', 'screens'] as const;
+type AdminTab = (typeof ADMIN_TABS)[number];
+const tabFromHash = (): AdminTab => {
+  if (typeof window === 'undefined') return 'today';
+  const h = window.location.hash.replace(/^#/, '');
+  return (ADMIN_TABS as readonly string[]).includes(h) ? (h as AdminTab) : 'today';
+};
+
 export function AdminClient() {
   const { loading, member } = useMember();
-  const [tab, setTab] = useState<'today' | 'members' | 'rooms' | 'events' | 'content' | 'partners' | 'birthdays' | 'screens'>('today');
+  const [tab, setTabState] = useState<AdminTab>('today');
+  // Deep-linkable tabs: admin notification emails link to /admin/#rooms, #members, #partners etc.
+  const setTab = useCallback((t: AdminTab) => {
+    setTabState(t);
+    if (typeof window !== 'undefined') {
+      try {
+        window.history.replaceState(null, '', `#${t}`);
+      } catch {
+        window.location.hash = t;
+      }
+    }
+  }, []);
+  useEffect(() => {
+    setTabState(tabFromHash());
+    const onHash = () => setTabState(tabFromHash());
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
 
   useEffect(() => {
     if (loading || member) return;

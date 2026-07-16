@@ -68,6 +68,30 @@
   font-size: var(--text-base);
   padding: 8px 0;
 }
+.eventSkeleton {
+  pointer-events: none;
+}
+.skelLine {
+  height: 13px;
+  border-radius: 6px;
+  margin: 6px 0;
+  background: linear-gradient(90deg, var(--border-subtle) 0%, var(--surface-page) 50%, var(--border-subtle) 100%);
+  background-size: 200% 100%;
+  animation: skelShimmer 1.3s ease-in-out infinite;
+}
+@keyframes skelShimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skelLine {
+    animation: none;
+  }
+}
 .eventTime {
   display: flex;
   align-items: center;

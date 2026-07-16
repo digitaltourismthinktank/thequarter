@@ -43,7 +43,28 @@ export function PublicEventsList() {
   const today = new Date().toISOString().slice(0, 10);
   const upcoming = events.filter((e) => e.start && e.start.slice(0, 10) >= today);
 
-  if (!loaded) return <p className={styles.state}>Loading what&rsquo;s on…</p>;
+  // Reserve column height with skeleton cards while the client fetch runs, so the list column
+  // doesn't collapse to one line next to the tall sticky image (which read as "broken until loaded").
+  if (!loaded) {
+    return (
+      <div className={styles.list} aria-hidden="true">
+        {[0, 1, 2].map((i) => (
+          <article key={i} className={`${styles.event} ${styles.eventSkeleton}`}>
+            <div className={styles.date}>
+              <div className={styles.skelLine} style={{ width: 24 }} />
+              <div className={styles.skelLine} style={{ width: 32, height: 24 }} />
+            </div>
+            <div className={styles.eventBody}>
+              <div className={styles.skelLine} style={{ width: 90 }} />
+              <div className={styles.skelLine} style={{ width: '70%', height: 20 }} />
+              <div className={styles.skelLine} style={{ width: '100%' }} />
+              <div className={styles.skelLine} style={{ width: '40%' }} />
+            </div>
+          </article>
+        ))}
+      </div>
+    );
+  }
   if (upcoming.length === 0) {
     return <p className={styles.state}>Nothing on the calendar just yet — check back soon, or come in for a Day Pass.</p>;
   }

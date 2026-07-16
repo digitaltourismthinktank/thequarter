@@ -172,6 +172,11 @@
   max-width: var(--container-max);
   margin: 0 auto;
   padding: 36px var(--gutter) 88px;
+  /* Safety net: no single wide descendant (e.g. an admin table/form) may push the whole
+     page frame wider than the viewport on a phone. Wide blocks scroll inside their own
+     overflow-x:auto containers instead. */
+  min-width: 0;
+  overflow-x: hidden;
 }
 .wide {
   max-width: var(--container-wide);
