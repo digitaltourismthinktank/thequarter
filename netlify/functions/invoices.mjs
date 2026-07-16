@@ -109,8 +109,9 @@ export default async function handler(req) {
     if (sub) await stripe(`/v1/subscriptions/${sub.id}`, 'POST', { default_payment_method: pm });
     // Clear any payment-issue flag — they've just fixed their card.
     if (member?.metaData?.paymentIssue) {
-      const meta = { ...(member.metaData || {}) };
-      delete meta.paymentIssue;
+      // NULL to clear, not delete — Memberstack merges metaData by key, so deleting
+      // (omitting) the key leaves the old flag in place and the dunning warning returns.
+      const meta = { ...(member.metaData || {}), paymentIssue: null };
       const admin = memberstackAdmin.init(MS_SECRET);
       await admin.members.update({ id: member.id, data: { metaData: meta } });
     }

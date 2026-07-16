@@ -13,7 +13,7 @@ export const PLAN_ALLOWANCE = {
   'pln_citizen-plan-q9oa04p9': null, // Citizen — unlimited
   'pln_resident-plan-mqjy0f6w': 10, // Resident — 10/month
   'pln_visitor-plan-blk50re2': 5, // Visitor — 5/month
-  'pln_hybrid-plan-r4k60rjp': 12, // Hybrid Office — 12/year
+  'pln_hybrid-plan-r4k60rjp': 1, // Hybrid Office — 1 day / month, auto-burns, resets monthly, no rollover
   'pln_daily-plan-45nv0v26': 1, // Day Pass — one-off (no recurring renewal)
 };
 
@@ -50,6 +50,19 @@ export function tierForMember(member) {
     if (t && (TIER_RANK[t] || 0) > (TIER_RANK[best] || 0)) best = t;
   }
   return best;
+}
+
+/**
+ * Hybrid Office — a Stripe ANNUAL plan whose day allowance is monthly (1/month,
+ * auto-burns, no rollover). Its monthly reset is owned by renew-cron.mjs; any reset
+ * that flows through renewMember (annual Stripe renewal, plan switch) must be FLAT
+ * (set exactly to the allowance), never the 1-month rollover — Hybrid never carries days.
+ */
+export const HYBRID_PLAN_ID = 'pln_hybrid-plan-r4k60rjp';
+
+/** True if a member holds the Hybrid Office plan tag. */
+export function isHybridMember(member) {
+  return (member?.planConnections || []).some((c) => (typeof c === 'string' ? c : c?.planId) === HYBRID_PLAN_ID);
 }
 
 /** The dedicated "Paused" Memberstack plan + the Stripe £0 "Pause my Plan" price. */
@@ -168,9 +181,12 @@ export async function renewMember(secret, email, { renewalDate, resetDays = true
   } else if (resetDays) {
     const allowance = allowanceForMember(member);
     if (allowance !== undefined) {
+      // Hybrid Office never rolls over — its allowance is monthly and auto-burns, so any
+      // reset (annual Stripe renewal, plan switch) is FLAT to the allowance, not rollover.
+      const forceFlat = flat || isHybridMember(member);
       // flat = set to the plan's base allowance (used on a plan switch);
       // otherwise apply the 1-month rollover (used on a genuine renewal).
-      fields['days-remaining'] = flat
+      fields['days-remaining'] = forceFlat
         ? allowance === null
           ? 'Unlimited'
           : String(allowance)

@@ -183,13 +183,15 @@ export const PLAN_BENEFITS: Partial<Record<PlanId, PlanBenefit[]>> = {
  * Monthly day allowance per plan (null = unlimited). Mirrors the server-side
  * PLAN_ALLOWANCE in netlify/functions/_quarter-sync.mjs; used on the dashboard to
  * show how many of the member's remaining days are rolled over from last month.
+ * Hybrid Office is 1 day PER MONTH — it auto-burns and never rolls over (the monthly
+ * reset is owned by renew-cron.mjs), so the dashboard shows a monthly allowance of 1.
  */
 export const PLAN_DAY_ALLOWANCE: Record<PlanId, number | null> = {
   'day-pass': 1,
   visitor: 5,
   resident: 10,
   citizen: null,
-  'hybrid-office': 12,
+  'hybrid-office': 1,
 };
 
 /** Our plan slug → Memberstack plan id (for the post-payment /welcome signup). */

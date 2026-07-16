@@ -203,6 +203,8 @@ function friendly(code?: string): string {
       return 'Weekends are by request — pick a weekend day and we’ll confirm.';
     case 'weekend-pending':
       return 'Your weekend request is in — we’ll confirm by email before the day.';
+    case 'no-allowance':
+      return 'You’ve used your allowance for this period — no days left.';
     case 'no-token':
     case 'invalid-token':
     case 'verify-failed':

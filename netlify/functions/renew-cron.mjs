@@ -21,7 +21,7 @@
  * Env: MEMBERSTACK_SECRET_KEY.
  */
 import memberstackAdmin from '@memberstack/admin';
-import { renewMember, formatDate } from './_quarter-sync.mjs';
+import { renewMember, formatDate, HYBRID_PLAN_ID, isHybridMember, PLAN_ALLOWANCE } from './_quarter-sync.mjs';
 import { londonNow } from './_time.mjs';
 
 const MS_SECRET = process.env.MEMBERSTACK_SECRET_KEY;
@@ -49,10 +49,13 @@ export default async function handler() {
   const today = londonNow().dateStr; // 'YYYY-MM-DD'
   const [ty, tm, td] = today.split('-').map(Number);
   const todayNum = numOf(ty, tm, td);
+  const monthKey = today.slice(0, 7); // 'YYYY-MM' (Europe/London) — Hybrid monthly reset key
+  const HYBRID_ALLOWANCE = String(PLAN_ALLOWANCE[HYBRID_PLAN_ID] ?? 1);
 
   let scanned = 0;
   let renewed = 0;
   let failed = 0;
+  let hybridReset = 0;
 
   let after;
   for (let i = 0; i < 50; i += 1) {
@@ -67,6 +70,31 @@ export default async function handler() {
     for (const m of data) {
       scanned += 1;
       try {
+        // ---- Hybrid Office monthly reset (independent of manualBilling) ----
+        // Hybrid is a Stripe ANNUAL plan but its 1-day allowance is monthly and auto-burns.
+        // Once per member per calendar month, reset the balance FLAT to the allowance (no
+        // rollover) and stamp the month key. Idempotent: only fires when the stored month key
+        // differs from the current one — so a re-run today (or a brand-new Hybrid member with
+        // no stamp yet) initialises exactly once, then no-ops for the rest of the month.
+        if (isHybridMember(m)) {
+          try {
+            const stored = m.metaData?.hybridMonth;
+            if (stored !== monthKey) {
+              // First sight (no stamp yet): the member already holds their freshly
+              // seeded/renewed balance from signup, so only STAMP the month — never reset
+              // here, or a member who joined + used their day this month would be handed a
+              // second one. A genuine PRIOR month → reset FLAT to the allowance (auto-burn).
+              const data = { metaData: { ...(m.metaData || {}), hybridMonth: monthKey } };
+              if (stored) data.customFields = { 'days-remaining': HYBRID_ALLOWANCE };
+              await admin.members.update({ id: m.id, data });
+              if (stored) hybridReset += 1;
+            }
+          } catch (e) {
+            failed += 1;
+            console.error('[renew-cron] hybrid reset failed', m?.id, e);
+          }
+        }
+
         if (m.metaData?.manualBilling !== true) continue; // Stripe-managed members never touched
         const renewal = parseRenewal(m.customFields?.['renewal-date']);
         if (!renewal) continue; // no/garbled renewal date → nothing to do
@@ -103,7 +131,7 @@ export default async function handler() {
     after = res?.endCursor;
   }
 
-  const summary = { scanned, renewed, failed, date: today };
+  const summary = { scanned, renewed, failed, hybridReset, date: today };
   console.log('[renew-cron]', JSON.stringify(summary));
   return new Response(JSON.stringify(summary), { status: 200, headers: { 'content-type': 'application/json' } });
 }

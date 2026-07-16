@@ -163,10 +163,16 @@ export function DashboardClient() {
   const renewal = memberRenewalDate(member);
   const doorCode = memberDoorCode(member);
   const planAllowance = matched ? PLAN_DAY_ALLOWANCE[matched.id] : undefined;
+  // Override-aware denominator: a member on a bespoke allowance carries a numeric
+  // customFields['allowance-override'] (mirrors the server's allowanceForMember). When it
+  // parses to a valid positive number it wins over the plan default, so the bar reads right.
+  const overrideRaw = member.customFields?.['allowance-override'];
+  const overrideNum = overrideRaw != null && String(overrideRaw).trim() !== '' ? Number(overrideRaw) : NaN;
+  const allowanceDenominator = Number.isFinite(overrideNum) && overrideNum > 0 ? overrideNum : planAllowance;
   const daysNum = days !== null ? parseInt(days, 10) : NaN;
   const daysProgress =
-    planAllowance != null && planAllowance > 0 && Number.isFinite(daysNum)
-      ? Math.max(0, Math.min(100, Math.round((daysNum / planAllowance) * 100)))
+    allowanceDenominator != null && allowanceDenominator > 0 && Number.isFinite(daysNum)
+      ? Math.max(0, Math.min(100, Math.round((daysNum / allowanceDenominator) * 100)))
       : undefined;
   const debug = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === '1';
   const band = today && !today.closed ? today.band ?? null : null;

@@ -24,12 +24,13 @@ export default async function handler(req) {
   if (!vm.ok) return json({ error: vm.reason }, 401);
 
   const meta = { ...(vm.member.metaData || {}) };
-  if (body.bday === null) delete meta.bday;
+  // NULL to clear, not delete — Memberstack merges metaData by key, so an omitted
+  // key keeps its old value (it would reappear on refresh). Setting null clears it.
+  if (body.bday === null) meta.bday = null;
   else if (typeof body.bday === 'string' && /^\d{2}-\d{2}$/.test(body.bday)) meta.bday = body.bday;
   if (typeof body.company === 'string') {
     const c = body.company.trim();
-    if (c) meta.company = c;
-    else delete meta.company;
+    meta.company = c || null;
   }
   // A VAT-invoice request — flagged for admin to action manually (our Stripe prices
   // are VAT-inclusive). Stamped with the request time; admin clears it when done.

@@ -206,6 +206,13 @@ async function privatisationsForDate(date) {
   return out;
 }
 
+/** A single member's check-in records for a given date (mirrors checkin.mjs's checkinsFor). */
+async function checkinsForMemberDate(email, dateStr) {
+  return listRecords(T.checkins, {
+    filterByFormula: `AND(LOWER({Member email})='${esc(String(email || '').toLowerCase())}', DATETIME_FORMAT({Date}, 'YYYY-MM-DD')='${esc(dateStr)}')`,
+  });
+}
+
 async function checkinsForDate(date) {
   // Include Planned (booked ahead, not yet arrived) as well as Checked-in, so
   // "who's in" reflects everyone expected that day — not just those on site now.
@@ -407,8 +414,10 @@ export default async function handler(req) {
     const r = await admin.members.retrieve({ id: body.memberId });
     const m = r?.data;
     if (!m) return json({ error: 'not-found' }, 404);
-    const meta = { ...(m.metaData || {}) };
-    delete meta.vatRequested;
+    // Memberstack MERGES metaData by key, so `delete meta.vatRequested` doesn't remove it —
+    // the key survives and the request reappears on refresh. Explicitly NULL it so the merge
+    // actually clears it. Readers treat null/falsy as "not requested".
+    const meta = { ...(m.metaData || {}), vatRequested: null };
     await admin.members.update({ id: body.memberId, data: { metaData: meta } });
     return json({ ok: true });
   }
@@ -434,21 +443,20 @@ export default async function handler(req) {
     if (typeof body.company === 'string' || typeof body.phone === 'string' || body.meetingRoomHoursCap !== undefined) {
       const r = await admin.members.retrieve({ id: body.memberId });
       const md = { ...(r?.data?.metaData || {}) };
+      // Memberstack merges metaData by key, so clearing a field means NULLing it, not
+      // `delete` (a deleted key is simply absent from the merge and the old value survives).
       if (typeof body.company === 'string') {
         const c = body.company.trim();
-        if (c) md.company = c;
-        else delete md.company;
+        md.company = c || null;
       }
       if (typeof body.phone === 'string') {
         const p = body.phone.trim();
-        if (p) md.phone = p;
-        else delete md.phone;
+        md.phone = p || null;
       }
       // Per-member override for free meeting-room hours/month (blank/0 → default 4).
       if (body.meetingRoomHoursCap !== undefined) {
         const n = Number(body.meetingRoomHoursCap);
-        if (Number.isFinite(n) && n > 0) md.meetingRoomHoursCap = n;
-        else delete md.meetingRoomHoursCap;
+        md.meetingRoomHoursCap = Number.isFinite(n) && n > 0 ? n : null;
       }
       data.metaData = md;
     }
@@ -544,9 +552,21 @@ export default async function handler(req) {
     const unlimited = allowanceForMember(m) === null;
     const today = londonNow().dateStr;
 
+    // Idempotent per member/day: if a non-Cancelled 'Checked-in' record already exists for
+    // today, a repeated admin tap is a no-op — no second deduction, no duplicate row.
+    const todaysRecs = await checkinsForMemberDate(email, today);
+    if (todaysRecs.some((rr) => rr.fields[F.checkins.status] === 'Checked-in')) {
+      return json({ ok: true, alreadyCheckedIn: true });
+    }
+
+    const raw = cf['days-remaining'];
+    const cur = String(raw).toLowerCase() === 'unlimited' ? null : Math.max(0, parseFloat(String(raw)) || 0);
+    // Block a check-in when the allowance is exhausted (metered member with < cost left).
+    if (!unlimited && cur !== null && cur < cost) {
+      return json({ error: 'no-allowance' }, 400);
+    }
+
     if (!unlimited) {
-      const raw = cf['days-remaining'];
-      const cur = String(raw).toLowerCase() === 'unlimited' ? null : Math.max(0, parseFloat(String(raw)) || 0);
       if (cur !== null) {
         await admin.members.update({ id: body.memberId, data: { customFields: { 'days-remaining': String(Math.max(0, cur - cost)) } } });
       }
@@ -606,7 +626,8 @@ export default async function handler(req) {
     const m = r?.data;
     if (!m) return json({ error: 'not-found' }, 404);
     const md = { ...(m.metaData || {}) };
-    if (body.claimed === false) delete md.bdayClaimed;
+    // Un-claim must NULL the key (Memberstack merges by key; a `delete` leaves it in place).
+    if (body.claimed === false) md.bdayClaimed = null;
     else md.bdayClaimed = body.date || londonNow().dateStr;
     await admin.members.update({ id: body.memberId, data: { metaData: md } });
     return json({ ok: true, bdayClaimed: md.bdayClaimed || null });

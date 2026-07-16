@@ -167,10 +167,18 @@ export default async function handler(req) {
       return json({ ok: true, alreadyCheckedIn: true, balance: me.customFields?.['days-remaining'] ?? null });
     }
 
+    // Block a check-in when the allowance is exhausted — a metered member with fewer days
+    // left than this visit costs (e.g. a Hybrid member's SECOND check-in in a month, 0 < 1)
+    // can't check in. Runs AFTER the same-day idempotency guard so an already-checked-in
+    // member still returns alreadyCheckedIn, not no-allowance.
+    const current = parseDays(me.customFields?.['days-remaining']);
+    if (!unlimited && current !== null && current < cost) {
+      return json({ error: 'no-allowance' }, 400);
+    }
+
     // Deduct from the Memberstack balance (unless unlimited).
     let newBalance = me.customFields?.['days-remaining'] ?? null;
     if (!unlimited) {
-      const current = parseDays(me.customFields?.['days-remaining']);
       const next = current === null ? null : Math.max(0, current - cost);
       if (next !== null) {
         newBalance = String(next);
