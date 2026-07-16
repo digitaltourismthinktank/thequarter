@@ -61,7 +61,7 @@ export function QuarterCard({
         color: 'var(--sand-50)',
         background: skin.bg,
         border: `1px solid ${skin.border}`,
-        boxShadow: 'var(--shadow-gold)',
+        boxShadow: '0 8px 22px rgba(142, 106, 46, 0.16)',
         ...style,
       }}
     >

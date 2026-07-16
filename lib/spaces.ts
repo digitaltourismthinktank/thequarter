@@ -65,4 +65,5 @@ export const INCLUDED: SpaceMetaItem[] = [
   { icon: 'cake', label: 'Pastries & cakes, on us' },
   { icon: 'door-open', label: 'Phone pods for calls' },
   { icon: 'heart', label: 'Dog friendly' },
+  { icon: 'users', label: 'A genuinely warm community' },
 ];

@@ -10,7 +10,7 @@
 }
 .heroImg {
   object-fit: cover;
-  object-position: center 38%;
+  object-position: center 64%;
   z-index: 0;
 }
 .heroOverlay {

@@ -69,12 +69,13 @@
 .included {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 18px;
+  gap: 20px 28px;
 }
 .includedItem {
   display: flex;
   align-items: center;
   gap: 12px;
+  padding: 6px 4px;
 }
 .includedIcon {
   width: 42px;

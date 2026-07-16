@@ -97,7 +97,7 @@
 .cardRow {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 18px;
+  gap: 26px 28px;
 }
 .cardCell {
   display: flex;

@@ -249,10 +249,6 @@ export function DashboardClient() {
 
       <div className={styles.layout}>
         <div className={styles.mainCol}>
-          {/* On-site mode — blossoms into a warm hero only when the member is AT The Quarter;
-              renders nothing otherwise (no forced prompt, no nag). */}
-          <GeoCheckIn doorCode={doorCode} busyBand={band ? { label: band.label, line: band.line } : null} />
-
           {hasPlan ? (
             <div className={styles.statRow}>
               <StatTile label="Your days" tone="ink" icon="calendar" value={daysValue} unit={daysUnit} hint={daysHint} progress={daysProg} valueSize="var(--text-2xl)" />
@@ -316,6 +312,9 @@ export function DashboardClient() {
             logoSrc="/brand/logo-wordmark-black.png"
             style={{ maxWidth: '100%' }}
           />
+          {/* On-site mode — blossoms into a warm hero only when the member is AT The Quarter;
+              renders nothing otherwise (no forced prompt, no nag). */}
+          <GeoCheckIn doorCode={doorCode} busyBand={band ? { label: band.label, line: band.line } : null} />
           <Button variant="primary" fullWidth href="/plan" iconAfter="arrow-right">
             {hasPlan ? 'Manage plan & billing' : 'Choose a plan'}
           </Button>

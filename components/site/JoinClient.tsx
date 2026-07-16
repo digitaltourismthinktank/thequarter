@@ -113,6 +113,7 @@ export function JoinClient({ plan }: { plan: string }) {
   // Step 1 → create the subscription server-side, then mount the Payment Element.
   async function toPayment() {
     setError(null);
+    if (!firstName.trim() || !lastName.trim()) return setError('Please enter your first and last name.');
     if (!isEmail(email.trim())) return setError('Please enter a valid email address.');
     if (startMode === 'date' && !startDate) return setError('Please choose a start date, or switch to “Start today”.');
     if (PREVIEW) return setError('Checkout runs on the live site — this is a preview.');
