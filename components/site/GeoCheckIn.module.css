@@ -1,36 +1,203 @@
-.card {
+/* GeoCheckIn — on-site dashboard mode.
+   Two surfaces: a subtle light "opt-in" strip (permission not yet decided) and the
+   prominent ink/gold ON-SITE hero (member confirmed at The Quarter). */
+
+/* ---- Opt-in strip (only when geolocation permission is still 'prompt') ---- */
+.offer {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 13px 16px;
+  padding: 12px 16px;
   background: var(--gold-100);
   border: 1px solid var(--gold-300);
   border-radius: var(--radius-lg);
 }
-.card[data-state='done'] {
-  color: var(--ink-900);
-  font-size: var(--text-sm);
-}
-.dot {
-  flex: none;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--gold-500);
-  box-shadow: 0 0 0 4px var(--gold-200);
-}
-.text {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
+.offerText {
   flex: 1;
   min-width: 0;
-}
-.text strong {
   font-size: var(--text-sm);
+  font-weight: var(--fw-medium);
   color: var(--ink-900);
 }
-.text span {
+.offerBtn {
+  flex: none;
+  font-size: var(--text-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--gold-700);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px 8px;
+  border-radius: var(--radius-md);
+}
+.offerBtn:hover {
+  text-decoration: underline;
+}
+.offerBtn:disabled {
+  opacity: 0.6;
+  cursor: default;
+  text-decoration: none;
+}
+.offerDismiss {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  background: none;
+  color: var(--stone-500);
+  cursor: pointer;
+  border-radius: 50%;
+}
+.offerDismiss:hover {
+  background: var(--gold-200);
+  color: var(--ink-900);
+}
+
+/* ---- On-site hero (ink card, gold accents) ---- */
+.card {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 22px 24px;
+  border-radius: var(--radius-lg);
+  color: var(--sand-50);
+  border: 1px solid var(--ink-700);
+  background:
+    radial-gradient(130% 150% at 100% 0%, rgba(190, 155, 83, 0.24), transparent 55%),
+    var(--ink-900);
+  box-shadow: var(--shadow-card);
+  animation: riseIn var(--duration-base) var(--ease-out);
+}
+@keyframes riseIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
   font-size: var(--text-xs);
-  color: var(--stone-700);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  font-weight: var(--fw-semibold);
+  color: var(--gold-300);
+}
+/* A gentle "live" pulse so the screen feels alive the moment they walk in. */
+.live {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--gold-400);
+  animation: livePulse 2.4s var(--ease-out) infinite;
+}
+@keyframes livePulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(210, 181, 118, 0.55);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(210, 181, 118, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(210, 181, 118, 0);
+  }
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.pin {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: rgba(190, 155, 83, 0.16);
+  border: 1px solid var(--gold-500);
+}
+.headText {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.title {
+  font-size: var(--text-xl);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--tracking-snug);
+  line-height: var(--leading-tight);
+  color: var(--pure-white);
+}
+.meta {
+  font-size: var(--text-sm);
+  color: var(--sand-200);
+}
+
+.pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(190, 155, 83, 0.35);
+  font-size: var(--text-sm);
+  color: var(--sand-50);
+}
+.pillLabel {
+  color: var(--gold-300);
+  font-weight: var(--fw-semibold);
+}
+.doorCode {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.12em;
+  font-weight: var(--fw-semibold);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-top: 2px;
+}
+.confirm {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-size: var(--text-base);
+  font-weight: var(--fw-semibold);
+  color: var(--gold-300);
+}
+.error {
+  font-size: var(--text-sm);
+  color: var(--gold-200);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    animation: none;
+  }
+  .live {
+    animation: none;
+  }
 }
