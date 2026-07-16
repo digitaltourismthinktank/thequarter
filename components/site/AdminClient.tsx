@@ -206,7 +206,7 @@ export function AdminClient() {
           Events
         </button>
         <button type="button" className={`${styles.tab} ${tab === 'content' ? styles.tabOn : ''}`} onClick={() => setTab('content')}>
-          Content
+          Perks &amp; Rewards
         </button>
         <button type="button" className={`${styles.tab} ${tab === 'partners' ? styles.tabOn : ''}`} onClick={() => setTab('partners')}>
           Partners &amp; float
@@ -2125,6 +2125,11 @@ function ContentPane() {
       ) : null}
 
       <div className={styles.list}>
+        {(sub === 'rewards' ? rewards : perks).length === 0 ? (
+          <p className={styles.muted} style={{ padding: '18px 4px' }}>
+            No {sub === 'rewards' ? 'rewards' : 'perks'} yet — add your first with “+ Add {sub === 'rewards' ? 'reward' : 'perk'}” above. They’ll appear on the public Rewards page once set to Live.
+          </p>
+        ) : null}
         {(sub === 'rewards' ? rewards : perks).map((it: any) => (
           <div key={it.id} className={styles.bRow}>
             <span className={styles.listChip}>

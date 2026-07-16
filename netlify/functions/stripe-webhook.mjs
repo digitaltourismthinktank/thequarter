@@ -354,7 +354,6 @@ async function finalisePrivatisation(m, refId, toEmail) {
     [F.bookings.name]: m.name || '',
     [F.bookings.status]: 'Confirmed',
     [F.bookings.source]: 'Web',
-    [F.bookings.recurring]: true,
     [F.bookings.notes]: notes,
   };
   if (m.startDate) fields[F.bookings.date] = m.startDate;

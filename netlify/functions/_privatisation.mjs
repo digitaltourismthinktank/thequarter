@@ -80,18 +80,19 @@ export function isPrivatisedOn(dateStr, cadence, weekdays, startDate) {
 
 /**
  * Is `record` an INDEFINITE recurring RULE (not a concrete dated row)? A rule is one Block OR
- * External row (company bookings write Kind='External') with Recurring=true whose Notes carry a
- * `slots=` cadence token (the same token privatisations use) — so an indefinite company/external
- * standing booking occupies the room on every future weekday exactly like an indefinite plain
- * block. Concrete weekly rows created up to an end date are also Recurring=true but carry NO token,
- * so they are NOT rules — they surface on their own date like any booking. Privatisation markers
- * (Kind='Privatisation') carry a slots token too but are handled by their own expansion path.
+ * External row (company bookings write Kind='External') whose Notes carry a `slots=` cadence token
+ * (the same token privatisations use) — so an indefinite company/external standing booking occupies
+ * the room on every future weekday exactly like an indefinite plain block. The presence of the token
+ * IS the signal: it is written only when a booking is created as indefinite-recurring, so we don't
+ * depend on a separate boolean "Recurring" column (which not every base defines as a checkbox).
+ * Concrete weekly rows created up to an end date carry NO token, so they are NOT rules — they
+ * surface on their own date like any booking. Privatisation markers (Kind='Privatisation') carry a
+ * slots token too but are handled by their own expansion path.
  */
 export function isRecurringBlockRule(record) {
   const f = record?.fields || {};
   const kind = f[F.bookings.kind];
   if (kind !== 'Block' && kind !== 'External') return false;
-  if (!f[F.bookings.recurring]) return false;
   return !!parsePrivatisationSlots(f[F.bookings.notes] || '');
 }
 

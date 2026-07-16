@@ -166,7 +166,7 @@ async function bookingsForDate(date) {
       holdUntil: f[F.bookings.holdUntil] || null,
       checkedIn: hold.checkedIn,
       releasable: hold.releasable,
-      recurring: f[F.bookings.recurring] || null,
+      recurring: !!parsePrivatisationSlots(f[F.bookings.notes] || '') || null,
       released: holdReleased(hold, date, now.min, now.dateStr),
     };
   });
@@ -387,7 +387,6 @@ export default async function handler(req) {
           [F.bookings.notes]: noteVal,
           [F.bookings.status]: 'Confirmed',
           [F.bookings.source]: 'Admin',
-          [F.bookings.recurring]: !!recurring,
         },
         { typecast: true },
       );
@@ -430,7 +429,6 @@ export default async function handler(req) {
           // (holdReleased() returns false without a holdUntil), just Confirmed.
           [F.bookings.holdUntil]: holdUntil || '',
           [F.bookings.releasable]: !!releasable,
-          [F.bookings.recurring]: !!recurring,
           [F.bookings.notes]: noteVal,
           [F.bookings.status]: 'Confirmed',
           [F.bookings.source]: 'Admin',
