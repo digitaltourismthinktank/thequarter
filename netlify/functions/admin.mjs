@@ -714,5 +714,39 @@ export default async function handler(req) {
     return json({ ok: true, balance: bal, floatTotal: total });
   }
 
+  // ---- Add a partner (in-app enrolment) ----
+  // Creates a prepaid partner float row + captures contact & payee bank details. The
+  // balance starts equal to the float total. The 6 contact/bank fields are written BY
+  // NAME (typecast:true) — SENSITIVE, stored only in the private Airtable, never logged
+  // or returned in any member-facing response.
+  if (action === 'createPartner') {
+    const partner = String(body.partner || '').trim();
+    if (!partner) return json({ error: 'missing-partner' }, 400);
+    const floatTotal = Math.max(0, Number(body.floatTotal) || 0);
+    // No dedicated notes column on Partners → fold the optional funding note into the
+    // reward label (display-only; payouts/availability match on partner, not reward).
+    const reward = [String(body.reward || '').trim(), String(body.fundingNote || '').trim()]
+      .filter(Boolean)
+      .join(' · ');
+    const rec = await createRecord(
+      T.partners,
+      {
+        [F.partners.partner]: partner,
+        [F.partners.reward]: reward,
+        [F.partners.balance]: floatTotal,
+        [F.partners.floatTotal]: floatTotal,
+        [F.partners.status]: floatStatus(floatTotal, floatTotal),
+        [F.partners.contactName]: String(body.contactName || '').trim(),
+        [F.partners.contactEmail]: String(body.contactEmail || '').trim(),
+        [F.partners.phone]: String(body.phone || '').trim(),
+        [F.partners.payeeName]: String(body.payeeName || '').trim(),
+        [F.partners.sortCode]: String(body.sortCode || '').trim(),
+        [F.partners.accountNumber]: String(body.accountNumber || '').trim(),
+      },
+      { typecast: true },
+    );
+    return json({ ok: true, id: rec.id });
+  }
+
   return json({ error: 'unknown-action' }, 400);
 }

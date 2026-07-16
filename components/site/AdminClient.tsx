@@ -11,6 +11,7 @@ import { Qr } from '@/components/ds/Qr';
 import { EVENT_THEMES } from '@/lib/eventThemes';
 import { busyness } from '@/lib/busyness';
 import { PLANS, PLAN_MEMBERSTACK_ID } from '@/lib/plans';
+import { POINTS_PER_POUND_VALUE, POINTS_PER_GBP, LEVELS } from '@/lib/rewards';
 import {
   adminGetMembers,
   adminGetSpaces,
@@ -44,6 +45,7 @@ import {
   adminDeletePerk,
   adminGetFloats,
   adminTopUpFloat,
+  adminCreatePartner,
   adminGetPayouts,
   adminMarkPaid,
   type PayoutPartner,
@@ -1617,6 +1619,8 @@ function ContentPane() {
 
   const set = (k: string, v: any) => setEditing((e: any) => ({ ...e, [k]: v }));
   function newItem() {
+    // Seed the £-value helper from the reward's default cost (300 pts → £3.00); blank for perks.
+    setValueGbp(sub === 'rewards' ? String(300 / POINTS_PER_POUND_VALUE) : '');
     setEditing(
       sub === 'rewards'
         ? { kind: 'rewards', partner: '', title: '', cost: 300, funding: 'inventory', category: '', icon: 'gift', pos: '', hero: false, image: '', status: 'draft' }
@@ -1651,6 +1655,19 @@ function ContentPane() {
 
   if (loading) return <p className={styles.state}>Loading content…</p>;
   const isReward = editing?.kind === 'rewards';
+  // £-value → points recommender (100 pts = £1, the POINTS_PER_POUND_VALUE anchor).
+  // Give-back = fixed % of spend (POINTS_PER_GBP/pt), so it's a property of the economy,
+  // not the reward: base ≈ 1%, Ambassadors earn it × the top level boost (×1.5) ≈ 1.5%.
+  const costPts = Math.max(0, Number(editing?.cost) || 0);
+  const rewardGbp = costPts / POINTS_PER_POUND_VALUE;
+  const topBoost = LEVELS[LEVELS.length - 1].boost;
+  const baseGiveBack = (POINTS_PER_GBP / POINTS_PER_POUND_VALUE) * 100;
+  const ambGiveBack = baseGiveBack * topBoost;
+  const fmtPct = (n: number) => String(Math.round(n * 100) / 100);
+  // Reference points implied by the £ value the admin typed. A cost BELOW this gives the
+  // member MORE than the reward is worth → amber warning. Equal/above is fine.
+  const valueRefPts = valueGbp === '' ? null : Math.round((Number(valueGbp) || 0) * 100);
+  const underValue = valueRefPts != null && costPts < valueRefPts;
 
   return (
     <div>
@@ -1694,32 +1711,34 @@ function ContentPane() {
                     <input type="checkbox" checked={!!editing.hero} onChange={(e) => set('hero', e.target.checked)} /> Hero
                   </label>
                 </div>
-                {/* Price → points helper. 100 pts = £1, so a reward worth £X costs X×100 pts. */}
+                {/* £-value → points recommender. Enter the real £ value; the points cost
+                    is set to value × 100 (100 pts = £1). The cost field above stays editable. */}
+                <div className={styles.pickerLabel}>Reward value (£)</div>
                 <div className={styles.calcRow}>
-                  <span className={styles.calcNote}>≈ £{((Number(editing.cost) || 0) / 100).toFixed(2)} to the member · 100 pts = £1</span>
-                  <span className={styles.calcTool}>
-                    <span className={styles.calcGbp}>
-                      £
-                      <input
-                        className={styles.calcInput}
-                        type="number"
-                        step="0.5"
-                        min="0"
-                        placeholder="value"
-                        value={valueGbp}
-                        onChange={(e) => setValueGbp(e.target.value)}
-                      />
-                    </span>
-                    <button
-                      type="button"
-                      className={styles.smallBtn}
-                      disabled={!valueGbp}
-                      onClick={() => set('cost', Math.round((Number(valueGbp) || 0) * 100))}
-                    >
-                      Set {valueGbp ? `${Math.round((Number(valueGbp) || 0) * 100).toLocaleString('en-GB')} pts` : 'points'}
-                    </button>
+                  <label className={styles.calcGbp}>
+                    £
+                    <input
+                      className={styles.calcInput}
+                      type="number"
+                      step="0.5"
+                      min="0"
+                      placeholder="value"
+                      value={valueGbp}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setValueGbp(v);
+                        if (v !== '') set('cost', Math.round((Number(v) || 0) * 100));
+                      }}
+                      aria-label="Reward value in pounds"
+                    />
+                  </label>
+                  <span className={styles.calcNote}>
+                    {costPts.toLocaleString('en-GB')} pts = £{rewardGbp.toFixed(2)} · ~{fmtPct(baseGiveBack)}% give-back (≈{fmtPct(ambGiveBack)}% for Ambassadors)
                   </span>
                 </div>
+                {underValue ? (
+                  <p className={styles.calcWarn}>This gives away more than the reward’s value — check this is intended.</p>
+                ) : null}
               </>
             ) : (
               <div className={styles.formRow}>
@@ -1788,7 +1807,15 @@ function ContentPane() {
             <button type="button" className={styles.smallBtn} onClick={() => togglePublish(it, sub)}>
               {it.status === 'live' ? 'Unpublish' : 'Publish'}
             </button>
-            <button type="button" className={styles.smallBtn} onClick={() => setEditing({ ...it, kind: sub })}>
+            <button
+              type="button"
+              className={styles.smallBtn}
+              onClick={() => {
+                // Seed the £-value helper from the existing points cost (cost / 100).
+                setValueGbp(sub === 'rewards' ? String((Number(it.cost) || 0) / POINTS_PER_POUND_VALUE) : '');
+                setEditing({ ...it, kind: sub });
+              }}
+            >
               Edit
             </button>
             <button type="button" className={styles.smallBtn} onClick={() => remove(it.id, sub)} disabled={busy}>
@@ -1803,6 +1830,112 @@ function ContentPane() {
 }
 
 // ---------------------------------------------------------------- Partners & float
+const EMPTY_PARTNER = {
+  partner: '',
+  reward: '',
+  fundingNote: '',
+  floatTotal: '',
+  contactName: '',
+  contactEmail: '',
+  phone: '',
+  payeeName: '',
+  sortCode: '',
+  accountNumber: '',
+};
+
+/** In-app partner enrolment: creates a prepaid float and captures contact + payee bank
+ *  details. Bank details go only to the private Airtable via the server — never rendered
+ *  back or logged. Reloads the float list on success. */
+function AddPartnerPanel({ onAdded }: { onAdded: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [f, setF] = useState({ ...EMPTY_PARTNER });
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const set = (k: keyof typeof EMPTY_PARTNER, v: string) => setF((s) => ({ ...s, [k]: v }));
+
+  async function submit() {
+    if (!f.partner.trim()) {
+      setMsg('Add a partner name.');
+      return;
+    }
+    setBusy(true);
+    setMsg(null);
+    const r = await adminCreatePartner({
+      partner: f.partner.trim(),
+      reward: f.reward.trim(),
+      fundingNote: f.fundingNote.trim(),
+      floatTotal: Number(f.floatTotal) || 0,
+      contactName: f.contactName.trim(),
+      contactEmail: f.contactEmail.trim(),
+      phone: f.phone.trim(),
+      payeeName: f.payeeName.trim(),
+      sortCode: f.sortCode.trim(),
+      accountNumber: f.accountNumber.trim(),
+    });
+    setBusy(false);
+    if (r.ok) {
+      setF({ ...EMPTY_PARTNER });
+      setOpen(false);
+      onAdded();
+    } else setMsg(r.data?.error || 'Could not add partner.');
+  }
+
+  if (!open) {
+    return (
+      <button type="button" className={styles.smallBtn} onClick={() => setOpen(true)}>
+        + Add partner
+      </button>
+    );
+  }
+
+  return (
+    <div className={styles.panel}>
+      <span className={styles.panelTitle}>Add a partner (creates a prepaid float)</span>
+      <div className={styles.formRow}>
+        <input className={styles.label} placeholder="Partner name" value={f.partner} onChange={(e) => set('partner', e.target.value)} />
+        <input className={styles.label} placeholder="Reward it funds (e.g. A treat on us)" value={f.reward} onChange={(e) => set('reward', e.target.value)} />
+      </div>
+      <div className={styles.formRow}>
+        <input className={styles.label} placeholder="Funding note (optional)" value={f.fundingNote} onChange={(e) => set('fundingNote', e.target.value)} />
+        <label className={styles.calcGbp} title="Initial float total — the balance starts here">
+          £
+          <input
+            className={styles.calcInput}
+            type="number"
+            min="0"
+            step="1"
+            placeholder="float total"
+            value={f.floatTotal}
+            onChange={(e) => set('floatTotal', e.target.value)}
+            aria-label="Initial float total in pounds"
+          />
+        </label>
+      </div>
+      <div className={styles.pickerLabel}>Contact &amp; payment — private, stored securely</div>
+      <div className={styles.formRow}>
+        <input className={styles.label} placeholder="Contact name" value={f.contactName} onChange={(e) => set('contactName', e.target.value)} />
+        <input className={styles.label} type="email" placeholder="Contact email" value={f.contactEmail} onChange={(e) => set('contactEmail', e.target.value)} />
+        <input className={styles.label} placeholder="Phone" value={f.phone} onChange={(e) => set('phone', e.target.value)} />
+      </div>
+      <div className={styles.formRow}>
+        <input className={styles.label} placeholder="Payee name" value={f.payeeName} onChange={(e) => set('payeeName', e.target.value)} />
+        <input className={styles.dayInput} placeholder="Sort code" value={f.sortCode} onChange={(e) => set('sortCode', e.target.value)} aria-label="Sort code" />
+        <input className={styles.dayInput} placeholder="Account number" value={f.accountNumber} onChange={(e) => set('accountNumber', e.target.value)} aria-label="Account number" />
+      </div>
+      <div className={styles.formRow}>
+        <Button variant="primary" size="sm" onClick={submit} disabled={busy}>
+          Add partner
+        </Button>
+        <button type="button" className={styles.smallBtn} onClick={() => setOpen(false)} disabled={busy}>
+          Cancel
+        </button>
+        <span className={styles.muted}>Bank details are stored privately in Airtable and never shown to members.</span>
+      </div>
+      {msg ? <p className={styles.msg}>{msg}</p> : null}
+    </div>
+  );
+}
+
 function PartnersPane() {
   const [floats, setFloats] = useState<AdminFloat[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1939,6 +2072,9 @@ function PartnersPane() {
         <Button variant="secondary" size="sm" onClick={exportReconciliation} disabled={!floats.length}>
           Export reconciliation (CSV)
         </Button>
+      </div>
+      <div style={{ marginBottom: 16 }}>
+        <AddPartnerPanel onAdded={refresh} />
       </div>
       <div className={styles.floatGrid}>
         {floats.map((f) => {

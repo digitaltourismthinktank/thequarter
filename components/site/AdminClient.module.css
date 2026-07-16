@@ -493,6 +493,17 @@ select.input {
   font-size: var(--text-sm);
   color: var(--ink-900);
 }
+/* Amber caution when a reward's points cost gives away more than its £ value. */
+.calcWarn {
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--gold-300);
+  border-radius: var(--radius-md);
+  background: var(--gold-100);
+  color: var(--gold-700);
+  font-size: var(--text-sm);
+  font-weight: var(--fw-semibold);
+}
 .textarea {
   width: 100%;
   min-height: 64px;

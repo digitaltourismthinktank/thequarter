@@ -109,6 +109,15 @@ export const F = {
     usesThisMonth: 'fldJ0ojSSMaURGlUt',
     lastUsed: 'fldmCXZsy2RrtWblJ',
     status: 'fldJ6zD9oxqxLeLhc',
+    // Enrolment contact + payee bank details. Referenced BY NAME (the user added these
+    // columns) and written with typecast:true. SENSITIVE — server-only, never rendered
+    // to members or logged.
+    contactName: 'Contact name',
+    contactEmail: 'Contact email',
+    phone: 'Phone',
+    payeeName: 'Payee name',
+    sortCode: 'Sort code',
+    accountNumber: 'Account number',
   },
   pointsLedger: {
     entry: 'fldBl1PRScPdJbHVn',

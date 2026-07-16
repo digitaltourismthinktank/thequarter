@@ -391,6 +391,23 @@ export const adminMarkPaid = (partner: string, month?: string) =>
   call<{ ok: boolean; settled: number }>('admin', { method: 'POST', body: { action: 'markPaid', partner, month } });
 export const adminTopUpFloat = (id: string, amount: number) =>
   call<{ ok: boolean; balance: number; floatTotal: number }>('admin', { method: 'POST', body: { action: 'topUpFloat', id, amount } });
+// Enrol a new partner (creates a prepaid float; balance starts = floatTotal). The
+// contact + bank fields are SENSITIVE — they go straight to the private Airtable via the
+// server function and are never rendered publicly or logged.
+export interface AdminPartnerInput {
+  partner: string;
+  reward?: string;
+  fundingNote?: string;
+  floatTotal?: number;
+  contactName?: string;
+  contactEmail?: string;
+  phone?: string;
+  payeeName?: string;
+  sortCode?: string;
+  accountNumber?: string;
+}
+export const adminCreatePartner = (input: AdminPartnerInput) =>
+  call<{ ok: boolean; id: string }>('admin', { method: 'POST', body: { action: 'createPartner', ...input } });
 export interface AdminCheckin {
   /** Airtable record id — present so the Today pane can undo/remove a check-in. */
   id?: string;
