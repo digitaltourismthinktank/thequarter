@@ -407,7 +407,7 @@ export const adminGrantPasses = (memberId: string, passes: number) =>
 export const adminSetDoorCode = (memberId: string, code: string) =>
   call<{ ok: boolean }>('admin', { method: 'POST', body: { action: 'setDoorCode', memberId, code } });
 export const adminCheckinMember = (memberId: string, length: 'Full' | 'Half') =>
-  call<{ ok: boolean }>('admin', { method: 'POST', body: { action: 'checkinMember', memberId, length } });
+  call<{ ok: boolean; alreadyCheckedIn?: boolean }>('admin', { method: 'POST', body: { action: 'checkinMember', memberId, length } });
 export const adminClaimBirthday = (memberId: string, claimed: boolean, date?: string) =>
   call<{ ok: boolean; bdayClaimed: string | null }>('admin', { method: 'POST', body: { action: 'claimBirthday', memberId, claimed, date } });
 export const adminGetRewards = () => call<{ rewards: AdminReward[] }>('admin?action=rewards');

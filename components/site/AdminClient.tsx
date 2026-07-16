@@ -247,6 +247,7 @@ function MembersPane() {
   const [passEdits, setPassEdits] = useState<Record<string, string>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  const [checkedInIds, setCheckedInIds] = useState<Set<string>>(new Set());
   const [q, setQ] = useState('');
   const [planFilter, setPlanFilter] = useState('All');
   const [dismissed, setDismissed] = useState<Set<string>>(() => {
@@ -305,8 +306,16 @@ function MembersPane() {
   async function checkIn(m: AdminMember, length: 'Full' | 'Half') {
     setBusyId(m.id);
     setMsg(null);
+    const who = m.name || m.email || 'Member';
     const r = await adminCheckinMember(m.id, length);
-    if (!r.ok) setMsg(r.data?.error || 'Check-in failed');
+    if (r.ok) {
+      // Success was previously silent (setMsg only fired on error) and the row didn't change,
+      // so a working check-in looked dead. Confirm it and mark the row.
+      setCheckedInIds((s) => new Set(s).add(m.id));
+      setMsg(r.data?.alreadyCheckedIn ? `${who} was already checked in today.` : `Checked in ${who}${length === 'Half' ? ' · ½ day' : ''}.`);
+    } else {
+      setMsg(r.data?.error === 'no-allowance' ? `${who} has no day allowance left.` : r.data?.error || 'Check-in failed');
+    }
     await refresh();
     setBusyId(null);
   }
@@ -454,14 +463,18 @@ function MembersPane() {
                   <button type="button" className={styles.smallBtn} onClick={() => setProfileId(m.id)}>
                     Profile
                   </button>{' '}
-                  <span className={styles.seg}>
-                    <button type="button" className={styles.segBtn} onClick={() => checkIn(m, 'Full')} disabled={busyId === m.id}>
-                      Check in
-                    </button>
-                    <button type="button" className={styles.segBtn} onClick={() => checkIn(m, 'Half')} disabled={busyId === m.id} title="Half day (½ day cost)">
-                      ½
-                    </button>
-                  </span>
+                  {checkedInIds.has(m.id) ? (
+                    <span className={styles.checkedTag}>✓ Checked in</span>
+                  ) : (
+                    <span className={styles.seg}>
+                      <button type="button" className={styles.segBtn} onClick={() => checkIn(m, 'Full')} disabled={busyId === m.id}>
+                        {busyId === m.id ? '…' : 'Check in'}
+                      </button>
+                      <button type="button" className={styles.segBtn} onClick={() => checkIn(m, 'Half')} disabled={busyId === m.id} title="Half day (½ day cost)">
+                        ½
+                      </button>
+                    </span>
+                  )}
                 </td>
               </tr>
             ))}
@@ -969,6 +982,7 @@ function MemberProfileModal({
         }}
         single
         allowWeekend
+        note="Pick the date this membership next renews."
         planned={[]}
       />
     </div>

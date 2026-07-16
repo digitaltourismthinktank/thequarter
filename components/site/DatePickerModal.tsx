@@ -18,6 +18,7 @@ export function DatePickerModal({
   planned = [],
   single = false,
   allowWeekend = false,
+  note,
 }: {
   open: boolean;
   onClose: () => void;
@@ -27,6 +28,9 @@ export function DatePickerModal({
   single?: boolean;
   /** Let members pick weekends too (outside regular hours, but open to members). */
   allowWeekend?: boolean;
+  /** Override the footer note (pass '' to hide it) — e.g. admin contexts where the
+   *  member-facing "weekends are open to you" copy is irrelevant. */
+  note?: string;
 }) {
   const today = new Date();
   const [ym, setYm] = useState<{ y: number; m: number }>({ y: today.getFullYear(), m: today.getMonth() });
@@ -128,13 +132,15 @@ export function DatePickerModal({
         </div>
         <div className={styles.footer}>
           <span className={styles.note}>
-            {allowWeekend
-              ? 'Weekends are outside our regular hours, but open to you as a member.'
-              : single
-                ? 'Pick a date to jump to that week.'
-                : justPicked.size > 0
-                  ? `${justPicked.size} day${justPicked.size === 1 ? '' : 's'} added — pick more or close.`
-                  : 'Pick as many days as you like.'}
+            {note !== undefined
+              ? note
+              : allowWeekend
+                ? 'Weekends are outside our regular hours, but open to you as a member.'
+                : single
+                  ? 'Pick a date to jump to that week.'
+                  : justPicked.size > 0
+                    ? `${justPicked.size} day${justPicked.size === 1 ? '' : 's'} added — pick more or close.`
+                    : 'Pick as many days as you like.'}
           </span>
           <Button size="sm" variant="primary" onClick={onClose}>
             Done
