@@ -46,6 +46,7 @@ export interface Space {
   capacityLabel: string | null;
   bookable: boolean;
   colour: string | null;
+  floor: number | null;
 }
 export interface BusyRange {
   startMin: number;
@@ -486,6 +487,7 @@ export interface ScreenSpace {
   capacityLabel: string | null;
   colour: string | null;
   bookable: boolean;
+  floor: number | null;
 }
 export interface ScreenBooking {
   space: string | null;

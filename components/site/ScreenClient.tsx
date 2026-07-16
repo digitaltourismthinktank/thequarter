@@ -53,6 +53,17 @@ export function ScreenClient() {
   const [bankHoliday, setBankHoliday] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [page, setPage] = useState(0);
+  // Optional per-floor filter from ?floor=1|2. Read from the URL in an
+  // export-safe way (no next/navigation useSearchParams, which would force a
+  // Suspense boundary and can break output:'export').
+  const [floor, setFloor] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const raw = new URLSearchParams(window.location.search).get('floor');
+    const n = raw ? Number(raw) : NaN;
+    setFloor(n === 1 || n === 2 ? n : null);
+  }, []);
 
   const load = useCallback(async () => {
     const [s, e] = await Promise.all([getTodayScreen(), getUpcomingEvents()]);
@@ -103,8 +114,14 @@ export function ScreenClient() {
   const nowMin = now.getHours() * 60 + now.getMinutes();
   const featured = events.length ? events[page % events.length] : null;
 
-  const spaces = data?.spaces || [];
+  const allSpaces = data?.spaces || [];
   const bookings = data?.bookings || [];
+  // Only apply a floor filter when a floor is selected AND the data actually
+  // carries that floor value — otherwise degrade to the original behaviour
+  // (show everything, no floor heading) until the Airtable Floor field is set.
+  const floorActive = floor != null && allSpaces.some((s) => s.floor === floor);
+  const spaces = floorActive ? allSpaces.filter((s) => s.floor === floor) : allSpaces;
+  const floorLabel = floorActive ? (floor === 1 ? 'First floor' : 'Second floor') : null;
   const rooms = spaces.filter((s) => s.type !== 'Workspace');
   const workspaces = spaces.filter((s) => s.type === 'Workspace');
   const dateLabel = now.toLocaleDateString('en-GB', { timeZone: 'Europe/London', weekday: 'long', day: 'numeric', month: 'long' });
@@ -114,6 +131,7 @@ export function ScreenClient() {
     <div className={styles.screen}>
       <header className={styles.top}>
         <img className={styles.logo} src="/brand/logo-wordmark-black.png" alt="The Quarter" />
+        {floorLabel ? <span className={styles.floorTag}>{floorLabel}</span> : null}
         <div className={styles.when}>
           <div className={styles.date}>{dateLabel}</div>
           <div className={styles.time}>{timeLabel}</div>

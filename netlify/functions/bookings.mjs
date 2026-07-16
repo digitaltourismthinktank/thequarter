@@ -26,6 +26,17 @@ const isReleased = (r, dateStr, nowMin, todayStr) =>
 
 const json = (b, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { 'content-type': 'application/json' } });
 
+/**
+ * Per-floor screen map for /screen?floor=1|2. Keyed by the exact Space name in
+ * Airtable, matched case- and whitespace-insensitively. Leave empty and both
+ * floor screens simply show every room (identical to the entrance screen) — a
+ * safe default. Populate once the room→floor split is confirmed, e.g.
+ *   'the knight’s tale': 1, 'the chapter house': 1, 'the open workspaces': 2
+ * (keys lowercased; curly apostrophes as they appear in the Space name).
+ */
+const SPACE_FLOORS = {};
+const floorForName = (name) => SPACE_FLOORS[String(name || '').trim().toLowerCase().replace(/\s+/g, ' ')] ?? null;
+
 function validateSlot(dateStr, start, end) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr || '')) return 'bad-date';
   if (!/^\d{2}:\d{2}$/.test(start || '') || !/^\d{2}:\d{2}$/.test(end || '')) return 'bad-time';
@@ -67,6 +78,7 @@ export default async function handler(req) {
           capacityLabel: r.fields[F.spaces.capacityLabel] ?? null,
           bookable: !!r.fields[F.spaces.bookable],
           colour: r.fields[F.spaces.colour] ?? null,
+          floor: floorForName(r.fields[F.spaces.name]),
         }))
         .filter((s) => s.bookable);
       return json({ spaces });
@@ -96,6 +108,7 @@ export default async function handler(req) {
         capacityLabel: r.fields[F.spaces.capacityLabel] ?? null,
         colour: r.fields[F.spaces.colour] ?? null,
         bookable: !!r.fields[F.spaces.bookable],
+        floor: floorForName(r.fields[F.spaces.name]),
       }));
       const recs = await listRecords(T.bookings, {
         filterByFormula: `AND(DATETIME_FORMAT({Date}, 'YYYY-MM-DD')='${today.dateStr}', {Status}='Confirmed')`,

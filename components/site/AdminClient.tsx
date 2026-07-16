@@ -1525,6 +1525,12 @@ function ScreensPane() {
           <a className={styles.shortcut} href="/screen" target="_blank" rel="noreferrer">
             <Icon name="monitor" size={16} color="var(--gold-700)" /> Entrance screen
           </a>
+          <a className={styles.shortcut} href="/screen?floor=1" target="_blank" rel="noreferrer">
+            <Icon name="monitor" size={16} color="var(--gold-700)" /> First-floor screen
+          </a>
+          <a className={styles.shortcut} href="/screen?floor=2" target="_blank" rel="noreferrer">
+            <Icon name="monitor" size={16} color="var(--gold-700)" /> Second-floor screen
+          </a>
           <a className={styles.shortcut} href="/arrive" target="_blank" rel="noreferrer">
             <Icon name="check" size={16} color="var(--gold-700)" /> Arrival check-in
           </a>
