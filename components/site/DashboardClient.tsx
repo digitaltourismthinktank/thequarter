@@ -306,29 +306,43 @@ export function DashboardClient() {
             </div>
           ) : null}
 
-          <CheckInCard />
-          <MyBookingsCard />
+          <div className={styles.ordCheckin}>
+            <CheckInCard />
+          </div>
+          <div className={styles.ordBookings}>
+            <MyBookingsCard />
+          </div>
         </div>
 
         <aside className={styles.rail}>
-          <QuarterCard
-            memberName={display ?? email}
-            plan={isPaused ? 'Paused' : slug ? cap(slug) : hasPlan ? 'Member' : 'Guest'}
-            cardId={cardId}
-            level={level}
-            points={points ?? undefined}
-            rewards={rewardsReady ?? undefined}
-            logoSrc="/brand/logo-wordmark-black.png"
-            style={{ maxWidth: '100%' }}
-          />
+          <div className={styles.ordCard}>
+            <QuarterCard
+              memberName={display ?? email}
+              plan={isPaused ? 'Paused' : slug ? cap(slug) : hasPlan ? 'Member' : 'Guest'}
+              cardId={cardId}
+              level={level}
+              points={points ?? undefined}
+              rewards={rewardsReady ?? undefined}
+              logoSrc="/brand/logo-wordmark-black.png"
+              style={{ maxWidth: '100%' }}
+            />
+          </div>
           {/* On-site mode — blossoms into a warm hero only when the member is AT The Quarter;
               renders nothing otherwise (no forced prompt, no nag). */}
-          <GeoCheckIn doorCode={doorCode} busyBand={band ? { label: band.label, line: band.line } : null} />
-          <Button variant="primary" fullWidth href="/plan" iconAfter="arrow-right">
-            {hasPlan ? 'Manage plan & billing' : 'Choose a plan'}
-          </Button>
-          <InstallPrompt />
-          <NotificationToggle />
+          <div className={cn(styles.slot, styles.ordGeo)}>
+            <GeoCheckIn doorCode={doorCode} busyBand={band ? { label: band.label, line: band.line } : null} />
+          </div>
+          <div className={styles.ordManage}>
+            <Button variant="primary" fullWidth href="/plan" iconAfter="arrow-right">
+              {hasPlan ? 'Manage plan & billing' : 'Choose a plan'}
+            </Button>
+          </div>
+          <div className={cn(styles.slot, styles.ordInstall)}>
+            <InstallPrompt />
+          </div>
+          <div className={cn(styles.slot, styles.ordNotif)}>
+            <NotificationToggle />
+          </div>
           {billingError ? (
             <p className={styles.billingError}>
               Couldn&rsquo;t open one-click billing ({billingError}).{' '}
@@ -336,13 +350,21 @@ export function DashboardClient() {
             </p>
           ) : null}
 
-          <CarnetMini />
+          <div className={cn(styles.slot, styles.ordCarnet)}>
+            <CarnetMini />
+          </div>
 
           {/* Gentle nudge: only until we have their birthday, then it disappears (the full
               birthday-treat card lives on /rewards). Collects day + month right here. */}
-          {!loading && member && !bdaySet ? <BirthdayCard birthday={{ bday: null, claimed: null }} onSaved={refresh} /> : null}
+          {!loading && member && !bdaySet ? (
+            <div className={styles.ordBirthday}>
+              <BirthdayCard birthday={{ bday: null, claimed: null }} onSaved={refresh} />
+            </div>
+          ) : null}
 
-          <EventsCard />
+          <div className={styles.ordEvents}>
+            <EventsCard />
+          </div>
 
           <div className={styles.linksCard}>
             <span className={styles.cardEyebrow}>Quick links</span>

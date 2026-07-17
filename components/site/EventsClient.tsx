@@ -75,6 +75,42 @@ function EventRow({
  * the same feed the entrance screen uses. A dedicated member route (not the public
  * /events marketing page) so there's no marketing-hero flash on the way in.
  */
+/** Subscribe to the live events calendar (auto-updates) — Google, Apple/Outlook (webcal), or copy. */
+function CalendarSubscribe() {
+  const [copied, setCopied] = useState(false);
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://thequarter.work';
+  const icsHttps = `${origin}/events.ics`;
+  const icsWebcal = icsHttps.replace(/^https?:\/\//, 'webcal://');
+  const googleUrl = `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(icsWebcal)}`;
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(icsHttps);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* ignore */
+    }
+  }
+  return (
+    <div className={styles.subscribe}>
+      <span className={styles.subscribeText}>
+        <Icon name="calendar" size={18} color="var(--gold-700)" /> Subscribe to our events — they&rsquo;ll appear in your calendar and update automatically.
+      </span>
+      <div className={styles.subscribeBtns}>
+        <a className={styles.subBtn} href={googleUrl} target="_blank" rel="noopener noreferrer">
+          Google Calendar
+        </a>
+        <a className={styles.subBtn} href={icsWebcal}>
+          Apple / Outlook
+        </a>
+        <button type="button" className={styles.subBtnGhost} onClick={copy}>
+          {copied ? 'Copied ✓' : 'Copy link'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function EventsClient() {
   const { loading, member } = useMember();
   const [events, setEvents] = useState<QuarterEvent[]>([]);
@@ -122,6 +158,8 @@ export function EventsClient() {
               <h1 className={styles.h1}>Events at The Quarter</h1>
               <p className={styles.sub}>Socials, briefings and workshops — part of being here.</p>
             </header>
+
+            <CalendarSubscribe />
 
             <section className={styles.section}>
               <h2 className={styles.h2}>Coming up</h2>

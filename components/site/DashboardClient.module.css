@@ -77,13 +77,48 @@
   gap: 16px;
   min-width: 0;
 }
+/* Card wrappers (used for mobile reordering) must be allowed to shrink so a wide
+   card scrolls inside itself rather than stretching the column. */
+.mainCol > *,
+.rail > * {
+  min-width: 0;
+}
+/* Wrappers around rail/main cards that let us reorder them on mobile. A card
+   whose component renders nothing (e.g. GeoCheckIn when off-site) must not leave
+   a phantom flex gap. */
+.slot:empty {
+  display: none;
+}
+
 @media (max-width: 940px) {
+  /* Flatten the two columns into one ordered stack. display:contents drops the
+     column boxes so every card becomes a direct flex item we can order — the
+     most-used cards (membership, check-in, bookings, events) rise to the top and
+     "Manage plan" falls to the bottom, regardless of which desktop column it's in. */
   .layout {
-    grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
   }
+  .mainCol,
   .rail {
-    order: -1;
+    display: contents;
   }
+  .ordCard { order: 1; } /* membership "business" card */
+  .statRow,
+  .payg { order: 2; }
+  .busy { order: 3; }
+  .ordCheckin { order: 4; }
+  .ordGeo { order: 5; }
+  .ordBookings { order: 6; }
+  .ordEvents { order: 7; }
+  .ordCarnet { order: 8; }
+  .ordBirthday { order: 9; }
+  .linksCard { order: 10; }
+  .ordInstall { order: 11; }
+  .ordNotif { order: 12; }
+  .billingError { order: 19; }
+  .ordManage { order: 20; } /* Manage plan & billing — always last */
 }
 
 /* StatTile metric row */

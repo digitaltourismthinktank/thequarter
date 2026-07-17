@@ -41,6 +41,12 @@
   to = "/partner/"
   status = 200
 
+# Pretty URL for the members' events calendar subscription (webcal://…/events.ics).
+[[redirects]]
+  from = "/events.ics"
+  to = "/.netlify/functions/calendar?type=events"
+  status = 200
+
 # --- Canonical host = the bare apex thequarter.work (set as the PRIMARY domain in
 #     Netlify, which auto-301s www → apex). No app-level host redirect here — one would
 #     fight Netlify's primary-domain redirect and cause an apex⇄www loop. ---

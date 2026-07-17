@@ -52,11 +52,13 @@ export default async function handler(req) {
     });
 
   const today = new Date().toISOString().slice(0, 10);
+  // ?type=events → an events-only calendar (for members to subscribe to What's On); the default
+  // feed also includes confirmed room bookings (room name only, no personal data).
+  const eventsOnly = new URL(req.url).searchParams.get('type') === 'events';
 
-  // Confirmed bookings from today forward (room name as the title; no personal data).
   const [spaceRecs, bookingRecs, eventRecs] = await Promise.all([
-    listRecords(T.spaces, {}),
-    listRecords(T.bookings, { filterByFormula: `AND({Status}='Confirmed', DATETIME_FORMAT({Date}, 'YYYY-MM-DD')>='${esc(today)}')` }),
+    eventsOnly ? Promise.resolve([]) : listRecords(T.spaces, {}),
+    eventsOnly ? Promise.resolve([]) : listRecords(T.bookings, { filterByFormula: `AND({Status}='Confirmed', DATETIME_FORMAT({Date}, 'YYYY-MM-DD')>='${esc(today)}')` }),
     listRecords(T.events, { filterByFormula: `{Published}=1` }),
   ]);
 
@@ -93,7 +95,7 @@ export default async function handler(req) {
     'PRODID:-//The Quarter//Bookings//EN',
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
-    'X-WR-CALNAME:The Quarter',
+    `X-WR-CALNAME:The Quarter${eventsOnly ? ' — Events' : ''}`,
     'X-WR-TIMEZONE:Europe/London',
     ...events,
     'END:VCALENDAR',
