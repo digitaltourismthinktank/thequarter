@@ -394,6 +394,102 @@ select.input {
   border-radius: var(--radius-pill);
   white-space: nowrap;
 }
+
+/* ---- Admin day schedule (08:00–18:00 room-lane timeline) ---- */
+.schedScroll {
+  overflow-x: auto;
+  margin-top: 12px;
+}
+.schedInner {
+  min-width: 640px;
+}
+.schedScaleRow {
+  position: relative;
+  height: 18px;
+  margin-left: 140px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.schedTick {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  font-size: var(--text-2xs);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.schedGroup {
+  margin-top: 8px;
+}
+.schedGroupLabel {
+  font-size: var(--text-2xs);
+  font-weight: var(--fw-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--gold-700);
+  margin: 10px 0 4px;
+}
+.schedLane {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+.schedRoom {
+  width: 130px;
+  flex: none;
+  font-size: var(--text-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--ink-900);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.schedTrack {
+  position: relative;
+  flex: 1;
+  height: 30px;
+  background: #f7f2e7;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+}
+.schedFree {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: var(--text-2xs);
+  color: var(--text-muted);
+}
+.schedSeg {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  border-radius: 6px;
+  font-size: var(--text-2xs);
+  font-weight: var(--fw-semibold);
+  color: var(--pure-white, #fff);
+  display: flex;
+  align-items: center;
+  padding: 0 6px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.segMember {
+  background: var(--gold-500);
+  color: var(--ink-900);
+}
+.segCompany {
+  background: #3a6ea5;
+}
+.segExt {
+  background: #6b7280;
+}
+.segBlock {
+  background: #9a3b30;
+}
+.segPriv {
+  background: #7c5cbf;
+}
 .kindBlock {
   color: var(--danger);
   background: #f3e2dd;

@@ -1633,6 +1633,80 @@ function WeekendRequestsPanel() {
   );
 }
 
+// Day schedule: an 08:00–18:00 timeline of every bookable room, grouped into meeting rooms /
+// phone pods / privatisable team rooms, with each booking drawn as a band in its slot.
+const DAY_START_MIN = 480; // 08:00
+const DAY_END_MIN = 1080; // 18:00
+const DAY_SPAN_MIN = DAY_END_MIN - DAY_START_MIN;
+function DaySchedule({ spaces, bookings }: { spaces: AdminSpace[]; bookings: AdminBooking[] }) {
+  const pods = spaces.filter((s) => s.bookable && s.type === 'Phone pod');
+  const team = spaces.filter((s) => s.bookable && s.type === 'Workspace'); // Hop Yard / Vineyard
+  const rooms = spaces.filter((s) => s.bookable && s.type !== 'Phone pod' && s.type !== 'Workspace');
+  const groups = [
+    { label: 'Meeting rooms', list: rooms },
+    { label: 'Phone pods', list: pods },
+    { label: 'Privatisable rooms', list: team },
+  ].filter((g) => g.list.length);
+  if (!groups.length) return null;
+
+  const segClass = (b: AdminBooking) =>
+    b.allDay ? styles.segPriv : b.kind === 'Block' ? styles.segBlock : b.company ? styles.segCompany : b.kind === 'External' ? styles.segExt : styles.segMember;
+  const segLabel = (b: AdminBooking) =>
+    b.allDay ? 'Privatised' : b.kind === 'Block' ? 'Blocked' : b.company || b.name || b.kind;
+
+  return (
+    <div className={styles.panel} style={{ marginTop: 18 }}>
+      <span className={styles.panelTitle}>Day schedule</span>
+      <div className={styles.schedScroll}>
+        <div className={styles.schedInner}>
+          <div className={styles.schedScaleRow}>
+            {[8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18].map((h) => (
+              <span key={h} className={styles.schedTick} style={{ left: `${((h * 60 - DAY_START_MIN) / DAY_SPAN_MIN) * 100}%` }}>
+                {String(h).padStart(2, '0')}
+              </span>
+            ))}
+          </div>
+          {groups.map((g) => (
+            <div key={g.label} className={styles.schedGroup}>
+              <div className={styles.schedGroupLabel}>{g.label}</div>
+              {g.list.map((s) => {
+                const bs = bookings.filter((x) => x.space === s.id);
+                return (
+                  <div key={s.id} className={styles.schedLane}>
+                    <div className={styles.schedRoom}>{s.name}</div>
+                    <div className={styles.schedTrack}>
+                      {bs.length === 0 ? (
+                        <span className={styles.schedFree}>Free all day</span>
+                      ) : (
+                        bs.map((b, i) => {
+                          const start = b.allDay ? DAY_START_MIN : Math.max(DAY_START_MIN, b.startMin);
+                          const end = b.allDay ? DAY_END_MIN : Math.min(DAY_END_MIN, b.endMin);
+                          const left = ((start - DAY_START_MIN) / DAY_SPAN_MIN) * 100;
+                          const width = Math.max(3, ((end - start) / DAY_SPAN_MIN) * 100);
+                          return (
+                            <span
+                              key={i}
+                              className={`${styles.schedSeg} ${segClass(b)}`}
+                              style={{ left: `${left}%`, width: `${width}%` }}
+                              title={`${segLabel(b)} · ${b.allDay ? 'all day' : `${minToHHMM(b.startMin)}–${minToHHMM(b.endMin)}`}`}
+                            >
+                              {width > 14 ? segLabel(b) : ''}
+                            </span>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AdminTodayPane({ onAllBirthdays }: { onAllBirthdays: () => void }) {
   const [offset, setOffset] = useState(0); // 0 = today, 1 = next open day
   const [custom, setCustom] = useState<string>(''); // a hand-picked day (overrides offset)
@@ -1868,6 +1942,8 @@ function AdminTodayPane({ onAllBirthdays }: { onAllBirthdays: () => void }) {
           </div>
         </div>
       )}
+
+      {!closed ? <DaySchedule spaces={spaces} bookings={bookings} /> : null}
 
       {members.filter((m) => m.vatRequested).length ? (
         <div className={styles.panel} style={{ marginTop: 18, borderColor: 'var(--gold-400)' }}>
