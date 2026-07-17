@@ -79,5 +79,42 @@ export function emailShell(title, bodyHtml, preheader = '') {
 </body></html>`;
 }
 
+/** Absolute site origin for deep-links in emails (no trailing slash). */
+export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://thequarter.work').replace(/\/$/, '');
+
+/**
+ * One shared admin/ops notification. Emails the ops inbox (info@thequarter.work — the reliable
+ * channel; admins are ordinary members flagged only by email domain, so there is no admin push
+ * store) with a consistent subject, an optional detail list, and a button that deep-links to the
+ * right admin tab (e.g. link '/admin/#partners'). Best-effort — sendEmail never throws, so a
+ * missing notification can never block or fail the underlying booking/payment/redemption.
+ *
+ * @param {string} kind    short category, e.g. 'New member', 'Reward redeemed', 'Room booked'
+ * @param {string} summary one-line summary, e.g. 'jo@x.com · Resident'
+ * @param {{ link?: string, rows?: Array<[string,string]|string> }} [opts]
+ */
+export async function notifyAdmins(kind, summary, opts = {}) {
+  const link = opts.link || '/admin/';
+  const href = `${SITE_URL}${link.startsWith('/') ? link : `/${link}`}`;
+  const rowsHtml = Array.isArray(opts.rows) && opts.rows.length
+    ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:4px 0 16px;font-size:14px;color:#4a4235;">${opts.rows
+        .map((r) =>
+          Array.isArray(r)
+            ? `<tr><td style="padding:2px 14px 2px 0;color:#8a8172;">${esc(r[0])}</td><td style="padding:2px 0;">${esc(r[1])}</td></tr>`
+            : `<tr><td colspan="2" style="padding:2px 0;">${esc(r)}</td></tr>`,
+        )
+        .join('')}</table>`
+    : '';
+  const body = `
+    <p style="margin:0 0 4px;">${esc(summary)}</p>
+    ${rowsHtml}
+    <p style="margin:18px 0 0;"><a href="${href}" style="display:inline-block;background:#2b2620;color:#fffdf8;text-decoration:none;padding:11px 20px;border-radius:10px;font-weight:600;font-size:14px;">Open in admin →</a></p>`;
+  return sendEmail({
+    to: OPS_EMAIL,
+    subject: `[The Quarter] ${kind} — ${String(summary).slice(0, 90)}`,
+    html: emailShell(kind, body, `${kind}: ${summary}`),
+  });
+}
+
 /** Escape helper re-exported for templates that interpolate user content. */
 export { esc as escapeHtml };

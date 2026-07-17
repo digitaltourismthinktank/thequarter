@@ -15,7 +15,7 @@ import { verifyMember, isAdmin, tokenFromRequest } from './_member.mjs';
 import { listRecords, createRecord, updateRecord, deleteRecord, T, F, airtableReady, esc } from './_airtable.mjs';
 import { londonWallClockToISO, isoToLondonMin, isoToLondonDate, hhmmToMin, londonNow, holdReleased } from './_time.mjs';
 import { PLAN_NAMES, allowanceForMember, setMemberPlan, renewMember, formatDate } from './_quarter-sync.mjs';
-import { listRewards, listPerks, listFloats, floatStatus, awardPoints, redeemReward, partnerPayouts, markPartnerPaid } from './_rewards.mjs';
+import { listRewards, listPerks, listFloats, floatStatus, awardPoints, redeemReward, partnerPayouts, markPartnerPaid, partnerStatement } from './_rewards.mjs';
 import { sendEmail, emailShell, escapeHtml, OPS_EMAIL } from './_email.mjs';
 import { pushToEmail } from './_push.mjs';
 import { parsePrivatisationSlots, isPrivatisedOn, isRecurringBlockRule, recurringBlockOccurrences, parseSkipDates } from './_privatisation.mjs';
@@ -299,6 +299,12 @@ export default async function handler(req) {
     if (action === 'payouts') {
       const month = new URL(req.url).searchParams.get('month') || undefined;
       return json({ partners: await partnerPayouts({ month }) });
+    }
+    if (action === 'partnerStatement') {
+      const url2 = new URL(req.url);
+      const partner = url2.searchParams.get('partner');
+      if (!partner) return json({ error: 'missing-partner' }, 400);
+      return json(await partnerStatement(partner, { month: url2.searchParams.get('month') || undefined }));
     }
     if (action === 'spaces') return json({ spaces: await allSpaces() });
     if (action === 'calendar') {

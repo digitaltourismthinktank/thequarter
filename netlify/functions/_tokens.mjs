@@ -128,14 +128,13 @@ export async function logScan(token, resolved) {
       [F.scanLog.result]: resolved?.state || 'unknown',
       [F.scanLog.at]: new Date().toISOString(),
     });
-    // Only the FIRST scan marks the token used AND draws the partner float — a
-    // re-scan or page reload of /v must never subtract the partner's money again.
+    // Only the FIRST scan marks the token used — a re-scan or /v reload must not re-count it.
     if (row && !f[F.tokens.usedAt]) {
       await updateRecord(T.tokens, row.id, { [F.tokens.usedAt]: new Date().toISOString() });
-      // Funded reward honoured → draw its £ value from the partner float (once).
-      if ((resolved?.state === 'valid' || resolved?.state === 'rotating') && resolved?.reward && resolved.reward.funding !== 'inventory') {
-        await drawFloat(resolved.reward.partner, poundsValue(resolved.reward.cost));
-      }
+      // PAYOUT MODEL: partner-funded rewards are settled via monthly/quarterly payouts
+      // (partnerPayouts()), so we deliberately DO NOT pre-draw the partner float here —
+      // drawing it would double-count against the payout the partner is already owed.
+      // Legacy prepaid floats stay visible in admin but are no longer auto-drawn.
     }
   } catch {
     /* logging must never break the verification page */

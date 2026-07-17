@@ -431,6 +431,22 @@ export const adminGetPayouts = (month?: string) =>
   call<{ partners: PayoutPartner[] }>(`admin?action=payouts${month ? `&month=${encodeURIComponent(month)}` : ''}`);
 export const adminMarkPaid = (partner: string, month?: string) =>
   call<{ ok: boolean; settled: number }>('admin', { method: 'POST', body: { action: 'markPaid', partner, month } });
+export interface PartnerStatementItem {
+  reward: string;
+  email: string;
+  gbp: number;
+  at: string | null;
+  status: 'owed' | 'paid';
+}
+export interface PartnerStatement {
+  partner: string;
+  items: PartnerStatementItem[];
+  owed: number;
+  paid: number;
+  count: number;
+}
+export const adminPartnerStatement = (partner: string, month?: string) =>
+  call<PartnerStatement>(`admin?action=partnerStatement&partner=${encodeURIComponent(partner)}${month ? `&month=${encodeURIComponent(month)}` : ''}`);
 export const adminTopUpFloat = (id: string, amount: number) =>
   call<{ ok: boolean; balance: number; floatTotal: number }>('admin', { method: 'POST', body: { action: 'topUpFloat', id, amount } });
 // Enrol a new partner (creates a prepaid float; balance starts = floatTotal). The

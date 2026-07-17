@@ -11,7 +11,7 @@
  */
 import memberstackAdmin from '@memberstack/admin';
 import { listRecords, createRecord, updateRecord, T, F, esc } from './_airtable.mjs';
-import { sendEmail, emailShell, escapeHtml } from './_email.mjs';
+import { sendEmail, emailShell, escapeHtml, notifyAdmins } from './_email.mjs';
 import { partnerToken } from './_partner.mjs';
 import { pushToEmail } from './_push.mjs';
 
@@ -255,10 +255,11 @@ export async function drawFloat(partner, gbp) {
 }
 
 // --- Partner payouts (arrears — what we owe each partner) -----------------------
-// Only rewards WE settle at a partner (funding 'quarter') create a payable. Each
-// redemption's £ value is the anchor value of its points cost. "Owed" = quarter-
-// funded redemptions still marked 'redeemed'; marking a partner paid flips theirs to
-// 'settled' (the running balance resets). A month filter is for viewing/exporting.
+// PAYOUT MODEL (no pre-purchase): every PARTNER-FUNDED redemption (funding 'partner'
+// or 'quarter') creates a payable we settle on a monthly/quarterly basis — only our
+// OWN 'inventory' rewards cost a partner nothing. Each redemption's £ value is the
+// anchor value of its points cost. "Owed" = unsettled partner-funded redemptions;
+// marking a partner paid flips theirs to 'settled'. A month filter is for view/export.
 
 export async function partnerPayouts({ month } = {}) {
   const [rewards, rows] = await Promise.all([
@@ -270,7 +271,7 @@ export async function partnerPayouts({ month } = {}) {
   for (const r of rows) {
     const f = r.fields;
     const rewardId = f[F.redemptions.rewardId] || '';
-    if ((fundingById.get(rewardId) || 'inventory') !== 'quarter') continue; // not a payable
+    if ((fundingById.get(rewardId) || 'inventory') === 'inventory') continue; // our stock — not a payable
     const at = f[F.redemptions.at] || null;
     const ym = at ? String(at).slice(0, 7) : '';
     if (month && ym !== month) continue;
@@ -303,12 +304,41 @@ export async function markPartnerPaid(partner, month) {
   let settled = 0;
   for (const r of rows) {
     const f = r.fields;
-    if ((fundingById.get(f[F.redemptions.rewardId]) || 'inventory') !== 'quarter') continue;
+    if ((fundingById.get(f[F.redemptions.rewardId]) || 'inventory') === 'inventory') continue;
     if (month && String(f[F.redemptions.at] || '').slice(0, 7) !== month) continue;
     await updateRecord(T.redemptions, r.id, { [F.redemptions.status]: 'settled' }, { typecast: true });
     settled += 1;
   }
   return { settled };
+}
+
+/**
+ * Itemised statement for ONE partner: every partner-funded redemption as a line
+ * (reward, member, £ value, date, owed|paid) plus running owed/paid totals. Powers the
+ * expandable per-partner breakdown in the admin Partners tab so each payout can be
+ * reconciled line by line. Optional `month` (YYYY-MM) scopes to one period.
+ */
+export async function partnerStatement(partner, { month } = {}) {
+  const [rewards, rows] = await Promise.all([
+    listRewards({ liveOnly: false }),
+    listRecords(T.redemptions, { filterByFormula: `{Partner}='${esc(partner)}'`, sort: [{ field: 'At', direction: 'desc' }] }),
+  ]);
+  const fundingById = new Map(rewards.map((r) => [r.id, r.funding]));
+  const items = [];
+  let owed = 0;
+  let paid = 0;
+  for (const r of rows) {
+    const f = r.fields;
+    if ((fundingById.get(f[F.redemptions.rewardId]) || 'inventory') === 'inventory') continue;
+    const at = f[F.redemptions.at] || null;
+    if (month && String(at || '').slice(0, 7) !== month) continue;
+    const gbp = Math.round(((Number(f[F.redemptions.cost]) || 0) / POINTS_PER_POUND_VALUE) * 100) / 100;
+    const status = (f[F.redemptions.status] || 'redeemed') === 'settled' ? 'paid' : 'owed';
+    if (status === 'paid') paid += gbp;
+    else owed += gbp;
+    items.push({ reward: f[F.redemptions.reward] || '', email: f[F.redemptions.email] || '', gbp, at, status });
+  }
+  return { partner, items, owed: Math.round(owed * 100) / 100, paid: Math.round(paid * 100) / 100, count: items.length };
 }
 
 // --- Partner activity email (best-effort, never blocks the redemption) -----------
@@ -350,7 +380,7 @@ async function notifyPartnerOfRedemption(reward) {
         <a href="${link}" style="display:inline-block;background:#b08a3e;color:#fff;text-decoration:none;font-weight:700;padding:11px 20px;border-radius:10px;">View your balance</a>
       </p>
       <p style="margin:0;font-size:13px;line-height:1.6;color:#8a8172;">
-        The Quarter settles partner payouts monthly — you don't need to invoice; we reconcile and pay per our agreement. Bookmark the balance link above to check in any time.
+        The Quarter settles partner payouts on a monthly or quarterly basis — you don't need to invoice; we reconcile and pay per our agreement. Bookmark the balance link above to check in any time.
       </p>`;
 
     await sendEmail({
@@ -390,6 +420,16 @@ export async function redeemReward(member, rewardId) {
   // Tell the partner (best-effort). Awaited-but-guarded so it completes within the
   // serverless lifecycle yet can never throw or block the redemption result.
   await notifyPartnerOfRedemption(reward);
+  // Copy the ops inbox so every claim is tracked (best-effort — never blocks).
+  await notifyAdmins('Reward redeemed', `${email} · ${reward.title}`, {
+    link: '/admin/#partners',
+    rows: [
+      ['Reward', reward.title],
+      ['Partner', reward.partner || '—'],
+      ['Value', `£${poundsValue(reward.cost).toFixed(2)} (${reward.cost} pts)`],
+      ['Member', email],
+    ],
+  });
   return { ok: true, balance, reward };
 }
 
