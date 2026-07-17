@@ -108,7 +108,7 @@ export const EARN_RULES: EarnRule[] = [
     value: `${POINTS_PER_GBP} per £1`,
   },
   { icon: 'users', title: 'Refer a friend', note: 'When they start their first paid plan.', value: `+${REFERRAL_BONUS}` },
-  { icon: 'gift', title: 'Welcome bonus', note: 'A warm hello on your first paid plan.', value: `+${WELCOME_BONUS}` },
+  { icon: 'gift', title: 'Welcome bonus', note: 'A warm hello on your first paid plan — more on higher tiers.', value: '+250–1000' },
 ];
 
 // --- Rewards catalogue ----------------------------------------------------------

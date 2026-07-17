@@ -377,7 +377,10 @@ export default async function handler(req) {
     let noteVal = notes || '';
     if (recurring && indefinite) {
       const wd = new Date(`${date}T00:00:00Z`).getUTCDay();
-      if (wd >= 1 && wd <= 5) noteVal = `${noteVal ? `${noteVal} ` : ''}slots=week:${wd}`.trim();
+      // The Quarter is a weekday space — an indefinite weekly rule MUST start on a weekday, or it
+      // would silently save as a one-off while the UI claims a standing weekly series.
+      if (wd < 1 || wd > 5) return json({ error: 'recurring-needs-weekday' }, 400);
+      noteVal = `${noteVal ? `${noteVal} ` : ''}slots=week:${wd}`.trim();
     }
     try {
       const rec = await createRecord(
@@ -417,7 +420,10 @@ export default async function handler(req) {
     let noteVal = notes || '';
     if (recurring && indefinite) {
       const wd = new Date(`${date}T00:00:00Z`).getUTCDay();
-      if (wd >= 1 && wd <= 5) noteVal = `${noteVal ? `${noteVal} ` : ''}slots=week:${wd}`.trim();
+      // The Quarter is a weekday space — an indefinite weekly rule MUST start on a weekday, or it
+      // would silently save as a one-off while the UI claims a standing weekly series.
+      if (wd < 1 || wd > 5) return json({ error: 'recurring-needs-weekday' }, 400);
+      noteVal = `${noteVal ? `${noteVal} ` : ''}slots=week:${wd}`.trim();
     }
     try {
       const rec = await createRecord(
@@ -660,16 +666,29 @@ export default async function handler(req) {
         await admin.members.update({ id: body.memberId, data: { customFields: { 'days-remaining': String(Math.max(0, cur - cost)) } } });
       }
     }
-    await createRecord(T.checkins, {
-      [F.checkins.ref]: `${name} · ${today}`,
-      [F.checkins.email]: email,
-      [F.checkins.name]: name,
-      [F.checkins.date]: today,
-      [F.checkins.length]: length,
-      [F.checkins.dayCost]: unlimited ? 0 : cost,
-      [F.checkins.status]: 'Checked-in',
-      [F.checkins.source]: 'Admin',
-    });
+    // If the member already has a Planned reservation for today (they reserved the day, or an
+    // approved weekend), FLIP it to Checked-in rather than adding a second row — otherwise the
+    // person is duplicated in the Today "Who's in" view. Only create fresh when none exists.
+    const plannedToday = todaysRecs.find((rr) => (rr.fields[F.checkins.status] || '') === 'Planned');
+    if (plannedToday) {
+      await updateRecord(T.checkins, plannedToday.id, {
+        [F.checkins.status]: 'Checked-in',
+        [F.checkins.length]: length,
+        [F.checkins.dayCost]: unlimited ? 0 : cost,
+        [F.checkins.source]: 'Admin',
+      });
+    } else {
+      await createRecord(T.checkins, {
+        [F.checkins.ref]: `${name} · ${today}`,
+        [F.checkins.email]: email,
+        [F.checkins.name]: name,
+        [F.checkins.date]: today,
+        [F.checkins.length]: length,
+        [F.checkins.dayCost]: unlimited ? 0 : cost,
+        [F.checkins.status]: 'Checked-in',
+        [F.checkins.source]: 'Admin',
+      });
+    }
     return json({ ok: true });
   }
 

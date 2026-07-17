@@ -220,6 +220,9 @@
   background: var(--surface-card);
   font-size: var(--text-sm);
   color: var(--ink-900);
+  /* A long option label must not widen the control past its container (narrow profile modal). */
+  min-width: 0;
+  max-width: 100%;
 }
 .label {
   flex: 1;

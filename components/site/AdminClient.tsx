@@ -1684,7 +1684,7 @@ function DaySchedule({ spaces, bookings }: { spaces: AdminSpace[]; bookings: Adm
                           const start = b.allDay ? DAY_START_MIN : Math.max(DAY_START_MIN, b.startMin);
                           const end = b.allDay ? DAY_END_MIN : Math.min(DAY_END_MIN, b.endMin);
                           const left = ((start - DAY_START_MIN) / DAY_SPAN_MIN) * 100;
-                          const width = Math.max(3, ((end - start) / DAY_SPAN_MIN) * 100);
+                          const width = Math.min(Math.max(3, ((end - start) / DAY_SPAN_MIN) * 100), 100 - left);
                           return (
                             <span
                               key={i}

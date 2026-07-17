@@ -115,7 +115,10 @@ export default async function handler(req) {
   const vm = await verifyMember(tokenFromRequest(req, body));
   if (!vm.ok) return json({ error: vm.reason }, 401);
   const me = vm.member;
-  const email = memberEmail(me);
+  // Canonical lowercase — checkin.mjs stores/queries check-ins lowercased, so the "already checked
+  // in today" guard below and the row we write must use the same key or a mixed-case email would
+  // spend a pass + create a duplicate check-in.
+  const email = (memberEmail(me) || '').toLowerCase();
 
   if (req.method === 'GET') return json({ carnet: carnetOf(me) });
   if (req.method !== 'POST') return json({ error: 'method-not-allowed' }, 405);

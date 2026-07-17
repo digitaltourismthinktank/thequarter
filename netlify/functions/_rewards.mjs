@@ -230,11 +230,13 @@ export async function listFloats() {
   return rows.map(floatFromRow);
 }
 
-/** A reward is "back soon" when it's funded (partner/quarter) and its float is spent. */
+/** A reward is "back soon" ONLY when a partner opted into a prepaid float (floatTotal > 0) and it
+ *  has run dry. Under the payout model (no pre-purchase) a zero-float partner reward is always
+ *  redeemable and settled in arrears via partnerPayouts — so we must NOT gate it on balance. */
 export function rewardAvailability(reward, floats) {
   if (reward.funding === 'inventory') return 'ok';
   const fl = floats.find((x) => x.partner === reward.partner);
-  if (!fl) return 'ok'; // no float tracked → treat as available
+  if (!fl || fl.floatTotal <= 0) return 'ok'; // no prepaid float → always available (arrears payout)
   return fl.balance > 0 ? 'ok' : 'soon';
 }
 
@@ -261,6 +263,19 @@ export async function drawFloat(partner, gbp) {
 // anchor value of its points cost. "Owed" = unsettled partner-funded redemptions;
 // marking a partner paid flips theirs to 'settled'. A month filter is for view/export.
 
+// The partner a redemption is bucketed under (blank → the '—' bucket).
+const bucketPartner = (f) => f[F.redemptions.partner] || '—';
+// Formula matching a bucket (the '—' bucket also matches genuinely-blank Partner rows).
+const partnerMatchFormula = (partner) => (partner === '—' ? `OR({Partner}='', {Partner}='—')` : `{Partner}='${esc(partner)}'`);
+// A redemption is a partner PAYABLE when its reward is partner-funded (funding !== 'inventory').
+// If the reward was since deleted / the id is blank, fall back to "payable when a partner is named"
+// so a real owed line is never silently dropped as our own inventory.
+const isPayableRedemption = (f, fundingById) => {
+  const funding = fundingById.get(f[F.redemptions.rewardId] || '');
+  if (funding) return funding !== 'inventory';
+  return !!String(f[F.redemptions.partner] || '').trim();
+};
+
 export async function partnerPayouts({ month } = {}) {
   const [rewards, rows] = await Promise.all([
     listRewards({ liveOnly: false }),
@@ -270,12 +285,11 @@ export async function partnerPayouts({ month } = {}) {
   const byPartner = new Map();
   for (const r of rows) {
     const f = r.fields;
-    const rewardId = f[F.redemptions.rewardId] || '';
-    if ((fundingById.get(rewardId) || 'inventory') === 'inventory') continue; // our stock — not a payable
+    if (!isPayableRedemption(f, fundingById)) continue;
     const at = f[F.redemptions.at] || null;
     const ym = at ? String(at).slice(0, 7) : '';
     if (month && ym !== month) continue;
-    const partner = f[F.redemptions.partner] || '—';
+    const partner = bucketPartner(f);
     const gbp = (Number(f[F.redemptions.cost]) || 0) / POINTS_PER_POUND_VALUE;
     const settled = (f[F.redemptions.status] || 'redeemed') === 'settled';
     const cur = byPartner.get(partner) || { partner, owed: 0, owedCount: 0, paid: 0, paidCount: 0, lastAt: at };
@@ -298,13 +312,13 @@ export async function partnerPayouts({ month } = {}) {
 export async function markPartnerPaid(partner, month) {
   const [rewards, rows] = await Promise.all([
     listRewards({ liveOnly: false }),
-    listRecords(T.redemptions, { filterByFormula: `AND({Partner}='${esc(partner)}', {Status}='redeemed')` }),
+    listRecords(T.redemptions, { filterByFormula: `AND(${partnerMatchFormula(partner)}, {Status}='redeemed')` }),
   ]);
   const fundingById = new Map(rewards.map((r) => [r.id, r.funding]));
   let settled = 0;
   for (const r of rows) {
     const f = r.fields;
-    if ((fundingById.get(f[F.redemptions.rewardId]) || 'inventory') === 'inventory') continue;
+    if (!isPayableRedemption(f, fundingById)) continue;
     if (month && String(f[F.redemptions.at] || '').slice(0, 7) !== month) continue;
     await updateRecord(T.redemptions, r.id, { [F.redemptions.status]: 'settled' }, { typecast: true });
     settled += 1;
@@ -321,7 +335,7 @@ export async function markPartnerPaid(partner, month) {
 export async function partnerStatement(partner, { month } = {}) {
   const [rewards, rows] = await Promise.all([
     listRewards({ liveOnly: false }),
-    listRecords(T.redemptions, { filterByFormula: `{Partner}='${esc(partner)}'`, sort: [{ field: 'At', direction: 'desc' }] }),
+    listRecords(T.redemptions, { filterByFormula: partnerMatchFormula(partner), sort: [{ field: 'At', direction: 'desc' }] }),
   ]);
   const fundingById = new Map(rewards.map((r) => [r.id, r.funding]));
   const items = [];
@@ -329,7 +343,7 @@ export async function partnerStatement(partner, { month } = {}) {
   let paid = 0;
   for (const r of rows) {
     const f = r.fields;
-    if ((fundingById.get(f[F.redemptions.rewardId]) || 'inventory') === 'inventory') continue;
+    if (!isPayableRedemption(f, fundingById)) continue;
     const at = f[F.redemptions.at] || null;
     if (month && String(at || '').slice(0, 7) !== month) continue;
     const gbp = Math.round(((Number(f[F.redemptions.cost]) || 0) / POINTS_PER_POUND_VALUE) * 100) / 100;
@@ -355,27 +369,26 @@ export async function partnerStatement(partner, { month } = {}) {
 async function notifyPartnerOfRedemption(reward) {
   try {
     if (!reward || !reward.partner) return;
-    const rows = await listRecords(T.partners, { filterByFormula: `{Partner}='${esc(reward.partner)}'`, maxRecords: 1 });
+    // Read BY NAME: the Contact-email/bank columns on the Partners table are addressed by field
+    // NAME (F.partners.contactEmail === 'Contact email'), so a default (returnFieldsByFieldId) read
+    // returns undefined for them — that silently broke this email. byName keys fields by name.
+    const rows = await listRecords(T.partners, { byName: true, filterByFormula: `{Partner}='${esc(reward.partner)}'`, maxRecords: 1 });
     const row = rows[0];
     if (!row) return;
-    const contactEmail = String(row.fields[F.partners.contactEmail] || '').trim();
+    const contactEmail = String(row.fields['Contact email'] || '').trim();
     if (!contactEmail) return; // e.g. our own inventory rewards — nobody to notify.
 
     const value = poundsValue(reward.cost);
-    const balance = Number(row.fields[F.partners.balance]) || 0;
-    const total = Number(row.fields[F.partners.floatTotal]) || 0;
     const gbp = (n) => `£${(Math.round((Number(n) || 0) * 100) / 100).toFixed(2)}`;
     const link = `${SITE_URL}/partner/${partnerToken(reward.partner)}`;
-    const funded = reward.funding !== 'inventory' && total > 0;
 
+    // Payout model: no float language — value is accrued and settled monthly/quarterly in arrears.
     const body = `
       <p style="margin:0 0 14px;">Good news — a Quarter member has just redeemed a reward with you.</p>
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #ece3d2;border-radius:12px;overflow:hidden;margin:0 0 16px;">
         <tr><td style="padding:12px 16px;border-bottom:1px solid #f0e8d8;font-size:13px;color:#8a8172;">Reward</td><td style="padding:12px 16px;border-bottom:1px solid #f0e8d8;text-align:right;font-weight:700;">${escapeHtml(reward.title)}</td></tr>
-        <tr><td style="padding:12px 16px;border-bottom:1px solid #f0e8d8;font-size:13px;color:#8a8172;">Value</td><td style="padding:12px 16px;border-bottom:1px solid #f0e8d8;text-align:right;font-weight:700;">${gbp(value)}</td></tr>
-        ${funded ? `<tr><td style="padding:12px 16px;font-size:13px;color:#8a8172;">Float balance</td><td style="padding:12px 16px;text-align:right;font-weight:700;">${gbp(balance)}</td></tr>` : ''}
+        <tr><td style="padding:12px 16px;font-size:13px;color:#8a8172;">Value</td><td style="padding:12px 16px;text-align:right;font-weight:700;">${gbp(value)}</td></tr>
       </table>
-      ${funded ? `<p style="margin:0 0 16px;font-size:13px;line-height:1.6;color:#8a8172;">This ${gbp(value)} is drawn from your float when the member's voucher is scanned at the till, so your balance updates then. The live figure is always on your balance page.</p>` : ''}
       <p style="margin:0 0 16px;">
         <a href="${link}" style="display:inline-block;background:#b08a3e;color:#fff;text-decoration:none;font-weight:700;padding:11px 20px;border-radius:10px;">View your balance</a>
       </p>
