@@ -83,6 +83,68 @@ export function emailShell(title, bodyHtml, preheader = '') {
 export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://thequarter.work').replace(/\/$/, '');
 
 /**
+ * Format a date the European long way — "Monday 20 July 2026" — for every email.
+ * Accepts a 'YYYY-MM-DD' string (treated as a London calendar day), an ISO
+ * timestamp, or a Date. Falls back to the raw input if it can't be parsed.
+ */
+export function fmtDateLong(input) {
+  try {
+    const d =
+      typeof input === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(input)
+        ? new Date(`${input}T12:00:00Z`) // noon UTC → same calendar day in London year-round
+        : input instanceof Date
+          ? input
+          : new Date(input);
+    if (Number.isNaN(d.getTime())) return String(input ?? '');
+    return d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/London' });
+  } catch {
+    return String(input ?? '');
+  }
+}
+
+/** "Monday 20 July 2026 · 09:00–17:30" (times optional). One consistent shape for all emails. */
+export function fmtDateTime(input, start, end) {
+  const day = fmtDateLong(input);
+  if (start && end) return `${day} · ${start}–${end}`;
+  if (start) return `${day} · ${start}`;
+  return day;
+}
+
+/**
+ * A tiny email-safe "where it sits in the day" bar for a booking. Renders the
+ * business day (08:00–18:00) as a faint track with the booked slot filled in gold,
+ * so ops can see the day filling up at a glance. startMin/endMin are minutes from
+ * midnight (London wall-clock). Pure nested tables + % widths — no CSS an email
+ * client would strip. Returns '' if the inputs aren't usable.
+ */
+export function dayBar(startMin, endMin) {
+  const OPEN = 8 * 60;
+  const CLOSE = 18 * 60;
+  const SPAN = CLOSE - OPEN;
+  const s0 = Number(startMin);
+  const e0 = Number(endMin);
+  if (!Number.isFinite(s0) || !Number.isFinite(e0) || e0 <= s0) return '';
+  const s = Math.max(OPEN, Math.min(CLOSE, s0));
+  const e = Math.max(s, Math.min(CLOSE, e0));
+  const pre = Math.max(0, Math.round(((s - OPEN) / SPAN) * 100));
+  const mid = Math.max(3, Math.round(((e - s) / SPAN) * 100));
+  const post = Math.max(0, 100 - pre - mid);
+  return `
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:10px 0 2px;border-collapse:collapse;table-layout:fixed;background:#efe7d6;border-radius:6px;">
+    <tr style="height:12px;line-height:12px;">
+      <td style="width:${pre}%;"></td>
+      <td style="width:${mid}%;background:#c99a3a;border-radius:6px;font-size:0;">&nbsp;</td>
+      <td style="width:${post}%;"></td>
+    </tr>
+  </table>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+    <tr style="font-size:11px;color:#8a8172;">
+      <td align="left">08:00</td><td align="center">13:00</td><td align="right">18:00</td>
+    </tr>
+  </table>`;
+}
+
+/**
  * One shared admin/ops notification. Emails the ops inbox (info@thequarter.work — the reliable
  * channel; admins are ordinary members flagged only by email domain, so there is no admin push
  * store) with a consistent subject, an optional detail list, and a button that deep-links to the
@@ -91,7 +153,9 @@ export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://thequarter
  *
  * @param {string} kind    short category, e.g. 'New member', 'Reward redeemed', 'Room booked'
  * @param {string} summary one-line summary, e.g. 'jo@x.com · Resident'
- * @param {{ link?: string, rows?: Array<[string,string]|string> }} [opts]
+ * @param {{ link?: string, rows?: Array<[string,string]|string>, extraHtml?: string }} [opts]
+ *   extraHtml is trusted HTML (already escaped by the caller) inserted before the button —
+ *   e.g. a dayBar() timeline for a booking.
  */
 export async function notifyAdmins(kind, summary, opts = {}) {
   const link = opts.link || '/admin/';
@@ -108,6 +172,7 @@ export async function notifyAdmins(kind, summary, opts = {}) {
   const body = `
     <p style="margin:0 0 4px;">${esc(summary)}</p>
     ${rowsHtml}
+    ${opts.extraHtml || ''}
     <p style="margin:18px 0 0;"><a href="${href}" style="display:inline-block;background:#2b2620;color:#fffdf8;text-decoration:none;padding:11px 20px;border-radius:10px;font-weight:600;font-size:14px;">Open in admin →</a></p>`;
   return sendEmail({
     to: OPS_EMAIL,

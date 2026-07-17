@@ -25,8 +25,8 @@ import {
 } from './_quarter-sync.mjs';
 import { pointsForGBP, appendLedger, WELCOME_BONUS, creditReferral, CARNET_AMOUNT_TO_PASSES } from './_rewards.mjs';
 import { listRecords, createRecord, T, F, airtableReady, esc } from './_airtable.mjs';
-import { londonWallClockToISO } from './_time.mjs';
-import { sendEmail, emailShell, escapeHtml, OPS_EMAIL } from './_email.mjs';
+import { londonWallClockToISO, hhmmToMin } from './_time.mjs';
+import { sendEmail, emailShell, escapeHtml, OPS_EMAIL, fmtDateLong, fmtDateTime, dayBar } from './_email.mjs';
 import { pushToEmail } from './_push.mjs';
 
 const MS_SECRET = process.env.MEMBERSTACK_SECRET_KEY;
@@ -183,11 +183,12 @@ async function finaliseRoomBooking(pi) {
 }
 
 async function sendRoomBookingEmails({ m, total, people, lunch }) {
-  const when = `${m.date} · ${m.start}–${m.end}`;
+  const when = fmtDateTime(m.date, m.start, m.end);
   const rows = `
     <p style="margin:0 0 6px;"><strong>${escapeHtml(m.spaceName || 'Room')}</strong></p>
     <p style="margin:0 0 6px;">${escapeHtml(when)}</p>
-    <p style="margin:0 0 6px;">${people} ${people === 1 ? 'person' : 'people'}${lunch ? ' · lunch added' : ''}</p>
+    ${dayBar(hhmmToMin(m.start), hhmmToMin(m.end))}
+    <p style="margin:8px 0 6px;">${people} ${people === 1 ? 'person' : 'people'}${lunch ? ' · lunch added' : ''}</p>
     <p style="margin:0 0 6px;">Total paid: <strong>£${total.toFixed(2)}</strong> (inc VAT)</p>`;
   if (m.email) {
     await sendEmail({
@@ -251,8 +252,9 @@ async function finaliseDayPass(pi) {
 }
 
 async function sendDayPassEmails({ email, name, date, total, arrival = '09:00', outOfHours = false }) {
+  const dateLong = fmtDateLong(date);
   const body = `
-    <p style="margin:0 0 6px;"><strong>Day Pass</strong> · ${escapeHtml(date)}</p>
+    <p style="margin:0 0 6px;"><strong>Day Pass</strong> · ${escapeHtml(dateLong)}</p>
     <p style="margin:0 0 6px;">Arrival: <strong>${escapeHtml(arrival)}</strong>${outOfHours ? ' — requested, we’ll confirm this early start with you' : ''}</p>
     <p style="margin:0 0 6px;">Total paid: <strong>£${total.toFixed(2)}</strong> (inc VAT)</p>`;
   if (email) {
@@ -262,15 +264,15 @@ async function sendDayPassEmails({ email, name, date, total, arrival = '09:00', 
       subject: 'Your Day Pass is booked — The Quarter',
       html: emailShell(
         'Your Day Pass is booked',
-        `<p>Thanks${name ? `, ${escapeHtml(name)}` : ''} — you’re in for ${escapeHtml(date)}.</p>${body}<p style="margin:12px 0 0;">Come up to the 1st &amp; 2nd floors, 27–28 Burgate — breakfast, coffee and a desk are waiting. Just let the team know you have a Day Pass.</p>`,
+        `<p>Thanks${name ? `, ${escapeHtml(name)}` : ''} — you’re in for ${escapeHtml(dateLong)}.</p>${body}<p style="margin:12px 0 0;">Come up to the 1st &amp; 2nd floors, 27–28 Burgate — breakfast, coffee and a desk are waiting. Just let the team know you have a Day Pass.</p>`,
         'Your Quarter Day Pass is booked',
       ),
     });
-    await pushToEmail(email, { title: 'Day Pass booked', body: `You're in for ${date}.`, url: '/dashboard/' });
+    await pushToEmail(email, { title: 'Day Pass booked', body: `You're in for ${dateLong}.`, url: '/dashboard/' });
   }
   await sendEmail({
     to: OPS_EMAIL,
-    subject: `${outOfHours ? '⏰ Early-arrival request · ' : ''}New Day Pass — ${name || email || 'guest'} (${date})`,
+    subject: `${outOfHours ? '⏰ Early-arrival request · ' : ''}New Day Pass — ${name || email || 'guest'} (${dateLong})`,
     html: emailShell(
       'New Day Pass',
       `${body}${outOfHours ? '<p style="margin:0 0 6px;color:#b45309;"><strong>Out-of-hours arrival requested</strong> — booked, pending your approval.</p>' : ''}<p style="margin:12px 0 0;">Guest: ${escapeHtml(name || '—')} · ${escapeHtml(email || '—')}</p>`,

@@ -18,7 +18,7 @@ import { allowanceForMember } from './_quarter-sync.mjs';
 import { awardPoints, checkinBonusesThisMonth, earnBoostForMember, CHECKIN_BONUS, CHECKIN_QUIET_BONUS, CHECKIN_BONUS_CAP } from './_rewards.mjs';
 import { isQuietDay } from './_busyness.mjs';
 import { isClosedDay } from './_holidays.mjs';
-import { sendEmail, emailShell, escapeHtml, OPS_EMAIL } from './_email.mjs';
+import { sendEmail, emailShell, escapeHtml, OPS_EMAIL, fmtDateLong } from './_email.mjs';
 import { pushToEmail } from './_push.mjs';
 
 const MS_SECRET = process.env.MEMBERSTACK_SECRET_KEY;
@@ -29,15 +29,13 @@ const isWeekend = (dateStr) => {
   const d = new Date(`${dateStr}T00:00:00Z`).getUTCDay();
   return d === 0 || d === 6;
 };
-const friendlyDate = (d) => {
-  try {
-    return new Date(`${d}T12:00:00Z`).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
-  } catch {
-    return d;
-  }
+/** A half day's period ('am'|'pm') is stored in the Check-in's Notes field as 'AM'/'PM'. */
+const periodFromNotes = (n) => {
+  const s = String(n || '').trim().toUpperCase();
+  return s === 'AM' ? 'am' : s === 'PM' ? 'pm' : null;
 };
 async function sendWeekendRequestEmails({ email, name, date }) {
-  const when = friendlyDate(date);
+  const when = fmtDateLong(date);
   await sendEmail({
     to: email,
     replyTo: OPS_EMAIL,
@@ -125,16 +123,25 @@ export default async function handler(req) {
       if (seenDates.has(d)) continue;
       if (d === today && active) continue;
       seenDates.add(d);
-      upcoming.push({ id: r.id, date: d, length: r.fields[F.checkins.length], kind: r.fields[F.checkins.status] === 'Paid' ? 'pass' : 'reserved' });
+      const len = r.fields[F.checkins.length];
+      const kind = r.fields[F.checkins.status] === 'Paid' ? 'pass' : 'reserved';
+      // Period only for a member's own half-day reservation (a paid pass's Notes hold pass metadata).
+      upcoming.push({ id: r.id, date: d, length: len, kind, period: len === 'Half' && kind !== 'pass' ? periodFromNotes(r.fields[F.checkins.notes]) : null });
     }
     upcoming.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
     return json({
       date: today,
       checkedIn: !!active,
       length: active ? active.fields[F.checkins.length] : null,
+      period: active && active.fields[F.checkins.length] === 'Half' ? periodFromNotes(active.fields[F.checkins.notes]) : null,
       balance: vm.member.customFields?.['days-remaining'] ?? null,
       planned: upcoming,
-      requested: requested.map((r) => ({ id: r.id, date: isoToLondonDate(r.fields[F.checkins.date]), length: r.fields[F.checkins.length] })),
+      requested: requested.map((r) => ({
+        id: r.id,
+        date: isoToLondonDate(r.fields[F.checkins.date]),
+        length: r.fields[F.checkins.length],
+        period: r.fields[F.checkins.length] === 'Half' ? periodFromNotes(r.fields[F.checkins.notes]) : null,
+      })),
     });
   }
 
@@ -148,6 +155,9 @@ export default async function handler(req) {
   const name = memberName(me);
   const length = body.length === 'Half' ? 'Half' : 'Full';
   const cost = length === 'Half' ? 0.5 : 1;
+  // Half days carry a morning/afternoon so staff know when to expect the member. Stored in
+  // the Notes field as 'AM'/'PM' (no Airtable schema change); empty for full days.
+  const periodNote = length === 'Half' ? (String(body.period).toLowerCase() === 'pm' ? 'PM' : 'AM') : '';
   const unlimited = allowanceForMember(me) === null;
 
   // Check in for TODAY (deducts unless unlimited). Idempotent per day.
@@ -192,6 +202,7 @@ export default async function handler(req) {
       await updateRecord(T.checkins, planned.id, {
         [F.checkins.status]: 'Checked-in',
         [F.checkins.length]: length,
+        [F.checkins.notes]: periodNote,
         [F.checkins.dayCost]: unlimited ? 0 : cost,
         [F.checkins.source]: 'Self',
       });
@@ -202,6 +213,7 @@ export default async function handler(req) {
         [F.checkins.name]: name,
         [F.checkins.date]: today,
         [F.checkins.length]: length,
+        [F.checkins.notes]: periodNote,
         [F.checkins.dayCost]: unlimited ? 0 : cost,
         [F.checkins.status]: 'Checked-in',
         [F.checkins.source]: 'Self',
@@ -245,6 +257,7 @@ export default async function handler(req) {
         [F.checkins.name]: name,
         [F.checkins.date]: date,
         [F.checkins.length]: length,
+        [F.checkins.notes]: periodNote,
         [F.checkins.dayCost]: 0,
         [F.checkins.status]: weekend ? 'Requested' : 'Planned',
         [F.checkins.source]: 'Self',

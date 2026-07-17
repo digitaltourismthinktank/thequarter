@@ -14,7 +14,7 @@
 import { listRecords, createRecord, T, F, airtableReady, esc } from './_airtable.mjs';
 import { londonWallClockToISO, isoToLondonMin, hhmmToMin } from './_time.mjs';
 import { isClosedDay } from './_holidays.mjs';
-import { sendEmail, emailShell, escapeHtml, OPS_EMAIL } from './_email.mjs';
+import { sendEmail, emailShell, escapeHtml, OPS_EMAIL, fmtDateLong } from './_email.mjs';
 import { pushToEmail } from './_push.mjs';
 
 const OPEN = 570; // 09:30
@@ -56,13 +56,8 @@ async function slotAvailability(date) {
   });
 }
 
-function friendlyDate(date) {
-  try {
-    return new Date(`${date}T12:00:00Z`).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
-  } catch {
-    return date;
-  }
-}
+/** "Monday 20 July 2026" — shared with every other email for one consistent date shape. */
+const friendlyDate = (date) => fmtDateLong(date);
 
 async function sendTourEmails({ name, email, date, time }) {
   const when = `${friendlyDate(date)} at ${time}`;

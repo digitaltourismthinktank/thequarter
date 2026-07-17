@@ -8,7 +8,7 @@
  * the confirmation. No account is created (it's a single guest day). Env: STRIPE_SECRET_KEY.
  */
 import { createRecord, T, F, airtableReady } from './_airtable.mjs';
-import { sendEmail, emailShell, escapeHtml, OPS_EMAIL } from './_email.mjs';
+import { sendEmail, emailShell, escapeHtml, OPS_EMAIL, fmtDateLong } from './_email.mjs';
 import { pushToEmail } from './_push.mjs';
 
 const STRIPE_SECRET = process.env.STRIPE_SECRET_KEY;
@@ -91,8 +91,8 @@ export default async function handler(req) {
       subject: 'Your Day Pass (TEST) is booked',
       html: emailShell(
         'Your Day Pass (TEST) is booked',
-        `<p>Thanks${name ? `, ${escapeHtml(name)}` : ''} — this is a £0 test Day Pass for ${escapeHtml(date)}.</p>
-         <p style="margin:0 0 6px;"><strong>Day Pass</strong> · ${escapeHtml(date)}</p>
+        `<p>Thanks${name ? `, ${escapeHtml(name)}` : ''} — this is a £0 test Day Pass for ${escapeHtml(fmtDateLong(date))}.</p>
+         <p style="margin:0 0 6px;"><strong>Day Pass</strong> · ${escapeHtml(fmtDateLong(date))}</p>
          <p style="margin:0 0 6px;">Arrival: <strong>${escapeHtml(arrival)}</strong>${outOfHours ? ' — requested, we’ll confirm this early start with you' : ''}</p>
          <p style="margin:0 0 6px;">Total: <strong>£0.00</strong> · TEST COMP</p>`,
         'Your Quarter Day Pass (TEST) is booked',

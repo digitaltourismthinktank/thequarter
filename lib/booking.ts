@@ -62,13 +62,16 @@ export interface MyBooking {
   /** 'Member' = free self-cancellable booking; 'Company' = paid (no self-cancel — ops/refund). */
   kind: string;
 }
+/** A half day's period — which half of the day the member will be in. */
+export type DayPeriod = 'am' | 'pm';
 export interface CheckinStatus {
   date: string;
   checkedIn: boolean;
   length: 'Full' | 'Half' | null;
+  period?: DayPeriod | null;
   balance: string | null;
-  planned: { id: string; date: string; length: 'Full' | 'Half'; kind?: 'pass' | 'reserved' }[];
-  requested?: { id: string; date: string; length: 'Full' | 'Half' }[];
+  planned: { id: string; date: string; length: 'Full' | 'Half'; kind?: 'pass' | 'reserved'; period?: DayPeriod | null }[];
+  requested?: { id: string; date: string; length: 'Full' | 'Half'; period?: DayPeriod | null }[];
 }
 
 // Bookings
@@ -252,10 +255,10 @@ export const bookTour = (b: { date: string; time: string; name: string; email: s
 
 // Check-in
 export const getCheckinToday = () => call<CheckinStatus>('checkin?action=today');
-export const checkInToday = (length: 'Full' | 'Half') =>
-  call<{ ok: boolean; balance: string | null }>('checkin', { method: 'POST', body: { action: 'checkin', length } });
-export const reserveDay = (date: string, length: 'Full' | 'Half') =>
-  call<{ ok: boolean; requested?: boolean }>('checkin', { method: 'POST', body: { action: 'reserve', date, length } });
+export const checkInToday = (length: 'Full' | 'Half', period?: DayPeriod | null) =>
+  call<{ ok: boolean; balance: string | null }>('checkin', { method: 'POST', body: { action: 'checkin', length, ...(length === 'Half' && period ? { period } : {}) } });
+export const reserveDay = (date: string, length: 'Full' | 'Half', period?: DayPeriod | null) =>
+  call<{ ok: boolean; requested?: boolean }>('checkin', { method: 'POST', body: { action: 'reserve', date, length, ...(length === 'Half' && period ? { period } : {}) } });
 export const cancelReservation = (id: string) =>
   call<{ ok: boolean }>('checkin', { method: 'POST', body: { action: 'cancel', id } });
 
@@ -393,6 +396,7 @@ export interface WeekendRequest {
   name: string;
   email: string;
   length: string;
+  period?: DayPeriod | null;
 }
 export const adminGetWeekendRequests = () => call<{ requests: WeekendRequest[] }>('admin?action=weekendRequests');
 export const adminApproveWeekend = (id: string) => call<{ ok: boolean }>('admin', { method: 'POST', body: { action: 'approveWeekend', id } });
@@ -406,8 +410,11 @@ export const adminGrantPasses = (memberId: string, passes: number) =>
   });
 export const adminSetDoorCode = (memberId: string, code: string) =>
   call<{ ok: boolean }>('admin', { method: 'POST', body: { action: 'setDoorCode', memberId, code } });
-export const adminCheckinMember = (memberId: string, length: 'Full' | 'Half') =>
-  call<{ ok: boolean; alreadyCheckedIn?: boolean }>('admin', { method: 'POST', body: { action: 'checkinMember', memberId, length } });
+export const adminCheckinMember = (memberId: string, length: 'Full' | 'Half', period?: DayPeriod | null) =>
+  call<{ ok: boolean; alreadyCheckedIn?: boolean }>('admin', {
+    method: 'POST',
+    body: { action: 'checkinMember', memberId, length, ...(length === 'Half' && period ? { period } : {}) },
+  });
 export const adminClaimBirthday = (memberId: string, claimed: boolean, date?: string) =>
   call<{ ok: boolean; bdayClaimed: string | null }>('admin', { method: 'POST', body: { action: 'claimBirthday', memberId, claimed, date } });
 export const adminGetRewards = () => call<{ rewards: AdminReward[] }>('admin?action=rewards');
@@ -471,6 +478,8 @@ export interface AdminCheckin {
   id?: string;
   name: string;
   length: string;
+  /** For a half-day member check-in — which half they're in for. */
+  period?: DayPeriod | null;
   status?: string;
   /** True for a paid Day Pass guest (Status 'Paid' / Source 'Web') — not a member. */
   dayPass?: boolean;

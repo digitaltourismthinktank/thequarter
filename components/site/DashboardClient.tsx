@@ -315,6 +315,27 @@ export function DashboardClient() {
         </div>
 
         <aside className={styles.rail}>
+          {/* Phones only: a tight one-card summary that stands in for the big membership card AND
+              the days/plan/door tiles, so the top of the screen isn't three stacked blocks. */}
+          <div className={styles.mSum} aria-hidden={false}>
+            <div className={styles.mSumTop}>
+              <div className={styles.mSumId}>
+                <strong className={styles.mSumName}>{display ?? email}</strong>
+                <span className={styles.mSumLevel}>
+                  {cap(level)}
+                  {typeof points === 'number' ? ` · ${points.toLocaleString('en-GB')} pts` : ''}
+                  {rewardsReady ? ` · ${rewardsReady} to redeem` : ''}
+                </span>
+              </div>
+              <span className={styles.mSumPlan}>{isPaused ? 'Paused' : slug ? cap(slug) : hasPlan ? 'Member' : 'Guest'}</span>
+            </div>
+            {hasPlan ? (
+              <div className={styles.mSumStats}>
+                <span>{isUnlimited ? <b>Unlimited</b> : <><b>{daysValue}</b> {isPaused ? 'held' : 'days left'}</>}</span>
+                <span>Door <b>{doorCode ?? '—'}</b></span>
+              </div>
+            ) : null}
+          </div>
           <div className={styles.ordCard}>
             <QuarterCard
               memberName={display ?? email}

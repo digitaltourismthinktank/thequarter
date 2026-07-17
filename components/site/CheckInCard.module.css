@@ -56,6 +56,10 @@
   background: var(--sand-100);
   margin: 12px 0 16px;
 }
+/* The Morning/Afternoon picker sits directly under Full/Half when Half is chosen. */
+.periodSeg {
+  margin: -8px 0 16px;
+}
 .segBtn {
   padding: 7px 16px;
   border: none;
@@ -183,4 +187,18 @@
   margin-top: 12px;
   font-size: var(--text-sm);
   color: var(--danger);
+}
+
+/* Phones: tighter padding so the card takes less of the first screen. */
+@media (max-width: 600px) {
+  .card {
+    padding: 18px;
+  }
+  .seg {
+    margin: 10px 0 12px;
+  }
+  .planAhead,
+  .datePick {
+    margin-top: 12px;
+  }
 }

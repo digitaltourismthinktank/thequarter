@@ -26,7 +26,7 @@ import { listRecords, createRecord, T, F, airtableReady, esc } from './_airtable
 import { BUSINESS, hhmmToMin, londonWallClockToISO, isoToLondonMin, londonNow } from './_time.mjs';
 import { isClosedDay } from './_holidays.mjs';
 import { verifyMember, memberEmail, memberName, tokenFromRequest } from './_member.mjs';
-import { sendEmail, emailShell, escapeHtml, OPS_EMAIL } from './_email.mjs';
+import { sendEmail, emailShell, escapeHtml, OPS_EMAIL, fmtDateTime } from './_email.mjs';
 import { pushToEmail } from './_push.mjs';
 import { isRecurringBlockRule, recurringBlockOccurrences } from './_privatisation.mjs';
 
@@ -305,7 +305,7 @@ export default async function handler(req) {
       } catch {
         /* record best-effort — never block the comp */
       }
-      const when = `${date} · ${priced.start}–${priced.end}`;
+      const when = fmtDateTime(date, priced.start, priced.end);
       await sendEmail({
         to: email,
         replyTo: OPS_EMAIL,

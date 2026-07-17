@@ -15,7 +15,7 @@ import { listRecords, createRecord, updateRecord, T, F, airtableReady, esc } fro
 import { BUSINESS, hhmmToMin, isWeekday, londonWallClockToISO, isoToLondonMin, isoToLondonDate, londonNow, holdReleased, roomBookingReleased } from './_time.mjs';
 import { isClosedDay } from './_holidays.mjs';
 import { isRecurringBlockRule, recurringBlockOccurrences, parsePrivatisationSlots, isPrivatisedOn } from './_privatisation.mjs';
-import { notifyAdmins } from './_email.mjs';
+import { notifyAdmins, fmtDateTime, dayBar } from './_email.mjs';
 
 /** A released company hold no longer blocks the room. */
 const isReleased = (r, dateStr, nowMin, todayStr) =>
@@ -84,6 +84,16 @@ function validateSlot(dateStr, start, end) {
  * date, so they're excluded here and expanded separately (recurringBlockOccurrences) — this makes
  * a recurring block occupy the room on EVERY future weekday, blocking member double-booking too.
  */
+/** The display name of a space by record id (for emails). Best-effort → 'Room'. */
+async function spaceNameById(spaceId) {
+  try {
+    const recs = await listRecords(T.spaces, { filterByFormula: `RECORD_ID()='${esc(spaceId)}'`, maxRecords: 1 });
+    return recs[0]?.fields[F.spaces.name] || 'Room';
+  } catch {
+    return 'Room';
+  }
+}
+
 async function bookingsForSpaceDate(spaceId, dateStr) {
   const recs = await listRecords(T.bookings, {
     filterByFormula: `AND(DATETIME_FORMAT({Date}, 'YYYY-MM-DD')='${esc(dateStr)}', {Status}='Confirmed')`,
@@ -338,12 +348,18 @@ export default async function handler(req) {
       [F.bookings.source]: 'Web',
     });
     // Tell ops a room/pod was just booked (best-effort — never blocks the booking).
-    await notifyAdmins('Room/pod booked', `${memberName(me)} · ${date} ${start}–${end}`, {
+    // Shows the room name, a European long date + time, the member's NAME (email kept
+    // secondary), and a little bar of where the booking sits in the day.
+    const spaceName = await spaceNameById(spaceId);
+    await notifyAdmins('Room/pod booked', `${memberName(me)} · ${spaceName} · ${fmtDateTime(date, start, end)}`, {
       link: '/admin/#rooms',
       rows: [
-        ['When', `${date} ${start}–${end}`],
-        ['Member', email || memberName(me)],
+        ['Room', spaceName],
+        ['When', fmtDateTime(date, start, end)],
+        ['Member', memberName(me)],
+        ...(email ? [['Email', email]] : []),
       ],
+      extraHtml: dayBar(s, e),
     });
     return json({ ok: true, id: rec.id });
   }

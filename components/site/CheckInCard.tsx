@@ -38,6 +38,7 @@ export function CheckInCard({ className }: { className?: string }) {
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<CheckinStatus | null>(null);
   const [half, setHalf] = useState(false);
+  const [period, setPeriod] = useState<'am' | 'pm'>('am');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -58,7 +59,7 @@ export function CheckInCard({ className }: { className?: string }) {
   async function doCheckIn() {
     setBusy(true);
     setError(null);
-    const r = await checkInToday(half ? 'Half' : 'Full');
+    const r = await checkInToday(half ? 'Half' : 'Full', half ? period : null);
     if (!r.ok) setError(friendly(r.data?.error));
     await refresh();
     setBusy(false);
@@ -70,7 +71,7 @@ export function CheckInCard({ className }: { className?: string }) {
     setError(null);
     setNote(null);
     setPending((p) => (p.includes(v) ? p : [...p, v])); // instant feedback
-    const r = await reserveDay(v, half ? 'Half' : 'Full');
+    const r = await reserveDay(v, half ? 'Half' : 'Full', half ? period : null);
     if (!r.ok) setError(friendly(r.data?.error));
     else if (r.data.requested) setNote('Weekend access requested — we’ll confirm by email.');
     await refresh();
@@ -105,7 +106,9 @@ export function CheckInCard({ className }: { className?: string }) {
           {status?.checkedIn ? (
             <>
               <h2 className={styles.title}>You&rsquo;re in today</h2>
-              <p className={styles.meta}>{status.length === 'Half' ? 'Half day' : 'Full day'} — enjoy The Quarter.</p>
+              <p className={styles.meta}>
+                {status.length === 'Half' ? `Half day${status.period ? ` · ${status.period === 'am' ? 'morning' : 'afternoon'}` : ''}` : 'Full day'} — enjoy The Quarter.
+              </p>
             </>
           ) : (
             <h2 className={styles.title}>Coming in?</h2>
@@ -120,6 +123,18 @@ export function CheckInCard({ className }: { className?: string }) {
               Half day
             </button>
           </div>
+
+          {/* Which half — only for a half day, so the team knows when to expect you. */}
+          {half ? (
+            <div className={cn(styles.seg, styles.periodSeg)} role="tablist" aria-label="Which half of the day">
+              <button type="button" role="tab" aria-selected={period === 'am'} className={cn(styles.segBtn, period === 'am' && styles.segOn)} onClick={() => setPeriod('am')}>
+                Morning
+              </button>
+              <button type="button" role="tab" aria-selected={period === 'pm'} className={cn(styles.segBtn, period === 'pm' && styles.segOn)} onClick={() => setPeriod('pm')}>
+                Afternoon
+              </button>
+            </div>
+          ) : null}
 
           {!status?.checkedIn ? (
             <div className={styles.actions}>
@@ -150,7 +165,7 @@ export function CheckInCard({ className }: { className?: string }) {
           {status?.planned?.map((p) => (
             <span key={p.id} className={styles.chip}>
               {fmtDate(p.date)}
-              {p.length === 'Half' ? ' · ½' : ''}
+              {p.length === 'Half' ? (p.period ? ` · ½ ${p.period.toUpperCase()}` : ' · ½') : ''}
               {p.kind === 'pass' ? <span className={styles.passTag}>Day Pass</span> : null}
               <button className={styles.chipX} onClick={() => doCancel(p.id)} aria-label="Cancel reservation" disabled={busy}>
                 ×

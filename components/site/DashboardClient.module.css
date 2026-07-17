@@ -128,6 +128,63 @@
   gap: 16px;
 }
 
+/* ---- Compact phone summary (≤600px only) ---- */
+/* Desktop + tablet: hidden — the QuarterCard and StatTiles do the work. On a phone those
+   three tall blocks stack and waste the whole first screen, so this one dense card replaces
+   them (name · level · points · plan, then days + door). */
+.mSum {
+  display: none;
+}
+.mSumTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.mSumId {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.mSumName {
+  font-size: var(--text-base);
+  font-weight: var(--fw-semibold);
+  color: var(--sand-50);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mSumLevel {
+  font-size: var(--text-xs);
+  color: rgba(251, 248, 242, 0.66);
+}
+.mSumPlan {
+  flex: none;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--gold-500);
+  color: var(--gold-300);
+  font-size: var(--text-2xs);
+  font-weight: var(--fw-bold);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  white-space: nowrap;
+}
+.mSumStats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(251, 248, 242, 0.14);
+  font-size: var(--text-sm);
+  color: rgba(251, 248, 242, 0.78);
+}
+.mSumStats b {
+  color: var(--sand-50);
+  font-weight: var(--fw-bold);
+}
+
 /* ---- Pay-as-you-go panel (no membership) — replaces the three StatTiles ---- */
 .payg {
   background: var(--surface-card);
@@ -294,4 +351,25 @@
   white-space: pre-wrap;
   word-break: break-word;
   color: var(--text-body);
+}
+
+/* Phones only: the compact summary replaces the big membership card + the days/plan/door
+   tiles, reclaiming the whole top of the first screen. MUST come after the unconditional
+   `.mSum { display:none }` and `.statRow { display:grid }` so it wins the cascade at ≤600px. */
+@media (max-width: 600px) {
+  .mSum {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    order: 0;
+    padding: 14px 16px;
+    background: var(--ink-900);
+    border: 1px solid var(--ink-900);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-card);
+  }
+  .ordCard,
+  .statRow {
+    display: none;
+  }
 }

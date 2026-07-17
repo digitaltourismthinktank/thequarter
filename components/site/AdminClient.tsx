@@ -1621,7 +1621,7 @@ function WeekendRequestsPanel() {
             <span style={{ fontWeight: 600 }}>{q.name || q.email}</span>
             <span className={styles.muted}>
               {fmt(q.date)}
-              {q.length === 'Half' ? ' · ½' : ''}
+              {q.length === 'Half' ? (q.period ? ` · ½ ${q.period.toUpperCase()}` : ' · ½') : ''}
             </span>
             <button type="button" className={styles.smallBtn} onClick={() => act(q.id, true)} disabled={busy}>
               Approve
@@ -1915,11 +1915,15 @@ function AdminTodayPane({ onAllBirthdays }: { onAllBirthdays: () => void }) {
                     title={
                       c.dayPass
                         ? `Day Pass · Paid${c.company ? ` · ${c.company}` : ''}${c.email ? ` · ${c.email}` : ''}`
-                        : `${c.status === 'Checked-in' ? 'Here now' : 'Expected'} · ${c.length === 'Half' ? 'Half day' : 'Full day'}`
+                        : `${c.status === 'Checked-in' ? 'Here now' : 'Expected'} · ${c.length === 'Half' ? `Half day${c.period ? ` (${c.period === 'am' ? 'morning' : 'afternoon'})` : ''}` : 'Full day'}`
                     }
                   >
                     <span className={styles.whoName}>{c.name}</span>
-                    {c.dayPass ? <span className={styles.whoTag}>Day Pass · Paid</span> : c.length === 'Half' ? <span className={styles.whoHalfTag}>½</span> : null}
+                    {c.dayPass ? (
+                      <span className={styles.whoTag}>Day Pass · Paid</span>
+                    ) : c.length === 'Half' ? (
+                      <span className={styles.whoHalfTag}>{c.period ? `½ ${c.period.toUpperCase()}` : '½'}</span>
+                    ) : null}
                     {c.id ? (
                       <button
                         type="button"

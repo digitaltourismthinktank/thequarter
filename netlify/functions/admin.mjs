@@ -16,7 +16,7 @@ import { listRecords, createRecord, updateRecord, deleteRecord, T, F, airtableRe
 import { londonWallClockToISO, isoToLondonMin, isoToLondonDate, hhmmToMin, londonNow, holdReleased } from './_time.mjs';
 import { PLAN_NAMES, allowanceForMember, setMemberPlan, renewMember, formatDate } from './_quarter-sync.mjs';
 import { listRewards, listPerks, listFloats, floatStatus, awardPoints, redeemReward, partnerPayouts, markPartnerPaid, partnerStatement } from './_rewards.mjs';
-import { sendEmail, emailShell, escapeHtml, OPS_EMAIL } from './_email.mjs';
+import { sendEmail, emailShell, escapeHtml, OPS_EMAIL, fmtDateLong } from './_email.mjs';
 import { pushToEmail } from './_push.mjs';
 import { parsePrivatisationSlots, isPrivatisedOn, isRecurringBlockRule, recurringBlockOccurrences, parseSkipDates } from './_privatisation.mjs';
 
@@ -253,6 +253,12 @@ async function checkinsForMemberDate(email, dateStr) {
   });
 }
 
+/** A half day's period ('am'|'pm'), stored in a member check-in's Notes as 'AM'/'PM'. */
+const periodFromNotes = (n) => {
+  const s = String(n || '').trim().toUpperCase();
+  return s === 'AM' ? 'am' : s === 'PM' ? 'pm' : null;
+};
+
 async function checkinsForDate(date) {
   // Include Planned (booked ahead, not yet arrived) as well as Checked-in, so
   // "who's in" reflects everyone expected that day — not just those on site now.
@@ -273,10 +279,13 @@ async function checkinsForDate(date) {
       const parts = String(r.fields[F.checkins.notes] || '').split(' · ');
       if (parts.length >= 4) company = parts.slice(3).join(' · ').trim();
     }
+    const length = r.fields[F.checkins.length] || 'Full';
     return {
       id: r.id,
       name: r.fields[F.checkins.name] || r.fields[F.checkins.email] || (dayPass ? 'Day guest' : 'Member'),
-      length: r.fields[F.checkins.length] || 'Full',
+      length,
+      // Half-day morning/afternoon — only for member check-ins (a day-pass's Notes hold pass metadata).
+      period: !dayPass && length === 'Half' ? periodFromNotes(r.fields[F.checkins.notes]) : null,
       status,
       dayPass,
       email: r.fields[F.checkins.email] || '',
@@ -333,6 +342,7 @@ export default async function handler(req) {
         name: r.fields[F.checkins.name] || '',
         email: r.fields[F.checkins.email] || '',
         length: r.fields[F.checkins.length] || 'Full',
+        period: (r.fields[F.checkins.length] || 'Full') === 'Half' ? periodFromNotes(r.fields[F.checkins.notes]) : null,
       }));
       return json({ requests });
     }
@@ -578,12 +588,7 @@ export default async function handler(req) {
     const email = r.fields[F.checkins.email];
     const name = r.fields[F.checkins.name] || 'there';
     const date = isoToLondonDate(r.fields[F.checkins.date]);
-    let when = date;
-    try {
-      when = new Date(`${date}T12:00:00Z`).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
-    } catch {
-      /* keep iso */
-    }
+    const when = fmtDateLong(date);
     if (email) {
       await sendEmail(
         approve
@@ -644,6 +649,9 @@ export default async function handler(req) {
     const name = [cf['first-name'], cf['last-name']].filter(Boolean).join(' ').trim() || email || 'Member';
     const length = body.length === 'Half' ? 'Half' : 'Full';
     const cost = length === 'Half' ? 0.5 : 1;
+    // Did staff explicitly pick a half? If not, we must not clobber a member's own AM/PM choice.
+    const adminChosePeriod = body.period === 'am' || body.period === 'pm';
+    const chosenPeriodNote = length === 'Half' ? (String(body.period).toLowerCase() === 'pm' ? 'PM' : 'AM') : '';
     const unlimited = allowanceForMember(m) === null;
     const today = londonNow().dateStr;
 
@@ -671,9 +679,13 @@ export default async function handler(req) {
     // person is duplicated in the Today "Who's in" view. Only create fresh when none exists.
     const plannedToday = todaysRecs.find((rr) => (rr.fields[F.checkins.status] || '') === 'Planned');
     if (plannedToday) {
+      // Keep the member's own half-day AM/PM (stored in Notes) unless staff explicitly chose one.
+      const existingPeriod = periodFromNotes(plannedToday.fields[F.checkins.notes]);
+      const flipNotes = length !== 'Half' ? '' : adminChosePeriod ? chosenPeriodNote : existingPeriod ? existingPeriod.toUpperCase() : 'AM';
       await updateRecord(T.checkins, plannedToday.id, {
         [F.checkins.status]: 'Checked-in',
         [F.checkins.length]: length,
+        [F.checkins.notes]: flipNotes,
         [F.checkins.dayCost]: unlimited ? 0 : cost,
         [F.checkins.source]: 'Admin',
       });
@@ -684,6 +696,7 @@ export default async function handler(req) {
         [F.checkins.name]: name,
         [F.checkins.date]: today,
         [F.checkins.length]: length,
+        [F.checkins.notes]: chosenPeriodNote,
         [F.checkins.dayCost]: unlimited ? 0 : cost,
         [F.checkins.status]: 'Checked-in',
         [F.checkins.source]: 'Admin',
