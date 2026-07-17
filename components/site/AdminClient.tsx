@@ -34,6 +34,7 @@ import {
   adminClearVat,
   adminCheckinMember,
   adminGetEvents,
+  getUpcomingEvents,
   adminCreateEvent,
   adminUpdateEvent,
   adminDeleteEvent,
@@ -1709,6 +1710,58 @@ function DaySchedule({ spaces, bookings }: { spaces: AdminSpace[]; bookings: Adm
   );
 }
 
+/** Today-home card: the next upcoming event + its live RSVP headcount + a few names.
+ *  (Replaces the old "rooms & pods booked" count, now that the Day schedule below covers rooms.) */
+function NextEventCard() {
+  const [ev, setEv] = useState<QuarterEvent | null>(null);
+  const [rsvps, setRsvps] = useState<EventAttendee[] | null>(null);
+  const [loaded, setLoaded] = useState(false);
+  useEffect(() => {
+    let live = true;
+    (async () => {
+      const r = await getUpcomingEvents();
+      const next = r.ok ? r.data.events[0] || null : null;
+      if (!live) return;
+      setEv(next);
+      if (next) {
+        const rr = await adminGetRsvps(next.id);
+        if (live) setRsvps(rr.ok ? rr.data.rsvps : []);
+      }
+      if (live) setLoaded(true);
+    })();
+    return () => {
+      live = false;
+    };
+  }, []);
+  const going = (rsvps || []).filter((a) => a.status === 'Going');
+  return (
+    <div className={styles.todayCard}>
+      <span className={styles.todayCardLabel}>Next event</span>
+      {!loaded ? (
+        <span className={styles.todayCardSub}>Loading…</span>
+      ) : !ev ? (
+        <span className={styles.todayCardSub}>Nothing scheduled — add one in Events.</span>
+      ) : (
+        <>
+          <strong style={{ fontSize: 'var(--text-lg)', fontWeight: 700, lineHeight: 1.2, margin: '2px 0' }}>{ev.title}</strong>
+          <span className={styles.todayCardSub}>
+            {ev.start ? new Date(ev.start).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }) : ''} · {going.length} going
+          </span>
+          {going.length ? (
+            <span className={styles.todayCardSub}>
+              {going.slice(0, 6).map((a) => a.name || a.email).join(', ')}
+              {going.length > 6 ? ` +${going.length - 6}` : ''}
+            </span>
+          ) : null}
+          <button type="button" className={styles.allBdays} onClick={() => (window.location.hash = 'events')}>
+            All events &amp; RSVPs ›
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
 function AdminTodayPane({ onAllBirthdays }: { onAllBirthdays: () => void }) {
   const [offset, setOffset] = useState(0); // 0 = today, 1 = next open day
   const [custom, setCustom] = useState<string>(''); // a hand-picked day (overrides offset)
@@ -1781,12 +1834,8 @@ function AdminTodayPane({ onAllBirthdays }: { onAllBirthdays: () => void }) {
 
   const dObj = date ? new Date(`${date}T12:00:00`) : new Date();
   const b = busyness(dObj);
-  const spaceName = (id: string | null) => spaces.find((s) => s.id === id)?.name ?? 'Space';
-  const roomBookings = bookings.filter((x) => x.kind !== 'Block');
   // The live headcount roll only means anything for the actual current day.
   const isLiveToday = !custom && offset === 0;
-  const bookedSpaceIds = new Set(roomBookings.map((x) => x.space));
-  const freeRooms = spaces.filter((s) => s.bookable && !bookedSpaceIds.has(s.id));
   const birthdaysThisWeek = members
     .filter((m) => m.bday)
     .map((m) => ({ m, s: bdayStatus(m) }))
@@ -1869,8 +1918,8 @@ function AdminTodayPane({ onAllBirthdays }: { onAllBirthdays: () => void }) {
                         : `${c.status === 'Checked-in' ? 'Here now' : 'Expected'} · ${c.length === 'Half' ? 'Half day' : 'Full day'}`
                     }
                   >
-                    {c.name}
-                    {c.dayPass ? <span className={styles.whoTag}>Day Pass · Paid</span> : c.length === 'Half' ? ' · ½' : ''}
+                    <span className={styles.whoName}>{c.name}</span>
+                    {c.dayPass ? <span className={styles.whoTag}>Day Pass · Paid</span> : c.length === 'Half' ? <span className={styles.whoHalfTag}>½</span> : null}
                     {c.id ? (
                       <button
                         type="button"
@@ -1911,18 +1960,7 @@ function AdminTodayPane({ onAllBirthdays }: { onAllBirthdays: () => void }) {
               )}
             </div>
           ) : null}
-          <div className={styles.todayCard}>
-            <span className={styles.todayCardLabel}>Rooms &amp; pods booked</span>
-            <strong className={styles.todayBig}>{roomBookings.length}</strong>
-            <span className={styles.todayCardSub}>
-              {roomBookings.length
-                ? roomBookings.map((x) => `${spaceName(x.space)} ${x.allDay ? 'all day' : minToHHMM(x.startMin)}`).join(' · ')
-                : 'Nothing booked.'}
-            </span>
-            {freeRooms.length ? (
-              <span className={styles.todayCardSub}>Free all day: {freeRooms.map((s) => s.name).join(', ')}</span>
-            ) : null}
-          </div>
+          <NextEventCard />
           <div className={styles.todayCard}>
             <span className={styles.todayCardLabel}>Birthdays in the next 30 days</span>
             {birthdaysThisWeek.length ? (

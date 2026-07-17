@@ -1193,13 +1193,19 @@ select.input {
 .who {
   display: inline-flex;
   align-items: center;
-  padding: 4px 10px;
-  border-radius: var(--radius-pill);
+  gap: 6px;
+  max-width: 100%;
+  padding: 4px 6px 4px 12px;
+  border-radius: 16px;
   border: 1px solid transparent;
   background: var(--gold-100);
   color: var(--gold-700);
   font-size: var(--text-sm);
   font-weight: var(--fw-semibold);
+}
+.whoName {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .whoHalf {
   background: var(--sand-100);
@@ -1218,20 +1224,29 @@ select.input {
   border-color: transparent;
 }
 .whoTag {
-  margin-left: 6px;
+  flex: none;
   font-size: var(--text-2xs);
   font-weight: var(--fw-semibold);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   background: var(--surface-card);
   color: var(--gold-700);
-  padding: 1px 6px;
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
+}
+.whoHalfTag {
+  flex: none;
+  font-size: var(--text-2xs);
+  font-weight: var(--fw-bold);
+  background: var(--surface-card);
+  color: var(--gold-700);
+  padding: 2px 8px;
   border-radius: var(--radius-pill);
 }
 /* Small "undo check-in" control on an attendee pill. */
 .whoUndo {
-  margin-left: 6px;
-  margin-right: -2px;
+  flex: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
