@@ -364,6 +364,71 @@ export default async function handler(req) {
     return json({ ok: true, id: rec.id });
   }
 
+  // Amend a booking's date/time IN PLACE (same room) — so a member can move a booking
+  // instead of cancelling and re-making it. Same clash rules as booking, but the booking
+  // being moved is excluded from the checks. Paid bookings move via ops (money), not here.
+  if (body.action === 'amend') {
+    const { bookingId, date, start, end } = body;
+    if (!bookingId) return json({ error: 'missing-booking' }, 400);
+    const err = validateSlot(date, start, end);
+    if (err) return json({ error: err }, 400);
+    const recs = await listRecords(T.bookings, { filterByFormula: `RECORD_ID()='${esc(bookingId)}'`, maxRecords: 1 });
+    const r = recs[0];
+    if (!r) return json({ error: 'not-found' }, 404);
+    const admin = isAdmin(me);
+    const ownerEmail = String(r.fields[F.bookings.email] || '').toLowerCase();
+    if (ownerEmail !== String(email || '').toLowerCase() && !admin) return json({ error: 'forbidden' }, 403);
+    if (r.fields[F.bookings.kind] === 'Company' && !admin) return json({ error: 'paid-booking' }, 403);
+    if (isRecurringBlockRule(r)) return json({ error: 'recurring-booking' }, 400);
+    if (await isClosedDay(date)) return json({ error: 'closed-day' }, 400);
+    const sp = r.fields[F.bookings.space];
+    const spaceId = Array.isArray(sp) && sp.length ? sp[0] : null;
+    if (!spaceId) return json({ error: 'no-space' }, 400);
+
+    const s = hhmmToMin(start);
+    const e = hhmmToMin(end);
+    const nowC = londonNow();
+    const existing = await bookingsForSpaceDate(spaceId, date);
+    const clash = existing.some((x) => {
+      if (x.id === bookingId) return false; // ignore the booking we're moving
+      if (roomReleased(x, date, nowC.min, nowC.dateStr)) return false;
+      const rs = isoToLondonMin(x.fields[F.bookings.start]);
+      const re = isoToLondonMin(x.fields[F.bookings.end]);
+      return s < re && e > rs;
+    });
+    if (clash) return json({ error: 'slot-taken' }, 409);
+
+    const mineThatDay = await listRecords(T.bookings, {
+      filterByFormula: `AND(DATETIME_FORMAT({Date}, 'YYYY-MM-DD')='${esc(date)}', LOWER({Member email})='${esc(ownerEmail)}', {Status}='Confirmed')`,
+    });
+    const selfClash = mineThatDay.some((x) => {
+      if (x.id === bookingId) return false;
+      const rs = isoToLondonMin(x.fields[F.bookings.start]);
+      const re = isoToLondonMin(x.fields[F.bookings.end]);
+      return s < re && e > rs;
+    });
+    if (selfClash) return json({ error: 'double-book' }, 409);
+
+    const nm = r.fields[F.bookings.name] || memberName(me);
+    await updateRecord(T.bookings, bookingId, {
+      [F.bookings.date]: date,
+      [F.bookings.start]: londonWallClockToISO(date, start),
+      [F.bookings.end]: londonWallClockToISO(date, end),
+      [F.bookings.title]: `${start}–${end} · ${nm}`,
+    });
+    const spaceName = await spaceNameById(spaceId);
+    await notifyAdmins('Booking amended', `${nm} · ${spaceName} · ${fmtDateTime(date, start, end)}`, {
+      link: '/admin/#rooms',
+      rows: [
+        ['Room', spaceName],
+        ['New time', fmtDateTime(date, start, end)],
+        ['Member', nm],
+      ],
+      extraHtml: dayBar(s, e),
+    });
+    return json({ ok: true });
+  }
+
   if (body.action === 'cancel') {
     const { bookingId } = body;
     if (!bookingId) return json({ error: 'missing-booking' }, 400);

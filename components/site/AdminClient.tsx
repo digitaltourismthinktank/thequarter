@@ -21,6 +21,7 @@ import {
   adminExternal,
   adminCompanyBooking,
   adminCancel,
+  amendBooking,
   adminGetTourBlocks,
   adminBlockTours,
   type TourBlock,
@@ -1159,6 +1160,12 @@ function RoomsPane() {
   const [msg, setMsg] = useState<string | null>(null);
   // Cancelling a recurring-rule occurrence: pick "this week only" vs "the whole series".
   const [cancelChoice, setCancelChoice] = useState<{ realId: string; date: string; room: string } | null>(null);
+  // Inline amend (move a booking's date/time, same room) — one booking at a time.
+  const [amendId, setAmendId] = useState<string | null>(null);
+  const [aDate, setADate] = useState('');
+  const [aStart, setAStart] = useState('');
+  const [aEnd, setAEnd] = useState('');
+  const [amendErr, setAmendErr] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -1315,6 +1322,34 @@ function RoomsPane() {
     await loadWeek();
     setBusy(false);
   }
+  function openAmend(b: AdminBooking, day: string) {
+    setAmendId(b.id);
+    setADate(day);
+    setAStart(minToHHMM(b.startMin));
+    setAEnd(minToHHMM(b.endMin));
+    setAmendErr(null);
+  }
+  async function saveAmend(id: string) {
+    if (aEnd <= aStart) {
+      setAmendErr('End must be after start.');
+      return;
+    }
+    setBusy(true);
+    setAmendErr(null);
+    const r = await amendBooking(id, aDate, aStart, aEnd);
+    if (!r.ok) {
+      const code = (r.data as { error?: string })?.error;
+      setAmendErr(code === 'slot-taken' ? 'That slot is taken.' : code === 'double-book' ? 'Clashes with another booking.' : code === 'closed-day' ? 'Closed that day.' : 'Couldn’t move it.');
+      setBusy(false);
+      return;
+    }
+    setAmendId(null);
+    await loadWeek();
+    setBusy(false);
+  }
+  // 08:00–18:00 in 30-min steps for the amend selects.
+  const AMEND_TIMES: string[] = [];
+  for (let mm = 8 * 60; mm <= 18 * 60; mm += 30) AMEND_TIMES.push(minToHHMM(mm));
 
   const weekdayName = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'long' });
 
@@ -1349,10 +1384,40 @@ function RoomsPane() {
         ) : null}
         {status ? <span className={styles.statusTag}>{status}</span> : null}
         {b.allDay ? null : (
-          <button type="button" className={styles.bCancel} onClick={() => cancel(b.id, day, spaceName(b.space))} disabled={busy}>
-            Cancel
-          </button>
+          <div className={styles.bActions}>
+            {!isRule ? (
+              <button type="button" className={styles.bAmend} onClick={() => (amendId === b.id ? setAmendId(null) : openAmend(b, day))} disabled={busy && amendId !== b.id}>
+                {amendId === b.id ? 'Close' : 'Amend'}
+              </button>
+            ) : null}
+            <button type="button" className={styles.bCancel} onClick={() => cancel(b.id, day, spaceName(b.space))} disabled={busy}>
+              Cancel
+            </button>
+          </div>
         )}
+        {amendId === b.id ? (
+          <div className={styles.bAmendEditor}>
+            <input type="date" value={aDate} onChange={(e) => setADate(e.target.value)} />
+            <select value={aStart} onChange={(e) => setAStart(e.target.value)}>
+              {AMEND_TIMES.slice(0, -1).map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+            <select value={aEnd} onChange={(e) => setAEnd(e.target.value)}>
+              {AMEND_TIMES.filter((t) => t > aStart).map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+            <button type="button" className={styles.bAmendSave} onClick={() => saveAmend(b.id)} disabled={busy}>
+              Save
+            </button>
+            {amendErr ? <span className={styles.bAmendErr}>{amendErr}</span> : null}
+          </div>
+        ) : null}
       </div>
     );
   }

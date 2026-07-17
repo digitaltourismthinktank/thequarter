@@ -37,9 +37,74 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 12px;
   padding: 10px 0;
   border-bottom: 1px solid var(--border-subtle);
+}
+.rowBtns {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  flex: none;
+}
+.amend {
+  border: none;
+  background: none;
+  color: var(--gold-700);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+  font-size: var(--text-sm);
+  flex: none;
+}
+.amend:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+/* Inline amend editor — wraps to its own full-width line under the booking row. */
+.editor {
+  flex: 0 0 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  margin-top: 4px;
+  padding: 14px;
+  background: var(--sand-50);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: var(--text-2xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  font-weight: var(--fw-semibold);
+  color: var(--text-muted);
+}
+.field input,
+.field select {
+  padding: 8px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+  font-size: var(--text-sm);
+  font-weight: var(--fw-medium);
+  color: var(--ink-900);
+  text-transform: none;
+  letter-spacing: normal;
+}
+.editActions {
+  display: flex;
+  align-items: flex-end;
+}
+.error {
+  flex: 0 0 100%;
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--danger);
 }
 .row:last-child {
   border-bottom: none;

@@ -86,6 +86,9 @@ export const createBooking = (b: { spaceId: string; date: string; start: string;
   call<{ ok: boolean; id: string }>('bookings', { method: 'POST', body: { action: 'book', ...b } });
 export const cancelBooking = (bookingId: string) =>
   call<{ ok: boolean }>('bookings', { method: 'POST', body: { action: 'cancel', bookingId } });
+/** Move a booking to a new date/time (same room). Paid bookings are ops-only. */
+export const amendBooking = (bookingId: string, date: string, start: string, end: string) =>
+  call<{ ok: boolean }>('bookings', { method: 'POST', body: { action: 'amend', bookingId, date, start, end } });
 
 // Native paid room booking (public — anyone can book + pay a meeting room / pod).
 export interface RoomQuoteLine {

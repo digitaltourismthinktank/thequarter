@@ -397,7 +397,7 @@ function RoomCard({
       </div>
       {s.bookable ? (
         <div className={styles.qrChip}>
-          <Qr value={`${origin}/kiosk?room=${encodeURIComponent(s.id)}`} size={qrSize} />
+          <Qr value={`${origin}/book?room=${encodeURIComponent(s.id)}`} size={qrSize} />
           <span className={styles.qrChipCaption}>Scan to reserve</span>
         </div>
       ) : null}
