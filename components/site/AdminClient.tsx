@@ -51,6 +51,8 @@ import {
   adminCreatePartner,
   adminGetPayouts,
   adminMarkPaid,
+  adminPartnerStatement,
+  type PartnerStatement,
   type PayoutPartner,
   adminGetToday,
   adminRemoveCheckin,
@@ -2432,6 +2434,66 @@ function AddPartnerPanel({ onAdded }: { onAdded: () => void }) {
   );
 }
 
+/** A payout row with an on-demand itemised statement (each redemption: date, reward, member, £, owed|paid). */
+function PayoutRow({ p, month, busy, onMarkPaid }: { p: PayoutPartner; month: string; busy: boolean; onMarkPaid: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [stmt, setStmt] = useState<PartnerStatement | null>(null);
+  const [loadingS, setLoadingS] = useState(false);
+  async function toggle() {
+    const next = !open;
+    setOpen(next);
+    if (next && stmt === null) {
+      setLoadingS(true);
+      const r = await adminPartnerStatement(p.partner, month || undefined);
+      setStmt(r.ok ? r.data : null);
+      setLoadingS(false);
+    }
+  }
+  return (
+    <div className={styles.payRow} style={{ flexWrap: 'wrap' }}>
+      <span className={styles.payName}>{p.partner}</span>
+      <span className={styles.payOwed}>£{p.owed.toFixed(2)}</span>
+      <span className={styles.muted}>
+        {p.owedCount} redemption{p.owedCount === 1 ? '' : 's'}
+        {p.paid > 0 ? ` · £${p.paid.toFixed(2)} settled` : ''}
+      </span>
+      <button type="button" className={styles.smallBtn} onClick={toggle}>
+        {open ? 'Hide' : 'Itemise'}
+      </button>
+      <button type="button" className={styles.smallBtn} disabled={busy || p.owed <= 0} onClick={onMarkPaid}>
+        Mark as paid
+      </button>
+      {open ? (
+        <div style={{ flexBasis: '100%', marginTop: 8, overflowX: 'auto' }}>
+          {loadingS ? (
+            <p className={styles.muted}>Loading…</p>
+          ) : !stmt || stmt.items.length === 0 ? (
+            <p className={styles.muted}>No redemptions in this period.</p>
+          ) : (
+            <table style={{ width: '100%', minWidth: 380, fontSize: 'var(--text-sm)', borderCollapse: 'collapse' }}>
+              <tbody>
+                {stmt.items.map((it, i) => (
+                  <tr key={i}>
+                    <td style={{ padding: '3px 8px 3px 0', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                      {it.at ? new Date(it.at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : ''}
+                    </td>
+                    <td style={{ padding: '3px 8px' }}>{it.reward}</td>
+                    <td style={{ padding: '3px 8px', color: 'var(--text-muted)' }}>{it.email}</td>
+                    <td style={{ padding: '3px 0', textAlign: 'right', fontWeight: 600, whiteSpace: 'nowrap' }}>£{it.gbp.toFixed(2)}</td>
+                    <td style={{ padding: '3px 0 3px 10px', textAlign: 'right', color: it.status === 'paid' ? '#2f7d52' : 'var(--gold-700)' }}>
+                      {it.status === 'paid' ? '✓ paid' : 'owed'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function PartnersPane() {
   const [floats, setFloats] = useState<AdminFloat[]>([]);
   const [loading, setLoading] = useState(true);
@@ -2545,20 +2607,7 @@ function PartnersPane() {
         {payouts.length ? (
           <div className={styles.payList}>
             {payouts.map((p) => (
-              <div key={p.partner} className={styles.payRow}>
-                <span className={styles.payName}>{p.partner}</span>
-                <span className={styles.payOwed}>£{p.owed.toFixed(2)}</span>
-                <span className={styles.muted}>
-                  {p.owedCount} redemption{p.owedCount === 1 ? '' : 's'}
-                  {p.paid > 0 ? ` · £${p.paid.toFixed(2)} settled` : ''}
-                </span>
-                <button type="button" className={styles.smallBtn} disabled={busy || p.owed <= 0} onClick={() => markPaid(p.partner)}>
-                  Mark as paid
-                </button>
-                <button type="button" className={styles.smallBtn} disabled title="Coming soon — one-tap Faster Payment via Starling">
-                  Pay via Starling
-                </button>
-              </div>
+              <PayoutRow key={p.partner} p={p} month={month} busy={busy} onMarkPaid={() => markPaid(p.partner)} />
             ))}
           </div>
         ) : (
