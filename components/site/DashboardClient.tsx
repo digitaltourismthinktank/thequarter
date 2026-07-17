@@ -13,6 +13,7 @@ import { CheckInCard } from './CheckInCard';
 import { MyBookingsCard } from './MyBookingsCard';
 import { EventsCard } from './EventsCard';
 import { CarnetMini } from './CarnetMini';
+import { BirthdayCard } from './BirthdayCard';
 import { InstallPrompt } from './InstallPrompt';
 import { GeoCheckIn } from './GeoCheckIn';
 import { NotificationToggle } from './NotificationToggle';
@@ -28,7 +29,8 @@ const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 /* PHASE-2 member dashboard, rebuilt on the design system: StatTile metrics +
    the QuarterCard membership hero, inside <MemberShell>'s constant nav. */
 export function DashboardClient() {
-  const { loading, member } = useMember();
+  const { loading, member, refresh } = useMember();
+  const bdaySet = !!(member?.metaData as { bday?: string } | undefined)?.bday;
   const [planName, setPlanName] = useState<string | null>(null);
   const [billingBusy, setBillingBusy] = useState(false);
   const [billingError, setBillingError] = useState<string | null>(null);
@@ -335,6 +337,10 @@ export function DashboardClient() {
           ) : null}
 
           <CarnetMini />
+
+          {/* Gentle nudge: only until we have their birthday, then it disappears (the full
+              birthday-treat card lives on /rewards). Collects day + month right here. */}
+          {!loading && member && !bdaySet ? <BirthdayCard birthday={{ bday: null, claimed: null }} onSaved={refresh} /> : null}
 
           <EventsCard />
 

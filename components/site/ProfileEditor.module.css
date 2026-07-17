@@ -1,0 +1,127 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(20, 17, 13, 0.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.card {
+  position: relative;
+  width: 100%;
+  max-width: 460px;
+  max-height: 92vh;
+  overflow-y: auto;
+  background: var(--surface-card);
+  border-radius: var(--radius-xl, 20px);
+  padding: clamp(22px, 4vw, 30px);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.22);
+  animation: pop var(--duration-base, 180ms) var(--ease-out, ease-out);
+}
+@keyframes pop {
+  from {
+    transform: translateY(10px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+.close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 50%;
+  background: var(--gold-100);
+  color: var(--ink-900);
+  cursor: pointer;
+}
+.eyebrow {
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--gold-700);
+}
+.h2 {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 4px 0 0;
+}
+.note {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin: 6px 0 18px;
+}
+.field {
+  display: block;
+  margin-bottom: 14px;
+}
+.label {
+  display: block;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--ink-900);
+  margin-bottom: 5px;
+}
+.input {
+  width: 100%;
+  min-width: 0;
+  font: inherit;
+  font-size: var(--text-base);
+  padding: 11px 13px;
+  border: 1px solid var(--border-strong, var(--border-subtle));
+  border-radius: var(--radius-md, 12px);
+  background: var(--surface-page);
+  color: var(--ink-900);
+}
+.input:focus-visible {
+  outline: 2px solid var(--gold-500);
+  outline-offset: 1px;
+}
+.bdayRow {
+  display: flex;
+  gap: 10px;
+}
+.bdayRow .input {
+  flex: 1;
+}
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 6px;
+}
+.save {
+  appearance: none;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  font-size: var(--text-base);
+  padding: 12px 22px;
+  border: none;
+  border-radius: var(--radius-pill, 999px);
+  background: var(--ink-900);
+  color: var(--sand-50, #fff);
+}
+.save:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.msg {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: #2f7d52;
+}

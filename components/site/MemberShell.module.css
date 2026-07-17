@@ -114,6 +114,24 @@
   display: inline-flex;
   align-items: center;
   gap: 11px;
+  /* now a button (opens the profile editor) — strip default chrome, keep the old look */
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 4px;
+  margin: -4px;
+  border-radius: var(--radius-md, 12px);
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+}
+.identity:hover {
+  background: var(--gold-100);
+}
+.identity:focus-visible {
+  outline: 2px solid var(--gold-500);
+  outline-offset: 1px;
 }
 .idText {
   display: flex;

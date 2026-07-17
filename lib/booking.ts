@@ -706,9 +706,19 @@ export const getRewards = () =>
     'rewards',
   );
 
-// ---- Member profile (birthday / company on Memberstack metaData) ----
-export const saveProfile = (body: { bday?: string | null; company?: string }) =>
-  call<{ ok: boolean; bday: string | null; company: string | null }>('member-profile', { method: 'POST', body });
+// ---- Member profile (birthday / company / phone / role / dietary on Memberstack metaData) ----
+export interface ProfileFields {
+  bday?: string | null; // 'MM-DD'
+  company?: string;
+  phone?: string;
+  role?: string;
+  dietary?: string;
+}
+export const saveProfile = (body: ProfileFields) =>
+  call<{ ok: boolean; bday: string | null; company: string | null; phone: string | null; role: string | null; dietary: string | null }>(
+    'member-profile',
+    { method: 'POST', body },
+  );
 export const requestVatInvoice = () =>
   call<{ ok: boolean; vatRequested: string | null }>('member-profile', { method: 'POST', body: { vatRequest: true } });
 export const adminClearVat = (memberId: string) =>

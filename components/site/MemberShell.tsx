@@ -3,12 +3,13 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Icon, type IconName } from '@/components/ds/Icon';
 import { cn } from '@/lib/cn';
 import { isAdminEmail } from '@/lib/admin';
 import { useMember, memberPlanSlug } from './useMember';
 import { getMemberstack, memberName, memberInitials, memberDaysRemaining } from '@/lib/memberstack';
+import { ProfileEditor } from './ProfileEditor';
 import styles from './MemberShell.module.css';
 
 const TABS: { href: string; label: string; icon: IconName }[] = [
@@ -36,7 +37,8 @@ async function logout() {
  */
 export function MemberShell({ children, wide = false }: { children: ReactNode; wide?: boolean }) {
   const pathname = usePathname() || '';
-  const { member } = useMember();
+  const { member, refresh } = useMember();
+  const [profileOpen, setProfileOpen] = useState(false);
   const onAdmin = pathname.startsWith('/admin');
   const admin = isAdminEmail(member?.auth?.email);
 
@@ -90,13 +92,13 @@ export function MemberShell({ children, wide = false }: { children: ReactNode; w
               </Link>
             ) : null}
 
-            <span className={styles.identity}>
+            <button type="button" className={styles.identity} onClick={() => setProfileOpen(true)} title="Edit your details">
               <span className={styles.idText}>
                 <strong className={styles.idName}>{name}</strong>
                 {sub ? <span className={styles.idSub}>{sub}</span> : null}
               </span>
               <span className={styles.avatar} aria-hidden="true">{initials}</span>
-            </span>
+            </button>
 
             <button type="button" className={styles.logout} onClick={logout} aria-label="Log out" title="Log out">
               <Icon name="log-out" size={17} />
@@ -106,6 +108,8 @@ export function MemberShell({ children, wide = false }: { children: ReactNode; w
       </header>
 
       <div className={cn(styles.inner, wide && styles.wide)}>{children}</div>
+
+      {profileOpen ? <ProfileEditor member={member} onClose={() => setProfileOpen(false)} onSaved={refresh} /> : null}
     </div>
   );
 }

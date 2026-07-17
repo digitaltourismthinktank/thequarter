@@ -32,6 +32,10 @@ export default async function handler(req) {
     const c = body.company.trim();
     meta.company = c || null;
   }
+  // Optional self-service profile fields (all free-form metaData, cleared with an empty string).
+  if (typeof body.phone === 'string') meta.phone = body.phone.trim() || null;
+  if (typeof body.role === 'string') meta.role = body.role.trim() || null; // "what you do" — for intros/events
+  if (typeof body.dietary === 'string') meta.dietary = body.dietary.trim() || null; // for catered events
   // A VAT-invoice request — flagged for admin to action manually (our Stripe prices
   // are VAT-inclusive). Stamped with the request time; admin clears it when done.
   if (body.vatRequest === true) meta.vatRequested = new Date().toISOString();
@@ -64,5 +68,13 @@ export default async function handler(req) {
     await pushToEmail(OPS_EMAIL, { title: 'VAT invoice requested', body: `${email || vm.member.id}`, url: '/admin/' });
   }
 
-  return json({ ok: true, bday: meta.bday || null, company: meta.company || null, vatRequested: meta.vatRequested || null });
+  return json({
+    ok: true,
+    bday: meta.bday || null,
+    company: meta.company || null,
+    phone: meta.phone || null,
+    role: meta.role || null,
+    dietary: meta.dietary || null,
+    vatRequested: meta.vatRequested || null,
+  });
 }
