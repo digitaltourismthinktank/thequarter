@@ -86,6 +86,48 @@
   margin-top: 2px;
   white-space: pre-line;
 }
+.rsvpRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+}
+.rsvpBtn {
+  appearance: none;
+  cursor: pointer;
+  font: inherit;
+  font-weight: var(--fw-semibold);
+  font-size: var(--text-sm);
+  padding: 8px 18px;
+  border-radius: var(--radius-pill, 999px);
+  border: none;
+  background: var(--gold-500);
+  color: var(--ink-900);
+}
+.rsvpBtn:disabled,
+.rsvpCancel:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.goingTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--text-sm);
+  font-weight: var(--fw-semibold);
+  color: #2f7d52;
+}
+.rsvpCancel {
+  appearance: none;
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  text-decoration: underline;
+  padding: 0;
+}
 .state,
 .muted {
   color: var(--text-muted);

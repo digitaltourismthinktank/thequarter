@@ -37,6 +37,8 @@ import {
   adminCreateEvent,
   adminUpdateEvent,
   adminDeleteEvent,
+  adminGetRsvps,
+  type EventAttendee,
   adminClaimBirthday,
   adminGetRewards,
   adminSaveReward,
@@ -2633,6 +2635,66 @@ function fmtEvent(iso: string): string {
   });
 }
 
+/** One admin event row with an on-demand RSVP list (Going count + attendee names). */
+function EventAdminRow({ e, onEdit, onDelete, busy }: { e: QuarterEvent; onEdit: () => void; onDelete: () => void; busy: boolean }) {
+  const [open, setOpen] = useState(false);
+  const [attendees, setAttendees] = useState<EventAttendee[] | null>(null);
+  const [loadingR, setLoadingR] = useState(false);
+  async function toggle() {
+    const next = !open;
+    setOpen(next);
+    if (next && attendees === null) {
+      setLoadingR(true);
+      const r = await adminGetRsvps(e.id);
+      setAttendees(r.ok ? r.data.rsvps : []);
+      setLoadingR(false);
+    }
+  }
+  const going = (attendees || []).filter((a) => a.status === 'Going');
+  return (
+    <div className={styles.bRow} style={{ flexWrap: 'wrap' }}>
+      <span className={styles.bSpace}>{e.title}</span>
+      <span className={styles.bTime}>{e.start ? fmtEvent(e.start) : ''}</span>
+      <span className={styles.bWho}>
+        {e.location || ''}
+        {e.published ? '' : ' · (draft)'}
+      </span>
+      <button type="button" className={styles.smallBtn} onClick={toggle}>
+        {open ? 'Hide RSVPs' : 'RSVPs'}
+      </button>
+      <button type="button" className={styles.smallBtn} onClick={onEdit}>
+        Edit
+      </button>
+      <button type="button" className={styles.smallBtn} onClick={onDelete} disabled={busy}>
+        Delete
+      </button>
+      {open ? (
+        <div style={{ flexBasis: '100%', marginTop: 8 }}>
+          {loadingR ? (
+            <p className={styles.muted}>Loading RSVPs…</p>
+          ) : going.length === 0 ? (
+            <p className={styles.muted}>No RSVPs yet.</p>
+          ) : (
+            <>
+              <p className={styles.muted} style={{ marginBottom: 6 }}>
+                Going: {going.length}
+              </p>
+              <ul style={{ margin: 0, paddingLeft: 18, fontSize: 'var(--text-sm)', lineHeight: 1.7 }}>
+                {going.map((a, i) => (
+                  <li key={i}>
+                    {a.name || a.email}
+                    {a.email && a.name ? ` · ${a.email}` : ''}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function EventsPane() {
   const [events, setEvents] = useState<QuarterEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -2808,20 +2870,7 @@ function EventsPane() {
       ) : (
         <div className={styles.list}>
           {events.map((e) => (
-            <div key={e.id} className={styles.bRow}>
-              <span className={styles.bSpace}>{e.title}</span>
-              <span className={styles.bTime}>{e.start ? fmtEvent(e.start) : ''}</span>
-              <span className={styles.bWho}>
-                {e.location || ''}
-                {e.published ? '' : ' · (draft)'}
-              </span>
-              <button type="button" className={styles.smallBtn} onClick={() => edit(e)}>
-                Edit
-              </button>
-              <button type="button" className={styles.smallBtn} onClick={() => del(e.id)} disabled={busy}>
-                Delete
-              </button>
-            </div>
+            <EventAdminRow key={e.id} e={e} onEdit={() => edit(e)} onDelete={() => del(e.id)} busy={busy} />
           ))}
         </div>
       )}

@@ -559,6 +559,19 @@ export const adminUpdateEvent = (id: string, e: Partial<QuarterEvent>) =>
 export const adminDeleteEvent = (id: string) =>
   call<{ ok: boolean }>('events', { method: 'POST', body: { action: 'delete', id } });
 
+// Event RSVPs
+export type RsvpStatus = 'Going' | 'Cancelled';
+export const rsvpEvent = (id: string, status: RsvpStatus) =>
+  call<{ ok: boolean; status: RsvpStatus }>('events', { method: 'POST', body: { action: 'rsvp', id, status } });
+export const getMyRsvps = () => call<{ rsvps: { eventId: string; status: RsvpStatus }[] }>('events?action=my-rsvps');
+export interface EventAttendee {
+  name: string;
+  email: string;
+  status: RsvpStatus;
+}
+export const adminGetRsvps = (eventId: string) =>
+  call<{ rsvps: EventAttendee[] }>(`events?action=rsvps&id=${encodeURIComponent(eventId)}`);
+
 // ---- Entrance screen (public, no auth) ----
 export interface ScreenSpace {
   id: string;

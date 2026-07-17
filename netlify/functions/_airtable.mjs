@@ -23,6 +23,10 @@ export const T = {
   scanLog: 'tblgAY1I86JhnxCQV',
   referrals: 'tblnFOW4GKzKmXKNw',
   guests: 'tblwCIQBuC1CuRztd',
+  // User-created table; addressed by NAME (the API accepts a table name or id) and read with
+  // { byName:true } since we don't hold its field IDs. Fields: Event (link → Events),
+  // 'Member email', Name, Status (single-select Going|Cancelled).
+  rsvps: 'Event RSVPs',
 };
 
 export const F = {
@@ -189,12 +193,14 @@ async function req(url, opts = {}) {
   return json;
 }
 
-/** List records. Returns records[] (handles a single page; raise pageSize/iterate if needed). */
-export async function listRecords(tableId, { filterByFormula, fields, sort, maxRecords } = {}) {
+/** List records. Returns records[] (handles a single page; raise pageSize/iterate if needed).
+ *  Pass { byName: true } for tables we don't hold field IDs for (e.g. the user-created Event
+ *  RSVPs table) — record.fields is then keyed by FIELD NAME instead of field ID. */
+export async function listRecords(tableId, { filterByFormula, fields, sort, maxRecords, byName } = {}) {
   const url = new URL(`${API}/${BASE}/${tableId}`);
-  // Return record fields keyed by FIELD ID (matches our F.* constants); the API
+  // Return record fields keyed by FIELD ID (matches our F.* constants) by default; the API
   // otherwise keys them by field name.
-  url.searchParams.set('returnFieldsByFieldId', 'true');
+  if (!byName) url.searchParams.set('returnFieldsByFieldId', 'true');
   if (filterByFormula) url.searchParams.set('filterByFormula', filterByFormula);
   if (maxRecords) url.searchParams.set('maxRecords', String(maxRecords));
   (fields || []).forEach((f) => url.searchParams.append('fields[]', f));

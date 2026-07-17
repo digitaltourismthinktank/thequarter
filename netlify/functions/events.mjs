@@ -7,11 +7,18 @@
  * POST {action:'update', id, ...fields}   (admin)
  * POST {action:'delete', id}              (admin)
  */
-import { verifyMember, isAdmin, tokenFromRequest } from './_member.mjs';
-import { listRecords, createRecord, updateRecord, deleteRecord, T, F, airtableReady } from './_airtable.mjs';
+import { verifyMember, isAdmin, tokenFromRequest, memberEmail, memberName } from './_member.mjs';
+import { listRecords, createRecord, updateRecord, deleteRecord, T, F, airtableReady, esc } from './_airtable.mjs';
 import { londonNow, isoToLondonDate } from './_time.mjs';
 
 const json = (b, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { 'content-type': 'application/json' } });
+
+// ---- Event RSVPs (user-created "Event RSVPs" Airtable table, read/written BY NAME) ----
+// We don't hold this table's field IDs, so reads use { byName:true } (fields keyed by name)
+// and writes pass field names + typecast. The Event field is a link → an array of Event record IDs.
+const RSVP = { event: 'Event', email: 'Member email', name: 'Name', status: 'Status' };
+const rsvpsForEmail = (email) => listRecords(T.rsvps, { byName: true, filterByFormula: `{${RSVP.email}}='${esc(email)}'` });
+const eventIdOf = (r) => (Array.isArray(r.fields[RSVP.event]) ? r.fields[RSVP.event][0] : null);
 
 function mapEvent(r) {
   return {
@@ -58,6 +65,32 @@ export default async function handler(req) {
       return json({ events: recs.map(mapEvent) });
     }
 
+    if (action === 'my-rsvps') {
+      // The caller's own RSVPs, so the member Events tab can show current status.
+      const vm = await verifyMember(tokenFromRequest(req, null));
+      if (!vm.ok) return json({ error: vm.reason }, 401);
+      const rows = await rsvpsForEmail(memberEmail(vm.member));
+      return json({
+        rsvps: rows
+          .map((r) => ({ eventId: eventIdOf(r), status: r.fields[RSVP.status] || 'Going' }))
+          .filter((x) => x.eventId),
+      });
+    }
+
+    if (action === 'rsvps') {
+      // Attendee list for one event (admin).
+      const vm = await verifyMember(tokenFromRequest(req, null));
+      if (!vm.ok) return json({ error: vm.reason }, 401);
+      if (!isAdmin(vm.member)) return json({ error: 'forbidden' }, 403);
+      const eventId = url.searchParams.get('id');
+      if (!eventId) return json({ error: 'missing-id' }, 400);
+      const rows = await listRecords(T.rsvps, { byName: true });
+      const rsvps = rows
+        .filter((r) => Array.isArray(r.fields[RSVP.event]) && r.fields[RSVP.event].includes(eventId))
+        .map((r) => ({ name: r.fields[RSVP.name] || '', email: r.fields[RSVP.email] || '', status: r.fields[RSVP.status] || 'Going' }));
+      return json({ rsvps });
+    }
+
     return json({ error: 'unknown-action' }, 400);
   }
 
@@ -66,6 +99,25 @@ export default async function handler(req) {
   const body = await req.json().catch(() => ({}));
   const vm = await verifyMember(tokenFromRequest(req, body));
   if (!vm.ok) return json({ error: vm.reason }, 401);
+
+  // Member RSVP — any authenticated member (NOT admin-gated). Upserts one row per member/event.
+  if (body.action === 'rsvp') {
+    const eventId = body.id;
+    if (!eventId) return json({ error: 'missing-id' }, 400);
+    const status = body.status === 'Cancelled' ? 'Cancelled' : 'Going';
+    const email = memberEmail(vm.member);
+    const name = memberName(vm.member) || email;
+    const rows = await rsvpsForEmail(email);
+    const existing = rows.find((r) => Array.isArray(r.fields[RSVP.event]) && r.fields[RSVP.event].includes(eventId));
+    if (existing) {
+      await updateRecord(T.rsvps, existing.id, { [RSVP.status]: status }, { typecast: true });
+    } else {
+      await createRecord(T.rsvps, { [RSVP.event]: [eventId], [RSVP.email]: email, [RSVP.name]: name, [RSVP.status]: status }, { typecast: true });
+    }
+    return json({ ok: true, status });
+  }
+
+  // Everything below is admin-only.
   if (!isAdmin(vm.member)) return json({ error: 'forbidden' }, 403);
 
   if (body.action === 'create') {

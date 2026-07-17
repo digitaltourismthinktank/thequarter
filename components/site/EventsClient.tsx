@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Icon } from '@/components/ds/Icon';
 import { MemberShell } from './MemberShell';
 import { useMember } from './useMember';
-import { getPublishedEvents, type QuarterEvent } from '@/lib/booking';
+import { getPublishedEvents, getMyRsvps, rsvpEvent, type QuarterEvent, type RsvpStatus } from '@/lib/booking';
 import styles from './EventsClient.module.css';
 
 function fmtWhen(start: string, end: string | null): string {
@@ -19,7 +19,20 @@ function fmtWhen(start: string, end: string | null): string {
   }
 }
 
-function EventRow({ e, past }: { e: QuarterEvent; past?: boolean }) {
+function EventRow({
+  e,
+  past,
+  status,
+  busy,
+  onToggle,
+}: {
+  e: QuarterEvent;
+  past?: boolean;
+  status?: RsvpStatus;
+  busy?: boolean;
+  onToggle?: () => void;
+}) {
+  const going = status === 'Going';
   return (
     <article className={`${styles.event} ${past ? styles.eventPast : ''}`}>
       <div className={styles.eventBody}>
@@ -36,6 +49,22 @@ function EventRow({ e, past }: { e: QuarterEvent; past?: boolean }) {
           ) : null}
         </div>
         {e.description ? <p className={styles.eventBlurb}>{e.description}</p> : null}
+        {!past && onToggle ? (
+          <div className={styles.rsvpRow}>
+            {going ? (
+              <>
+                <span className={styles.goingTag}>✓ You&rsquo;re going</span>
+                <button type="button" className={styles.rsvpCancel} onClick={onToggle} disabled={busy}>
+                  {busy ? '…' : 'Cancel RSVP'}
+                </button>
+              </>
+            ) : (
+              <button type="button" className={styles.rsvpBtn} onClick={onToggle} disabled={busy}>
+                {busy ? '…' : 'RSVP'}
+              </button>
+            )}
+          </div>
+        ) : null}
       </div>
     </article>
   );
@@ -50,6 +79,8 @@ export function EventsClient() {
   const { loading, member } = useMember();
   const [events, setEvents] = useState<QuarterEvent[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [rsvps, setRsvps] = useState<Record<string, RsvpStatus>>({});
+  const [busyRsvp, setBusyRsvp] = useState<string | null>(null);
 
   useEffect(() => {
     if (!member) return;
@@ -57,7 +88,19 @@ export function EventsClient() {
       if (r.ok) setEvents(r.data.events);
       setLoaded(true);
     });
+    getMyRsvps().then((r) => {
+      if (r.ok) setRsvps(Object.fromEntries(r.data.rsvps.map((x) => [x.eventId, x.status])));
+    });
   }, [member]);
+
+  async function toggleRsvp(id: string) {
+    const next: RsvpStatus = rsvps[id] === 'Going' ? 'Cancelled' : 'Going';
+    setBusyRsvp(id);
+    setRsvps((s) => ({ ...s, [id]: next })); // optimistic
+    const r = await rsvpEvent(id, next);
+    if (!r.ok) setRsvps((s) => ({ ...s, [id]: next === 'Going' ? 'Cancelled' : 'Going' })); // revert
+    setBusyRsvp(null);
+  }
 
   const today = new Date().toISOString().slice(0, 10);
   const upcoming = useMemo(() => events.filter((e) => e.start && e.start.slice(0, 10) >= today), [events, today]);
@@ -87,7 +130,7 @@ export function EventsClient() {
               ) : upcoming.length ? (
                 <div className={styles.list}>
                   {upcoming.map((e) => (
-                    <EventRow key={e.id} e={e} />
+                    <EventRow key={e.id} e={e} status={rsvps[e.id]} busy={busyRsvp === e.id} onToggle={() => toggleRsvp(e.id)} />
                   ))}
                 </div>
               ) : (
