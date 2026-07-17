@@ -15,6 +15,7 @@ import { listRecords, createRecord, updateRecord, T, F, airtableReady, esc } fro
 import { BUSINESS, hhmmToMin, isWeekday, londonWallClockToISO, isoToLondonMin, isoToLondonDate, londonNow, holdReleased, roomBookingReleased } from './_time.mjs';
 import { isClosedDay } from './_holidays.mjs';
 import { isRecurringBlockRule, recurringBlockOccurrences, parsePrivatisationSlots, isPrivatisedOn } from './_privatisation.mjs';
+import { notifyAdmins } from './_email.mjs';
 
 /** A released company hold no longer blocks the room. */
 const isReleased = (r, dateStr, nowMin, todayStr) =>
@@ -335,6 +336,14 @@ export default async function handler(req) {
       [F.bookings.name]: memberName(me),
       [F.bookings.status]: 'Confirmed',
       [F.bookings.source]: 'Web',
+    });
+    // Tell ops a room/pod was just booked (best-effort — never blocks the booking).
+    await notifyAdmins('Room/pod booked', `${memberName(me)} · ${date} ${start}–${end}`, {
+      link: '/admin/#rooms',
+      rows: [
+        ['When', `${date} ${start}–${end}`],
+        ['Member', email || memberName(me)],
+      ],
     });
     return json({ ok: true, id: rec.id });
   }

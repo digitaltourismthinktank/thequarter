@@ -14,6 +14,7 @@ import { listRecords, createRecord, updateRecord, T, F, airtableReady, esc } fro
 import { verifyMember, isAdmin, tokenFromRequest } from './_member.mjs';
 import { londonNow } from './_time.mjs';
 import { PLAN_NAMES } from './_quarter-sync.mjs';
+import { notifyAdmins } from './_email.mjs';
 
 const MS_SECRET = process.env.MEMBERSTACK_SECRET_KEY;
 const json = (b, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { 'content-type': 'application/json' } });
@@ -118,6 +119,10 @@ export default async function handler(req) {
       [F.guests.hostId]: String(body.hostId || '').trim(),
       [F.guests.reason]: String(body.reason || '').trim(),
       [F.guests.arrivedAt]: new Date().toISOString(),
+    });
+    // Let ops know a guest just arrived (best-effort — never blocks the sign-in).
+    await notifyAdmins('Guest arrived', `${name}${body.company ? ` · ${String(body.company).trim()}` : ''}${host ? ` → ${host}` : ''}`, {
+      link: '/admin/',
     });
     return json({ ok: true, host: host || null });
   }
