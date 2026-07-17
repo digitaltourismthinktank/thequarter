@@ -79,7 +79,10 @@ function EventRow({
 function CalendarSubscribe() {
   const [copied, setCopied] = useState(false);
   const origin = typeof window !== 'undefined' ? window.location.origin : 'https://thequarter.work';
-  const icsHttps = `${origin}/events.ics`;
+  // The events-only flag must ride on the client request: Netlify forwards the
+  // incoming query through the /events.ics rewrite, but drops a query baked into
+  // the rewrite target — so keep ?type=events here.
+  const icsHttps = `${origin}/events.ics?type=events`;
   const icsWebcal = icsHttps.replace(/^https?:\/\//, 'webcal://');
   const googleUrl = `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(icsWebcal)}`;
   async function copy() {
