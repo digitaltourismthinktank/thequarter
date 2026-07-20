@@ -2094,6 +2094,7 @@ function AdminTodayPane({ onAllBirthdays }: { onAllBirthdays: () => void }) {
 // ------------------------------------------------------- Screens, links & resources
 function ScreensPane() {
   const [spaces, setSpaces] = useState<AdminSpace[]>([]);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     adminGetSpaces().then((s) => {
@@ -2122,8 +2123,21 @@ function ScreensPane() {
             <Icon name="users" size={16} color="var(--gold-700)" /> Guest sign-in
           </a>
           <a className={styles.shortcut} href="/enrol" target="_blank" rel="noreferrer">
-            <Icon name="users" size={16} color="var(--gold-700)" /> Team enrolment link
+            <Icon name="users" size={16} color="var(--gold-700)" /> New member sign-up
           </a>
+          <button
+            type="button"
+            className={styles.shortcut}
+            onClick={() => {
+              const url = `${window.location.origin}/enrol`;
+              navigator.clipboard?.writeText(url);
+              setCopied(true);
+              window.setTimeout(() => setCopied(false), 2000);
+            }}
+            title="Copy the sign-up link to send to a new member"
+          >
+            <Icon name={copied ? 'check' : 'share-2'} size={16} color="var(--gold-700)" /> {copied ? 'Link copied' : 'Copy sign-up link'}
+          </button>
           <a className={styles.shortcut} href="/dashboard">
             <Icon name="user" size={16} color="var(--gold-700)" /> My member view
           </a>
