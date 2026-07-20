@@ -406,3 +406,15 @@
   .ordInstall { order: 12; }
   .ordNotif { order: 13; }
 }
+
+/* Phones: the member card already says who you are, so the greeting block (eyebrow, large
+   name, full email address) was pure overhead at the top of the screen. The quick-links
+   card duplicates the new tab bar. Both go, which is most of the Home rethink. */
+@media (max-width: 600px) {
+  .hero {
+    display: none;
+  }
+  .linksCard {
+    display: none;
+  }
+}

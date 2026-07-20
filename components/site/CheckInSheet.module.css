@@ -1,0 +1,149 @@
+/* Bottom sheet for check-in, opened from the tab bar's centre button. Rises from the foot
+   of the screen so it reads as an action over the current page, not a new place. */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(30, 26, 21, 0.42);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+  animation: fade var(--duration-fast) var(--ease-standard);
+}
+.sheet {
+  width: 100%;
+  max-width: 520px;
+  background: var(--surface-card);
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  padding: 12px 20px calc(24px + env(safe-area-inset-bottom));
+  /* dvh tracks the visible viewport, so the foot never sits under the iOS toolbar. */
+  max-height: calc(100dvh - 60px);
+  overflow-y: auto;
+  animation: rise var(--duration-base) var(--ease-out);
+}
+@media (min-width: 861px) {
+  /* On a desktop there's no tab bar to open it from, but if it is opened, centre it. */
+  .overlay {
+    align-items: center;
+  }
+  .sheet {
+    border-radius: var(--radius-xl);
+    max-height: calc(100dvh - 120px);
+  }
+}
+.grab {
+  display: block;
+  width: 38px;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--sand-300);
+  margin: 0 auto 14px;
+}
+.title {
+  font-size: var(--text-lg);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--tracking-snug);
+  color: var(--ink-900);
+  margin: 0;
+}
+.meta {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  margin: 4px 0 0;
+}
+.note {
+  color: var(--text-body);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  margin: 12px 0 0;
+}
+.seg {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  margin: 14px 0 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill);
+  background: var(--sand-100);
+}
+.segBtn {
+  flex: 1;
+  padding: 10px 14px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--text-muted);
+}
+.segOn,
+.segOn:hover {
+  background: var(--gold-500);
+  color: var(--ink-900);
+}
+.cta {
+  width: 100%;
+  margin-top: 16px;
+  padding: 14px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--ink-900);
+  color: var(--sand-50);
+  font: inherit;
+  font-size: var(--text-base);
+  font-weight: var(--fw-bold);
+  cursor: pointer;
+}
+.cta:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.fine {
+  text-align: center;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  margin: 10px 0 0;
+}
+.error {
+  margin: 12px 0 0;
+  font-size: var(--text-sm);
+  color: var(--danger);
+}
+
+/* Confirmation — the thing members told us was missing entirely. */
+.doneWrap {
+  text-align: center;
+  padding: 8px 0 0;
+}
+.doneTick {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 62px;
+  height: 62px;
+  border-radius: var(--radius-pill);
+  background: var(--gold-500);
+  margin-bottom: 12px;
+}
+
+@keyframes rise {
+  from {
+    transform: translateY(14px);
+    opacity: 0;
+  }
+}
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .overlay,
+  .sheet {
+    animation: none;
+  }
+}

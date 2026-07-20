@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Icon, type IconName } from '@/components/ds/Icon';
 import { cn } from '@/lib/cn';
 import { isAdminEmail } from '@/lib/admin';
@@ -11,6 +11,7 @@ import { useMember, memberPlanSlug } from './useMember';
 import { getMemberstack, memberName, memberInitials, memberDaysRemaining } from '@/lib/memberstack';
 import { ProfileEditor } from './ProfileEditor';
 import { MobileTabBar } from './MobileTabBar';
+import { CheckInSheet } from './CheckInSheet';
 import styles from './MemberShell.module.css';
 
 const TABS: { href: string; label: string; icon: IconName }[] = [
@@ -40,7 +41,22 @@ export function MemberShell({ children, wide = false }: { children: ReactNode; w
   const pathname = usePathname() || '';
   const { member, refresh } = useMember();
   const [profileOpen, setProfileOpen] = useState(false);
+  const [checkInOpen, setCheckInOpen] = useState(false);
   const onAdmin = pathname.startsWith('/admin');
+
+  // The Crisp launcher floats bottom-right, directly on top of the new tab bar (and its
+  // raised check-in button). Inside the member app the bubble is hidden and chat is opened
+  // deliberately, from a "Talk to us" control; it re-hides when the conversation closes.
+  // The public marketing site keeps its launcher — this only applies while the shell is
+  // mounted. Pushing to $crisp before the script loads is safe: it's a queue Crisp replays.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const w = window as unknown as { $crisp?: { push: (cmd: unknown[]) => void } };
+    if (!w.$crisp) return;
+    w.$crisp.push(['do', 'chat:hide']);
+    w.$crisp.push(['on', 'chat:closed', () => w.$crisp?.push(['do', 'chat:hide'])]);
+    return () => w.$crisp?.push(['do', 'chat:show']);
+  }, []);
   const admin = isAdminEmail(member?.auth?.email);
 
   const name = memberName(member) || 'Member';
@@ -111,7 +127,8 @@ export function MemberShell({ children, wide = false }: { children: ReactNode; w
       <div className={cn(styles.inner, wide && styles.wide)}>{children}</div>
 
       {/* Phone navigation. Admin keeps its own dense tab set, so the bar is member-only. */}
-      {!onAdmin ? <MobileTabBar /> : null}
+      {!onAdmin ? <MobileTabBar onCheckIn={() => setCheckInOpen(true)} /> : null}
+      <CheckInSheet open={checkInOpen} onClose={() => setCheckInOpen(false)} />
 
       {profileOpen ? <ProfileEditor member={member} onClose={() => setProfileOpen(false)} onSaved={refresh} /> : null}
     </div>

@@ -569,3 +569,21 @@
     align-self: center;
   }
 }
+
+/* The earn rows never wrapped: a long title pushed the value ("+250–1000", "1 per £1")
+   straight off the right edge of the phone. Let the row wrap and the value drop onto its
+   own line, indented past the icon so it still reads as belonging to that rule. */
+.earnRow {
+  flex-wrap: wrap;
+}
+.earnText {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+@media (max-width: 560px) {
+  .earnVal {
+    flex: 1 0 100%;
+    margin-left: 54px;
+    font-size: var(--text-sm);
+  }
+}
