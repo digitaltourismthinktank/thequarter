@@ -8,11 +8,14 @@ import {
   type ScreenBooking,
   type QuarterEvent,
 } from '@/lib/booking';
-import { busyness, meetingRoomLine, type Band } from '@/lib/busyness';
+import { busyness, type Band } from '@/lib/busyness';
 import { Icon } from '@/components/ds/Icon';
 import { eventThemeIcon } from '@/lib/eventThemes';
 import { FloorScreen } from './FloorScreen';
 import styles from './ScreenClient.module.css';
+
+/** The lobby screen rotates through the next few events only. */
+const MAX_EVENTS = 3;
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const minToHHMM = (m: number) => `${pad(Math.floor(m / 60))}:${pad(m % 60)}`;
@@ -22,17 +25,6 @@ interface ScreenData {
   nowMin: number;
   spaces: ScreenSpace[];
   bookings: ScreenBooking[];
-}
-
-function statusFor(space: ScreenSpace, bookings: ScreenBooking[], nowMin: number): { busy: boolean; text: string } {
-  const mine = bookings.filter((b) => b.space === space.id);
-  const current = mine.find((b) => b.startMin <= nowMin && nowMin < b.endMin);
-  if (current) {
-    return { busy: true, text: `${current.kind === 'Block' ? 'Reserved' : 'Busy'} until ${minToHHMM(current.endMin)}` };
-  }
-  const next = mine.filter((b) => b.startMin > nowMin).sort((a, b) => a.startMin - b.startMin)[0];
-  const free = space.bookable ? 'Available' : 'Open';
-  return { busy: false, text: next ? `${free} · next ${minToHHMM(next.startMin)}` : free };
 }
 
 /** Mirrors the floor screens: a room is "hot" while in use, or with a booking due within
@@ -329,8 +321,9 @@ function EntranceScreen() {
 
   // "What's on" auto-rotates one event per page every 6s.
   useEffect(() => {
-    if (events.length <= 1) return;
-    const t = setInterval(() => setPage((p) => (p + 1) % events.length), 6000);
+    const n = Math.min(events.length, MAX_EVENTS);
+    if (n <= 1) return;
+    const t = setInterval(() => setPage((p) => (p + 1) % n), 6000);
     return () => clearInterval(t);
   }, [events.length]);
 
@@ -356,7 +349,9 @@ function EntranceScreen() {
   const closed = b.closed || bankHoliday || shutdown;
   const band: Band | undefined = b.band;
   const nowMin = now.getHours() * 60 + now.getMinutes();
-  const featured = events.length ? events[page % events.length] : null;
+  // Only the next few events — a lobby screen shouldn't cycle through the whole calendar.
+  const shownEvents = events.slice(0, MAX_EVENTS);
+  const featured = shownEvents.length ? shownEvents[page % shownEvents.length] : null;
 
   const allSpaces = data?.spaces || [];
   const bookings = data?.bookings || [];
@@ -439,7 +434,6 @@ function EntranceScreen() {
                 );
               })}
             </div>
-            <p className={styles.note}>{meetingRoomLine(now)}</p>
           </section>
 
           {workspaces.length ? (
@@ -447,12 +441,14 @@ function EntranceScreen() {
               <h2 className={styles.h2}>Workspaces</h2>
               <div className={styles.spaceGrid}>
                 {workspaces.map((s) => {
-                  const st = statusFor(s, bookings, nowMin);
+                  // A privatised or block-booked workspace reads red exactly like a room in
+                  // use — the whole space is unavailable, so it needs the same signal.
+                  const v = roomView(s, bookings, nowMin);
                   return (
-                    <div key={s.id} className={`${styles.spaceCard} ${st.busy ? styles.busyCard : ''}`}>
+                    <div key={s.id} className={`${styles.spaceCard} ${v.hot ? styles.hotCard : ''}`}>
                       <span className={styles.spaceName}>{s.name}</span>
-                      <span className={`${styles.spaceStatus} ${st.busy ? styles.statusBusy : styles.statusFree}`}>
-                        {st.busy ? st.text : 'Spaces usually available'}
+                      <span className={`${styles.spaceStatus} ${v.hot ? styles.statusHot : styles.statusFree}`}>
+                        {v.hot ? v.text : 'Spaces usually available'}
                       </span>
                     </div>
                   );
@@ -465,7 +461,7 @@ function EntranceScreen() {
 
       {featured ? (
         <section className={styles.block}>
-          <h2 className={styles.h2}>What&rsquo;s on{events[0]?.location ? ` in ${events[0].location}` : ''}</h2>
+          <h2 className={styles.h2}>What&rsquo;s on{shownEvents[0]?.location ? ` in ${shownEvents[0].location}` : ''}</h2>
           <div className={styles.eventFeature}>
             <span className={styles.evIcon}>
               <Icon name={eventThemeIcon(featured.category)} size={56} color="var(--gold-700)" />
@@ -479,10 +475,10 @@ function EntranceScreen() {
               {featured.description ? <span className={styles.evDesc}>{featured.description}</span> : null}
             </div>
           </div>
-          {events.length > 1 ? (
+          {shownEvents.length > 1 ? (
             <div className={styles.dots}>
-              {events.map((_, i) => (
-                <span key={i} className={`${styles.dot} ${i === page % events.length ? styles.dotOn : ''}`} aria-hidden="true" />
+              {shownEvents.map((_, i) => (
+                <span key={i} className={`${styles.dot} ${i === page % shownEvents.length ? styles.dotOn : ''}`} aria-hidden="true" />
               ))}
             </div>
           ) : null}
