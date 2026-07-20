@@ -29,10 +29,10 @@ import { verifyMember, memberEmail, memberName, tokenFromRequest } from './_memb
 import { sendEmail, emailShell, escapeHtml, OPS_EMAIL, fmtDateTime } from './_email.mjs';
 import { pushToEmail } from './_push.mjs';
 import { isRecurringBlockRule, recurringBlockOccurrences } from './_privatisation.mjs';
+import { roomHoursCap } from './_entitlement.mjs';
 
-/** Default free meeting-room hours per member per calendar month (overridable per
- *  member via metaData.meetingRoomHoursCap). Pods are free + never counted here. */
-const DEFAULT_FREE_HOURS = 4;
+/* Free meeting-room hours are per plan and live in _entitlement.mjs, which both this path
+   and the dashboard's bookings.mjs now share. Pods are free and never counted. */
 
 /** Free meeting-room hours belong to a PLAN. A member with no plan connection (pay-as-you-go
  *  account) earns no free hours — they pay (and earn the give-back) like a guest. Mirrors the
@@ -215,7 +215,7 @@ export default async function handler(req) {
     const vm = await verifyMember(tokenFromRequest(req, body));
     if (!vm.ok) return json({ error: 'auth' }, 401);
     const me = vm.member;
-    const cap = Number(me?.metaData?.meetingRoomHoursCap) || DEFAULT_FREE_HOURS;
+    const cap = roomHoursCap(me);
     // No plan → no free hours: report remaining:0 so the client's freeEligible is false and the
     // member is routed to the paid path (where they still earn the give-back).
     if (!hasPlan(me)) return json({ capHours: cap, usedHours: 0, remaining: 0 });
@@ -370,7 +370,7 @@ export default async function handler(req) {
     let cap = null;
     let used = null;
     if (!priced.isPod) {
-      cap = Number(me?.metaData?.meetingRoomHoursCap) || DEFAULT_FREE_HOURS;
+      cap = roomHoursCap(me);
       used = await monthlyMeetingRoomHours(email, date);
       if (used + hours > cap + 1e-6) {
         return json({ error: 'cap-exceeded', capHours: cap, usedHours: round2(used), remaining: round2(Math.max(0, cap - used)) });

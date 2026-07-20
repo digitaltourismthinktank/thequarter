@@ -78,11 +78,14 @@ export const hasPlan = (m) => (m?.planConnections?.length ?? 0) > 0;
  * A per-member override on Memberstack metaData wins, so the team can grant hours to anyone
  * (a company deal, an apology, a trial) without a code change.
  */
-export function roomHoursCap(member, planSlug) {
+export function roomHoursCap(member, planSlug = undefined) {
   const override = Number(member?.metaData?.meetingRoomHoursCap);
   if (Number.isFinite(override) && override >= 0) return override;
   if (!hasPlan(member)) return 0;
-  const byPlan = PLAN_ROOM_HOURS[planSlug];
+  // Resolve the plan ourselves when the caller didn't pass one — otherwise a single-argument
+  // call silently lands on the fallback and every tier gets the same allowance.
+  const slug = planSlug ?? planSlugForMember(member);
+  const byPlan = PLAN_ROOM_HOURS[slug];
   return Number.isFinite(byPlan) ? byPlan : FALLBACK_ROOM_HOURS;
 }
 

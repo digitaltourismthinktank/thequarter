@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/ds/Button';
 import { Icon } from '@/components/ds/Icon';
 import { StatTile } from '@/components/ds/StatTile';
+import { DayPassCard } from './DayPassCard';
 import { MemberCardSheet } from './MemberCardSheet';
 import { QuarterCard } from '@/components/ds/QuarterCard';
 import { cn } from '@/lib/cn';
@@ -272,23 +273,7 @@ export function DashboardClient() {
               />
             </div>
           ) : (
-            <div className={styles.payg}>
-              <span className={styles.paygEyebrow}>Welcome to The Quarter</span>
-              <h2 className={styles.paygTitle}>Your account&rsquo;s all set</h2>
-              <p className={styles.paygBody}>
-                We&rsquo;ll assign your plan shortly — there&rsquo;s nothing you need to do. In the meantime you can browse the
-                plans to see what&rsquo;s included, or book a Day Pass if you&rsquo;d like to come in sooner. Any Day Pass you book
-                appears in your bookings just below.
-              </p>
-              <div className={styles.paygActions}>
-                <Button variant="primary" size="sm" href="/plans" iconAfter="arrow-right">
-                  Browse plans
-                </Button>
-                <Button variant="secondary" size="sm" href="/day-pass">
-                  Book a Day Pass
-                </Button>
-              </div>
-            </div>
+            <DayPassCard />
           )}
 
           {band ? (
