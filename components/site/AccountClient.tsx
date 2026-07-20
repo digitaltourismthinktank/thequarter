@@ -10,6 +10,7 @@ import { CharacterPicker } from './CharacterPicker';
 import { ProfileEditor } from './ProfileEditor';
 import { QuarterCharacter } from './QuarterCharacter';
 import { characterById } from '@/lib/characters';
+import { soundMuted, setSoundMuted, playChime, unlockSound } from '@/lib/feedback';
 import styles from './AccountClient.module.css';
 
 /* Mirrors GeoCheckIn — the offer to use your location is dismissed permanently, and until
@@ -27,6 +28,7 @@ export function AccountClient() {
   const { loading, member, refresh } = useMember();
   const [editing, setEditing] = useState(false);
   const [geoDismissed, setGeoDismissed] = useState(false);
+  const [muted, setMuted] = useState(false);
 
   useEffect(() => {
     try {
@@ -34,7 +36,20 @@ export function AccountClient() {
     } catch {
       /* private mode — leave it as-is */
     }
+    setMuted(soundMuted());
   }, []);
+
+  function toggleSound() {
+    const next = !muted;
+    setSoundMuted(next);
+    setMuted(next);
+    // Turning them on should demonstrate what you've turned on. The tap itself is the
+    // gesture the browser needs before it will let audio play at all.
+    if (!next) {
+      unlockSound();
+      playChime('success');
+    }
+  }
 
   function restoreGeoOffer() {
     try {
@@ -136,6 +151,16 @@ export function AccountClient() {
           ) : (
             <span className={styles.on}>On</span>
           )}
+        </div>
+
+        <div className={styles.row}>
+          <div className={styles.rowText}>
+            <strong>Sounds</strong>
+            <span>A quiet chime when something lands — checking in, a booking confirmed.</span>
+          </div>
+          <button type="button" className={styles.btnSm} onClick={toggleSound}>
+            {muted ? 'Turn on' : 'Turn off'}
+          </button>
         </div>
 
         <div className={styles.row}>

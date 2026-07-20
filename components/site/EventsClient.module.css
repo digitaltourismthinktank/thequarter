@@ -189,3 +189,43 @@
 .eventBlurb {
   overflow-wrap: anywhere;
 }
+
+/* ---- Calendar subscribe: slimmer on a phone ---------------------------------------- */
+.subShort {
+  display: none;
+}
+@media (max-width: 600px) {
+  .subLong {
+    display: none;
+  }
+  .subShort {
+    display: inline;
+  }
+  /* One tight row rather than a block: icon + short label, then the buttons beneath. */
+  .subscribe {
+    padding: 12px 14px;
+    gap: 10px;
+  }
+  .subscribeText {
+    align-items: center;
+    gap: 8px;
+    font-size: var(--text-sm);
+    font-weight: var(--fw-semibold);
+  }
+  .subscribeBtns {
+    gap: 8px;
+  }
+  .subBtn,
+  .subBtnGhost {
+    padding: 10px 12px;
+    font-size: var(--text-xs);
+  }
+  /* Copying the raw feed URL is a power-user escape hatch — it doesn't need to look like
+     a third equal option next to the two buttons that actually work on a tap. */
+  .subBtnGhost {
+    border: none;
+    padding: 10px 4px;
+    color: var(--text-muted);
+    text-decoration: underline;
+  }
+}

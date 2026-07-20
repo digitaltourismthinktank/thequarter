@@ -97,7 +97,11 @@ function CalendarSubscribe() {
   return (
     <div className={styles.subscribe}>
       <span className={styles.subscribeText}>
-        <Icon name="calendar" size={18} color="var(--gold-700)" /> Subscribe to our events — they&rsquo;ll appear in your calendar and update automatically.
+        <Icon name="calendar" size={18} color="var(--gold-700)" />
+        {/* The full explanation is worth having on a desktop, where there's room; on a phone
+            it was three lines of preamble above the two buttons that actually do the job. */}
+        <span className={styles.subLong}>Subscribe to our events &mdash; they&rsquo;ll appear in your calendar and update automatically.</span>
+        <span className={styles.subShort}>Add to your calendar</span>
       </span>
       <div className={styles.subscribeBtns}>
         <a className={styles.subBtn} href={googleUrl} target="_blank" rel="noopener noreferrer">

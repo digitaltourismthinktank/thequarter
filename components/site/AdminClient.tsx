@@ -78,6 +78,8 @@ import {
   type QuarterEvent,
 } from '@/lib/booking';
 import { isAdminEmail } from '@/lib/admin';
+import { unlockSound } from '@/lib/feedback';
+import { useAlertChime } from './useAlertChime';
 import styles from './AdminClient.module.css';
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || 'https://thequarter.work';
@@ -179,6 +181,14 @@ const tabFromHash = (): AdminTab => {
 
 export function AdminClient() {
   const { loading, member } = useMember();
+  // Browsers refuse to start audio until the user has interacted with the page, so the
+  // first chime after a page load would otherwise be dropped in silence. Spend the admin's
+  // first click on unlocking it, once.
+  useEffect(() => {
+    const go = () => unlockSound();
+    window.addEventListener('pointerdown', go, { once: true });
+    return () => window.removeEventListener('pointerdown', go);
+  }, []);
   const [tab, setTabState] = useState<AdminTab>('today');
   // Deep-linkable tabs: admin notification emails link to /admin/#rooms, #members, #partners etc.
   const setTab = useCallback((t: AdminTab) => {
@@ -1661,7 +1671,14 @@ function WeekendRequestsPanel() {
   }, []);
   useEffect(() => {
     load();
+    // Without a poll this panel only ever showed what was pending when the tab opened, so
+    // a request arriving mid-morning sat unseen until someone reloaded. A minute is often
+    // enough for a member waiting on a weekend answer, and it's one small read.
+    const t = setInterval(load, 60_000);
+    return () => clearInterval(t);
   }, [load]);
+  // Chime only when the count rises — see useAlertChime for why not on first load.
+  useAlertChime(reqs.length);
   async function act(id: string, approve: boolean) {
     setBusy(true);
     await (approve ? adminApproveWeekend(id) : adminDeclineWeekend(id));

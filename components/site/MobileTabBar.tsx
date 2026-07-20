@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Icon, type IconName } from '@/components/ds/Icon';
 import { cn } from '@/lib/cn';
+import { haptic, unlockSound } from '@/lib/feedback';
 import styles from './MobileTabBar.module.css';
 
 /**
@@ -35,7 +36,13 @@ export function MobileTabBar({ onCheckIn }: { onCheckIn?: () => void }) {
   const tab = (t: (typeof TABS)[number]) => {
     const on = t.href === '/rewards' ? rewardsOn : isOn(t.href);
     return (
-      <Link key={t.href} href={t.href} className={cn(styles.tab, on && styles.tabOn)} aria-current={on ? 'page' : undefined}>
+      <Link
+        key={t.href}
+        href={t.href}
+        className={cn(styles.tab, on && styles.tabOn)}
+        aria-current={on ? 'page' : undefined}
+        onClick={() => haptic(6)}
+      >
         <span className={styles.ic}>
           <Icon name={t.icon} size={21} />
         </span>
@@ -53,7 +60,17 @@ export function MobileTabBar({ onCheckIn }: { onCheckIn?: () => void }) {
           than navigating, so nobody loses their place. */}
       {/* The whole slot is the button: the raised circle is absolutely positioned, so when
           only it was clickable the "Check in" label underneath was a dead tap zone. */}
-      <button type="button" className={styles.checkSlot} onClick={onCheckIn}>
+      <button
+        type="button"
+        className={styles.checkSlot}
+        onClick={() => {
+          // Also the app's most-tapped control, so it's where we take the chance to satisfy
+          // the browser's "audio needs a user gesture" rule for later chimes.
+          unlockSound();
+          haptic(12);
+          onCheckIn?.();
+        }}
+      >
         <span className={styles.check} aria-hidden="true">
           <Icon name="check" size={26} color="var(--ink-900)" strokeWidth={2.6} />
         </span>

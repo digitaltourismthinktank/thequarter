@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Icon } from '@/components/ds/Icon';
 import { cn } from '@/lib/cn';
 import { getCheckinToday, checkInToday, type CheckinStatus } from '@/lib/booking';
+import { haptic, playChime } from '@/lib/feedback';
 import styles from './CheckInSheet.module.css';
 
 /** "Monday 20 July" — the same long form the emails use. */
@@ -89,8 +90,14 @@ export function CheckInSheet({ open, onClose }: { open: boolean; onClose: () => 
     setBusy(true);
     setError(null);
     const r = await checkInToday(half ? 'Half' : 'Full', half ? period : null);
-    if (!r.ok) setError(friendly(r.data?.error));
-    else setDone({ points: r.data?.pointsAwarded ?? 0 });
+    if (!r.ok) {
+      setError(friendly(r.data?.error));
+      haptic([8, 40, 8]); // a stutter, so a failure doesn't feel like a success
+    } else {
+      setDone({ points: r.data?.pointsAwarded ?? 0 });
+      haptic(18);
+      playChime('success');
+    }
     setBusy(false);
   }
 
