@@ -15,7 +15,7 @@
    original `calc(10px + env(...))` was therefore just 10px on every device, which is why
    the row sat so close to the bottom edge and was awkward to tap. */
 :root {
-  --tabbar-inset: max(14px, env(safe-area-inset-bottom));
+  --tabbar-inset: max(24px, env(safe-area-inset-bottom));
   --tabbar-h: calc(56px + var(--tabbar-inset));
 }
 

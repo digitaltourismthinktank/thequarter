@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Icon, type IconName } from '@/components/ds/Icon';
 import { useMember, memberPlanSlug } from './useMember';
+import { RewardsTabs } from './RewardsTabs';
 import { PLANS } from '@/lib/plans';
 import { getMemberPerks, usePerk, type PerkItem } from '@/lib/booking';
 import { MemberShell } from './MemberShell';
@@ -104,6 +105,8 @@ export function PerksClient({ marketing }: { marketing: ReactNode }) {
           </div>
         ) : (
           <>
+            <RewardsTabs />
+
             <header className={styles.header}>
               <span className={styles.eyebrow}>Local perks</span>
               <h1 className={styles.h1}>Good things, around the corner</h1>

@@ -593,3 +593,81 @@
     font-size: var(--text-sm);
   }
 }
+
+/* ---- Levels folded away on phones ------------------------------------------------- */
+/* Everything below must sit AFTER the `@media (max-width: 760px) { .levels }` rule
+   earlier in this file: media queries add no specificity, so at equal specificity the
+   later rule wins and source order is the whole game. */
+
+/* The current earn rate, lifted onto the status card from the levels rail. */
+.pcRate {
+  display: block;
+  margin-top: 6px;
+  font-size: var(--text-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--gold-700);
+}
+
+/* Desktop shows the four-across rail as it always has; the toggle is a phone affordance. */
+.levelsBar {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .levelsBar {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0 0 22px;
+    padding: 11px 16px;
+    min-height: 44px;
+    border: 1px dashed var(--sand-300);
+    border-radius: var(--radius-pill);
+    background: var(--sand-50);
+    font: inherit;
+    font-size: var(--text-sm);
+    font-weight: var(--fw-semibold);
+    color: var(--gold-700);
+    cursor: pointer;
+  }
+  .pips {
+    display: inline-flex;
+    gap: 5px;
+  }
+  .pip {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--sand-300);
+  }
+  /* Filled = reached, ringed = where you are now. */
+  .pipOn {
+    background: var(--gold-500);
+  }
+  .pipYou {
+    box-shadow: 0 0 0 3px var(--gold-100);
+  }
+  .levels {
+    display: none;
+  }
+}
+
+/* Must follow the `.levels { display: none }` above — same specificity, later wins. */
+@media (max-width: 760px) {
+  .levelsOpen {
+    display: grid;
+  }
+}
+
+/* An earn reads as a gain, a spend as a cost. */
+.histPlus {
+  color: var(--gold-700);
+}
+
+/* The pitch line under the h1 is for people deciding whether to join, not for members
+   who already have. Reclaims ~120px of the first screen on a phone. */
+@media (max-width: 760px) {
+  .subDesktop {
+    display: none;
+  }
+}

@@ -12,8 +12,9 @@ import styles from './MobileTabBar.module.css';
  *
  * Replaces the horizontally-scrolling strip of six pills at the top, which could not fit
  * on a phone — Rewards, Perks and Plan were scrolled off the right edge behind a hidden
- * scrollbar, so a third of the app was undiscoverable. Perks now lives inside Rewards and
- * Plan under the header avatar, which frees the slots.
+ * scrollbar, so a third of the app was undiscoverable. Perks is reached from the segmented
+ * control at the top of Rewards (RewardsTabs) and Plan from the header avatar, which frees
+ * the slots — so this bar lights the Rewards tab for /perks as well as /rewards.
  *
  * Phones only; the desktop keeps its top nav (see MemberShell).
  */

@@ -6,10 +6,11 @@ import { Button } from '@/components/ds/Button';
 import { useMember, memberPlanSlug } from './useMember';
 import { PLANS } from '@/lib/plans';
 import { EARN_RULES, LEVELS, levelProgress } from '@/lib/rewards';
-import { getRewards, redeemReward, type RewardItem, type Redemption, type BirthdayState } from '@/lib/booking';
+import { getRewards, redeemReward, type RewardItem, type Redemption, type BirthdayState, type LedgerEntry } from '@/lib/booking';
 import { BirthdayCard } from './BirthdayCard';
 import { ReferFriendCard } from './ReferFriendCard';
 import { RedemptionSheet, type RedemptionInfo } from './RedemptionSheet';
+import { RewardsTabs } from './RewardsTabs';
 import { MemberShell } from './MemberShell';
 import styles from './RewardsClient.module.css';
 
@@ -45,6 +46,9 @@ export function RewardsClient({ marketing }: { marketing: ReactNode }) {
   const [earnedLately, setEarnedLately] = useState(0);
   const [catalogue, setCatalogue] = useState<RewardItem[]>([]);
   const [redemptions, setRedemptions] = useState<Redemption[]>([]);
+  const [activity, setActivity] = useState<LedgerEntry[]>([]);
+  // Other members' tiers are reference material, not status — folded away by default.
+  const [levelsOpen, setLevelsOpen] = useState(false);
   const [birthday, setBirthday] = useState<BirthdayState>({ bday: null, claimed: null });
   const [loaded, setLoaded] = useState(false);
   const [confirm, setConfirm] = useState<RewardItem | null>(null);
@@ -72,6 +76,7 @@ export function RewardsClient({ marketing }: { marketing: ReactNode }) {
       setEarnedLately(r.data.earnedLately);
       setCatalogue(r.data.catalogue);
       setRedemptions(r.data.redemptions);
+      setActivity(r.data.activity ?? []);
       setBirthday(r.data.birthday);
     }
     setLoaded(true);
@@ -123,10 +128,13 @@ export function RewardsClient({ marketing }: { marketing: ReactNode }) {
   return (
     <MemberShell>
     <div className={styles.wrap}>
+      <RewardsTabs />
+
       <header className={styles.header}>
         <span className={styles.eyebrow}>Quarter Rewards</span>
         <h1 className={styles.h1}>A little back, for being a regular</h1>
-        <p className={styles.sub}>Earn points by being here and spending locally, then spend them on treats around the Quarter.</p>
+        {/* Pitch copy on a page the member has already bought into — desktop only. */}
+        <p className={`${styles.sub} ${styles.subDesktop}`}>Earn points by being here and spending locally, then spend them on treats around the Quarter.</p>
       </header>
 
       {/* Quarter Points Card */}
@@ -145,6 +153,8 @@ export function RewardsClient({ marketing }: { marketing: ReactNode }) {
             {prog.next ? `${prog.toGo.toLocaleString('en-GB')} points to ${prog.next.name}` : 'Top tier reached — thank you'}
           </span>
           {earnedLately > 0 ? <span className={styles.pcPill}>+{earnedLately.toLocaleString('en-GB')} earned lately</span> : null}
+          {/* The one thing the levels rail said about *you*, lifted up to where you are. */}
+          <span className={styles.pcRate}>{level.boost === 1 ? 'Base earn rate' : `Earning ${Math.round((level.boost - 1) * 100)}% faster`}</span>
         </div>
         <div className={styles.ring} style={{ '--pct': String(prog.pct) } as CSSProperties}>
           <div className={styles.ringHole}>
@@ -154,8 +164,22 @@ export function RewardsClient({ marketing }: { marketing: ReactNode }) {
         </div>
       </section>
 
-      {/* Levels — named tiers everyone climbs by earning points over time. */}
-      <section className={styles.levels} aria-label="Your level">
+      {/* Levels — named tiers everyone climbs by earning points over time. Four full-width
+          cards ran to ~720px on a phone: two screens of other people's tiers between your
+          status and anything you can act on. The rail is unchanged; it just folds away, and
+          the pips give you the shape of the ladder at a glance. */}
+      <button type="button" className={styles.levelsBar} onClick={() => setLevelsOpen((v) => !v)} aria-expanded={levelsOpen}>
+        <span className={styles.pips} aria-hidden="true">
+          {LEVELS.map((lv) => (
+            <span
+              key={lv.slug}
+              className={`${styles.pip} ${lifetime >= lv.min ? styles.pipOn : ''} ${lv.slug === level.slug ? styles.pipYou : ''}`}
+            />
+          ))}
+        </span>
+        <span className={styles.levelsBarText}>{levelsOpen ? 'Hide levels' : 'What each level gets you'}</span>
+      </button>
+      <section className={`${styles.levels} ${levelsOpen ? styles.levelsOpen : ''}`} aria-label="Your level">
         {LEVELS.map((lv) => {
           const on = lv.slug === level.slug;
           const reached = lifetime >= lv.min;
@@ -178,8 +202,6 @@ export function RewardsClient({ marketing }: { marketing: ReactNode }) {
         })}
       </section>
 
-      <BirthdayCard birthday={birthday} onSaved={load} />
-
       <div className={styles.cols}>
         {/* How you earn */}
         <section className={styles.earn}>
@@ -200,10 +222,52 @@ export function RewardsClient({ marketing }: { marketing: ReactNode }) {
           </div>
         </section>
 
-        <aside className={styles.side}>
-          <ReferFriendCard />
-        </aside>
       </div>
+
+      {/* Activity — earns and spends in one list. The ledger already carries redemptions as
+          negative entries, so using it alone avoids listing a redemption twice. */}
+      {activity.length ? (
+        <section className={styles.history}>
+          <h2 className={styles.h2}>Your activity</h2>
+          <div className={styles.historyCard}>
+            {activity.map((h) => (
+              <div key={h.id} className={styles.histRow}>
+                <span className={styles.histChip}>
+                  <Icon name={h.delta < 0 ? 'gift' : 'star'} size={17} color="var(--gold-700)" />
+                </span>
+                <div className={styles.histText}>
+                  <strong>{reasonLabel[h.reason] || h.reason || 'Points'}</strong>
+                  <span>{fmtDate(h.at)}</span>
+                </div>
+                <span className={`${styles.histPts} ${h.delta > 0 ? styles.histPlus : ''}`}>
+                  {h.delta > 0 ? '+' : '−'}
+                  {Math.abs(h.delta).toLocaleString('en-GB')}
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : redemptions.length ? (
+        <section className={styles.history}>
+          <h2 className={styles.h2}>Recently redeemed</h2>
+          <div className={styles.historyCard}>
+            {redemptions.map((h) => (
+              <div key={h.id} className={styles.histRow}>
+                <span className={styles.histChip}>
+                  <Icon name="gift" size={17} color="var(--gold-700)" />
+                </span>
+                <div className={styles.histText}>
+                  <strong>{h.reward}</strong>
+                  <span>
+                    {h.partner} · {fmtDate(h.at)}
+                  </span>
+                </div>
+                <span className={styles.histPts}>−{h.cost.toLocaleString('en-GB')}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       {/* Catalogue */}
       <section className={styles.catSection}>
@@ -255,28 +319,9 @@ export function RewardsClient({ marketing }: { marketing: ReactNode }) {
         </div>
       </section>
 
-      {/* History */}
-      {redemptions.length ? (
-        <section className={styles.history}>
-          <h2 className={styles.h2}>Recently redeemed</h2>
-          <div className={styles.historyCard}>
-            {redemptions.map((h) => (
-              <div key={h.id} className={styles.histRow}>
-                <span className={styles.histChip}>
-                  <Icon name="gift" size={17} color="var(--gold-700)" />
-                </span>
-                <div className={styles.histText}>
-                  <strong>{h.reward}</strong>
-                  <span>
-                    {h.partner} · {fmtDate(h.at)}
-                  </span>
-                </div>
-                <span className={styles.histPts}>−{h.cost.toLocaleString('en-GB')}</span>
-              </div>
-            ))}
-          </div>
-        </section>
-      ) : null}
+      {/* Occasional extras, below the things you came here for. */}
+      <BirthdayCard birthday={birthday} onSaved={load} />
+      <ReferFriendCard />
 
       {/* Redeem confirm */}
       {confirm ? (

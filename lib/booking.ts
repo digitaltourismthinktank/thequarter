@@ -712,6 +712,14 @@ export interface RewardItem {
   pos: string;
   avail: 'ok' | 'soon';
 }
+/** One line of the member's points ledger — an earn or a spend, newest first. */
+export interface LedgerEntry {
+  id: string;
+  delta: number;
+  reason: string;
+  at: string | null;
+}
+
 export interface Redemption {
   id: string;
   reward: string;
@@ -726,7 +734,7 @@ export interface BirthdayState {
   claimed: string | null; // ISO date claimed, or null
 }
 export const getRewards = () =>
-  call<{ points: number; lifetimePoints: number; earnedLately: number; catalogue: RewardItem[]; redemptions: Redemption[]; birthday: BirthdayState }>(
+  call<{ points: number; lifetimePoints: number; earnedLately: number; catalogue: RewardItem[]; redemptions: Redemption[]; birthday: BirthdayState; activity?: LedgerEntry[] }>(
     'rewards',
   );
 

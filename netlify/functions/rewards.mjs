@@ -54,7 +54,10 @@ export default async function handler(req) {
       .reduce((s, e) => s + e.delta, 0);
     const meta = vm.member.metaData || {};
     const birthday = { bday: meta.bday || null, claimed: meta.bdayClaimed || null };
-    return json({ points: memberPoints(vm.member), lifetimePoints: memberLifetimePoints(vm.member), earnedLately, catalogue, redemptions, birthday });
+    // The ledger is already in hand for earnedLately, so returning a slice of it costs
+    // nothing and gives the member the same earn history the admin view has always had.
+    const activity = ledger.slice(0, 12).map((e) => ({ id: e.id, delta: e.delta, reason: e.reason, at: e.at }));
+    return json({ points: memberPoints(vm.member), lifetimePoints: memberLifetimePoints(vm.member), earnedLately, catalogue, redemptions, birthday, activity });
   }
 
   if (req.method !== 'POST') return json({ error: 'method-not-allowed' }, 405);

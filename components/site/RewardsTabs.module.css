@@ -1,0 +1,42 @@
+/* Segmented control for Rewards ↔ Perks. Matches the gold active pill used by the check-in
+   sheet, so the two segmented controls in the member app read as the same component. */
+.tabs {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  margin: 0 0 20px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill);
+  background: var(--sand-100);
+}
+.tab {
+  flex: 1;
+  padding: 11px 14px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--text-muted);
+  text-decoration: none;
+  transition:
+    background var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard);
+}
+.tab:hover {
+  color: var(--ink-900);
+}
+.tabOn,
+.tabOn:hover {
+  background: var(--gold-500);
+  color: var(--ink-900);
+}
+
+/* Desktop keeps the top nav, which already carries both destinations. */
+@media (min-width: 861px) {
+  .tabs {
+    display: none;
+  }
+}
