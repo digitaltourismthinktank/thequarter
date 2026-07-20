@@ -180,3 +180,9 @@
   color: var(--text-muted);
   font-size: var(--text-base);
 }
+
+/* Mobile audit: blurbs are staff-written and can carry long URLs. pre-line keeps the
+   newlines but still won't break a long token. */
+.eventBlurb {
+  overflow-wrap: anywhere;
+}

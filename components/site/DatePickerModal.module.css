@@ -117,3 +117,11 @@
     opacity: 1;
   }
 }
+
+/* Mobile audit: on a short viewport (a landscape phone) the calendar grew taller than the
+   overlay, leaving the last week of dates and Done unreachable. Grid start-aligns the
+   overflow, so making the overlay scroll is enough — no nested scroller needed. */
+.overlay {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}

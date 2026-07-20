@@ -201,3 +201,11 @@
     animation: none;
   }
 }
+
+/* Mobile audit: the opt-in strip never wrapped, crushing the question to ~74px. */
+.offer {
+  flex-wrap: wrap;
+}
+.offerText {
+  flex: 1 1 100%;
+}

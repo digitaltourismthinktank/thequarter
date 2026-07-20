@@ -548,3 +548,24 @@
     opacity: 1;
   }
 }
+
+/* Mobile audit: the points card was a non-wrapping row whose 60px balance forced a
+   min-content width wider than the phone, silently slicing off the progress ring. */
+@media (max-width: 560px) {
+  .pointsCard {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 22px 20px;
+  }
+  .pcLeft {
+    min-width: 0;
+    align-self: stretch;
+  }
+  .pcBalance strong {
+    font-size: clamp(36px, 12vw, 60px);
+  }
+  .ring {
+    align-self: center;
+  }
+}

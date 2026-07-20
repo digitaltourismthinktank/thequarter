@@ -468,3 +468,54 @@
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
+
+/* ---- Landscape wall displays (a 16:9 TV) -------------------------------------------
+   This screen was designed portrait, so on a landscape TV everything stacks down a thin
+   middle column: the height runs out while half the width sits empty, and the hero's 10vw
+   type swamps the rest. Split it into a proper landscape composition — header across the
+   top, the mood and what's-on down the left, live room status filling the right — so the
+   display uses the shape of the screen it's actually on.
+   Appended last so it wins over the portrait rules and the 1600px centring block. */
+@media (orientation: landscape) and (min-width: 1000px) {
+  .screen {
+    display: grid;
+    align-items: stretch;
+    grid-template-columns: minmax(0, 4fr) minmax(0, 6fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    column-gap: clamp(24px, 2.5vw, 56px);
+    row-gap: clamp(12px, 1.6vh, 26px);
+  }
+  .top {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    max-width: none;
+  }
+  .hero {
+    grid-column: 1;
+    grid-row: 2;
+    align-self: start;
+    max-width: none;
+  }
+  /* The What's-on section is a direct child of .screen; the room blocks are nested inside
+     .entranceMain, so this targets only the footer block. */
+  .screen > .block {
+    grid-column: 1;
+    grid-row: 3;
+    align-self: end;
+    max-width: none;
+  }
+  .entranceMain {
+    grid-column: 2;
+    grid-row: 2 / 4;
+    min-height: 0;
+  }
+  /* 10vw is portrait maths — in a half-width column it dwarfs the room status, which is
+     the part people actually walk up to read. */
+  .heroLabel {
+    font-size: clamp(44px, 5vw, 92px);
+  }
+  .heroLine {
+    font-size: clamp(16px, 1.5vw, 24px);
+    max-width: 32ch;
+  }
+}

@@ -140,3 +140,15 @@
   font-size: var(--text-sm);
   color: var(--text-muted);
 }
+
+/* Mobile audit: a long friend name wrapped "Pending" inside its own pill. */
+.fName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pill {
+  flex: none;
+  white-space: nowrap;
+}

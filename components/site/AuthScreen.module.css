@@ -165,3 +165,10 @@
 .linkBtn:hover {
   color: var(--ink-900);
 }
+
+/* Mobile audit: desktop side padding squeezed the sign-in form to ~280px on a phone. */
+@media (max-width: 600px) {
+  .panel {
+    padding: 32px var(--gutter);
+  }
+}

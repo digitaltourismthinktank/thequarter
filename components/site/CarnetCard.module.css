@@ -146,3 +146,8 @@
   color: var(--gold-700);
   font-size: var(--text-sm);
 }
+
+/* Mobile audit: "Valid until ..." collided with the pass count with no room to wrap. */
+.balanceRow {
+  flex-wrap: wrap;
+}

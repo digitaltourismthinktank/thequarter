@@ -373,3 +373,8 @@
     display: none;
   }
 }
+
+/* Mobile audit: a long member email is a single unbreakable token and was being clipped. */
+.email {
+  overflow-wrap: anywhere;
+}

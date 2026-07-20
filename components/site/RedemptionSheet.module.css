@@ -212,3 +212,10 @@
     transform: scale(1);
   }
 }
+
+/* Mobile audit: 100vh puts the sheet's foot under the iOS Safari toolbar, out of reach.
+   dvh tracks the visible viewport; browsers without it keep the 100vh rule above. */
+.sheet {
+  max-height: calc(100dvh - 40px);
+  min-height: 0;
+}

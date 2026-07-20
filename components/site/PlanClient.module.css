@@ -383,3 +383,18 @@
   line-height: 1.5;
   color: var(--text-muted);
 }
+
+/* Mobile audit: Stripe invoice ids are unbreakable strings and spilled out of the row. */
+.invNum {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 480px) {
+  .card,
+  .current {
+    padding: 18px;
+  }
+  .switchHead {
+    flex-wrap: wrap;
+  }
+}
