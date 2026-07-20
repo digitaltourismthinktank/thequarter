@@ -4,6 +4,9 @@ import type { CSSProperties, SVGProps } from 'react';
    Curated subset, ported verbatim from the design system. To add an icon, use the
    matching Lucide path (keep 1.75 stroke, round caps) — never mix icon families. */
 const PATHS = {
+  /* Added for the mobile tab bar — "Dashboard" reads as Home on a phone, and a monitor
+     glyph makes no sense there. */
+  home: 'M3 10.5 12 3l9 7.5M5 9.5V21h14V9.5',
   'arrow-right': 'M5 12h14M13 6l6 6-6 6',
   'arrow-up-right': 'M7 17 17 7M8 7h9v9',
   'arrow-left': 'M19 12H5M11 6l-6 6 6 6',

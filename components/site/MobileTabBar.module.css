@@ -1,0 +1,92 @@
+/* Phone navigation for the member app. Fixed to the bottom, five destinations, with
+   check-in raised into the middle where a thumb rests. Hidden above 860px, where the
+   desktop top nav takes over. */
+.bar {
+  display: none;
+}
+
+@media (max-width: 860px) {
+  .bar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 60;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    align-items: end;
+    background: var(--surface-card);
+    border-top: 1px solid var(--border-subtle);
+    padding: 8px 6px calc(10px + env(safe-area-inset-bottom));
+    /* Sits above the home indicator on iOS and clears the Crisp launcher. */
+    box-shadow: 0 -6px 20px rgba(30, 26, 21, 0.06);
+  }
+
+  .tab,
+  .checkSlot {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    font-size: 10px;
+    font-weight: var(--fw-semibold);
+    line-height: 1;
+    text-align: center;
+    color: var(--stone-400);
+    min-width: 0;
+  }
+  .tab {
+    padding: 2px 0;
+    transition: color var(--duration-fast) var(--ease-standard);
+  }
+  .ic {
+    width: 22px;
+    height: 22px;
+    display: grid;
+    place-items: center;
+  }
+  .tabOn {
+    color: var(--ink-900);
+  }
+  .tabOn .ic {
+    color: var(--gold-700);
+  }
+
+  /* The raised button floats above the bar; the invisible spacer keeps this slot's label
+     on exactly the same baseline as the other four, so the row reads level. */
+  .checkSlot {
+    position: relative;
+    color: var(--ink-900);
+    font-weight: var(--fw-bold);
+  }
+  .slot {
+    width: 22px;
+    height: 22px;
+  }
+  .check {
+    position: absolute;
+    left: 50%;
+    top: -30px;
+    transform: translateX(-50%);
+    width: 54px;
+    height: 54px;
+    border-radius: var(--radius-pill);
+    background: var(--gold-500);
+    border: 4px solid var(--surface-page);
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    box-shadow: 0 8px 18px rgba(142, 106, 46, 0.34);
+    transition: transform var(--duration-fast) var(--ease-standard);
+  }
+  .check:active {
+    transform: translateX(-50%) scale(0.94);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tab,
+  .check {
+    transition: none;
+  }
+}

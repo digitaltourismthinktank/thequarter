@@ -262,3 +262,17 @@
     display: inline;
   }
 }
+
+/* Phones: the bottom tab bar replaces the top strip entirely. Six pills never fitted
+   across ~360px — three sections sat off the right edge behind a hidden scrollbar — so
+   rather than shrinking them further, the strip goes and MobileTabBar takes over. */
+@media (max-width: 860px) {
+  .tabs,
+  .tabsSpacer {
+    display: none;
+  }
+  /* Clear the fixed bar (and its raised check-in button) at the foot of every page. */
+  .inner {
+    padding-bottom: calc(96px + env(safe-area-inset-bottom));
+  }
+}

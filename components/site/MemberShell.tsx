@@ -10,6 +10,7 @@ import { isAdminEmail } from '@/lib/admin';
 import { useMember, memberPlanSlug } from './useMember';
 import { getMemberstack, memberName, memberInitials, memberDaysRemaining } from '@/lib/memberstack';
 import { ProfileEditor } from './ProfileEditor';
+import { MobileTabBar } from './MobileTabBar';
 import styles from './MemberShell.module.css';
 
 const TABS: { href: string; label: string; icon: IconName }[] = [
@@ -108,6 +109,9 @@ export function MemberShell({ children, wide = false }: { children: ReactNode; w
       </header>
 
       <div className={cn(styles.inner, wide && styles.wide)}>{children}</div>
+
+      {/* Phone navigation. Admin keeps its own dense tab set, so the bar is member-only. */}
+      {!onAdmin ? <MobileTabBar /> : null}
 
       {profileOpen ? <ProfileEditor member={member} onClose={() => setProfileOpen(false)} onSaved={refresh} /> : null}
     </div>
