@@ -78,6 +78,11 @@ export function BookingClient() {
   const [amendErr, setAmendErr] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  // Who's it for? Asked before the room list so the smallest space that fits is what you
+  // see first — otherwise the instinct is to take the nicest room, and the six-seater gets
+  // held for a call. Always escapable: "Choose another room" shows everything.
+  const [party, setParty] = useState<number | null>(null);
+  const [showAllRooms, setShowAllRooms] = useState(false);
 
   useEffect(() => {
     if (loading || member) return;
@@ -228,6 +233,16 @@ export function BookingClient() {
   if (loading) return <p className={styles.state}>Loading…</p>;
   if (!member) return <p className={styles.state}>Please sign in — taking you to the login page…</p>;
 
+  // A plan is what carries meeting-room hours; a day-pass visitor gets the pods.
+  const hasPlan = (member?.planConnections?.length ?? 0) > 0;
+  const capOf = (sp: Space) => sp.capacity ?? 99;
+  const fits = (sp: Space) => party === null || capOf(sp) >= party;
+  // The best match is the smallest space that fits. Anything the same size is a fair
+  // alternative (two pods), so show those too rather than picking one arbitrarily.
+  const bestCap = party === null ? null : Math.min(...spaces.filter(fits).map(capOf), 99);
+  const shortlist =
+    party === null || showAllRooms ? spaces : spaces.filter((sp) => fits(sp) && capOf(sp) === bestCap);
+
   const open = avail?.openMin ?? 8 * 60;
   const close = avail?.closeMin ?? 18 * 60;
   // Times that have already passed are noise you have to read past — on today, start the
@@ -265,8 +280,34 @@ export function BookingClient() {
         </a>
       </div>
 
+      {/* Asked before the rooms, because the room you see first is the room you take. */}
+      <div className={styles.party} role="group" aria-label="How many people?">
+        <span className={styles.partyLabel}>Who&rsquo;s it for?</span>
+        <div className={styles.partyOpts}>
+          {[
+            { n: 1, label: 'Just me', hint: 'A call or some quiet' },
+            { n: 4, label: 'Up to 3 guests', hint: 'A small meeting' },
+            { n: 8, label: '4 or more', hint: 'The big table' },
+          ].map((o) => (
+            <button
+              key={o.n}
+              type="button"
+              className={`${styles.partyBtn} ${party === o.n ? styles.partyOn : ''}`}
+              onClick={() => {
+                setParty(o.n);
+                setShowAllRooms(false);
+                setSpaceId(null);
+              }}
+            >
+              <strong>{o.label}</strong>
+              <span>{o.hint}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className={styles.spaces}>
-        {spaces.map((s) => (
+        {shortlist.map((s) => (
           <button
             key={s.id}
             type="button"
@@ -276,10 +317,17 @@ export function BookingClient() {
             <span className={styles.spaceName}>{s.name}</span>
             <span className={styles.spaceMeta}>
               {s.type === 'Phone pod' ? 'Phone pod' : `Up to ${s.capacityLabel ?? s.capacity ?? ''}`}
+              {s.type !== 'Phone pod' && !hasPlan ? ' · plan needed' : ''}
             </span>
           </button>
         ))}
       </div>
+
+      {party !== null && !showAllRooms && shortlist.length < spaces.length ? (
+        <button type="button" className={styles.showAll} onClick={() => setShowAllRooms(true)}>
+          Choose another room
+        </button>
+      ) : null}
 
       {!spaceId ? (
         <p className={styles.state}>Choose a room or pod above to see its availability.</p>

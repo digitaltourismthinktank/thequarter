@@ -53,6 +53,7 @@ export const PLANS: Plan[] = [
     welcomeReward: 250,
     features: [
       'Five days’ access each month',
+      '2 hours of meeting room a month — for you and your clients',
       'From £16.80 a working day',
       'Everything in the Day Pass, included',
       '24/7 access',
@@ -73,6 +74,7 @@ export const PLANS: Plan[] = [
     welcomeReward: 500,
     features: [
       'Ten days’ access each month',
+      '4 hours of meeting room a month — for you and your clients',
       'From £13.80 a working day',
       'Everything in Visitor, included',
       '24/7 access',
@@ -91,6 +93,7 @@ export const PLANS: Plan[] = [
     welcomeReward: 1000,
     features: [
       'Unlimited days — work here every day',
+      '8 hours of meeting room a month — for you and your clients',
       'Everything in Resident, included',
       'Priority room booking',
       '24/7 access',
@@ -164,6 +167,7 @@ export const PLAN_BENEFITS: Partial<Record<PlanId, PlanBenefit[]>> = {
   visitor: [
     { icon: 'pound-sterling', text: '£84 per month, everything included' },
     { icon: 'calendar', text: '5 days access per month' },
+    { icon: 'users', text: '2 hours of meeting room a month — for you and your clients' },
     { icon: 'map-pin', text: 'Register your business address at The Quarter' },
     { icon: 'monitor', text: 'Pick any available workspace, monitor included' },
     { icon: 'coffee', text: 'Unlimited coffee, refreshments, cereals, yoghurts and pastries' },
@@ -175,6 +179,7 @@ export const PLAN_BENEFITS: Partial<Record<PlanId, PlanBenefit[]>> = {
   resident: [
     { icon: 'pound-sterling', text: '£138 per month, everything included' },
     { icon: 'calendar', text: '10 days access per month' },
+    { icon: 'users', text: '4 hours of meeting room a month — for you and your clients' },
     { icon: 'map-pin', text: 'Register your business address at The Quarter' },
     { icon: 'monitor', text: 'Pick any available workspace, monitor included' },
     { icon: 'coffee', text: 'Unlimited coffee, refreshments, cereals, yoghurts and pastries' },
@@ -186,6 +191,7 @@ export const PLAN_BENEFITS: Partial<Record<PlanId, PlanBenefit[]>> = {
   citizen: [
     { icon: 'pound-sterling', text: '£258 per month, everything included' },
     { icon: 'calendar', text: 'Unlimited days access' },
+    { icon: 'users', text: '8 hours of meeting room a month — for you and your clients' },
     { icon: 'map-pin', text: 'Register your business address at The Quarter' },
     { icon: 'monitor', text: 'Pick any available workspace, monitor included' },
     { icon: 'coffee', text: 'Unlimited coffee, refreshments, cereals, yoghurts and pastries' },
