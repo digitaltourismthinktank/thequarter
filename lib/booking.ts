@@ -259,7 +259,10 @@ export const bookTour = (b: { date: string; time: string; name: string; email: s
 // Check-in
 export const getCheckinToday = () => call<CheckinStatus>('checkin?action=today');
 export const checkInToday = (length: 'Full' | 'Half', period?: DayPeriod | null) =>
-  call<{ ok: boolean; balance: string | null }>('checkin', { method: 'POST', body: { action: 'checkin', length, ...(length === 'Half' && period ? { period } : {}) } });
+  call<{ ok: boolean; balance: string | null; pointsAwarded?: number; alreadyCheckedIn?: boolean }>('checkin', {
+    method: 'POST',
+    body: { action: 'checkin', length, ...(length === 'Half' && period ? { period } : {}) },
+  });
 export const reserveDay = (date: string, length: 'Full' | 'Half', period?: DayPeriod | null) =>
   call<{ ok: boolean; requested?: boolean }>('checkin', { method: 'POST', body: { action: 'reserve', date, length, ...(length === 'Half' && period ? { period } : {}) } });
 export const cancelReservation = (id: string) =>

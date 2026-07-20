@@ -9,6 +9,7 @@ import {
   getMyBookings,
   createBooking,
   cancelBooking,
+  amendBooking,
   type Space,
   type MyBooking,
 } from '@/lib/booking';
@@ -28,6 +29,9 @@ interface Avail {
 const pad = (n: number) => String(n).padStart(2, '0');
 const minToHHMM = (m: number) => `${pad(Math.floor(m / 60))}:${pad(m % 60)}`;
 const fmtRange = (a: number, b: number) => `${minToHHMM(a)}–${minToHHMM(b)}`;
+/** 08:00–18:00 in 30-minute steps, for the amend pickers (mirrors the server's window). */
+const AMEND_TIMES: string[] = [];
+for (let m = 8 * 60; m <= 18 * 60; m += SLOT) AMEND_TIMES.push(minToHHMM(m));
 
 function toISO(d: Date): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -64,6 +68,13 @@ export function BookingClient() {
   const [sel, setSel] = useState<{ start: number; end: number } | null>(null); // committed range
   const [mine, setMine] = useState<MyBooking[]>([]);
   const [busyAction, setBusyAction] = useState(false);
+  // Inline amend (move a booking's date/time, same room) — parity with the dashboard,
+  // which already allowed this while the Book tab only offered Cancel.
+  const [editId, setEditId] = useState<string | null>(null);
+  const [eDate, setEDate] = useState('');
+  const [eStart, setEStart] = useState('');
+  const [eEnd, setEEnd] = useState('');
+  const [amendErr, setAmendErr] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
 
@@ -181,6 +192,33 @@ export function BookingClient() {
   async function cancel(id: string) {
     setBusyAction(true);
     await cancelBooking(id);
+    await loadMine();
+    await reloadAvail();
+    setBusyAction(false);
+  }
+
+  function openEdit(b: MyBooking) {
+    setEditId(b.id);
+    setEDate(b.date);
+    setEStart(minToHHMM(b.startMin));
+    setEEnd(minToHHMM(b.endMin));
+    setAmendErr(null);
+  }
+
+  async function saveAmend(id: string) {
+    if (eEnd <= eStart) {
+      setAmendErr('The end time must be after the start.');
+      return;
+    }
+    setBusyAction(true);
+    setAmendErr(null);
+    const r = await amendBooking(id, eDate, eStart, eEnd);
+    if (!r.ok) {
+      setAmendErr(friendly((r.data as { error?: string } | undefined)?.error));
+      setBusyAction(false);
+      return;
+    }
+    setEditId(null);
     await loadMine();
     await reloadAvail();
     setBusyAction(false);
@@ -321,9 +359,44 @@ export function BookingClient() {
               <span>
                 {spaceName(b.space)} · {dayLabel(b.date)} · {fmtRange(b.startMin, b.endMin)}
               </span>
-              <button type="button" className={styles.cancel} onClick={() => cancel(b.id)} disabled={busyAction}>
-                Cancel
-              </button>
+              <span className={styles.mineBtns}>
+                {b.kind === 'Member' ? (
+                  <button
+                    type="button"
+                    className={styles.amend}
+                    onClick={() => (editId === b.id ? setEditId(null) : openEdit(b))}
+                    disabled={busyAction && editId !== b.id}
+                  >
+                    {editId === b.id ? 'Close' : 'Amend'}
+                  </button>
+                ) : null}
+                <button type="button" className={styles.cancel} onClick={() => cancel(b.id)} disabled={busyAction}>
+                  Cancel
+                </button>
+              </span>
+              {editId === b.id ? (
+                <div className={styles.amendEditor}>
+                  <input type="date" value={eDate} onChange={(e) => setEDate(e.target.value)} />
+                  <select value={eStart} onChange={(e) => setEStart(e.target.value)}>
+                    {AMEND_TIMES.slice(0, -1).map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </select>
+                  <select value={eEnd} onChange={(e) => setEEnd(e.target.value)}>
+                    {AMEND_TIMES.filter((t) => t > eStart).map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </select>
+                  <Button size="sm" variant="primary" onClick={() => saveAmend(b.id)} disabled={busyAction}>
+                    Save
+                  </Button>
+                  {amendErr ? <p className={styles.amendErr}>{amendErr}</p> : null}
+                </div>
+              ) : null}
             </div>
           ))}
         </div>

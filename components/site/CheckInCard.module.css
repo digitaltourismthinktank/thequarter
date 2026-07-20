@@ -202,3 +202,54 @@
     margin-top: 12px;
   }
 }
+
+/* Check-in acknowledgement. Members reported not knowing whether it had worked — there was
+   no confirmation at all — so this is deliberately prominent, and names the points earned. */
+.confirm {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0 4px;
+  padding: 12px 14px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--gold-400);
+  background: var(--gold-100);
+}
+.confirmTick {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--ink-900);
+  color: var(--gold-400);
+  font-size: var(--text-sm);
+  font-weight: var(--fw-bold);
+}
+.confirmText {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  min-width: 0;
+  font-size: var(--text-sm);
+  color: var(--ink-900);
+}
+.confirmPoints {
+  font-weight: var(--fw-bold);
+  color: var(--gold-700);
+  white-space: nowrap;
+}
+.confirmX {
+  margin-left: auto;
+  flex: none;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: var(--text-md);
+  line-height: 1;
+  color: var(--text-muted);
+  padding: 0 2px;
+}

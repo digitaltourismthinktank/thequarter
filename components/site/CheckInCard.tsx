@@ -44,6 +44,7 @@ export function CheckInCard({ className }: { className?: string }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pending, setPending] = useState<string[]>([]); // optimistic reservations in flight
   const [note, setNote] = useState<string | null>(null);
+  const [confirmed, setConfirmed] = useState<{ points: number; already: boolean } | null>(null);
 
   async function refresh() {
     const r = await getCheckinToday();
@@ -61,6 +62,11 @@ export function CheckInCard({ className }: { className?: string }) {
     setError(null);
     const r = await checkInToday(half ? 'Half' : 'Full', half ? period : null);
     if (!r.ok) setError(friendly(r.data?.error));
+    else {
+      // Members told us they couldn't tell whether checking in had worked — there was no
+      // acknowledgement at all. Show an explicit confirmation, with the points just earned.
+      setConfirmed({ points: r.data?.pointsAwarded ?? 0, already: !!r.data?.alreadyCheckedIn });
+    }
     await refresh();
     setBusy(false);
   }
@@ -98,6 +104,22 @@ export function CheckInCard({ className }: { className?: string }) {
   return (
     <div className={cn(styles.card, className)}>
       <span className={styles.eyebrow}>Book a visit</span>
+
+      {/* Unmissable acknowledgement that the check-in landed, and what it earned. */}
+      {confirmed ? (
+        <div className={styles.confirm} role="status" aria-live="polite">
+          <span className={styles.confirmTick} aria-hidden="true">
+            ✓
+          </span>
+          <span className={styles.confirmText}>
+            <strong>{confirmed.already ? 'You were already checked in' : "You're checked in"}</strong>
+            {confirmed.points > 0 ? <span className={styles.confirmPoints}>+{confirmed.points} points</span> : null}
+          </span>
+          <button type="button" className={styles.confirmX} onClick={() => setConfirmed(null)} aria-label="Dismiss">
+            ×
+          </button>
+        </div>
+      ) : null}
 
       {loading ? (
         <p className={styles.meta}>Loading…</p>

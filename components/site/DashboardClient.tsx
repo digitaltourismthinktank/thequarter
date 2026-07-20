@@ -292,7 +292,9 @@ export function DashboardClient() {
           {band ? (
             <div className={styles.busy}>
               <div>
-                <span className={styles.busyEyebrow}>How busy we expect it to be</span>
+                {/* Name the day explicitly — someone browsing next week's dates read this as
+                    a forecast for the whole week rather than for today. */}
+                <span className={styles.busyEyebrow}>How busy we expect today to be</span>
                 <div className={styles.busyLine}>
                   <strong className={styles.busyBand}>{band.label}</strong>
                   <span className={styles.busyDesc}>{band.line} Our best guess from past weeks.</span>

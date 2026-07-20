@@ -284,3 +284,49 @@
   cursor: pointer;
   font-size: var(--text-sm);
 }
+
+/* Inline amend on the Book tab — the dashboard already allowed moving a booking, so the
+   Book tab offering only Cancel meant re-booking from scratch. */
+.mineBtns {
+  display: inline-flex;
+  gap: 8px;
+  flex: none;
+}
+.amend {
+  appearance: none;
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--gold-700);
+  background: none;
+  border: none;
+  padding: 0;
+  text-decoration: underline;
+}
+.amendEditor {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-subtle);
+}
+.amendEditor input,
+.amendEditor select {
+  min-width: 0;
+  max-width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+  font-size: var(--text-sm);
+  color: var(--ink-900);
+}
+.amendErr {
+  width: 100%;
+  font-size: var(--text-sm);
+  color: var(--danger);
+}
