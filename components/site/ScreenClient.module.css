@@ -519,3 +519,55 @@
     max-width: 32ch;
   }
 }
+
+/* ---- Wall display: room cards read at a glance ------------------------------------
+   Free vs busy is carried by FILL, not hue — the brand has no traffic lights and no green.
+   An available room is lifted with the gold accent; an occupied one recedes into sand so
+   the eye lands on what you can actually walk into right now. */
+.spaceCard {
+  border-color: var(--gold-300);
+}
+.busyCard {
+  border-color: var(--border-subtle);
+  background: var(--sand-100);
+}
+.statusFree {
+  color: var(--gold-700);
+  font-weight: var(--fw-bold);
+}
+.statusBusy {
+  color: var(--text-muted);
+}
+/* The timeline is the point of the card, so give it real presence on a TV. */
+.dayTrack {
+  height: clamp(10px, 1.4vh, 16px);
+}
+.dayScale {
+  font-size: clamp(10px, 0.75vw, 14px);
+}
+
+@media (orientation: landscape) and (min-width: 1000px) {
+  /* The rooms grid was absorbing the whole column's slack: four cards stretched the full
+     height of the display, which shoved each card's timeline (margin-top:auto) down out of
+     sight and ran the card borders straight through the Workspaces block beneath. Size the
+     cards to their content and stack the blocks from the top instead. */
+  .entranceMain {
+    justify-content: flex-start;
+  }
+  .entranceMain .block:first-child {
+    flex: 0 1 auto;
+    min-height: 0;
+  }
+  .entranceMain .block:first-child .spaceGrid {
+    flex: 0 0 auto;
+    grid-auto-rows: min-content;
+  }
+  /* Four rooms across the right-hand column rather than four tall towers. */
+  .spaceGrid {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  }
+  /* With cards no longer stretched, the timeline sits under the status where it belongs. */
+  .dayLine {
+    margin-top: 12px;
+  }
+}
