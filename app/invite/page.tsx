@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { InviteClient } from '@/components/site/InviteClient';
+import { EventInviteClient } from '@/components/site/EventInviteClient';
 
 export const metadata: Metadata = {
   title: "You're invited · The Quarter",
@@ -10,5 +10,5 @@ export const metadata: Metadata = {
 };
 
 export default function InvitePage() {
-  return <InviteClient />;
+  return <EventInviteClient />;
 }

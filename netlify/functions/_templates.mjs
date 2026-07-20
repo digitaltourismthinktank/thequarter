@@ -197,7 +197,11 @@ export const TEMPLATES = {
     id: 'custom',
     name: 'Write your own',
     blurb: 'A plain note in the house style — for anything that has no template.',
-    kind: 'operational',
+    // Marketing, deliberately. Free text aimed at a whole audience is the single most
+    // likely thing here to carry promotion, and classing it operational would have let it
+    // reach everyone who unsubscribed with no way out in the footer — every other route to
+    // a mass promotional send is guarded, and this would have been the hole in that.
+    kind: 'marketing',
     audience: 'any',
     subject: (c) => c.subject || 'A note from The Quarter',
     body: (c) =>

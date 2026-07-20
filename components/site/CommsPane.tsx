@@ -33,6 +33,11 @@ export function CommsPane() {
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
 
+  /* call() reports the HTTP status, and these handlers answer 200 with ok:false in the body
+     when a send is rejected — so the transport succeeded and the send did not. Both have to
+     be true before we tell someone their email went. */
+  const sent = (r: { ok: boolean; data?: { ok?: boolean } }) => r.ok && r.data?.ok !== false;
+
   // Group send
   const [templateId, setTemplateId] = useState('');
   const [audience, setAudience] = useState('members-active');
@@ -66,7 +71,7 @@ export function CommsPane() {
       markVisitIds: [v.id],
     });
     setBusy(null);
-    setNote(r.ok ? `Thanked ${v.name || v.email}.` : 'That didn’t send — try again.');
+    setNote(sent(r) ? `Thanked ${v.name || v.email}.` : 'That didn’t send — it stays on the list, so nothing is lost.');
     load();
   }
 
@@ -81,7 +86,7 @@ export function CommsPane() {
     setBusy(m.id);
     const r = await commsSend({ templateId: id, audience: 'explicit', emails: [m.email] });
     setBusy(null);
-    setNote(r.ok ? `Sent to ${m.name || m.email}.` : 'That didn’t send — try again.');
+    setNote(sent(r) ? `Sent to ${m.name || m.email}.` : 'That didn’t send — try again.');
     load();
   }
 
@@ -101,7 +106,7 @@ export function CommsPane() {
     setBusy('test');
     const r = await commsTest({ templateId, eventId, subject, message });
     setBusy(null);
-    setNote(r.ok ? `Test sent to ${r.data.sentTo}.` : 'Test didn’t send.');
+    setNote(sent(r) ? `Test sent to ${r.data.sentTo}.` : 'Test didn’t send — check the Resend key.');
   }
 
   /** Never sends. Asks the server who this would actually reach, then shows the confirm. */
@@ -118,7 +123,7 @@ export function CommsPane() {
     const r = await commsSend({ templateId, audience, eventId, subject, message });
     setBusy(null);
     setConfirm(null);
-    setNote(r.ok ? `Sent to ${r.data.sent} ${r.data.sent === 1 ? 'person' : 'people'}.` : `Sent ${r.data?.sent ?? 0}, ${r.data?.failed ?? 0} failed.`);
+    setNote(sent(r) ? `Sent to ${r.data.sent} ${r.data.sent === 1 ? 'person' : 'people'}.` : `Sent ${r.data?.sent ?? 0}, ${r.data?.failed ?? 0} failed — nobody was marked as contacted.`);
     load();
   }
 
@@ -127,7 +132,7 @@ export function CommsPane() {
     setBusy('push');
     const r = await commsPush({ title: pushTitle, message: pushMsg, email });
     setBusy(null);
-    setNote(r.ok ? `Pinged ${r.data.sent} ${r.data.sent === 1 ? 'person' : 'people'}.` : 'That didn’t go.');
+    setNote(sent(r) ? `Pinged ${r.data.sent} ${r.data.sent === 1 ? 'person' : 'people'}.` : 'That didn’t go.');
     if (!email) setPushMsg('');
   }
 

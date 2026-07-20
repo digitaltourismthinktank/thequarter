@@ -51,9 +51,12 @@ export default async function handler(req) {
 
   const admin = memberstackAdmin.init(MS_SECRET);
   const m = await findByEmail(admin, email);
-  // No member record? Nothing to store against — but say yes rather than expose whether
-  // an address is on our list, and because a day-pass buyer may have no account at all.
-  if (!m) return json({ ok: true, email, note: 'no-member-record' });
+  // No member record — a day-pass buyer usually has no account — and there is nowhere to
+  // store the objection yet. Saying "done" here would be a lie to the one person we most
+  // owe the truth: they asked to be left alone and we would carry on. Say what is actually
+  // true and give them a route that works, until a suppression list exists for addresses
+  // with no member record.
+  if (!m) return json({ ok: false, email, error: 'no-member-record' }, 200);
 
   const optOut = body.resubscribe !== true;
   await admin.members.update({ id: m.id, data: { metaData: { ...(m.metaData || {}), emailOptOut: optOut } } });

@@ -265,7 +265,21 @@ export default async function handler(req) {
     if (!t) return json({ error: 'unknown-template' }, 400);
     const ev = body.eventId ? (await upcomingEvents()).find((e) => e.id === body.eventId) : null;
 
-    let people = await resolveAudience(admin, body.audience || 'explicit', { eventId: body.eventId, emails: body.emails }, t.kind);
+    // A template's `audience` was advisory, so an operational template could be aimed at a
+    // list its operational classification doesn't justify — event-reminder is only
+    // operational BECAUSE it goes to people who already said yes, and pointing it at
+    // everyone would have kept the opt-out skip while losing the reason for it.
+    const permitted = {
+      'day-pass': ['explicit', 'daypass-4w', 'daypass-12m'],
+      members: ['explicit', 'members-active'],
+      event: ['explicit', 'members-active', 'members-not-rsvpd', 'daypass-4w', 'daypass-12m'],
+      'event-rsvps': ['explicit', 'event-rsvps'],
+      any: ['explicit', 'members-active', 'daypass-4w', 'daypass-12m', 'event-rsvps', 'members-not-rsvpd'],
+    }[t.audience] || ['explicit'];
+    const audience = body.audience || 'explicit';
+    if (!permitted.includes(audience)) return json({ error: 'audience-not-allowed', permitted }, 400);
+
+    let people = await resolveAudience(admin, audience, { eventId: body.eventId, emails: body.emails }, t.kind);
 
     // A once-only template is enforced here, not by the sender remembering. Silently
     // dropping already-sent recipients is deliberate — the count in the reply tells the
@@ -307,8 +321,10 @@ export default async function handler(req) {
       );
     }
 
-    // Day-pass thank-yous clear their own to-do item.
-    if (body.markVisitIds?.length) {
+    // Day-pass thank-yous clear their own to-do item — but ONLY if something was actually
+    // sent. Stamping on a failed send made the visitor vanish from the queue having never
+    // been thanked, unrecoverable without editing Airtable by hand.
+    if (body.markVisitIds?.length && result.sent > 0) {
       await Promise.allSettled(
         body.markVisitIds.map(async (id) => {
           const [row] = await listRecords(T.checkins, { filterByFormula: `RECORD_ID()='${esc(id)}'`, maxRecords: 1 });

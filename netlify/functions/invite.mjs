@@ -10,23 +10,42 @@
  * GET  ?token=…                           → what the friend's page needs to render
  * POST {action:'accept', token, name}     → the friend is coming; tell the member who asked
  *
- * The invite token carries the event and the inviter, encoded rather than signed. The worst
- * a forged one can do is add a name to a guest list for a free event — the same thing the
- * link is for. Weighing a signature against that is the wrong trade.
+ * The invite token is SIGNED. An earlier version wasn't, on the reasoning that the worst a
+ * forged token could do was add a name to a guest list. That reasoning was wrong: `accept`
+ * also emails the inviter, and the inviter's address came out of the token — so anyone
+ * could mint a token naming any victim and make our DMARC-passing domain deliver mail to
+ * them, with attacker-chosen text in the subject, at any rate they liked. Signing closes
+ * it; the subject no longer interpolates guest input either.
  */
 import { verifyMember, memberEmail, memberName, tokenFromRequest } from './_member.mjs';
 import { listRecords, listAllRecords, createRecord, updateRecord, T, F, airtableReady, esc } from './_airtable.mjs';
 import { sendEmail, emailShell, escapeHtml, fmtDateLong, OPS_EMAIL, SITE_URL } from './_email.mjs';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 
 const json = (b, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { 'content-type': 'application/json' } });
 const lower = (s) => String(s || '').trim().toLowerCase();
 
 const RSVP = { event: 'Event', email: 'Member email', name: 'Name', status: 'Status' };
 
-const encode = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
+/* HMAC-signed. Falls back to the Memberstack secret so there is no new env var to forget —
+   any long-lived server secret works, it only needs to be stable and not public. */
+const SIGNING_SECRET = process.env.INVITE_SECRET || process.env.MEMBERSTACK_SECRET_KEY || '';
+
+const sign = (payload) => createHmac('sha256', SIGNING_SECRET).update(payload).digest('base64url').slice(0, 32);
+
+const encode = (o) => {
+  const payload = Buffer.from(JSON.stringify(o)).toString('base64url');
+  return `${payload}.${sign(payload)}`;
+};
+
 const decode = (t) => {
   try {
-    return JSON.parse(Buffer.from(String(t || ''), 'base64url').toString('utf8'));
+    const [payload, mac] = String(t || '').split('.');
+    if (!payload || !mac || !SIGNING_SECRET) return null;
+    const expected = sign(payload);
+    // Constant-time, and length-checked first because timingSafeEqual throws on a mismatch.
+    if (mac.length !== expected.length || !timingSafeEqual(Buffer.from(mac), Buffer.from(expected))) return null;
+    return JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
   } catch {
     return null;
   }
@@ -112,7 +131,7 @@ export default async function handler(req) {
     if (!ev || !ev.published) return json({ error: 'not-found' }, 404);
 
     const guestEmail = lower(body.email);
-    const guestName = String(body.name || '').trim();
+    const guestName = String(body.name || '').trim().slice(0, 80);
     if (!guestEmail.includes('@') || !guestName) return json({ error: 'missing-details' }, 400);
 
     // Same table as a member RSVP so the guest simply appears on the list. The inviter is
@@ -132,7 +151,9 @@ export default async function handler(req) {
     if (data.m) {
       await sendEmail({
         to: data.m,
-        subject: `${guestName} is coming to ${ev.title}`,
+        // Guest-supplied text stays out of the subject — it is the part a recipient sees
+        // before deciding anything, and it is not ours to let a stranger write.
+        subject: `Your guest is coming to ${ev.title}`,
         replyTo: OPS_EMAIL,
         html: emailShell(
           'Your guest is coming',

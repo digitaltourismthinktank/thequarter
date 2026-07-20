@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { unsubLookup, unsubSet } from '@/lib/booking';
-import styles from './InviteClient.module.css';
+import styles from './EventInviteClient.module.css';
 
 /**
  * /unsubscribe?t=… — one tap, no login.
@@ -13,7 +13,7 @@ import styles from './InviteClient.module.css';
  * or membership email — the commonest fear is losing something they actually need.
  */
 export function UnsubscribeClient() {
-  const [state, setState] = useState<'loading' | 'ready' | 'done' | 'resubscribed' | 'bad'>('loading');
+  const [state, setState] = useState<'loading' | 'ready' | 'done' | 'resubscribed' | 'manual' | 'bad'>('loading');
   const [email, setEmail] = useState('');
   const [token, setToken] = useState('');
 
@@ -34,7 +34,11 @@ export function UnsubscribeClient() {
 
   async function set(resubscribe: boolean) {
     const r = await unsubSet(token, resubscribe);
-    if (r.ok) setState(resubscribe ? 'resubscribed' : 'done');
+    // The endpoint answers 200 with ok:false when there is no member record to store the
+    // objection against. Telling someone they are unsubscribed when they are not is worse
+    // than admitting we have to do it by hand.
+    if (r.ok && r.data?.ok !== false) setState(resubscribe ? 'resubscribed' : 'done');
+    else setState('manual');
   }
 
   if (state === 'loading') return <main className={styles.wrap}><p className={styles.meta}>One moment…</p></main>;
@@ -55,7 +59,16 @@ export function UnsubscribeClient() {
   return (
     <main className={styles.wrap}>
       <div className={styles.card}>
-        {state === 'done' ? (
+        {state === 'manual' ? (
+          <>
+            <h1 className={styles.h1}>We&rsquo;ll take you off by hand</h1>
+            <p className={styles.meta}>
+              We couldn&rsquo;t do it automatically for <strong>{email}</strong> — that address doesn&rsquo;t have an
+              account with us. Email <a href="mailto:info@thequarter.work">info@thequarter.work</a> and we&rsquo;ll
+              remove you today. We&rsquo;re sorry to make you ask twice.
+            </p>
+          </>
+        ) : state === 'done' ? (
           <>
             <h1 className={styles.h1}>Done — no more of those</h1>
             <p className={styles.meta}>
