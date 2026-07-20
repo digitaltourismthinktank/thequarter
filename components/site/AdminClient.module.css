@@ -1584,3 +1584,22 @@ select.input {
     padding: 18px;
   }
 }
+
+/* A booked tour in the who's-in pane — deliberately distinct from members and day guests,
+   since it's a visitor the team needs to greet at a specific time. */
+.whoTour {
+  background: var(--sand-50);
+  border: 1px dashed var(--gold-500);
+}
+.whoTourTag {
+  flex: none;
+  font-size: var(--text-2xs);
+  font-weight: var(--fw-bold);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  color: var(--gold-700);
+  background: var(--gold-100);
+  border-radius: var(--radius-pill);
+  padding: 2px 8px;
+  white-space: nowrap;
+}

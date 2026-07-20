@@ -1897,6 +1897,10 @@ function AdminTodayPane({ onAllBirthdays }: { onAllBirthdays: () => void }) {
     await loadToday();
   }
 
+  // Tours are Kind='Tour' bookings rather than check-ins, so they never reached the who's-in
+  // pane and a booked tour was easy to overlook entirely.
+  const tours = bookings.filter((b) => b.kind === 'Tour').sort((a, b) => a.startMin - b.startMin);
+
   const dObj = date ? new Date(`${date}T12:00:00`) : new Date();
   const b = busyness(dObj);
   // The live headcount roll only means anything for the actual current day.
@@ -1971,7 +1975,7 @@ function AdminTodayPane({ onAllBirthdays }: { onAllBirthdays: () => void }) {
               {checkins.some((c) => c.dayPass) ? ` · ${checkins.filter((c) => c.dayPass).length} day pass` : ''}
               {isLiveToday && roll.guests.length ? ` · ${roll.guests.length} guest${roll.guests.length === 1 ? '' : 's'}` : ''}
             </span>
-            {checkins.length ? (
+            {checkins.length || tours.length ? (
               <div className={styles.whoWrap}>
                 {checkins.map((c, i) => (
                   <span
@@ -2000,6 +2004,15 @@ function AdminTodayPane({ onAllBirthdays }: { onAllBirthdays: () => void }) {
                         ✕
                       </button>
                     ) : null}
+                  </span>
+                ))}
+                {/* Tours are Kind='Tour' bookings, not check-ins, so they never appeared in
+                    this pane — a booked tour was easy to miss entirely. Shown here with the
+                    visitor's name and time, styled apart from members and day guests. */}
+                {tours.map((t) => (
+                  <span key={t.id} className={`${styles.who} ${styles.whoTour}`} title={`Tour · ${minToHHMM(t.startMin)}–${minToHHMM(t.endMin)}`}>
+                    <span className={styles.whoName}>{t.name || 'Tour visitor'}</span>
+                    <span className={styles.whoTourTag}>Tour · {minToHHMM(t.startMin)}</span>
                   </span>
                 ))}
               </div>

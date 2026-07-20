@@ -45,6 +45,9 @@ export function CheckInCard({ className }: { className?: string }) {
   const [pending, setPending] = useState<string[]>([]); // optimistic reservations in flight
   const [note, setNote] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState<{ points: number; already: boolean } | null>(null);
+  // Planning a future day is useful but secondary — on a phone the tab bar's check-in
+  // sheet handles today, so this folds away behind a toggle rather than filling Home.
+  const [planOpen, setPlanOpen] = useState(false);
 
   async function refresh() {
     const r = await getCheckinToday();
@@ -172,7 +175,10 @@ export function CheckInCard({ className }: { className?: string }) {
           ) : null}
 
           {/* Plan-ahead stays available even once you're checked in today. */}
-          <div className={styles.planAhead}>
+          <button type="button" className={styles.planToggle} onClick={() => setPlanOpen((v) => !v)} aria-expanded={planOpen}>
+            {planOpen ? 'Hide other days' : 'Book another day'}
+          </button>
+          <div className={cn(styles.planAhead, planOpen && styles.planAheadOpen)}>
             <WeekStrip label={status?.checkedIn ? 'Book another day' : 'Book for the coming week'} onSelect={doReserveDate} booked={[...plannedDates, ...pending]} />
             <button type="button" className={styles.dateBtn} onClick={() => setPickerOpen(true)}>
               + Pick a date

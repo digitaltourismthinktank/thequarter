@@ -253,3 +253,38 @@
   color: var(--text-muted);
   padding: 0 2px;
 }
+
+/* Desktop keeps the plan-ahead strip open; the toggle is a phone affordance only. */
+.planToggle {
+  display: none;
+}
+.planAheadOpen {
+  display: flex;
+}
+@media (max-width: 600px) {
+  .planToggle {
+    display: inline-flex;
+    align-self: flex-start;
+    margin-top: 14px;
+    padding: 8px 16px;
+    border: 1px dashed var(--sand-300);
+    border-radius: var(--radius-pill);
+    background: var(--sand-50);
+    color: var(--gold-700);
+    font: inherit;
+    font-size: var(--text-sm);
+    font-weight: var(--fw-semibold);
+    cursor: pointer;
+  }
+  .planAhead {
+    display: none;
+  }
+}
+
+/* Must come after the ≤600px `.planAhead { display: none }` above: same specificity, so the
+   later rule wins and the toggle would otherwise never reveal anything. */
+@media (max-width: 600px) {
+  .planAheadOpen {
+    display: flex;
+  }
+}

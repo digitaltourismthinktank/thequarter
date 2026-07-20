@@ -229,8 +229,13 @@ export function BookingClient() {
 
   const open = avail?.openMin ?? 8 * 60;
   const close = avail?.closeMin ?? 18 * 60;
+  // Times that have already passed are noise you have to read past — on today, start the
+  // grid at the next bookable slot. Other days are unaffected.
+  const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
+  const isToday = date === toISO(new Date());
+  const firstSlot = isToday ? Math.ceil(nowMinutes / SLOT) * SLOT : open;
   const slots: number[] = [];
-  for (let s = open; s < close; s += SLOT) slots.push(s);
+  for (let s = Math.max(open, firstSlot); s < close; s += SLOT) slots.push(s);
   const spaceName = (id: string | null) => spaces.find((x) => x.id === id)?.name ?? 'Room';
 
   const hint = sel
@@ -254,7 +259,7 @@ export function BookingClient() {
     <div>
       <div className={styles.head}>
         <h1 className={styles.title}>Book a room or pod</h1>
-        <a className={styles.back} href="/dashboard">
+        <a className={`${styles.back} ${styles.backDesktop}`} href="/dashboard">
           ← Dashboard
         </a>
       </div>

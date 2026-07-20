@@ -330,3 +330,19 @@
   font-size: var(--text-sm);
   color: var(--danger);
 }
+
+/* Phones: the tab bar is the way back, so the "← Dashboard" link is redundant chrome; and
+   the room chips read as a uniform grid rather than a ragged wrapped row. */
+@media (max-width: 600px) {
+  .backDesktop {
+    display: none;
+  }
+  .spaces {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .space {
+    min-width: 0;
+  }
+}
