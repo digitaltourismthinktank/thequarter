@@ -429,3 +429,42 @@
 .fsBtn:focus-visible {
   opacity: 1;
 }
+
+/* Each room's day laid out 08:00–18:00, so a passer-by can read how it's filling up
+   without decoding times. Booked stretches in gold, a marker for now. */
+.dayLine {
+  margin-top: auto;
+  padding-top: clamp(8px, 1vh, 14px);
+}
+.dayTrack {
+  position: relative;
+  height: clamp(8px, 1.1vh, 14px);
+  border-radius: var(--radius-pill);
+  background: var(--sand-200);
+  overflow: hidden;
+}
+.daySeg {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--gold-500);
+  border-radius: var(--radius-pill);
+}
+.daySegBlock {
+  background: var(--stone-600);
+}
+.dayNow {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  background: var(--ink-900);
+}
+.dayScale {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 3px;
+  font-size: clamp(9px, 0.8vw, 12px);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}

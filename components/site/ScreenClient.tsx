@@ -35,6 +35,40 @@ function statusFor(space: ScreenSpace, bookings: ScreenBooking[], nowMin: number
   return { busy: false, text: next ? `${free} · next ${minToHHMM(next.startMin)}` : free };
 }
 
+/** The business day the timeline spans (08:00–18:00), matching the booking window. */
+const DAY_START = 8 * 60;
+const DAY_END = 18 * 60;
+const DAY_SPAN = DAY_END - DAY_START;
+const pct = (min: number) => ((Math.max(DAY_START, Math.min(DAY_END, min)) - DAY_START) / DAY_SPAN) * 100;
+
+/**
+ * A room's day at a glance: booked stretches laid across 08:00–18:00, with a marker for
+ * now. Lets anyone walking past read how the room is filling up without parsing times.
+ */
+function DayLine({ space, bookings, nowMin }: { space: ScreenSpace; bookings: ScreenBooking[]; nowMin: number }) {
+  const mine = bookings.filter((b) => b.space === space.id && b.endMin > DAY_START && b.startMin < DAY_END);
+  const nowIn = nowMin >= DAY_START && nowMin <= DAY_END;
+  return (
+    <div className={styles.dayLine} aria-hidden="true">
+      <div className={styles.dayTrack}>
+        {mine.map((b, i) => (
+          <span
+            key={`${b.startMin}-${i}`}
+            className={`${styles.daySeg} ${b.kind === 'Block' ? styles.daySegBlock : ''}`}
+            style={{ left: `${pct(b.startMin)}%`, width: `${Math.max(2, pct(b.endMin) - pct(b.startMin))}%` }}
+          />
+        ))}
+        {nowIn ? <span className={styles.dayNow} style={{ left: `${pct(nowMin)}%` }} /> : null}
+      </div>
+      <div className={styles.dayScale}>
+        <span>08</span>
+        <span>13</span>
+        <span>18</span>
+      </div>
+    </div>
+  );
+}
+
 function eventWhen(start: string): string {
   return new Date(start).toLocaleString('en-GB', {
     timeZone: 'Europe/London',
@@ -354,6 +388,7 @@ function EntranceScreen() {
                       {s.type === 'Phone pod' ? 'Phone pod' : `Meeting room${s.capacityLabel ? ` · up to ${s.capacityLabel}` : ''}`}
                     </span>
                     <span className={`${styles.spaceStatus} ${st.busy ? styles.statusBusy : styles.statusFree}`}>{st.text}</span>
+                    <DayLine space={s} bookings={bookings} nowMin={nowMin} />
                   </div>
                 );
               })}
