@@ -1,0 +1,140 @@
+.muted { color: var(--text-muted); font-size: var(--text-sm); margin: 6px 0 0; }
+.panel {
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 18px 20px;
+  margin-bottom: 16px;
+}
+.panelTitle {
+  display: block;
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  font-weight: var(--fw-bold);
+  color: var(--gold-700);
+  margin-bottom: 12px;
+}
+.note {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+  margin-bottom: 14px;
+  border: 1px solid var(--gold-400);
+  border-radius: var(--radius-lg);
+  background: var(--gold-100);
+  font-size: var(--text-sm);
+  color: var(--ink-900);
+}
+.note button { margin-left: auto; border: none; background: none; font-size: var(--text-md); cursor: pointer; color: var(--text-muted); }
+
+/* A to-do row: who, why, and the decisions. Always includes a way to let it go — an item
+   you can only complete by acting is a guilt generator, not a queue. */
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 0;
+  border-top: 1px solid var(--border-subtle);
+}
+.row:first-of-type { border-top: none; }
+.rowText { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 200px; }
+.rowText strong { font-size: var(--text-sm); color: var(--ink-900); }
+.rowText span { font-size: var(--text-xs); color: var(--text-muted); }
+.rowActions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+.primary, .ghost {
+  padding: 10px 15px;
+  min-height: 44px;
+  border-radius: var(--radius-pill);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+}
+.primary { border: none; background: var(--ink-900); color: var(--sand-50); }
+.ghost { border: 1px solid var(--border-subtle); background: var(--surface-card); color: var(--ink-900); }
+.ghost:hover { border-color: var(--gold-400); }
+.primary:disabled, .ghost:disabled { opacity: 0.55; cursor: default; }
+.x {
+  border: none; background: none; cursor: pointer;
+  font-size: var(--text-lg); line-height: 1; color: var(--text-muted);
+  min-width: 44px; min-height: 44px;
+}
+.x:hover { color: var(--ink-900); }
+
+/* Templates as cards, not a dropdown — what we say to members deserves to be readable
+   before it is chosen. */
+.templates { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; margin-bottom: 16px; }
+.tpl {
+  display: flex; flex-direction: column; gap: 3px; align-items: flex-start; text-align: left;
+  padding: 13px 15px; min-height: 44px;
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
+  background: var(--surface-card); font: inherit; cursor: pointer;
+}
+.tpl:hover { border-color: var(--gold-400); }
+.tplOn, .tplOn:hover { border-color: var(--gold-500); background: var(--gold-100); }
+.tpl strong { font-size: var(--text-sm); color: var(--ink-900); }
+.tpl span { font-size: var(--text-xs); color: var(--text-muted); line-height: 1.4; }
+.badge, .badgeQuiet {
+  margin-top: 4px; font-style: normal;
+  font-size: 10px; text-transform: uppercase; letter-spacing: var(--tracking-caps);
+  font-weight: var(--fw-bold); border-radius: var(--radius-pill); padding: 2px 8px;
+}
+.badge { background: var(--gold-500); color: var(--ink-900); }
+.badgeQuiet { background: var(--sand-100); color: var(--text-muted); }
+
+.field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
+.field span {
+  font-size: var(--text-2xs); text-transform: uppercase; letter-spacing: var(--tracking-caps);
+  font-weight: var(--fw-semibold); color: var(--text-muted);
+}
+.input, .textarea {
+  padding: 11px 13px; min-height: 44px;
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+  background: var(--surface-card); font: inherit; font-size: var(--text-sm); color: var(--ink-900);
+}
+.textarea { min-height: 110px; resize: vertical; line-height: var(--leading-normal); }
+.actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.chip {
+  padding: 9px 14px; min-height: 44px;
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-pill);
+  background: var(--sand-100); font: inherit; font-size: var(--text-sm); cursor: pointer;
+}
+.chip:hover { border-color: var(--gold-500); }
+
+/* Preview + confirm */
+.overlay {
+  position: fixed; inset: 0; z-index: 1400;
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+  background: rgba(30, 26, 21, 0.5); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+}
+.modal {
+  width: 100%; max-width: 620px; max-height: calc(100dvh - 60px);
+  display: flex; flex-direction: column; overflow: hidden;
+  background: var(--surface-card); border-radius: var(--radius-xl); box-shadow: var(--shadow-card-hover);
+}
+.modalHead {
+  display: flex; align-items: center; gap: 10px;
+  padding: 14px 18px; border-bottom: 1px solid var(--border-subtle);
+}
+.modalHead strong { font-size: var(--text-sm); flex: 1; min-width: 0; }
+.frame { border: none; width: 100%; height: 70vh; background: #f6f1e7; }
+
+.confirmBody { padding: 26px 24px; text-align: center; }
+.warnIcon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 52px; height: 52px; border-radius: 50%; background: var(--gold-500); margin-bottom: 12px;
+}
+.confirmTitle { font-size: var(--text-lg); font-weight: var(--fw-bold); margin: 0 0 6px; }
+.sample {
+  margin: 12px 0 0; padding: 10px 12px;
+  background: var(--sand-100); border-radius: var(--radius-md);
+  font-size: var(--text-xs); color: var(--text-muted); overflow-wrap: anywhere;
+}
+.confirmBody .actions { justify-content: center; margin-top: 18px; }

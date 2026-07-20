@@ -212,6 +212,41 @@ export async function listRecords(tableId, { filterByFormula, fields, sort, maxR
   return json.records || [];
 }
 
+/**
+ * Every matching record, following Airtable's pagination.
+ *
+ * listRecords above deliberately does not: it asks once and returns whatever came back.
+ * Airtable caps a page at 100 records and hands you an `offset` to continue with, so any
+ * query matching more than 100 rows quietly returns the first 100 and no error. That is
+ * fine for the small, bounded queries it was written for (one day's bookings, the spaces
+ * list) and dangerous for anything unbounded — an audience of "everyone who bought a day
+ * pass in the last year" would silently leave people out of a mailing.
+ *
+ * Use this whenever the result set has no natural ceiling. The page cap is a backstop
+ * against a runaway query, not a limit anyone should hit.
+ */
+export async function listAllRecords(tableId, opts = {}, maxPages = 25) {
+  const out = [];
+  let offset;
+  for (let i = 0; i < maxPages; i += 1) {
+    const url = new URL(`${API}/${BASE}/${tableId}`);
+    if (!opts.byName) url.searchParams.set('returnFieldsByFieldId', 'true');
+    if (opts.filterByFormula) url.searchParams.set('filterByFormula', opts.filterByFormula);
+    (opts.fields || []).forEach((f) => url.searchParams.append('fields[]', f));
+    (opts.sort || []).forEach((sr, si) => {
+      url.searchParams.append(`sort[${si}][field]`, sr.field);
+      url.searchParams.append(`sort[${si}][direction]`, sr.direction || 'asc');
+    });
+    if (offset) url.searchParams.set('offset', offset);
+    const json = await req(url.toString());
+    out.push(...(json.records || []));
+    offset = json.offset;
+    if (!offset) return out;
+  }
+  console.warn('[airtable] listAllRecords hit the page cap on', tableId, '— result may be truncated');
+  return out;
+}
+
 export async function createRecord(tableId, fields, opts = {}) {
   const body = opts.typecast ? { fields, typecast: true } : { fields };
   return req(`${API}/${BASE}/${tableId}`, { method: 'POST', body: JSON.stringify(body) });

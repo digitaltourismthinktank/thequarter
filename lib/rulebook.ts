@@ -239,6 +239,83 @@ export const RULE_SECTIONS: RuleSection[] = [
     ],
   },
   {
+    title: 'Emails the team sends by hand',
+    blurb: 'Admin → Comms. Everything here is chosen by a person; nothing sends itself.',
+    rows: [
+      {
+        trigger: 'Thank a day-pass visitor',
+        source: 'comms.mjs · thanks-review / thanks-only',
+        member: 'Thanks them for the day, and either asks for a Google review or does not',
+        records: 'Stamps the Check-ins row so the to-do list stops asking',
+        notes:
+          'Two versions on purpose: send the plain thank-you when the day was less than perfect, so we never ask for a review we would regret. Dismissing the row also stamps it — an item you can only clear by acting becomes a guilt list.',
+      },
+      {
+        trigger: 'Welcome a new member',
+        source: 'comms.mjs · welcome',
+        member: 'Door, hours, kitchen, etiquette',
+        records: 'commsSent.welcome on their Memberstack record',
+        notes: 'Once only, enforced server-side. Operational, so it reaches people who have unsubscribed.',
+      },
+      {
+        trigger: 'Introduce Quarter Rewards',
+        source: 'comms.mjs · rewards-intro',
+        member: 'How earning, spending and levels work',
+        records: 'commsSent.rewards-intro',
+        notes: 'Once only. Appears in the to-do list once they have had the welcome.',
+      },
+      {
+        trigger: 'Invite a group to an event',
+        source: 'comms.mjs · event-invite',
+        member: 'The event, and that food and drinks are on us',
+        notes: 'Marketing — carries an unsubscribe link and skips anyone who has opted out.',
+      },
+      {
+        trigger: 'Remind people who are coming',
+        source: 'comms.mjs · event-reminder',
+        member: 'Time, place, and a nudge to tell us if plans changed',
+        notes: 'Operational — they already said yes, so opt-outs still receive it.',
+      },
+      { trigger: 'Write something one-off', source: 'comms.mjs · custom', member: 'Whatever you type, in the house style' },
+      {
+        trigger: 'Any group send',
+        source: 'comms.mjs · send',
+        notes:
+          'Always asks the server who it would reach and shows the count before sending. Recipients are resolved server-side, so a stale tab cannot mail the wrong list. Sent one message per person via Resend batch — never a shared To header.',
+      },
+      {
+        trigger: 'Someone unsubscribes',
+        source: 'unsubscribe.mjs',
+        records: 'emailOptOut on their Memberstack record',
+        notes: 'Only stops marketing. Bookings, membership and events they said yes to still arrive.',
+      },
+      {
+        trigger: 'Push to whoever is in today',
+        source: 'comms.mjs · push',
+        push: 'Everyone checked in today, or one named person',
+        notes: 'For "there is cake in the Pantry", or a quiet word about locking up. Goes only to people who enabled notifications.',
+      },
+    ],
+  },
+  {
+    title: 'Friends of members',
+    rows: [
+      {
+        trigger: 'Member invites a friend to an event',
+        source: 'invite.mjs · invite',
+        member: 'The friend gets the event and a one-tap RSVP link',
+        notes: 'No account needed. The link carries the event and who invited them.',
+      },
+      {
+        trigger: 'The friend accepts',
+        source: 'invite.mjs · accept',
+        member: 'The member who invited them is told their friend is coming',
+        ops: 'Guest RSVP, so the kitchen caters properly',
+        records: 'An RSVP row named "Name (guest of Member)" — so the admin list shows who vouched for whom',
+      },
+    ],
+  },
+  {
     title: 'On a schedule',
     rows: [
       { trigger: 'Daily — renewals and rollover', source: 'renew-cron.mjs', notes: 'Runs @daily. Resets allowances that Stripe did not, and applies rollover.' },

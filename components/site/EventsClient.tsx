@@ -5,6 +5,7 @@ import { Icon } from '@/components/ds/Icon';
 import { MemberShell } from './MemberShell';
 import { useMember } from './useMember';
 import { getPublishedEvents, getMyRsvps, rsvpEvent, type QuarterEvent, type RsvpStatus } from '@/lib/booking';
+import { InviteFriend } from './InviteFriend';
 import styles from './EventsClient.module.css';
 
 function fmtWhen(start: string, end: string | null): string {
@@ -65,6 +66,9 @@ function EventRow({
             )}
           </div>
         ) : null}
+        {/* Offered once they're coming: the moment you decide to go is the moment you
+            think of who else would enjoy it. */}
+        {!past && going ? <InviteFriend eventId={e.id} /> : null}
       </div>
     </article>
   );

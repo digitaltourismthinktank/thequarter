@@ -66,6 +66,65 @@ export async function sendEmail({ to, subject, html, replyTo }) {
   }
 }
 
+/**
+ * Send many DIFFERENT emails in one request (Resend's batch endpoint, max 100 per call).
+ *
+ * Not the same thing as passing an array to sendEmail: that puts every address in a single
+ * To header, so all 80 members would see each other's email. Every entry here is its own
+ * message with its own single recipient — the only safe way to mail a group.
+ *
+ * Also the only practical way inside a Netlify function: 80 sequential sends would be 80
+ * round-trips against a 10-second budget. This is one request per 100.
+ *
+ * @param {{to: string, subject: string, html: string, replyTo?: string}[]} messages
+ * @returns {Promise<{ok: boolean, sent: number, failed: number, errors: string[]}>}
+ */
+export async function sendBatch(messages) {
+  const list = (messages || []).filter((m) => m && m.to && m.subject && m.html);
+  if (!list.length) return { ok: true, sent: 0, failed: 0, errors: [] };
+  if (!RESEND_API_KEY) {
+    console.warn('[email] RESEND_API_KEY unset — skipping batch of', list.length);
+    return { ok: false, sent: 0, failed: list.length, errors: ['not-configured'] };
+  }
+
+  let sent = 0;
+  let failed = 0;
+  const errors = [];
+  // Resend caps a batch at 100. Chunking keeps one oversized audience from being rejected
+  // wholesale — and a failed chunk doesn't lose the ones that already went.
+  for (let i = 0; i < list.length; i += 100) {
+    const chunk = list.slice(i, i + 100);
+    try {
+      const res = await fetch('https://api.resend.com/emails/batch', {
+        method: 'POST',
+        headers: { authorization: `Bearer ${RESEND_API_KEY}`, 'content-type': 'application/json' },
+        body: JSON.stringify(
+          chunk.map((m) => ({
+            from: FROM,
+            to: [m.to],
+            subject: m.subject,
+            html: m.html,
+            reply_to: m.replyTo || OPS_EMAIL,
+          })),
+        ),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        sent += chunk.length;
+      } else {
+        failed += chunk.length;
+        const detail = `${res.status} ${JSON.stringify(data)}`;
+        errors.push(detail);
+        console.error('[email] Resend rejected batch', detail, 'from', FROM);
+      }
+    } catch (err) {
+      failed += chunk.length;
+      errors.push(String(err?.message || err));
+    }
+  }
+  return { ok: failed === 0, sent, failed, errors };
+}
+
 const esc = (s) =>
   String(s ?? '')
     .replace(/&/g, '&amp;')

@@ -79,6 +79,7 @@ import {
 } from '@/lib/booking';
 import { isAdminEmail } from '@/lib/admin';
 import { unlockSound } from '@/lib/feedback';
+import { CommsPane } from './CommsPane';
 import { useAlertChime } from './useAlertChime';
 import styles from './AdminClient.module.css';
 
@@ -171,7 +172,7 @@ function daysToBirthday(bday: string | null): number | null {
   return Math.round((next.getTime() - today.getTime()) / 86400000);
 }
 
-const ADMIN_TABS = ['today', 'members', 'rooms', 'events', 'content', 'partners', 'birthdays', 'screens'] as const;
+const ADMIN_TABS = ['today', 'members', 'comms', 'rooms', 'events', 'content', 'partners', 'birthdays', 'screens'] as const;
 type AdminTab = (typeof ADMIN_TABS)[number];
 const tabFromHash = (): AdminTab => {
   if (typeof window === 'undefined') return 'today';
@@ -240,6 +241,9 @@ export function AdminClient() {
         <button type="button" className={`${styles.tab} ${tab === 'members' ? styles.tabOn : ''}`} onClick={() => setTab('members')}>
           Members
         </button>
+        <button type="button" className={`${styles.tab} ${tab === 'comms' ? styles.tabOn : ''}`} onClick={() => setTab('comms')}>
+          Comms
+        </button>
         <button type="button" className={`${styles.tab} ${tab === 'rooms' ? styles.tabOn : ''}`} onClick={() => setTab('rooms')}>
           Rooms &amp; bookings
         </button>
@@ -264,6 +268,8 @@ export function AdminClient() {
         <AdminTodayPane onAllBirthdays={() => setTab('birthdays')} />
       ) : tab === 'members' ? (
         <MembersPane />
+      ) : tab === 'comms' ? (
+        <CommsPane />
       ) : tab === 'rooms' ? (
         <RoomsPane />
       ) : tab === 'events' ? (

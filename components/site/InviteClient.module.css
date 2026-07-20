@@ -1,0 +1,119 @@
+/* A guest's first sight of The Quarter. One card, no navigation, nothing to explore —
+   they are deciding whether to come to a thing, not browsing a website. */
+.wrap {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--surface-page);
+}
+.card {
+  width: 100%;
+  max-width: 460px;
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-card);
+  padding: 30px 28px;
+}
+.eyebrow {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  color: var(--gold-700);
+  font-weight: var(--fw-semibold);
+}
+.h1 {
+  font-size: var(--text-xl);
+  font-weight: var(--fw-bold);
+  letter-spacing: -0.02em;
+  line-height: var(--leading-tight);
+  margin: 8px 0 14px;
+  text-wrap: balance;
+}
+.meta {
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  color: var(--text-muted);
+  margin: 0 0 14px;
+}
+.event {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 16px 18px;
+  margin: 0 0 16px;
+  border-radius: var(--radius-lg);
+  background: var(--sand-100);
+}
+.event strong {
+  font-size: var(--text-md);
+  color: var(--ink-900);
+}
+.event span {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 12px;
+}
+.field span {
+  font-size: var(--text-2xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  font-weight: var(--fw-semibold);
+  color: var(--text-muted);
+}
+.input {
+  padding: 12px 14px;
+  min-height: 44px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+  font: inherit;
+  font-size: var(--text-base);
+  color: var(--ink-900);
+}
+.cta {
+  width: 100%;
+  margin-top: 6px;
+  padding: 14px;
+  min-height: 44px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--ink-900);
+  color: var(--sand-50);
+  font: inherit;
+  font-size: var(--text-base);
+  font-weight: var(--fw-bold);
+  cursor: pointer;
+}
+.cta:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.fine {
+  margin: 14px 0 0;
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+  color: var(--text-muted);
+}
+.err {
+  margin: 0 0 10px;
+  font-size: var(--text-sm);
+  color: var(--danger);
+}
+.tick {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--gold-500);
+  margin-bottom: 14px;
+}

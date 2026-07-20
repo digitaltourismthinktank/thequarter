@@ -887,3 +887,62 @@ export const switchPlan = (priceId: string) =>
   call<{ ok: boolean }>('plan-change', { method: 'POST', body: { action: 'switch', priceId } });
 export const pausePlan = () => call<{ ok: boolean; paused: boolean }>('plan-change', { method: 'POST', body: { action: 'pause' } });
 export const resumePlan = () => call<{ ok: boolean; paused: boolean }>('plan-change', { method: 'POST', body: { action: 'resume' } });
+
+
+// ---- Comms (admin) --------------------------------------------------------------
+export interface CommsTodoThank { kind: 'thank'; id: string; email: string; name: string | null; date: string }
+export interface CommsTodoMember { kind: string; id: string; email: string; name: string | null; plan?: string | null }
+export interface CommsTemplate { id: string; name: string; blurb: string; kind: 'marketing' | 'operational'; audience: string; once: boolean }
+export interface CommsAudience { id: string; label: string; hint?: string; count: number | null }
+export interface CommsEvent { id: string; title: string; start: string | null; location: string; blurb: string }
+export interface CommsIndex {
+  templates: CommsTemplate[];
+  events: CommsEvent[];
+  audiences: CommsAudience[];
+  todo: { thank: CommsTodoThank[]; welcome: CommsTodoMember[]; rewards: CommsTodoMember[] };
+  optedOut: number;
+  checkedInToday: { email: string; name: string | null }[];
+}
+
+export const commsIndex = () => call<CommsIndex>('comms');
+export const commsPreview = (b: { templateId: string; eventId?: string; subject?: string; message?: string; visitDate?: string }) =>
+  call<{ ok: boolean; subject: string; html: string }>('comms', { method: 'POST', body: { action: 'preview', ...b } });
+export const commsTest = (b: { templateId: string; eventId?: string; subject?: string; message?: string }) =>
+  call<{ ok: boolean; sentTo: string }>('comms', { method: 'POST', body: { action: 'test', ...b } });
+/** dryRun answers "who exactly gets this?" without sending — always call it before send. */
+export const commsSend = (b: {
+  templateId: string;
+  audience?: string;
+  eventId?: string;
+  emails?: string[];
+  name?: string;
+  subject?: string;
+  message?: string;
+  visitDate?: string;
+  markVisitIds?: string[];
+  dryRun?: boolean;
+}) =>
+  call<{ ok: boolean; sent?: number; failed?: number; count?: number; dryRun?: boolean; sample?: string[]; skippedAlreadySent?: number; note?: string }>(
+    'comms',
+    { method: 'POST', body: { action: 'send', ...b } },
+  );
+export const commsDismiss = (b: { visitId?: string; memberId?: string; templateId?: string }) =>
+  call<{ ok: boolean }>('comms', { method: 'POST', body: { action: 'dismiss', ...b } });
+export const commsPush = (b: { title: string; message: string; email?: string }) =>
+  call<{ ok: boolean; sent: number; note?: string }>('comms', { method: 'POST', body: { action: 'push', ...b } });
+
+// ---- Friend invites (event guests) -----------------------------------------------
+export const inviteFriend = (eventId: string, email: string) =>
+  call<{ ok: boolean; invited: string }>('invite', { method: 'POST', body: { action: 'invite', eventId, email } });
+export const inviteLookup = (token: string) =>
+  call<{ ok: boolean; event: CommsEvent & { end: string | null; description: string }; invitedBy: string }>(
+    `invite?token=${encodeURIComponent(token)}`,
+    { auth: false },
+  );
+export const inviteAccept = (token: string, name: string, email: string) =>
+  call<{ ok: boolean }>('invite', { method: 'POST', auth: false, body: { action: 'accept', token, name, email } });
+
+// ---- Unsubscribe (public) ---------------------------------------------------------
+export const unsubLookup = (t: string) => call<{ ok: boolean; email: string }>(`unsubscribe?t=${encodeURIComponent(t)}`, { auth: false });
+export const unsubSet = (t: string, resubscribe = false) =>
+  call<{ ok: boolean; email: string; optOut?: boolean }>('unsubscribe', { method: 'POST', auth: false, body: { t, resubscribe } });
