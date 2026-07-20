@@ -35,6 +35,33 @@ function statusFor(space: ScreenSpace, bookings: ScreenBooking[], nowMin: number
   return { busy: false, text: next ? `${free} · next ${minToHHMM(next.startMin)}` : free };
 }
 
+/** Mirrors the floor screens: a room is "hot" while in use, or with a booking due within
+ *  30 minutes, so the entrance display and the door screens agree at a glance. */
+const SOON_MIN = 30;
+
+interface RoomView {
+  hot: boolean;
+  text: string;
+  schedule: ScreenBooking[];
+}
+
+function roomView(space: ScreenSpace, bookings: ScreenBooking[], nowMin: number): RoomView {
+  const mine = bookings.filter((b) => b.space === space.id);
+  const schedule = mine.filter((b) => b.endMin > nowMin).sort((a, b) => a.startMin - b.startMin);
+  const current = mine.find((b) => b.startMin <= nowMin && nowMin < b.endMin) || null;
+  const next = mine.filter((b) => b.startMin > nowMin).sort((a, b) => a.startMin - b.startMin)[0] || null;
+  const soon = !current && !!next && next.startMin - nowMin <= SOON_MIN;
+  const free = space.bookable ? 'Available' : 'Open';
+  const text = current
+    ? `${current.kind === 'Block' ? 'Reserved' : 'In use'} until ${minToHHMM(current.endMin)}`
+    : soon && next
+      ? `Booked from ${minToHHMM(next.startMin)}`
+      : next
+        ? `${free} · next ${minToHHMM(next.startMin)}`
+        : free;
+  return { hot: !!current || soon, text, schedule };
+}
+
 /** The business day the timeline spans (08:00–18:00), matching the booking window. */
 const DAY_START = 8 * 60;
 const DAY_END = 18 * 60;
@@ -378,16 +405,35 @@ function EntranceScreen() {
         <div className={styles.entranceMain}>
           <section className={styles.block}>
             <h2 className={styles.h2}>Meeting rooms &amp; pods</h2>
-            <div className={styles.spaceGrid}>
+            <div className={`${styles.spaceGrid} ${styles.roomGrid}`}>
               {rooms.map((s) => {
-                const st = statusFor(s, bookings, nowMin);
+                const v = roomView(s, bookings, nowMin);
                 return (
-                  <div key={s.id} className={`${styles.spaceCard} ${st.busy ? styles.busyCard : ''}`}>
+                  <div key={s.id} className={`${styles.spaceCard} ${v.hot ? styles.hotCard : ''}`}>
                     <span className={styles.spaceName}>{s.name}</span>
                     <span className={styles.spaceType}>
                       {s.type === 'Phone pod' ? 'Phone pod' : `Meeting room${s.capacityLabel ? ` · up to ${s.capacityLabel}` : ''}`}
                     </span>
-                    <span className={`${styles.spaceStatus} ${st.busy ? styles.statusBusy : styles.statusFree}`}>{st.text}</span>
+                    <span className={`${styles.spaceStatus} ${v.hot ? styles.statusHot : styles.statusFree}`}>{v.text}</span>
+                    {/* Today's remaining bookings, times only — a public wall display should
+                        never carry members' names. */}
+                    {v.schedule.length ? (
+                      <ul className={styles.sched}>
+                        {v.schedule.slice(0, 4).map((b, i) => {
+                          const live = b.startMin <= nowMin && nowMin < b.endMin;
+                          return (
+                            <li key={`${b.startMin}-${i}`} className={live ? styles.schedNow : undefined}>
+                              <span className={styles.schedTime}>
+                                {minToHHMM(b.startMin)}–{minToHHMM(b.endMin)}
+                              </span>
+                              {live ? <span className={styles.schedTag}>Now</span> : null}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    ) : (
+                      <p className={styles.schedNone}>No bookings today</p>
+                    )}
                     <DayLine space={s} bookings={bookings} nowMin={nowMin} />
                   </div>
                 );

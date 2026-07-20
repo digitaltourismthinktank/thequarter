@@ -604,3 +604,69 @@
     padding-top: 14px;
   }
 }
+
+/* ---- Rooms: in-use state + today's schedule ---------------------------------------
+   The same pastel-red wash the floor screens use, so the entrance display and the door
+   screens tell the same story: red = in use now (or due within 30 minutes). */
+.screen {
+  --hot-wash: #fbeceb;
+  --hot-border: #eab9b2;
+  --hot-ink: #9a3b30;
+}
+.hotCard {
+  border-color: var(--hot-border);
+  background: var(--hot-wash);
+}
+.statusHot {
+  color: var(--hot-ink);
+  font-weight: var(--fw-bold);
+}
+/* Today's remaining bookings — times only; a public wall display carries no names. */
+.sched {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.sched li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: clamp(13px, 1.15vw, 18px);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.schedNow {
+  color: var(--hot-ink);
+  font-weight: var(--fw-semibold);
+}
+.schedTag {
+  font-size: clamp(10px, 0.72vw, 13px);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  font-weight: var(--fw-bold);
+  color: var(--hot-ink);
+  background: var(--hot-wash);
+  border: 1px solid var(--hot-border);
+  border-radius: var(--radius-pill);
+  padding: 1px 7px;
+}
+.schedNone {
+  margin: 10px 0 0;
+  font-size: clamp(13px, 1.1vw, 17px);
+  color: var(--text-muted);
+}
+
+@media (orientation: landscape) and (min-width: 1000px) {
+  /* Four rooms as a 2x2 block rather than four thin columns: bigger cards that carry the
+     status, the schedule and the timeline comfortably, and they fill the height that was
+     sitting empty between the rooms and the workspaces. */
+  .roomGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .roomGrid .spaceCard {
+    min-height: clamp(180px, 22vh, 280px);
+  }
+}
