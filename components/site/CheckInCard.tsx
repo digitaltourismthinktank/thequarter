@@ -207,7 +207,9 @@ export function CheckInCard({ className }: { className?: string }) {
       {showPlanned ? (
         <div className={styles.planned}>
           <span className={styles.plannedLabel}>Your upcoming check-ins</span>
-          {status?.planned?.map((p) => (
+          {/* Copy before sorting: sort() mutates, and this array is held in React state.
+              Check-ins carry no start time, so date is the whole key. */}
+          {[...(status?.planned ?? [])].sort((a, b) => a.date.localeCompare(b.date)).map((p) => (
             <span key={p.id} className={styles.chip}>
               {fmtDate(p.date)}
               {p.length === 'Half' ? (p.period ? ` · ½ ${p.period.toUpperCase()}` : ' · ½') : ''}
