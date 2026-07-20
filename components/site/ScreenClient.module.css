@@ -571,3 +571,36 @@
     margin-top: 12px;
   }
 }
+
+/* ---- Wall display: overscan safety + filling the space ----------------------------
+   Older TVs crop a few percent off every edge (overscan), which was clipping the wordmark
+   and the clock. Inset the whole display further so nothing important sits in the crop
+   zone — harmless on a screen that doesn't overscan, essential on one that does.
+
+   The hero was pinned to the top of its column, leaving a dead band above What's-on, while
+   the room cards sat in a thin strip with half the right column empty beneath. The hero now
+   fills its column with its content centred, and the cards are given real presence so the
+   two sections use the height instead of floating in it. */
+@media (orientation: landscape) and (min-width: 1000px) {
+  .screen {
+    padding: clamp(30px, 3.4vw, 62px) clamp(34px, 4vw, 78px);
+  }
+  .hero {
+    align-self: stretch;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .entranceMain {
+    justify-content: space-between;
+  }
+  .spaceCard {
+    min-height: clamp(150px, 17vh, 224px);
+  }
+  /* With taller cards the timeline can sit lower in the card, closer to where the eye
+     finishes reading the status. */
+  .dayLine {
+    margin-top: auto;
+    padding-top: 14px;
+  }
+}
