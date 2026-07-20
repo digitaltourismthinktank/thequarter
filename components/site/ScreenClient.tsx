@@ -199,6 +199,47 @@ function EntranceScreen() {
   // export-safe way (no next/navigation useSearchParams, which would force a
   // Suspense boundary and can break output:'export').
   const [floor, setFloor] = useState<number | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Full screen for the wall display. Old Safari (the Mac mini driving the TV) only has
+  // the webkit-prefixed API, so try both. Kept in sync with the browser's own controls
+  // (Esc, the menu) via both change events.
+  const toggleFullscreen = useCallback(() => {
+    type FsDoc = Document & {
+      webkitFullscreenElement?: Element | null;
+      webkitExitFullscreen?: () => void;
+    };
+    type FsEl = HTMLElement & { webkitRequestFullscreen?: () => void };
+    const doc = document as FsDoc;
+    const el = document.documentElement as FsEl;
+    const active = !!(document.fullscreenElement || doc.webkitFullscreenElement);
+    try {
+      if (active) {
+        if (document.exitFullscreen) document.exitFullscreen();
+        else if (doc.webkitExitFullscreen) doc.webkitExitFullscreen();
+      } else if (el.requestFullscreen) {
+        el.requestFullscreen();
+      } else if (el.webkitRequestFullscreen) {
+        el.webkitRequestFullscreen();
+      }
+    } catch {
+      /* full screen can be refused (user gesture / permissions) — never break the display */
+    }
+  }, []);
+
+  useEffect(() => {
+    const sync = () => {
+      const doc = document as Document & { webkitFullscreenElement?: Element | null };
+      setIsFullscreen(!!(document.fullscreenElement || doc.webkitFullscreenElement));
+    };
+    sync();
+    document.addEventListener('fullscreenchange', sync);
+    document.addEventListener('webkitfullscreenchange', sync);
+    return () => {
+      document.removeEventListener('fullscreenchange', sync);
+      document.removeEventListener('webkitfullscreenchange', sync);
+    };
+  }, []);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -271,6 +312,12 @@ function EntranceScreen() {
 
   return (
     <div className={styles.screen}>
+      {/* Wall displays often run on old machines where the browser's own full-screen is
+          fiddly to reach — this puts it one tap away. Fades back once you're in. */}
+      <button type="button" className={styles.fsBtn} onClick={toggleFullscreen} title={isFullscreen ? 'Exit full screen' : 'Full screen'}>
+        {isFullscreen ? 'Exit full screen' : 'Full screen'}
+      </button>
+
       <header className={styles.top}>
         <img className={styles.logo} src="/brand/logo-wordmark-black.png" alt="The Quarter" />
         {floorLabel ? <span className={styles.floorTag}>{floorLabel}</span> : null}

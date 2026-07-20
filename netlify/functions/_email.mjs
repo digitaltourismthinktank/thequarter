@@ -8,11 +8,19 @@
  * booking or a payment.
  *
  * Env: RESEND_API_KEY (secret — set in Netlify only, never committed).
- * From: no-reply@notifications.thequarter.work (a verified Resend domain).
+ *      RESEND_FROM (optional) — overrides the From address.
+ * From: info@thequarter.work. NOTE: emails from any other brand/domain do NOT come from
+ * here — check Memberstack (account + password-reset emails), Crisp and Stripe, whose
+ * sender identities are configured in those dashboards, not in this repo.
  */
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 
-export const FROM = 'The Quarter <no-reply@notifications.thequarter.work>';
+/**
+ * Every email we send comes from The Quarter, never from another brand. Overridable via
+ * RESEND_FROM so the address can be changed without a deploy — but the domain MUST be a
+ * verified sending domain in the Resend account or Resend rejects the send.
+ */
+export const FROM = process.env.RESEND_FROM || 'The Quarter <info@thequarter.work>';
 /** Operations inbox — all admin/ops notifications (bookings, requests, plan changes, etc.) land here. */
 export const OPS_EMAIL = 'info@thequarter.work';
 
