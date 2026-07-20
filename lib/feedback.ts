@@ -17,6 +17,11 @@
  * so `haptic([8,40,8])` feels the same as `haptic(8)` — and it needs the device's System
  * Haptics setting on.
  *
+ * It also may simply not fire. Safari distinguishes trusted (real touch) events from
+ * synthetic ones, and a programmatic .click() is synthetic. Nothing here can change that.
+ * If it stays silent on device, the honest move is to delete this rather than keep a hack
+ * that does nothing — Android keeps working either way through navigator.vibrate.
+ *
  * SOUND: synthesised with the Web Audio API rather than shipped as audio files — a chime
  * is a few sine tones, and this way there is nothing to download, nothing to cache and no
  * request to make. Browsers refuse to start audio until the user has interacted with the
@@ -51,9 +56,13 @@ function iosHapticElement(): HTMLInputElement | null {
   if (iosSwitch?.isConnected) return iosSwitch;
 
   const label = document.createElement('label');
-  // Off-screen rather than display:none — a hidden control can't be clicked meaningfully.
   label.setAttribute('aria-hidden', 'true');
-  label.style.cssText = 'position:fixed;top:-100px;left:-100px;width:1px;height:1px;opacity:0;pointer-events:none;';
+  // Kept ON screen, faintly non-zero, and without pointer-events:none. A control positioned
+  // off-canvas or at opacity 0 may not be laid out as a switch at all, and iOS only plays
+  // the haptic for a control it is actually rendering. 1px in the corner is invisible in
+  // practice without being "not rendered".
+  label.style.cssText =
+    'position:fixed;bottom:0;left:0;width:1px;height:1px;opacity:0.001;z-index:-1;overflow:hidden;';
 
   const input = document.createElement('input');
   input.type = 'checkbox';
@@ -90,11 +99,10 @@ export function haptic(pattern: number | number[] = 8): void {
     if (!isAppleTouch()) return;
     const el = iosHapticElement();
     if (!el) return;
-    // Toggle rather than always-check: a switch only plays the haptic when its state
-    // actually changes, so re-checking an already-checked box would be silent.
+    // .click() toggles the checkbox itself and fires the events — setting .checked first
+    // would flip it back, and a hand-dispatched 'change' is not what iOS listens for.
+    // A switch only plays the haptic on an actual state change, which click() gives us.
     iosChecked = !iosChecked;
-    el.checked = iosChecked;
-    el.dispatchEvent(new Event('change', { bubbles: false }));
     el.click();
   } catch {
     /* a haptic is never worth an exception */

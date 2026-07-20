@@ -415,3 +415,23 @@
 .showAll:hover {
   color: var(--ink-900);
 }
+
+/* The room list had no heading, so after answering "Who's it for?" it wasn't obvious the
+   next row was the answer to a different question. */
+.pickTitle {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  color: var(--gold-700);
+  font-weight: var(--fw-semibold);
+  margin: 0 0 8px;
+}
+
+/* Said once, quietly, and only to someone booking for themselves — a general rule posted at
+   everyone reads as a telling-off; a note where it applies reads as a steer. */
+.podNudge {
+  margin: -4px 0 16px;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  max-width: 60ch;
+}

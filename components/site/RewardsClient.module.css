@@ -711,28 +711,21 @@
   transform: rotateY(180deg);
 }
 
-/* Belt and braces behind backface-visibility, which WebKit has been unreliable about here.
-   The step lands at the midpoint of the turn, when the card is edge-on and unreadable. */
-.cardFront,
-.cardBack {
-  transition: visibility 0s linear 310ms;
-}
-.cardBack {
-  visibility: hidden;
-}
-.cardTurned .cardFront {
-  visibility: hidden;
-}
-.cardTurned .cardBack {
-  visibility: visible;
-}
+/* The visibility step that used to live here WAS the light flash.
+   It swapped the faces at 310ms — half of 620ms — on the assumption that the card is
+   edge-on at the halfway point. It isn't: the easing is cubic-bezier(0.2, 0.8, …), which
+   is deliberately fast out of the gate, so the rotation passes 90 degrees at roughly a
+   quarter of the duration. Between there and 310ms the front was turned away (hidden by
+   backface-visibility) while the back was still visibility:hidden — both faces invisible,
+   for about a sixth of a second, showing the page behind. Hence the pale flash.
+   backface-visibility alone is correct now that the transformed element is no longer the
+   overflow-clipped one, so the step is gone. */
 
-/* No turn, no midpoint to hide at — swap immediately. */
-@media (prefers-reduced-motion: reduce) {
-  .cardFront,
-  .cardBack {
-    transition: none;
-  }
+/* Insurance for the genuine edge-on instant: the container doesn't rotate, so a card-shaped
+   dark ground sits behind the turn and there is never light showing through. */
+.cardFlip {
+  background: var(--ink-900);
+  border-radius: var(--radius-xl);
 }
 /* The back holds one column of text, so it reads better top-aligned than centred. */
 .cardBack > .pointsCard {

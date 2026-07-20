@@ -286,8 +286,8 @@ export function BookingClient() {
         <div className={styles.partyOpts}>
           {[
             { n: 1, label: 'Just me', hint: 'A call or some quiet' },
-            { n: 4, label: 'Up to 3 guests', hint: 'A small meeting' },
-            { n: 8, label: '4 or more', hint: 'The big table' },
+            { n: 4, label: 'Up to 4 people', hint: 'A small meeting' },
+            { n: 5, label: '5 or more', hint: 'The big table' },
           ].map((o) => (
             <button
               key={o.n}
@@ -306,6 +306,7 @@ export function BookingClient() {
         </div>
       </div>
 
+      <h2 className={styles.pickTitle}>{party === null ? 'Choose a room or pod' : 'Choose a room'}</h2>
       <div className={styles.spaces}>
         {shortlist.map((s) => (
           <button
@@ -327,6 +328,12 @@ export function BookingClient() {
         <button type="button" className={styles.showAll} onClick={() => setShowAllRooms(true)}>
           Choose another room
         </button>
+      ) : null}
+
+      {party === 1 ? (
+        <p className={styles.podNudge}>
+          A phone pod is usually best for calls — it keeps the meeting rooms free for groups. Rooms are there if you need one.
+        </p>
       ) : null}
 
       {!spaceId ? (
