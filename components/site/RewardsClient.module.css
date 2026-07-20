@@ -401,7 +401,8 @@
 .btnOutline {
   width: 100%;
   margin-top: 4px;
-  padding: 10px 16px;
+  padding: 11px 16px;
+  min-height: 44px;
   border-radius: var(--radius-pill);
   font-size: var(--text-sm);
   font-weight: var(--fw-semibold);
@@ -578,12 +579,17 @@
 }
 .earnText {
   min-width: 0;
-  flex: 1 1 auto;
+  /* 0 basis, so the text shares line 1 with the icon instead of claiming a line of its own. */
+  flex: 1 1 0;
 }
 @media (max-width: 560px) {
   .earnVal {
+    /* `flex: 1 0 100%` can't shrink, so a 54px left margin pushed the row 13px past the
+       viewport — the points values visibly ran off the screen edge. Indent with padding
+       instead: box-sizing is border-box globally, so it stays inside the 100%. */
     flex: 1 0 100%;
-    margin-left: 54px;
+    margin-left: 0;
+    padding-left: 56px;
     font-size: var(--text-sm);
   }
 }

@@ -17,8 +17,7 @@
     align-items: end;
     background: var(--surface-card);
     border-top: 1px solid var(--border-subtle);
-    padding: 8px 6px calc(10px + env(safe-area-inset-bottom));
-    /* Sits above the home indicator on iOS and clears the Crisp launcher. */
+    padding: 8px 6px var(--tabbar-inset);
     box-shadow: 0 -6px 20px rgba(30, 26, 21, 0.06);
   }
 
@@ -35,9 +34,26 @@
     color: var(--stone-400);
     min-width: 0;
   }
+  /* 6 + 22 icon + 3 gap + 10 label + 6 = 47px tall, clearing Apple's 44pt minimum. The
+     row was 39px, which is what made these fiddly to hit. */
+  .tab,
+  .checkSlot {
+    padding: 6px 0;
+  }
   .tab {
-    padding: 2px 0;
     transition: color var(--duration-fast) var(--ease-standard);
+  }
+  /* .checkSlot is a <button> so the "Check in" label is tappable, not just the circle —
+     base.css only resets font-family and cursor on button, so strip the UA chrome here. */
+  .checkSlot {
+    appearance: none;
+    -webkit-appearance: none;
+    background: none;
+    border: 0;
+    font: inherit;
+    font-size: 10px;
+    font-weight: var(--fw-bold);
+    cursor: pointer;
   }
   .ic {
     width: 22px;

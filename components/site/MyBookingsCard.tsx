@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ds/Button';
 import { cn } from '@/lib/cn';
-import { getMyBookings, getSpaces, cancelBooking, amendBooking, type MyBooking } from '@/lib/booking';
+import { getMyBookings, getSpaces, cancelBooking, amendBooking, type MyBooking, sortBookings } from '@/lib/booking';
 import styles from './MyBookingsCard.module.css';
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -64,7 +64,7 @@ export function MyBookingsCard({ className }: { className?: string }) {
       for (const sp of s.data.spaces) map[sp.id] = sp.name;
       setSpaceNames(map);
     }
-    if (b.ok) setBookings(b.data.bookings);
+    if (b.ok) setBookings(sortBookings(b.data.bookings));
     setLoading(false);
   }
 

@@ -10,6 +10,7 @@ import {
   createBooking,
   cancelBooking,
   amendBooking,
+  sortBookings,
   type Space,
   type MyBooking,
 } from '@/lib/booking';
@@ -86,7 +87,7 @@ export function BookingClient() {
 
   const loadMine = useCallback(async () => {
     const r = await getMyBookings();
-    if (r.ok) setMine(r.data.bookings);
+    if (r.ok) setMine(sortBookings(r.data.bookings));
   }, []);
 
   useEffect(() => {

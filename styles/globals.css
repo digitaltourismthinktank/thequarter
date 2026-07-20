@@ -8,6 +8,17 @@
 @import './tokens/elevation.css';
 @import './tokens/base.css';
 
+/* Phone tab-bar geometry, defined once because three places depend on it: MobileTabBar
+   draws the bar, MemberShell reserves content space beneath it, and anything floating at
+   the foot of the screen has to clear it. The max() floor matters because viewport-fit is
+   not 'cover' here, so env(safe-area-inset-bottom) resolves to 0 in the member app — the
+   original `calc(10px + env(...))` was therefore just 10px on every device, which is why
+   the row sat so close to the bottom edge and was awkward to tap. */
+:root {
+  --tabbar-inset: max(14px, env(safe-area-inset-bottom));
+  --tabbar-h: calc(56px + var(--tabbar-inset));
+}
+
 /* ---- App-level helpers (layout scaffolding shared across pages) ---- */
 
 /* Respect users who prefer reduced motion — disable the soft lifts & fades. */
@@ -39,13 +50,16 @@
 
 html { scroll-behavior: smooth; }
 
-/* CookieScript injects a persistent "Cookie settings" badge into <body> at
-   position:fixed; left:10px; bottom:0; z-index:99999 — which lands squarely on top of the
-   member app's fixed tab bar, covering the Home and Book labels. It isn't ours to restyle
-   at source, and it must stay reachable (withdrawing consent is not optional), so lift it
-   clear of the bar rather than hiding it. The tab bar only exists below 860px. */
-@media (max-width: 860px) {
-  :root[data-member-app] #cookiescript_badge {
-    bottom: calc(72px + env(safe-area-inset-bottom)) !important;
-  }
+/* CookieScript injects a persistent floating "Cookie settings" badge into <body> at
+   position:fixed; left:10px; bottom:0; z-index:99999. In the member app it eats screen
+   space and collides with the tab bar, so it's hidden there — but consent must stay as
+   easy to withdraw as it was to give, so ProfileEditor carries a "Cookie settings" control
+   that reopens the identical panel via CookieScript.instance.show(). The public site keeps
+   the badge: this only applies while a member shell is mounted.
+
+   display:none rather than a one-off .remove(): the script re-injects the badge whenever
+   the node is absent, so a rule that reapplies every time is the only thing that holds.
+   The badge's own CSS uses no !important, so this wins cleanly. */
+:root[data-member-app] #cookiescript_badge {
+  display: none !important;
 }

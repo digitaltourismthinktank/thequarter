@@ -6,6 +6,14 @@ import { saveProfile } from '@/lib/booking';
 import { memberName } from '@/lib/memberstack';
 import styles from './ProfileEditor.module.css';
 
+/* CookieScript's own global. Loaded from a CDN tag in ThirdPartyScripts, and created
+   afterInteractive — so every access is optional-chained rather than assumed present. */
+declare global {
+  interface Window {
+    CookieScript?: { instance?: { show?: () => void } };
+  }
+}
+
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 /**
@@ -105,6 +113,22 @@ export function ProfileEditor({ member, onClose, onSaved }: { member: any; onClo
           </button>
           {msg ? <span className={styles.msg}>{msg}</span> : null}
         </div>
+
+        {/* CookieScript's floating badge is hidden inside the member app (it covered the tab
+            bar), so this is the replacement affordance — withdrawing consent has to stay as
+            easy as giving it. show() is the same call the badge's own click handler makes,
+            and it re-renders the panel if it isn't in the DOM. Close this dialog first:
+            it's aria-modal, which would make the consent panel inert to screen readers. */}
+        <button
+          type="button"
+          className={styles.cookieBtn}
+          onClick={() => {
+            onClose();
+            window.CookieScript?.instance?.show?.();
+          }}
+        >
+          Cookie settings
+        </button>
       </div>
     </div>
   );

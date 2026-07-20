@@ -38,8 +38,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
+  /* 44px minimum tap target; this was 34, and it's the only way out of the dialog. */
+  width: 44px;
+  height: 44px;
   border: none;
   border-radius: 50%;
   background: var(--gold-100);
@@ -124,4 +125,25 @@
   font-size: var(--text-sm);
   font-weight: 600;
   color: #2f7d52;
+}
+
+/* Replacement for CookieScript's floating badge, which is hidden inside the member app.
+   Deliberately quiet — it's a legal affordance, not something members need often — but a
+   full-width 44px target so it's genuinely usable on a phone. */
+.cookieBtn {
+  align-self: flex-start;
+  margin-top: 18px;
+  padding: 11px 0;
+  min-height: 44px;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.cookieBtn:hover {
+  color: var(--ink-900);
 }

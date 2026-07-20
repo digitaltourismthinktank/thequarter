@@ -82,6 +82,15 @@ export const getAvailability = (space: string, date: string) =>
     { auth: false },
   );
 export const getMyBookings = () => call<{ bookings: MyBooking[] }>('bookings?action=mine');
+
+/**
+ * Nearest booking first. The API sorts by Start already, but that's one Airtable query
+ * param away from silently changing, and every surface that lists bookings depends on the
+ * order being right — so guarantee it here. The key is (date, then start time): sorting by
+ * date alone leaves several bookings on the same day in arbitrary order.
+ */
+export const sortBookings = <T extends { date: string; startMin: number }>(bs: T[]): T[] =>
+  [...bs].sort((a, b) => (a.date === b.date ? a.startMin - b.startMin : a.date < b.date ? -1 : 1));
 export const createBooking = (b: { spaceId: string; date: string; start: string; end: string }) =>
   call<{ ok: boolean; id: string }>('bookings', { method: 'POST', body: { action: 'book', ...b } });
 export const cancelBooking = (bookingId: string) =>

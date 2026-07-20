@@ -50,13 +50,15 @@ export function MobileTabBar({ onCheckIn }: { onCheckIn?: () => void }) {
 
       {/* The daily action, reachable from every screen. Opens the check-in sheet rather
           than navigating, so nobody loses their place. */}
-      <div className={styles.checkSlot}>
-        <button type="button" className={styles.check} onClick={onCheckIn} aria-label="Check in">
+      {/* The whole slot is the button: the raised circle is absolutely positioned, so when
+          only it was clickable the "Check in" label underneath was a dead tap zone. */}
+      <button type="button" className={styles.checkSlot} onClick={onCheckIn}>
+        <span className={styles.check} aria-hidden="true">
           <Icon name="check" size={26} color="var(--ink-900)" strokeWidth={2.6} />
-        </button>
+        </span>
         <span className={styles.slot} aria-hidden="true" />
         Check in
-      </div>
+      </button>
 
       {tab(TABS[2])}
       {tab(TABS[3])}

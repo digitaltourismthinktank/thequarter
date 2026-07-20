@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { cn } from '@/lib/cn';
 import { Icon } from '@/components/ds/Icon';
-import { getUpcomingEvents, type QuarterEvent } from '@/lib/booking';
+import { getUpcomingEvents, getMyRsvps, type QuarterEvent } from '@/lib/booking';
 import styles from './EventsCard.module.css';
 
 function fmtWhen(start: string, end: string | null): string {
@@ -18,26 +18,35 @@ function fmtWhen(start: string, end: string | null): string {
   return `${date} · ${time}`;
 }
 
-/** Dashboard card: upcoming published events (mostly in The Kentish Pantry). */
+/**
+ * Dashboard card: the events you've said you're coming to. Home used to list the next four
+ * published events, which simply repeated the Events tab — so this now answers the question
+ * only Home can answer ("what have I committed to?") and renders nothing when the answer is
+ * "nothing", leaving discovery to the Events tab.
+ */
 export function EventsCard({ className }: { className?: string }) {
   const [loading, setLoading] = useState(true);
   const [events, setEvents] = useState<QuarterEvent[]>([]);
 
   useEffect(() => {
     (async () => {
-      const r = await getUpcomingEvents();
-      if (r.ok) setEvents(r.data.events);
+      const [ev, rs] = await Promise.all([getUpcomingEvents(), getMyRsvps()]);
+      if (ev.ok && rs.ok) {
+        const going = new Set(rs.data.rsvps.filter((r) => r.status === 'Going').map((r) => r.eventId));
+        setEvents(ev.data.events.filter((e) => going.has(e.id)));
+      }
       setLoading(false);
     })();
   }, []);
 
+  // Nothing booked in? Say nothing at all — the Events tab is one tap away.
+  if (!loading && events.length === 0) return null;
+
   return (
     <div className={cn(styles.card, className)}>
-      <span className={styles.eyebrow}>What&rsquo;s on</span>
+      <span className={styles.eyebrow}>You&rsquo;re going to</span>
       {loading ? (
         <p className={styles.meta}>Loading…</p>
-      ) : events.length === 0 ? (
-        <p className={styles.meta}>No upcoming events just now — watch this space.</p>
       ) : (
         <ul className={styles.list}>
           {events.slice(0, 4).map((e) => (
@@ -51,7 +60,7 @@ export function EventsCard({ className }: { className?: string }) {
           ))}
         </ul>
       )}
-      <a className={styles.link} href="/events">
+      <a className={styles.link} href="/whats-on">
         See all events <Icon name="arrow-right" size={16} />
       </a>
     </div>

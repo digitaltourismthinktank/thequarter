@@ -118,7 +118,8 @@
   font: inherit;
   font-size: var(--text-sm);
   font-weight: var(--fw-semibold);
-  padding: 7px 14px;
+  /* 11px vertical takes these past a 44px tap target on a phone. */
+  padding: 11px 14px;
   border-radius: var(--radius-pill, 999px);
   white-space: nowrap;
   text-decoration: none;
@@ -173,7 +174,9 @@
   background: none;
   border: none;
   text-decoration: underline;
-  padding: 0;
+  /* Was padding:0 — a bare-text button with no hit area to speak of. */
+  padding: 12px 0;
+  min-height: 44px;
 }
 .state,
 .muted {

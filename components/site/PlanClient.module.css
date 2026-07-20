@@ -112,7 +112,11 @@
 .linkBtn {
   border: none;
   background: none;
-  padding: 0;
+  /* Keeps the link look, restores a real hit area (was padding:0). */
+  padding: 11px 0;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
   color: var(--gold-700);
   font-size: var(--text-sm);
   font-weight: var(--fw-semibold);
@@ -384,8 +388,13 @@
   color: var(--text-muted);
 }
 
-/* Mobile audit: Stripe invoice ids are unbreakable strings and spilled out of the row. */
+/* Mobile audit: Stripe invoice ids are unbreakable strings and spilled out of the row.
+   The first pass set min-width:0, which fixed the horizontal spill by turning it into a
+   vertical one — with flex-basis 0 the reference won only the ~25px the fixed columns left
+   over, then wrapped one character per line, giving a 239px-tall row. A real basis lets it
+   take a sensible share and wrap like prose. */
 .invNum {
+  flex: 1 1 140px;
   min-width: 0;
   overflow-wrap: anywhere;
 }
