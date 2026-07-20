@@ -49,6 +49,8 @@ export function RewardsClient({ marketing }: { marketing: ReactNode }) {
   const [activity, setActivity] = useState<LedgerEntry[]>([]);
   // Other members' tiers are reference material, not status — folded away by default.
   const [levelsOpen, setLevelsOpen] = useState(false);
+  // The points card behaves like a real membership card: tap to turn it over.
+  const [flipped, setFlipped] = useState(false);
   const [birthday, setBirthday] = useState<BirthdayState>({ bday: null, claimed: null });
   const [loaded, setLoaded] = useState(false);
   const [confirm, setConfirm] = useState<RewardItem | null>(null);
@@ -65,6 +67,15 @@ export function RewardsClient({ marketing }: { marketing: ReactNode }) {
     return slug ? PLANS.find((p) => p.id === slug)?.name ?? null : null;
   }, [member]);
   // Earned level + progress to the next one (drives the ring + the levels rail).
+  const joined = useMemo(() => {
+    const iso = member?.createdAt;
+    if (!iso) return null;
+    try {
+      return new Date(iso).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+    } catch {
+      return null;
+    }
+  }, [member]);
   const prog = useMemo(() => levelProgress(lifetime), [lifetime]);
   const level = prog.level;
 
@@ -132,13 +143,22 @@ export function RewardsClient({ marketing }: { marketing: ReactNode }) {
 
       <header className={styles.header}>
         <span className={styles.eyebrow}>Quarter Rewards</span>
-        <h1 className={styles.h1}>A little back, for being a regular</h1>
+        <h1 className={styles.h1}>A little thanks for checking in</h1>
         {/* Pitch copy on a page the member has already bought into — desktop only. */}
         <p className={`${styles.sub} ${styles.subDesktop}`}>Earn points by being here and spending locally, then spend them on treats around the Quarter.</p>
       </header>
 
-      {/* Quarter Points Card */}
-      <section className={styles.pointsCard}>
+      {/* Quarter Points Card — a real card, front and back. */}
+      <div className={styles.cardFlip}>
+        <div className={`${styles.cardInner} ${flipped ? styles.cardTurned : ''}`}>
+      <section
+        className={styles.pointsCard}
+        onClick={() => setFlipped(true)}
+        role="button"
+        tabIndex={0}
+        aria-label="Turn card over"
+        onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), setFlipped(true))}
+      >
         <span className={styles.arc} aria-hidden="true" />
         <div className={styles.pcLeft}>
           <span className={styles.pcOver}>Quarter Points</span>
@@ -162,7 +182,32 @@ export function RewardsClient({ marketing }: { marketing: ReactNode }) {
             <span>{prog.next ? `to ${prog.next.name}` : 'top tier'}</span>
           </div>
         </div>
+        <span className={styles.flipHint} aria-hidden="true">Tap to turn over</span>
       </section>
+
+      {/* Back — what this level actually gets you, and how long you've been here. */}
+      <section
+        className={`${styles.pointsCard} ${styles.cardBack}`}
+        onClick={() => setFlipped(false)}
+        role="button"
+        tabIndex={flipped ? 0 : -1}
+        aria-label="Turn card back"
+        onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), setFlipped(false))}
+      >
+        <div className={styles.pcLeft}>
+          <span className={styles.pcOver}>{level.name} member</span>
+          {joined ? <span className={styles.pcSince}>Here since {joined}</span> : null}
+          <ul className={styles.backPerks}>
+            {level.perks.map((perk) => (
+              <li key={perk}>{perk}</li>
+            ))}
+          </ul>
+          <span className={styles.pcRate}>{level.boost === 1 ? 'Base earn rate' : `Earning ${Math.round((level.boost - 1) * 100)}% faster`}</span>
+        </div>
+        <span className={styles.flipHint} aria-hidden="true">Tap to turn back</span>
+      </section>
+        </div>
+      </div>
 
       {/* Levels — named tiers everyone climbs by earning points over time. Four full-width
           cards ran to ~720px on a phone: two screens of other people's tiers between your

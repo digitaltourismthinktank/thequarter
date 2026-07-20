@@ -671,3 +671,117 @@
     display: none;
   }
 }
+
+/* ---- The points card as a real membership card ------------------------------------ */
+/* Must sit after the `@media (max-width: 560px) { .pointsCard { flex-direction: column } }`
+   rule earlier in this file — equal specificity, so source order decides. */
+
+.cardFlip {
+  perspective: 1400px;
+  margin-bottom: 28px;
+}
+.cardInner {
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform 620ms cubic-bezier(0.2, 0.8, 0.25, 1);
+}
+.cardTurned {
+  transform: rotateY(180deg);
+}
+/* The front defines the height; the back is laid over it, already turned. */
+.cardInner > .pointsCard {
+  margin-bottom: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  cursor: pointer;
+}
+.cardBack {
+  position: absolute;
+  inset: 0;
+  transform: rotateY(180deg);
+  align-items: flex-start;
+}
+.pcSince {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--text-sm);
+  color: var(--sand-300);
+}
+.backPerks {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: var(--text-sm);
+  color: var(--sand-50);
+}
+.backPerks li {
+  position: relative;
+  padding-left: 18px;
+}
+.backPerks li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 7px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--gold-500);
+}
+.flipHint {
+  position: absolute;
+  right: 20px;
+  bottom: 16px;
+  font-size: var(--text-2xs);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--stone-400);
+}
+
+/* Phones: keep it a landscape card rather than stacking the ring below the balance —
+   the earlier column rule made it a tall panel, and it should read as a loyalty card. */
+@media (max-width: 560px) {
+  .pointsCard {
+    flex-direction: row;
+    align-items: center;
+    gap: 14px;
+    padding: 22px 20px 34px;
+  }
+  .pcBalance strong {
+    font-size: clamp(30px, 9vw, 44px);
+  }
+  .ring {
+    align-self: center;
+    flex: none;
+    width: 96px;
+    height: 96px;
+  }
+  /* The hole has to shrink with the ring — at its 86px desktop size a 96px ring would be
+     a 5px hairline. Keeps the same ~14px band as the desktop 118/86 pairing. */
+  .ringHole {
+    width: 68px;
+    height: 68px;
+  }
+  .ringHole strong {
+    font-size: var(--text-base);
+  }
+  .ringHole span {
+    font-size: 9px;
+  }
+  .cardBack {
+    padding-top: 20px;
+  }
+  .backPerks {
+    gap: 6px;
+    font-size: var(--text-xs);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cardInner {
+    transition: none;
+  }
+}

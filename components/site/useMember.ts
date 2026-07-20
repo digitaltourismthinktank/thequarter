@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { createContext, createElement, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import { getMemberstack, PLAN_ID_TO_SLUG, type Member } from '@/lib/memberstack';
 import { PREVIEW, previewMember } from '@/lib/devMock';
 
@@ -17,7 +17,7 @@ export interface UseMember extends MemberState {
    Retries getCurrentMember briefly to ride out the session not being readable
    immediately after a fresh page load post-login (which otherwise bounced the
    dashboard back to /login). */
-export function useMember(): UseMember {
+function useMemberResolver(): UseMember {
   // Local preview seeds the mock member synchronously so it's present from the
   // first client render (no redirect race). Never runs in production.
   const [state, setState] = useState<MemberState>(
@@ -86,4 +86,32 @@ export function memberPlanSlug(member: Member | null): string | null {
   const active = member?.planConnections?.find((p) => p.active || p.status === 'ACTIVE');
   const planId = active?.planId ?? member?.planConnections?.[0]?.planId;
   return planId ? PLAN_ID_TO_SLUG[planId] ?? null : null;
+}
+
+
+/**
+ * One shared member resolution for the whole app.
+ *
+ * Every component used to call useMember() directly, so each resolved Memberstack from
+ * scratch — dynamic-import the SDK, then poll getCurrentMember up to six times. Fifteen
+ * components did this, and because App Router remounts a page subtree on navigation, they
+ * all started over on every route change. Pages that render their public marketing view
+ * until the member resolves (Rewards, Perks) therefore flashed the shopfront on each
+ * navigation, which read as the whole screen reloading.
+ *
+ * Resolving once at the root and sharing it makes navigation instant: the member is
+ * already known, so gated pages render their member view on the first frame.
+ */
+const MemberContext = createContext<UseMember | null>(null);
+
+export function MemberProvider({ children }: { children: ReactNode }) {
+  const value = useMemberResolver();
+  return createElement(MemberContext.Provider, { value }, children);
+}
+
+export function useMember(): UseMember {
+  const ctx = useContext(MemberContext);
+  // No provider (shouldn't happen — it's mounted in the root layout) → report "still
+  // resolving" rather than "logged out", so a member is never wrongly shown the shopfront.
+  return ctx ?? { loading: true, member: null, refresh: async () => {} };
 }

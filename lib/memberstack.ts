@@ -58,6 +58,9 @@ export interface MemberPlanConnection {
 }
 export interface Member {
   id: string;
+  /** ISO timestamp from Memberstack. Optional: this interface is a subset we maintain by
+      hand, and the card that shows it degrades gracefully when it isn't present. */
+  createdAt?: string;
   auth?: { email?: string };
   planConnections?: MemberPlanConnection[];
   customFields?: Record<string, unknown>;

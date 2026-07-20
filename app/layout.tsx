@@ -7,6 +7,7 @@ import { SiteHeader, SiteFooter } from '@/components/site/SiteChrome';
 import { JsonLd } from '@/components/site/JsonLd';
 import { TopProgress } from '@/components/site/TopProgress';
 import { PWARegister } from '@/components/site/PWARegister';
+import { MemberProvider } from '@/components/site/useMember';
 import { ThirdPartyScripts } from '@/components/site/ThirdPartyScripts';
 import '@/styles/globals.css';
 
@@ -136,9 +137,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <a href="#main" className="q-skip-link">
           Skip to content
         </a>
-        <SiteHeader />
-        <main id="main">{children}</main>
-        <SiteFooter />
+        {/* One member resolution shared by every component — see MemberProvider. */}
+        <MemberProvider>
+          <SiteHeader />
+          <main id="main">{children}</main>
+          <SiteFooter />
+        </MemberProvider>
       </body>
     </html>
   );
