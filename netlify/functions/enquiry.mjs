@@ -10,7 +10,7 @@
  * Env: RESEND_API_KEY (via _email). No auth — it's a public contact form.
  */
 import { sendEmail, emailShell, escapeHtml, OPS_EMAIL, emailReady } from './_email.mjs';
-import { pushToEmail } from './_push.mjs';
+import { pushToEmail, pushToAdmins } from './_push.mjs';
 
 const json = (b, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { 'content-type': 'application/json' } });
 
@@ -46,7 +46,7 @@ export default async function handler(req) {
     subject: `New ${kind} — ${String(b.room || b.company || name)}`,
     html: emailShell(`New website ${kind}`, rows, `A new ${kind} from the website`),
   });
-  await pushToEmail(OPS_EMAIL, { title: 'New enquiry', body: `${name} · ${String(b.room || b.company || kind)}`, url: '/admin/' });
+  await pushToAdmins({ title: 'New enquiry', body: `${name} · ${String(b.room || b.company || kind)}`, url: '/admin/' });
 
   // Acknowledge the sender (best-effort — never fails the submit).
   await sendEmail({

@@ -65,3 +65,37 @@ export async function pushToEmail(email, payload) {
     return { skipped: true };
   }
 }
+
+/**
+ * Push to every STAFF device. Ops notifications used to go to pushToEmail(OPS_EMAIL), but
+ * info@thequarter.work is a shared inbox, not a Memberstack member — so the lookup found
+ * nobody and every ops push silently no-op'd. Admins are ordinary members identified by
+ * email domain, so gather their subscriptions and push to all of them.
+ */
+export async function pushToAdmins(payload) {
+  if (!pushConfigured()) return { skipped: true };
+  const MS = process.env.MEMBERSTACK_SECRET_KEY;
+  if (!MS) return { skipped: true };
+  const domain = (process.env.ADMIN_EMAIL_DOMAIN || 'thinkdigital.travel').toLowerCase();
+  try {
+    const { default: memberstackAdmin } = await import('@memberstack/admin');
+    const admin = memberstackAdmin.init(MS);
+    const subs = [];
+    let after;
+    for (let i = 0; i < 20; i += 1) {
+      const res = await admin.members.list({ limit: 100, after });
+      const data = res?.data || [];
+      for (const m of data) {
+        const em = String(m?.auth?.email || m?.email || '').toLowerCase();
+        if (!em.endsWith(`@${domain}`)) continue;
+        const s = m?.metaData?.pushSubscriptions;
+        if (Array.isArray(s)) subs.push(...s);
+      }
+      if (!res?.hasNextPage || data.length === 0) break;
+      after = res?.endCursor;
+    }
+    return sendPush(subs, payload);
+  } catch {
+    return { skipped: true };
+  }
+}

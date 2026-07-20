@@ -64,7 +64,7 @@ export function emailShell(title, bodyHtml, preheader = '') {
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f6f1e7;padding:28px 0;"><tr><td align="center">
     <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#fffdf8;border:1px solid #ece3d2;border-radius:16px;overflow:hidden;">
       <tr><td style="padding:26px 32px 8px;">
-        <div style="font-size:13px;letter-spacing:0.12em;text-transform:uppercase;color:#b08a3e;font-weight:700;">The Quarter</div>
+        <img src="${SITE_URL}/brand/logo-wordmark-black.png" alt="The Quarter" width="132" style="display:block;height:auto;width:132px;border:0;margin:0 0 10px;" />
         <h1 style="margin:8px 0 0;font-size:22px;line-height:1.2;color:#2b2620;">${esc(title)}</h1>
       </td></tr>
       <tr><td style="padding:12px 32px 28px;font-size:15px;line-height:1.6;color:#4a4235;">
@@ -72,7 +72,8 @@ export function emailShell(title, bodyHtml, preheader = '') {
       </td></tr>
       <tr><td style="padding:18px 32px 26px;border-top:1px solid #ece3d2;font-size:12px;line-height:1.5;color:#8a8172;">
         The Quarter · 1st &amp; 2nd Floor, 27–28 Burgate, Canterbury, Kent CT1 2HA<br/>
-        <a href="mailto:info@thequarter.work" style="color:#b08a3e;">info@thequarter.work</a> · 01227 202 227 · Mon–Fri 09:00–17:30
+        <a href="mailto:info@thequarter.work" style="color:#b08a3e;">info@thequarter.work</a> · 01227 202 227 · Mon–Fri 09:00–17:30<br/>
+        <span style="color:#a49b8c;">The Quarter is operated by SE1 Media Ltd, trading as the Digital Tourism Think Tank.</span>
       </td></tr>
     </table>
   </td></tr></table>

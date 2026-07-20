@@ -15,7 +15,7 @@ import { listRecords, createRecord, T, F, airtableReady, esc } from './_airtable
 import { londonWallClockToISO, isoToLondonMin, hhmmToMin } from './_time.mjs';
 import { isClosedDay } from './_holidays.mjs';
 import { sendEmail, emailShell, escapeHtml, OPS_EMAIL, fmtDateLong } from './_email.mjs';
-import { pushToEmail } from './_push.mjs';
+import { pushToEmail, pushToAdmins } from './_push.mjs';
 
 const OPEN = 570; // 09:30
 const LAST = 990; // 16:30 (last tour start; a 30-min tour ends by 17:00)
@@ -78,7 +78,7 @@ async function sendTourEmails({ name, email, date, time }) {
     subject: `New tour booked — ${friendlyDate(date)} at ${time} (${name})`,
     html: emailShell('New tour booked', `<p><strong>${escapeHtml(name)}</strong> booked a tour for <strong>${escapeHtml(when)}</strong>.</p><p>${escapeHtml(email)}</p>`, 'A new tour was just booked'),
   });
-  await pushToEmail(OPS_EMAIL, { title: 'New tour booked', body: `${name} · ${when}`, url: '/admin/' });
+  await pushToAdmins({ title: 'New tour booked', body: `${name} · ${when}`, url: '/admin/' });
 }
 
 export default async function handler(req) {

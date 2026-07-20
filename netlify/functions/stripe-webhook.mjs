@@ -27,7 +27,7 @@ import { pointsForGBP, appendLedger, WELCOME_BONUS, creditReferral, CARNET_AMOUN
 import { listRecords, createRecord, T, F, airtableReady, esc } from './_airtable.mjs';
 import { londonWallClockToISO, hhmmToMin } from './_time.mjs';
 import { sendEmail, emailShell, escapeHtml, OPS_EMAIL, fmtDateLong, fmtDateTime, dayBar } from './_email.mjs';
-import { pushToEmail } from './_push.mjs';
+import { pushToEmail, pushToAdmins } from './_push.mjs';
 
 const MS_SECRET = process.env.MEMBERSTACK_SECRET_KEY;
 const STRIPE_SECRET = process.env.STRIPE_SECRET_KEY;
@@ -212,7 +212,7 @@ async function sendRoomBookingEmails({ m, total, people, lunch }) {
       'A new room booking was just paid',
     ),
   });
-  await pushToEmail(OPS_EMAIL, { title: 'New room booking', body: `${m.spaceName || 'Room'} · ${m.company || m.name || 'guest'}`, url: '/dashboard/' });
+  await pushToAdmins({ title: 'New room booking', body: `${m.spaceName || 'Room'} · ${m.company || m.name || 'guest'}`, url: '/dashboard/' });
 }
 
 /**
@@ -279,7 +279,7 @@ async function sendDayPassEmails({ email, name, date, total, arrival = '09:00', 
       'A Day Pass was just paid',
     ),
   });
-  await pushToEmail(OPS_EMAIL, { title: outOfHours ? 'New Day Pass · early-arrival request' : 'New Day Pass', body: `${name || email || 'guest'} · ${date} · ${arrival}`, url: '/dashboard/' });
+  await pushToAdmins({ title: outOfHours ? 'New Day Pass · early-arrival request' : 'New Day Pass', body: `${name || email || 'guest'} · ${date} · ${arrival}`, url: '/dashboard/' });
 }
 
 /**
@@ -310,7 +310,7 @@ async function sendCarnetEmails({ email, name, passes, total }) {
     subject: `New carnet — ${name || email || 'member'} (${passes} passes)`,
     html: emailShell('New carnet', `${body}<p style="margin:12px 0 0;">Buyer: ${escapeHtml(name || '—')} · ${escapeHtml(email || '—')}</p>`, 'A day-pass carnet was just bought'),
   });
-  await pushToEmail(OPS_EMAIL, { title: 'New carnet', body: `${name || email || 'member'} · ${passes} passes`, url: '/dashboard/' });
+  await pushToAdmins({ title: 'New carnet', body: `${name || email || 'member'} · ${passes} passes`, url: '/dashboard/' });
 }
 
 const normName = (s) => String(s ?? '').toLowerCase().replace(/[‘’']/g, "'").replace(/\s+/g, ' ').trim();
@@ -391,7 +391,7 @@ async function sendPrivatisationEmails(m, toEmail) {
     subject: `New privatisation — ${m.roomName || ''} (${m.company || ''})`,
     html: emailShell('New privatisation', `${body}<p style="margin:12px 0 0;">Company: ${escapeHtml(m.company || '')}<br/>Contact: ${escapeHtml(m.name || '')} · ${escapeHtml(to)}</p>`, 'A team room was just privatised'),
   });
-  await pushToEmail(OPS_EMAIL, { title: 'New privatisation', body: `${m.roomName || 'Team room'} · ${m.company || ''}`, url: '/dashboard/' });
+  await pushToAdmins({ title: 'New privatisation', body: `${m.roomName || 'Team room'} · ${m.company || ''}`, url: '/dashboard/' });
 }
 
 const memberFirstName = (member) => String(member?.customFields?.['first-name'] || '').trim();

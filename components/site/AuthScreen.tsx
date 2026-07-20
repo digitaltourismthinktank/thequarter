@@ -41,9 +41,14 @@ export function AuthScreen({
 }) {
   const isLogin = mode === 'login';
   const router = useRouter();
-  const [view, setView] = useState<'main' | 'forgot'>('main');
+  const [view, setView] = useState<'main' | 'forgot' | 'code'>('main');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  // Password reset: Memberstack emails a CODE, so we collect it here along with the new
+  // password (the old flow only said "check your inbox" and gave nowhere to enter it).
+  const [resetCode, setResetCode] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [notice, setNotice] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [company, setCompany] = useState('');
@@ -51,6 +56,19 @@ export function AuthScreen({
   const [status, setStatus] = useState<Status>('idle');
   const [error, setError] = useState('');
   const [agree, setAgree] = useState(false);
+
+  // A reset link from the Memberstack email lands on /reset-password?token=… which Netlify
+  // 301s here (query preserved). Jump straight to the "set a new password" step with the
+  // code filled in. Also accepts ?code= for a pasted code.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const tok = params.get('token') || params.get('code');
+    if (tok && tok.trim()) {
+      setResetCode(tok.trim());
+      setView('code');
+    }
+  }, []);
 
   // Pre-fill the email from ?email= — the post-purchase "Create your account" CTAs
   // (Day Pass / room / carnet confirmations) link here with the buyer's email so their
@@ -141,7 +159,39 @@ export function AuthScreen({
     }
     try {
       await ms.sendMemberResetPasswordEmail({ email });
-      setStatus('sent');
+      setStatus('idle');
+      setNotice('We’ve emailed you a reset code — enter it below with your new password.');
+      setView('code');
+    } catch (err) {
+      setStatus('error');
+      setError(memberstackError(err));
+    }
+  }
+
+  /** Finish the reset: the emailed code + a new password. */
+  async function handleReset(e: FormEvent) {
+    e.preventDefault();
+    if (newPassword.length < 8) {
+      setStatus('error');
+      setError('Please choose a password of at least 8 characters.');
+      return;
+    }
+    setStatus('submitting');
+    setError('');
+    const ms = await getMemberstack();
+    if (!ms) {
+      setStatus('error');
+      setError('Could not reach the member service. Please try again.');
+      return;
+    }
+    try {
+      await ms.resetMemberPassword({ token: resetCode.trim(), newPassword });
+      setStatus('idle');
+      setError('');
+      setResetCode('');
+      setNewPassword('');
+      setNotice('Password changed — sign in with your new password.');
+      setView('main');
     } catch (err) {
       setStatus('error');
       setError(memberstackError(err));
@@ -161,29 +211,28 @@ export function AuthScreen({
             <>
               <Badge tone="gold">Reset password</Badge>
               <h1 className={styles.title}>Forgotten your password?</h1>
-              <p className={styles.subtitle}>Enter your email and we&rsquo;ll send you a reset link.</p>
-              {status === 'sent' ? (
-                <p className={styles.info}>
-                  <Icon name="check" size={16} color="var(--gold-700)" /> Check your inbox for the reset link.
-                </p>
-              ) : (
-                <form className={styles.fields} onSubmit={handleForgot}>
-                  <Input
-                    label="Email"
-                    type="email"
-                    icon="user"
-                    placeholder="you@company.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                    autoComplete="email"
-                  />
-                  {status === 'error' ? <p className={styles.error}>{error}</p> : null}
-                  <Button type="submit" variant="primary" fullWidth disabled={status === 'submitting'} iconAfter="arrow-right">
-                    {status === 'submitting' ? 'Sending…' : 'Send reset link'}
-                  </Button>
-                </form>
-              )}
+              <p className={styles.subtitle}>Enter your email and we&rsquo;ll send you a reset code.</p>
+              <form className={styles.fields} onSubmit={handleForgot}>
+                <Input
+                  label="Email"
+                  type="email"
+                  icon="user"
+                  placeholder="you@company.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  autoComplete="email"
+                />
+                {status === 'error' ? <p className={styles.error}>{error}</p> : null}
+                <Button type="submit" variant="primary" fullWidth disabled={status === 'submitting'} iconAfter="arrow-right">
+                  {status === 'submitting' ? 'Sending…' : 'Send reset code'}
+                </Button>
+              </form>
+              <p className={styles.alt}>
+                <button type="button" className={styles.linkBtn} onClick={() => setView('code')}>
+                  I already have a code
+                </button>
+              </p>
               <p className={styles.alt}>
                 <button
                   type="button"
@@ -197,6 +246,54 @@ export function AuthScreen({
                 </button>
               </p>
             </>
+          ) : view === 'code' ? (
+            <>
+              <Badge tone="gold">Reset password</Badge>
+              <h1 className={styles.title}>Set a new password</h1>
+              <p className={styles.subtitle}>Paste the code from your email and choose a new password.</p>
+              {notice ? (
+                <p className={styles.info}>
+                  <Icon name="check" size={16} color="var(--gold-700)" /> {notice}
+                </p>
+              ) : null}
+              <form className={styles.fields} onSubmit={handleReset}>
+                <Input
+                  label="Reset code"
+                  type="text"
+                  placeholder="Paste the code from your email"
+                  value={resetCode}
+                  onChange={(e) => setResetCode(e.target.value)}
+                  required
+                  autoComplete="one-time-code"
+                />
+                <Input
+                  label="New password"
+                  type="password"
+                  placeholder="At least 8 characters"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  required
+                  autoComplete="new-password"
+                />
+                {status === 'error' ? <p className={styles.error}>{error}</p> : null}
+                <Button type="submit" variant="primary" fullWidth disabled={status === 'submitting'} iconAfter="arrow-right">
+                  {status === 'submitting' ? 'Saving…' : 'Save new password'}
+                </Button>
+              </form>
+              <p className={styles.alt}>
+                <button
+                  type="button"
+                  className={styles.linkBtn}
+                  onClick={() => {
+                    setView('forgot');
+                    setNotice('');
+                    reset();
+                  }}
+                >
+                  Send me another code
+                </button>
+              </p>
+            </>
           ) : (
             <>
               <Badge tone="gold">{badge ?? (isLogin ? 'Welcome back' : 'Join The Quarter')}</Badge>
@@ -207,6 +304,11 @@ export function AuthScreen({
                     ? 'Sign in to see your plan, book a room and redeem your perks.'
                     : 'Set up your member account to manage your plan, bookings and perks.')}
               </p>
+              {notice ? (
+                <p className={styles.info}>
+                  <Icon name="check" size={16} color="var(--gold-700)" /> {notice}
+                </p>
+              ) : null}
               {intro ? <div className={styles.intro}>{intro}</div> : null}
               <form className={styles.fields} onSubmit={handleAuth}>
                 {!isLogin ? (

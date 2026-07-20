@@ -19,7 +19,7 @@ import { awardPoints, checkinBonusesThisMonth, earnBoostForMember, CHECKIN_BONUS
 import { isQuietDay } from './_busyness.mjs';
 import { isClosedDay } from './_holidays.mjs';
 import { sendEmail, emailShell, escapeHtml, OPS_EMAIL, fmtDateLong } from './_email.mjs';
-import { pushToEmail } from './_push.mjs';
+import { pushToEmail, pushToAdmins } from './_push.mjs';
 
 const MS_SECRET = process.env.MEMBERSTACK_SECRET_KEY;
 const json = (b, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { 'content-type': 'application/json' } });
@@ -52,7 +52,7 @@ async function sendWeekendRequestEmails({ email, name, date }) {
     subject: `Weekend access requested — ${when} (${name})`,
     html: emailShell('Weekend access requested', `<p><strong>${escapeHtml(name)}</strong> (${escapeHtml(email)}) has requested weekend access for <strong>${escapeHtml(when)}</strong>.</p><p>Approve or decline in Admin → Today.</p>`, 'A member requested weekend access'),
   });
-  await pushToEmail(OPS_EMAIL, { title: 'New weekend request', body: `${name} · ${when}`, url: '/admin/' });
+  await pushToAdmins({ title: 'New weekend request', body: `${name} · ${when}`, url: '/admin/' });
 }
 
 function parseDays(raw) {
