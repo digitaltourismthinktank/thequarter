@@ -16,11 +16,18 @@
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 
 /**
- * Every email we send comes from The Quarter, never from another brand. Overridable via
- * RESEND_FROM so the address can be changed without a deploy — but the domain MUST be a
- * verified sending domain in the Resend account or Resend rejects the send.
+ * Every email we send comes from The Quarter, never from another brand.
+ *
+ * MUST be on a domain VERIFIED in the Resend account the API key belongs to, or Resend
+ * rejects the send outright. Today that account has exactly ONE verified domain:
+ * notifications.thequarter.work (eu-west-1). Sending as @thequarter.work fails until that
+ * apex is added and verified in this same account — DNS records alone are not enough, and
+ * the apex's existing resend records point at a different (us-east-1) account.
+ *
+ * Replies still reach a real inbox: every send sets replyTo: info@thequarter.work.
+ * Overridable via RESEND_FROM once the apex is verified, with no deploy needed.
  */
-export const FROM = process.env.RESEND_FROM || 'The Quarter <info@thequarter.work>';
+export const FROM = process.env.RESEND_FROM || 'The Quarter <no-reply@notifications.thequarter.work>';
 /** Operations inbox — all admin/ops notifications (bookings, requests, plan changes, etc.) land here. */
 export const OPS_EMAIL = 'info@thequarter.work';
 
@@ -50,6 +57,9 @@ export async function sendEmail({ to, subject, html, replyTo }) {
       }),
     });
     const data = await res.json().catch(() => ({}));
+    // Loudly. A rejected send (unverified From domain, bad key) used to fail silently and
+    // simply never arrive — this puts the reason in the Netlify function log.
+    if (!res.ok) console.error('[email] Resend rejected', res.status, JSON.stringify(data), '→', subject, 'from', FROM);
     return { ok: res.ok, status: res.status, id: data?.id ?? null, error: res.ok ? null : data };
   } catch (err) {
     return { ok: false, error: String(err?.message || err) };

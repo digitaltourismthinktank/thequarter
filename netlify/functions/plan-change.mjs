@@ -128,7 +128,11 @@ export default async function handler(req) {
     if (!email) return json({ error: 'no-email' }, 404);
 
     const sub = await findSubscription(email);
-    if (!sub) return json({ error: 'no-subscription' }, 404);
+    if (!sub) {
+      console.warn('[plan-change]', action, 'no live subscription for', email);
+      return json({ error: 'no-subscription' }, 404);
+    }
+    console.log('[plan-change]', action, email, 'sub', sub.id, 'status', sub.status);
 
     if (action === 'switch') {
       const item = sub.items?.data?.[0];
