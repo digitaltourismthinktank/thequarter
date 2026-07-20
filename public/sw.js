@@ -2,7 +2,13 @@
  * Deliberately conservative for a member portal: navigations and API calls always
  * go to the network (so auth state + live data are never stale); only same-origin
  * static assets are cached (cache-first, revalidated in the background). */
-const CACHE = 'quarter-v1';
+/* Bump this on any release that changes cached assets. The activate handler deletes every
+ * cache whose key isn't the current one, so changing the version purges stale HTML and CSS
+ * for everyone on their next open. Without a bump the name never changes, nothing is ever
+ * evicted, and a device that cached an old page keeps serving it — that page references the
+ * old hashed CSS, which is also still cached, so the staleness is self-consistent and can
+ * persist indefinitely. */
+const CACHE = 'quarter-v2';
 
 self.addEventListener('install', () => {
   self.skipWaiting();
