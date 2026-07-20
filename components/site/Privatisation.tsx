@@ -8,6 +8,7 @@ import { STRIPE_PUBLISHABLE_KEY } from '@/lib/commerce';
 import { PRIVATISATION_ROOMS, FREQUENCIES, WEEKDAYS, PRIVATISATION_MIN_MEMBERS, quarterlyAmount, type FrequencyId } from '@/lib/privatisation';
 import { privatisationSubscribe, privatisationAvailability } from '@/lib/booking';
 import { DatePickerModal } from './DatePickerModal';
+import { TalkToUs } from './TalkToUs';
 import { PREVIEW } from '@/lib/devMock';
 import styles from './Privatisation.module.css';
 import pay from './RoomBooking.module.css';
@@ -42,12 +43,17 @@ async function waitForNode(ref: { current: HTMLDivElement | null }): Promise<HTM
   return ref.current;
 }
 
+/** "Monday, Wednesday and Friday" from a list of weekday entries. */
+const listDays = (ds: typeof WEEKDAYS) =>
+  ds.length === 1 ? ds[0].label : `${ds.slice(0, -1).map((d) => d.label).join(', ')} and ${ds[ds.length - 1].label}`;
+
 const ERRORS: Record<string, string> = {
   'already-privatised': 'Our team rooms are fully booked out right now. Do get in touch and we’ll find you a date.',
   'min-members': `Privatisation is for teams of ${PRIVATISATION_MIN_MEMBERS} or more.`,
   'over-capacity': 'That’s more people than this room seats — pick the larger room or reduce the team size.',
   'days-mismatch': 'Please pick the number of days that matches your chosen frequency.',
   'weekday-taken': 'One of those days is already taken on this room — please pick another day or room.',
+  'weekday-partial': 'One of those days is only partly free on this room — message us and we’ll agree the dates with you.',
   'bad-email': 'Please enter a valid email address.',
   'missing-company': 'Please add your company name.',
   'bad-date': 'Please choose a start date.',
@@ -75,7 +81,7 @@ export function Privatisation() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Real-time per-weekday availability on the chosen room/cadence/start-date.
-  const [avail, setAvail] = useState<Record<number, 'free' | 'taken'>>({});
+  const [avail, setAvail] = useState<Record<number, 'free' | 'taken' | 'partial'>>({});
   const [checking, setChecking] = useState(false);
 
   const doneRef = useRef<HTMLDivElement>(null);
@@ -148,6 +154,7 @@ export function Privatisation() {
     if (!startDate) return setError(ERRORS['bad-date']);
     if (!wholeWeek && days.length !== freq.days) return setError(ERRORS['days-mismatch']);
     if (days.some((d) => avail[d] === 'taken')) return setError(ERRORS['weekday-taken']);
+    if (days.some((d) => avail[d] === 'partial')) return setError(ERRORS['weekday-partial']);
     if (PREVIEW) {
       setError('Checkout opens on the live site — this is a preview.');
       return;
@@ -263,16 +270,24 @@ export function Privatisation() {
             <div className={styles.dayRow}>
               {WEEKDAYS.map((d) => {
                 const taken = avail[d.id] === 'taken';
+                const partial = avail[d.id] === 'partial';
                 return (
                   <button
                     key={d.id}
                     type="button"
-                    className={`${styles.day} ${days.includes(d.id) ? styles.dayOn : ''}`}
+                    className={`${styles.day} ${days.includes(d.id) ? styles.dayOn : ''} ${partial ? styles.dayPartial : ''}`}
                     onClick={() => toggleDay(d.id)}
                     disabled={disabled || taken}
-                    title={taken ? 'That day’s taken on this room' : undefined}
+                    title={
+                      taken
+                        ? 'That day’s taken on this room'
+                        : partial
+                          ? 'Partly held on this room — some dates are free, talk to us'
+                          : undefined
+                    }
                   >
                     {d.short}
+                    {partial ? <span className={styles.dayPartialDot} aria-hidden="true" /> : null}
                   </button>
                 );
               })}
@@ -281,17 +296,39 @@ export function Privatisation() {
                 left people thinking a taken day was still on offer. */}
             {!checking && Object.keys(avail).length ? (
               (() => {
-                const free = WEEKDAYS.filter((d) => avail[d.id] !== 'taken');
+                const free = WEEKDAYS.filter((d) => !avail[d.id] || avail[d.id] === 'free');
+                const partial = WEEKDAYS.filter((d) => avail[d.id] === 'partial');
                 const taken = WEEKDAYS.filter((d) => avail[d.id] === 'taken');
-                const list = (ds: typeof WEEKDAYS) =>
-                  ds.length === 1 ? ds[0].label : `${ds.slice(0, -1).map((d) => d.label).join(', ')} and ${ds[ds.length - 1].label}`;
-                if (!taken.length) return <p className={styles.availNote}>Every weekday is free on {room.name}.</p>;
-                if (!free.length) return <p className={styles.availNoteTaken}>{room.name} is fully privatised — please choose another room.</p>;
+                const pickedPartial = partial.filter((d) => days.includes(d.id));
                 return (
-                  <p className={styles.availNote}>
-                    <strong>{list(free)}</strong> {free.length === 1 ? 'is' : 'are'} free on {room.name}. {list(taken)}{' '}
-                    {taken.length === 1 ? 'is' : 'are'} already taken.
-                  </p>
+                  <>
+                    {free.length ? (
+                      <p className={styles.availNote}>
+                        <strong>{listDays(free)}</strong> {free.length === 1 ? 'is' : 'are'} free on {room.name}.
+                        {taken.length ? ` ${listDays(taken)} ${taken.length === 1 ? 'is' : 'are'} already taken.` : ''}
+                      </p>
+                    ) : !partial.length ? (
+                      <p className={styles.availNoteTaken}>{room.name} is fully privatised — please choose another room.</p>
+                    ) : null}
+                    {partial.length ? (
+                      <p className={styles.availNote}>
+                        {listDays(partial)} {partial.length === 1 ? 'is' : 'are'} <strong>partly held</strong> — another company has some
+                        {partial.length === 1 ? ' of those dates' : ' of those dates'}, but not every week.
+                      </p>
+                    ) : null}
+                    {pickedPartial.length ? (
+                      <div className={styles.partialBox}>
+                        <p className={styles.partialText}>
+                          {listDays(pickedPartial)} {pickedPartial.length === 1 ? 'has' : 'have'} partial availability on {room.name} — we
+                          can usually make the free dates work, but they need agreeing with us rather than booking online.
+                        </p>
+                        <TalkToUs
+                          variant="solid"
+                          prefill={`Hi — I'd like to privatise ${room.name} on ${listDays(pickedPartial)}. I can see there's partial availability, could we check which dates are free?`}
+                        />
+                      </div>
+                    ) : null}
+                  </>
                 );
               })()
             ) : null}

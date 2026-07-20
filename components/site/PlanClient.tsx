@@ -17,6 +17,25 @@ const gbp = (n: number) => `£${Math.round(n).toLocaleString('en-GB')}`;
 type Term = 'monthly' | 'annual';
 type Pending = { kind: 'switch'; slug: PlanId; term: Term } | { kind: 'pause' } | { kind: 'resume' } | null;
 
+/** Say what actually went wrong — a blanket "something went wrong" left members stuck. */
+function planChangeError(code?: string): string {
+  switch (code) {
+    case 'no-subscription':
+      return 'We couldn’t find a card subscription on your account — if we invoice you directly, just message us and we’ll pause it for you.';
+    case 'no-email':
+      return 'We couldn’t match your account to your billing record — please message us and we’ll sort it.';
+    case 'not-configured':
+      return 'Billing isn’t available just this moment — please try again shortly.';
+    case 'invalid-token':
+    case 'missing-token':
+      return 'Please sign in again, then try once more.';
+    case 'stripe':
+      return 'Your bank or card provider wouldn’t complete that — you can also change it in the billing portal.';
+    default:
+      return 'Something went wrong — please try again, or manage it in the billing portal.';
+  }
+}
+
 export function PlanClient() {
   const { loading, member, refresh } = useMember();
   const currentSlug = memberPlanSlug(member) as PlanId | null;
@@ -59,6 +78,7 @@ export function PlanClient() {
     setDone(null);
     try {
       let ok = false;
+      let code: string | undefined;
       if (pending.kind === 'switch') {
         const priceId = PLAN_STRIPE_PRICE[pending.slug]?.[pending.term];
         if (!priceId) {
@@ -68,17 +88,20 @@ export function PlanClient() {
         }
         const r = await switchPlan(priceId);
         ok = r.ok;
+        code = (r.data as { error?: string } | undefined)?.error;
         if (ok) setDone('Done — your new plan starts at your next renewal.');
       } else if (pending.kind === 'pause') {
         const r = await pausePlan();
         ok = r.ok;
+        code = (r.data as { error?: string } | undefined)?.error;
         if (ok) setDone('Your membership is pausing — billing stops and your days are frozen.');
       } else {
         const r = await resumePlan();
         ok = r.ok;
+        code = (r.data as { error?: string } | undefined)?.error;
         if (ok) setDone('Welcome back — your membership is active again from today.');
       }
-      if (!ok) setErr('Something went wrong — please try again, or manage it in the billing portal.');
+      if (!ok) setErr(planChangeError(code));
       else {
         // The Stripe webhook updates Memberstack a few seconds later — poll so this
         // page reflects the new plan/pause state without a manual reload.

@@ -76,14 +76,27 @@ async function stripe(path, method, form) {
   return res.json();
 }
 
-/** Find the member's active membership subscription (the customer that carries one). */
+/**
+ * Find the member's live membership subscription.
+ *
+ * Deliberately NOT restricted to status='active': a member part-way through a trial
+ * (`trialing`) or behind on a payment (`past_due`/`unpaid`) still holds a real
+ * subscription and must be able to pause it. The old active-only query returned
+ * nothing for them, which surfaced as a flat "Something went wrong". Prefer a
+ * genuinely active/trialing sub, otherwise fall back to any other live one.
+ */
+const LIVE_STATUSES = ['active', 'trialing', 'past_due', 'unpaid', 'paused'];
 async function findSubscription(email) {
   const customers = await stripe(`/v1/customers?email=${encodeURIComponent(email)}&limit=10`, 'GET');
+  let fallback = null;
   for (const c of customers?.data || []) {
-    const subs = await stripe(`/v1/subscriptions?customer=${c.id}&status=active&limit=1`, 'GET');
-    if (subs?.data?.length) return subs.data[0];
+    const subs = await stripe(`/v1/subscriptions?customer=${c.id}&status=all&limit=10`, 'GET');
+    for (const s of subs?.data || []) {
+      if (s.status === 'active' || s.status === 'trialing') return s;
+      if (LIVE_STATUSES.includes(s.status) && !fallback) fallback = s;
+    }
   }
-  return null;
+  return fallback;
 }
 
 export default async function handler(req) {

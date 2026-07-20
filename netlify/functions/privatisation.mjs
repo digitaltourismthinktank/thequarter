@@ -120,28 +120,56 @@ async function spaceIdByName(name) {
  * This also closes the legacy-record and past-the-horizon gaps of the old date-based lock.
  * Fails OPEN (empty set) but logs when the room's space id can't be resolved.
  */
-async function takenWeekdaysForRoom(roomSlug) {
-  const taken = new Set();
+async function weekdayStatusForRoom(roomSlug) {
+  /** wd → 'taken' (a standing weekly hold) | 'partial' (occasional/monthly — some dates free) */
+  const status = new Map();
   const room = ROOMS[roomSlug];
-  if (!room) return taken;
+  if (!room) return status;
   const spaceId = await spaceIdByName(room.name);
   if (!spaceId) {
     console.warn(`privatisation: could not resolve space id for room "${room.name}" (${roomSlug}); weekday lock fails open`);
-    return taken; // fail open, but logged
+    return status; // fail open, but logged
   }
   const recs = await listRecords(T.bookings, {
     filterByFormula: `AND({Status}='Confirmed', OR({Kind}='Privatisation', {Kind}='Block', {Kind}='External'))`,
   });
+  // 'taken' always wins over 'partial', whichever order the records arrive in.
+  const mark = (wd, level) => {
+    if (level === 'taken') status.set(wd, 'taken');
+    else if (!status.has(wd)) status.set(wd, 'partial');
+  };
+  const datesByWeekday = new Map();
   for (const rec of recs) {
     const sp = rec.fields[F.bookings.space];
     if (!Array.isArray(sp) || !sp.includes(spaceId)) continue;
-    // Token first; for a Privatisation with no token, fall back to its own date's weekday
-    // so hand-entered arrangements (the common case for long-standing tenants) still lock.
-    const weekdays = parseSlots(rec) ?? (rec.fields[F.bookings.kind] === 'Privatisation' ? weekdaysFromDate(rec) : null);
-    if (!weekdays) continue; // still unparseable → skip (see parseSlots note)
-    for (const wd of weekdays) taken.add(wd);
+    const parsed = parsePrivatisationSlots(rec);
+    if (parsed?.weekdays?.length) {
+      // Known cadence: a weekly hold owns the weekday outright; a monthly one only takes
+      // one date a month, so the rest of that weekday is negotiable with the team.
+      for (const wd of parsed.weekdays) mark(wd, parsed.cadence === 'month' ? 'partial' : 'taken');
+      continue;
+    }
+    // No token (hand-entered). Only privatisations imply a standing arrangement — a one-off
+    // Block must never lock a weekday forever.
+    if (rec.fields[F.bookings.kind] !== 'Privatisation') continue;
+    const wds = weekdaysFromDate(rec);
+    if (!wds) continue;
+    const d = String(rec.fields[F.bookings.date]).slice(0, 10);
+    for (const wd of wds) {
+      if (!datesByWeekday.has(wd)) datesByWeekday.set(wd, new Set());
+      datesByWeekday.get(wd).add(d);
+    }
   }
-  return taken;
+  // Token-less rows: several dates on one weekday reads as a standing weekly arrangement;
+  // one or two reads as occasional — offer a conversation rather than refusing outright.
+  for (const [wd, dates] of datesByWeekday) mark(wd, dates.size >= 3 ? 'taken' : 'partial');
+  return status;
+}
+
+/** Weekdays that are hard-blocked (a standing weekly hold). Used by the checkout guard. */
+async function takenWeekdaysForRoom(roomSlug) {
+  const status = await weekdayStatusForRoom(roomSlug);
+  return new Set([...status].filter(([, v]) => v === 'taken').map(([k]) => k));
 }
 
 const json = (b, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { 'content-type': 'application/json' } });
@@ -191,12 +219,12 @@ export default async function handler(req) {
   // privatisation on the same room. Weekday-level exclusivity: a weekday is 'taken' iff any
   // confirmed privatisation on the room includes it (cadence/dates/horizon are irrelevant).
   if (action === 'availability') {
-    const taken = await takenWeekdaysForRoom(roomSlug);
+    const status = await weekdayStatusForRoom(roomSlug);
     // Report the requested subset if the client sent one; otherwise the full working week.
     const requested = normWeekdays(body.weekdays);
     const ids = requested.length ? requested : [1, 2, 3, 4, 5];
     const map = {};
-    for (const wd of ids) map[wd] = taken.has(wd) ? 'taken' : 'free';
+    for (const wd of ids) map[wd] = status.get(wd) || 'free';
     return json({ ok: true, weekdays: map });
   }
 
@@ -224,8 +252,12 @@ export default async function handler(req) {
     // Weekday-level clash check: refuse if ANY requested weekday is already exclusive to
     // another confirmed privatisation on this room. Different companies can share a room only
     // on different weekdays; sharing a weekday always collides, so no dates/horizon needed.
-    const taken = await takenWeekdaysForRoom(roomSlug);
-    if (normWeekdays(days).some((wd) => taken.has(wd))) return json({ error: 'weekday-taken' }, 400);
+    const status = await weekdayStatusForRoom(roomSlug);
+    const wanted = normWeekdays(days);
+    if (wanted.some((wd) => status.get(wd) === 'taken')) return json({ error: 'weekday-taken' }, 400);
+    // Partly-held weekdays (an occasional/monthly tenant) can't be sold self-serve — the
+    // free dates have to be agreed with the team, so route the enquirer to a conversation.
+    if (wanted.some((wd) => status.get(wd) === 'partial')) return json({ error: 'weekday-partial' }, 400);
 
     const price = await stripe('/v1/prices', 'POST', {
       currency: 'gbp',
