@@ -51,6 +51,22 @@ export function RewardsClient({ marketing }: { marketing: ReactNode }) {
   const [levelsOpen, setLevelsOpen] = useState(false);
   // The points card behaves like a real membership card: tap to turn it over.
   const [flipped, setFlipped] = useState(false);
+  // `turning` drives the edge-on moment. The content swaps while the card is a zero-width
+  // line, so the two sides are never visible together. Reduced-motion swaps instantly.
+  const [turning, setTurning] = useState(false);
+  function turnCard() {
+    if (turning) return;
+    const reduce = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    if (reduce) {
+      setFlipped((f) => !f);
+      return;
+    }
+    setTurning(true);
+    window.setTimeout(() => {
+      setFlipped((f) => !f); // swap content at the invisible midpoint
+      setTurning(false);
+    }, 200);
+  }
   const [birthday, setBirthday] = useState<BirthdayState>({ bday: null, claimed: null });
   const [loaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState(false);
@@ -162,69 +178,67 @@ export function RewardsClient({ marketing }: { marketing: ReactNode }) {
         <p className={`${styles.sub} ${styles.subDesktop}`}>Earn points by being here and spending locally, then spend them on treats around the Quarter.</p>
       </header>
 
-      {/* Quarter Points Card — a real card, front and back. */}
-      <div className={styles.cardFlip}>
-        <div className={`${styles.cardInner} ${flipped ? styles.cardTurned : ''}`}>
-        <div className={styles.face}>
-      <section
-        className={styles.pointsCard}
-        onClick={() => setFlipped(true)}
-        role="button"
-        tabIndex={0}
-        aria-label="Turn card over"
-        onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), setFlipped(true))}
-      >
-        <span className={styles.arc} aria-hidden="true" />
-        <div className={styles.pcLeft}>
-          <span className={styles.pcOver}>Quarter Points</span>
-          <span className={styles.pcName}>
-            {memberName} · {level.name}
-          </span>
-          <div className={styles.pcBalance}>
-            <strong>{points.toLocaleString('en-GB')}</strong>
-            <span>points</span>
-          </div>
-          <span className={styles.pcNext}>
-            {prog.next ? `${prog.toGo.toLocaleString('en-GB')} points to ${prog.next.name}` : 'Top tier reached — thank you'}
-          </span>
-          {earnedLately > 0 ? <span className={styles.pcPill}>+{earnedLately.toLocaleString('en-GB')} earned lately</span> : null}
-          {/* The one thing the levels rail said about *you*, lifted up to where you are. */}
-          <span className={styles.pcRate}>{level.boost === 1 ? 'Base earn rate' : `Earning ${Math.round((level.boost - 1) * 100)}% faster`}</span>
-        </div>
-        <div className={styles.ring} style={{ '--pct': String(prog.pct) } as CSSProperties}>
-          <div className={styles.ringHole}>
-            <strong>{prog.pct}%</strong>
-            <span>{prog.next ? `to ${prog.next.name}` : 'top tier'}</span>
-          </div>
-        </div>
-        <span className={styles.flipHint} aria-hidden="true">Tap to turn over</span>
-      </section>
-        </div>
+      {/* The membership card, front and back.
 
-      {/* Back — what this level actually gets you, and how long you've been here. */}
-        <div className={`${styles.face} ${styles.cardBack}`}>
-      <section
-        className={styles.pointsCard}
-        onClick={() => setFlipped(false)}
-        role="button"
-        tabIndex={flipped ? 0 : -1}
-        aria-label="Turn card back"
-        onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), setFlipped(false))}
-      >
-        <div className={styles.pcLeft}>
-          <span className={styles.pcOver}>{level.name} member</span>
-          {joined ? <span className={styles.pcSince}>Here since {joined}</span> : null}
-          <ul className={styles.backPerks}>
-            {level.perks.map((perk) => (
-              <li key={perk}>{perk}</li>
-            ))}
-          </ul>
-          <span className={styles.pcRate}>{level.boost === 1 ? 'Base earn rate' : `Earning ${Math.round((level.boost - 1) * 100)}% faster`}</span>
-        </div>
-        <span className={styles.flipHint} aria-hidden="true">Tap to turn back</span>
-      </section>
-        </div>
-        </div>
+          Rebuilt to end a run of iOS flip bugs. Three earlier attempts used a real 3D flip
+          (two faces, backface-visibility, preserve-3d) and each broke on Safari a different
+          way — both faces showing at once, mirrored, because WebKit handles those two
+          properties unreliably. This does NOT use them. Only ONE face is ever in the DOM;
+          the card turns edge-on (rotateY 90°, zero width, invisible), swaps its content at
+          that instant, and turns back. There is no second face to bleed through, so the bug
+          is structurally impossible rather than merely fixed. */}
+      <div className={styles.cardFlip}>
+        <section
+          className={`${styles.pointsCard} ${turning ? styles.turning : ''} ${flipped ? styles.showingBack : ''}`}
+          onClick={turnCard}
+          role="button"
+          tabIndex={0}
+          aria-label={flipped ? 'Turn card back' : 'Turn card over'}
+          onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), turnCard())}
+        >
+          {!flipped ? (
+            <>
+              <span className={styles.arc} aria-hidden="true" />
+              <div className={styles.pcLeft}>
+                <span className={styles.pcOver}>Quarter Points</span>
+                <span className={styles.pcName}>
+                  {memberName} · {level.name}
+                </span>
+                <div className={styles.pcBalance}>
+                  <strong>{points.toLocaleString('en-GB')}</strong>
+                  <span>points</span>
+                </div>
+                <span className={styles.pcNext}>
+                  {prog.next ? `${prog.toGo.toLocaleString('en-GB')} points to ${prog.next.name}` : 'Top tier reached — thank you'}
+                </span>
+                {earnedLately > 0 ? <span className={styles.pcPill}>+{earnedLately.toLocaleString('en-GB')} earned lately</span> : null}
+                {/* The one thing the levels rail said about *you*, lifted up to where you are. */}
+                <span className={styles.pcRate}>{level.boost === 1 ? 'Base earn rate' : `Earning ${Math.round((level.boost - 1) * 100)}% faster`}</span>
+              </div>
+              <div className={styles.ring} style={{ '--pct': String(prog.pct) } as CSSProperties}>
+                <div className={styles.ringHole}>
+                  <strong>{prog.pct}%</strong>
+                  <span>{prog.next ? `to ${prog.next.name}` : 'top tier'}</span>
+                </div>
+              </div>
+              <span className={styles.flipHint} aria-hidden="true">Tap to turn over</span>
+            </>
+          ) : (
+            <>
+              <div className={styles.pcLeft}>
+                <span className={styles.pcOver}>{level.name} member</span>
+                {joined ? <span className={styles.pcSince}>Here since {joined}</span> : null}
+                <ul className={styles.backPerks}>
+                  {level.perks.map((perk) => (
+                    <li key={perk}>{perk}</li>
+                  ))}
+                </ul>
+                <span className={styles.pcRate}>{level.boost === 1 ? 'Base earn rate' : `Earning ${Math.round((level.boost - 1) * 100)}% faster`}</span>
+              </div>
+              <span className={styles.flipHint} aria-hidden="true">Tap to turn back</span>
+            </>
+          )}
+        </section>
       </div>
 
       {/* Levels — named tiers everyone climbs by earning points over time. Four full-width

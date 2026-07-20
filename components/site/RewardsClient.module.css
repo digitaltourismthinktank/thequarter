@@ -676,60 +676,31 @@
 /* Must sit after the `@media (max-width: 560px) { .pointsCard { flex-direction: column } }`
    rule earlier in this file — equal specificity, so source order decides. */
 
+/* One card, turned in place. See the JSX comment for why this replaced the 3D flip: no
+   backface-visibility, no preserve-3d, no second face — the two properties WebKit could not
+   be trusted with are simply not used. The card carries its own dark ground, so the
+   edge-on instant shows the card's colour, never the page. */
 .cardFlip {
-  perspective: 1400px;
+  perspective: 1200px;
   margin-bottom: 28px;
 }
-.cardInner {
-  position: relative;
-  transform-style: preserve-3d;
-  transition: transform 620ms cubic-bezier(0.2, 0.8, 0.25, 1);
-}
-.cardTurned {
-  transform: rotateY(180deg);
-}
-/* The face is the 3D layer: it carries the rotation and the backface, and it deliberately
-   has NO overflow of its own. .pointsCard keeps its overflow:hidden (it needs it, to clip
-   the decorative arc) but is now a plain child rather than the transformed element.
-
-   That separation is the whole fix. WebKit flattens an element that is both 3D-transformed
-   and overflow-clipped: mid-turn the card's gradient dropped out entirely while its text
-   and ring carried on painting, which is why the animation looked like loose parts flying
-   about rather than a card turning. Clip inside the layer, transform the layer. */
-.face {
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
+/* The card itself rotates. `turning` takes it to edge-on (a zero-width line), where the
+   React state swaps the content, then it releases back to flat — two 200ms halves. */
+.pointsCard {
+  transition: transform 200ms ease-in;
   cursor: pointer;
 }
-.face > .pointsCard {
-  margin-bottom: 0;
-  height: 100%;
+.turning {
+  transform: rotateY(90deg);
 }
-.cardBack {
-  position: absolute;
-  inset: 0;
-  transform: rotateY(180deg);
-}
-
-/* The visibility step that used to live here WAS the light flash.
-   It swapped the faces at 310ms — half of 620ms — on the assumption that the card is
-   edge-on at the halfway point. It isn't: the easing is cubic-bezier(0.2, 0.8, …), which
-   is deliberately fast out of the gate, so the rotation passes 90 degrees at roughly a
-   quarter of the duration. Between there and 310ms the front was turned away (hidden by
-   backface-visibility) while the back was still visibility:hidden — both faces invisible,
-   for about a sixth of a second, showing the page behind. Hence the pale flash.
-   backface-visibility alone is correct now that the transformed element is no longer the
-   overflow-clipped one, so the step is gone. */
-
-/* Insurance for the genuine edge-on instant: the container doesn't rotate, so a card-shaped
-   dark ground sits behind the turn and there is never light showing through. */
-.cardFlip {
-  background: var(--ink-900);
-  border-radius: var(--radius-xl);
-}
-/* The back holds one column of text, so it reads better top-aligned than centred. */
-.cardBack > .pointsCard {
+/* The back is a single left-aligned column; the front is space-between with the ring. */
+.showingBack {
   align-items: flex-start;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pointsCard {
+    transition: none;
+  }
 }
 .pcSince {
   display: block;
@@ -801,18 +772,12 @@
   .ringHole span {
     font-size: 9px;
   }
-  .cardBack > .pointsCard {
+  .showingBack {
     padding-top: 20px;
   }
   .backPerks {
     gap: 6px;
     font-size: var(--text-xs);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .cardInner {
-    transition: none;
   }
 }
 
