@@ -278,3 +278,12 @@
     padding-bottom: calc(var(--tabbar-h) + 40px);
   }
 }
+
+/* A chosen character sits where the initials disc was — same 38px footprint, same round
+   silhouette, so the header doesn't reflow when someone picks one. */
+.avatarArt {
+  flex: none;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+}

@@ -745,6 +745,8 @@ export interface ProfileFields {
   phone?: string;
   role?: string;
   dietary?: string;
+  /** Chosen Quarter Character id (see lib/characters.ts), or '' to clear. */
+  character?: string;
 }
 export const saveProfile = (body: ProfileFields) =>
   call<{ ok: boolean; bday: string | null; company: string | null; phone: string | null; role: string | null; dietary: string | null }>(

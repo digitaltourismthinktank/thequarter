@@ -9,8 +9,8 @@ import { cn } from '@/lib/cn';
 import { isAdminEmail } from '@/lib/admin';
 import { useMember, memberPlanSlug } from './useMember';
 import { getMemberstack, memberName, memberInitials, memberDaysRemaining } from '@/lib/memberstack';
-import { ProfileEditor } from './ProfileEditor';
 import { MobileTabBar } from './MobileTabBar';
+import { QuarterCharacter } from './QuarterCharacter';
 import { CheckInSheet } from './CheckInSheet';
 import styles from './MemberShell.module.css';
 
@@ -39,8 +39,7 @@ async function logout() {
  */
 export function MemberShell({ children, wide = false }: { children: ReactNode; wide?: boolean }) {
   const pathname = usePathname() || '';
-  const { member, refresh } = useMember();
-  const [profileOpen, setProfileOpen] = useState(false);
+  const { member } = useMember();
   const [checkInOpen, setCheckInOpen] = useState(false);
   const onAdmin = pathname.startsWith('/admin');
 
@@ -60,6 +59,7 @@ export function MemberShell({ children, wide = false }: { children: ReactNode; w
 
   const name = memberName(member) || 'Member';
   const initials = memberInitials(member);
+  const character = typeof member?.metaData?.character === 'string' ? member.metaData.character : null;
   const slug = memberPlanSlug(member);
   const days = memberDaysRemaining(member);
   const planLabel = slug ? cap(slug) : member?.planConnections?.length ? 'Member' : null;
@@ -108,13 +108,19 @@ export function MemberShell({ children, wide = false }: { children: ReactNode; w
               </Link>
             ) : null}
 
-            <button type="button" className={styles.identity} onClick={() => setProfileOpen(true)} title="Edit your details">
+            <Link href="/account" className={styles.identity} title="Your account">
               <span className={styles.idText}>
                 <strong className={styles.idName}>{name}</strong>
                 {sub ? <span className={styles.idSub}>{sub}</span> : null}
               </span>
-              <span className={styles.avatar} aria-hidden="true">{initials}</span>
-            </button>
+              {/* A chosen Quarter Character stands in for the initials; initials are the
+                  fallback for anyone who hasn't picked one. */}
+              {character ? (
+                <QuarterCharacter id={character} size={38} className={styles.avatarArt} />
+              ) : (
+                <span className={styles.avatar} aria-hidden="true">{initials}</span>
+              )}
+            </Link>
 
             <button type="button" className={styles.logout} onClick={logout} aria-label="Log out" title="Log out">
               <Icon name="log-out" size={17} />
@@ -129,7 +135,6 @@ export function MemberShell({ children, wide = false }: { children: ReactNode; w
       {!onAdmin ? <MobileTabBar onCheckIn={() => setCheckInOpen(true)} /> : null}
       <CheckInSheet open={checkInOpen} onClose={() => setCheckInOpen(false)} />
 
-      {profileOpen ? <ProfileEditor member={member} onClose={() => setProfileOpen(false)} onSaved={refresh} /> : null}
     </div>
   );
 }

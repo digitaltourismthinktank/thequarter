@@ -8,7 +8,7 @@
  * evicted, and a device that cached an old page keeps serving it — that page references the
  * old hashed CSS, which is also still cached, so the staleness is self-consistent and can
  * persist indefinitely. */
-const CACHE = 'quarter-v13';
+const CACHE = 'quarter-v14';
 
 self.addEventListener('install', () => {
   self.skipWaiting();

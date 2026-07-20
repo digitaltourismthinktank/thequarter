@@ -1,0 +1,60 @@
+/* A grid of pilgrims. Three up on a phone, more as the screen allows — the art carries the
+   choice, so the names are a caption rather than the thing you read. */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+  gap: 10px;
+}
+.item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 6px;
+  min-height: 44px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-card);
+  font: inherit;
+  cursor: pointer;
+  transition:
+    border-color var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-out);
+}
+.item:hover {
+  transform: translateY(-2px);
+  border-color: var(--gold-400);
+}
+.item:disabled {
+  opacity: 0.55;
+  cursor: default;
+  transform: none;
+}
+/* The chosen one is ringed rather than filled, so the artwork keeps its own colours. */
+.itemOn {
+  border-color: var(--gold-500);
+  box-shadow: 0 0 0 2px var(--gold-200) inset;
+}
+.art {
+  display: block;
+}
+.name {
+  font-size: var(--text-2xs);
+  font-weight: var(--fw-semibold);
+  color: var(--text-muted);
+  text-align: center;
+  line-height: 1.25;
+}
+.itemOn .name {
+  color: var(--ink-900);
+}
+.note {
+  margin: 12px 0 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+.error {
+  margin: 8px 0 0;
+  font-size: var(--text-sm);
+  color: var(--danger);
+}

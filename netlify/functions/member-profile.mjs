@@ -15,6 +15,10 @@ import { pushToEmail, pushToAdmins } from './_push.mjs';
 const MS_SECRET = process.env.MEMBERSTACK_SECRET_KEY;
 const json = (b, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { 'content-type': 'application/json' } });
 
+/* Mirrors lib/characters.ts. Duplicated deliberately: Netlify Functions are plain .mjs
+   and can't import the TS module, and an allowlist is worth the duplication. */
+const CHARACTER_IDS = ['knight', 'squire', 'yeoman', 'prioress', 'second-nun', 'monk', 'friar', 'merchant', 'clerk', 'lawyer', 'franklin', 'cook', 'shipman', 'physician', 'wife-of-bath', 'parson', 'plowman', 'miller', 'manciple', 'host'];
+
 export default async function handler(req) {
   if (!MS_SECRET) return json({ error: 'not-configured' }, 503);
   if (req.method !== 'POST') return json({ error: 'method-not-allowed' }, 405);
@@ -36,6 +40,11 @@ export default async function handler(req) {
   if (typeof body.phone === 'string') meta.phone = body.phone.trim() || null;
   if (typeof body.role === 'string') meta.role = body.role.trim() || null; // "what you do" — for intros/events
   if (typeof body.dietary === 'string') meta.dietary = body.dietary.trim() || null; // for catered events
+  // Quarter Character — validated against the fixed set rather than stored free-form, so a
+  // bad value can never reach the avatar renderer and blank someone's identity everywhere.
+  if (typeof body.character === 'string') {
+    meta.character = CHARACTER_IDS.includes(body.character) ? body.character : null;
+  }
   // A VAT-invoice request — flagged for admin to action manually (our Stripe prices
   // are VAT-inclusive). Stamped with the request time; admin clears it when done.
   if (body.vatRequest === true) meta.vatRequested = new Date().toISOString();
