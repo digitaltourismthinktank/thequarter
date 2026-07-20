@@ -152,7 +152,7 @@ export function RewardsClient({ marketing }: { marketing: ReactNode }) {
       <div className={styles.cardFlip}>
         <div className={`${styles.cardInner} ${flipped ? styles.cardTurned : ''}`}>
       <section
-        className={styles.pointsCard}
+        className={`${styles.pointsCard} ${styles.cardFront}`}
         onClick={() => setFlipped(true)}
         role="button"
         tabIndex={0}

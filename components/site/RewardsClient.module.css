@@ -695,6 +695,34 @@
   -webkit-backface-visibility: hidden;
   cursor: pointer;
 }
+
+/* backface-visibility alone is not enough here. WebKit ignores it on an element that also
+   has overflow:hidden — which .pointsCard needs, to clip its decorative arc — so on iOS the
+   front stayed painted and showed through the back, mirrored, ring and all. Hiding the
+   inactive face outright is the reliable fix. The visibility flips as a step exactly at the
+   halfway point of the 620ms turn, when the card is edge-on and nothing is legible anyway,
+   so the swap is invisible. */
+.cardFront,
+.cardBack {
+  transition: visibility 0s linear 310ms;
+}
+.cardBack {
+  visibility: hidden;
+}
+.cardTurned .cardFront {
+  visibility: hidden;
+}
+.cardTurned .cardBack {
+  visibility: visible;
+}
+
+/* No turn, no midpoint to hide at — swap immediately. */
+@media (prefers-reduced-motion: reduce) {
+  .cardFront,
+  .cardBack {
+    transition: none;
+  }
+}
 .cardBack {
   position: absolute;
   inset: 0;

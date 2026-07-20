@@ -1,0 +1,72 @@
+/* Wallet-style presentation: dim everything, then let the card rise and settle. */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(20, 17, 13, 0.72);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  animation: fade var(--duration-fast) var(--ease-standard);
+}
+.stage {
+  width: 100%;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+}
+/* The settle is the whole trick: it comes up from below, overshoots very slightly, and
+   lands — which is what makes it read as a physical pass rather than a modal. */
+.card {
+  width: 100%;
+  animation: rise 560ms cubic-bezier(0.16, 0.9, 0.24, 1.02);
+  transform-origin: 50% 100%;
+}
+.done {
+  padding: 12px 26px;
+  min-height: 44px;
+  border: 1px solid rgba(250, 247, 240, 0.28);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--sand-50);
+  cursor: pointer;
+  animation: fade var(--duration-base) var(--ease-standard) 160ms backwards;
+}
+.done:hover {
+  border-color: var(--gold-400);
+  color: var(--gold-400);
+}
+
+@keyframes rise {
+  from {
+    transform: translateY(46px) scale(0.94);
+    opacity: 0;
+  }
+  60% {
+    opacity: 1;
+  }
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .overlay,
+  .card,
+  .done {
+    animation: none;
+  }
+}

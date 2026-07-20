@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/ds/Button';
 import { Icon } from '@/components/ds/Icon';
 import { StatTile } from '@/components/ds/StatTile';
+import { MemberCardSheet } from './MemberCardSheet';
 import { QuarterCard } from '@/components/ds/QuarterCard';
 import { cn } from '@/lib/cn';
 import { busyness } from '@/lib/busyness';
@@ -31,6 +32,7 @@ const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 export function DashboardClient() {
   const { loading, member, refresh } = useMember();
   const bdaySet = !!(member?.metaData as { bday?: string } | undefined)?.bday;
+  const [cardOpen, setCardOpen] = useState(false);
   const [planName, setPlanName] = useState<string | null>(null);
   const [billingBusy, setBillingBusy] = useState(false);
   const [billingError, setBillingError] = useState<string | null>(null);
@@ -319,7 +321,7 @@ export function DashboardClient() {
         <aside className={styles.rail}>
           {/* Phones only: a tight one-card summary that stands in for the big membership card AND
               the days/plan/door tiles, so the top of the screen isn't three stacked blocks. */}
-          <div className={styles.mSum} aria-hidden={false}>
+          <button type="button" className={styles.mSum} onClick={() => setCardOpen(true)} aria-label="Show your membership card">
             <div className={styles.mSumTop}>
               <div className={styles.mSumId}>
                 <strong className={styles.mSumName}>{display ?? email}</strong>
@@ -337,7 +339,8 @@ export function DashboardClient() {
                 <span>Door <b>{doorCode ?? '—'}</b></span>
               </div>
             ) : null}
-          </div>
+            <span className={styles.mSumHint} aria-hidden="true">Tap for your card</span>
+          </button>
           <div className={styles.ordCard}>
             <QuarterCard
               memberName={display ?? email}
@@ -411,6 +414,21 @@ export function DashboardClient() {
           </div>
         </aside>
       </div>
+
+      {/* The full membership card, wallet-style. Same QuarterCard the desktop rail shows —
+          it's hidden below 600px, so this is the only way a member on a phone ever sees it. */}
+      <MemberCardSheet open={cardOpen} onClose={() => setCardOpen(false)}>
+        <QuarterCard
+          memberName={display ?? email}
+          plan={isPaused ? 'Paused' : slug ? cap(slug) : hasPlan ? 'Member' : 'Guest'}
+          cardId={cardId}
+          level={level}
+          points={points ?? undefined}
+          rewards={rewardsReady ?? undefined}
+          logoSrc="/brand/logo-wordmark-black.png"
+          style={{ maxWidth: '100%' }}
+        />
+      </MemberCardSheet>
 
       {debug ? (
         <pre className={styles.debug}>

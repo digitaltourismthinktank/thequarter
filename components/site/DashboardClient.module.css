@@ -423,3 +423,23 @@
     display: none;
   }
 }
+
+/* The compact summary is now a button, so it needs to stop looking like a bare <button>
+   and start looking like the card it opens. */
+.mSum {
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+}
+.mSumHint {
+  display: block;
+  margin-top: 10px;
+  font-size: var(--text-2xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  color: var(--gold-500);
+}
