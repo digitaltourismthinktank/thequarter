@@ -35,7 +35,10 @@ export const metadata: Metadata = {
       { url: '/favicon.ico', sizes: 'any' },
       { url: '/icon.png', type: 'image/png' },
     ],
-    apple: '/icon.png',
+    // iOS wants 180x180 for the home screen; pointing it at the 512 made it downscale
+    // every time. All of these are deliberately RGB with no alpha — iOS composites any
+    // transparency onto white, which is what put a white wedge in the cut corner.
+    apple: [{ url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }],
   },
   openGraph: {
     type: 'website',
