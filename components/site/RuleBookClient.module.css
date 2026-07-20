@@ -1,0 +1,151 @@
+.state {
+  color: var(--text-muted);
+  padding: 60px 0;
+  text-align: center;
+}
+.header {
+  margin-bottom: 20px;
+}
+.eyebrow {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  color: var(--gold-700);
+  font-weight: var(--fw-semibold);
+}
+.h1 {
+  font-size: var(--text-xl);
+  font-weight: var(--fw-bold);
+  letter-spacing: -0.02em;
+  margin: 6px 0 6px;
+  text-wrap: balance;
+}
+.sub {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  max-width: 68ch;
+  margin: 0;
+  line-height: var(--leading-normal);
+}
+.search {
+  width: 100%;
+  padding: 12px 14px;
+  min-height: 44px;
+  margin-bottom: 20px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--ink-900);
+}
+
+/* The things true of every row, stated once so the rows can stay short. */
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px 20px;
+  margin-bottom: 28px;
+  padding: 16px 18px;
+  border: 1px solid var(--gold-300);
+  border-radius: var(--radius-lg);
+  background: var(--gold-100);
+}
+.fact dt {
+  font-size: var(--text-2xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  font-weight: var(--fw-bold);
+  color: var(--gold-700);
+}
+.fact dd {
+  margin: 2px 0 0;
+  font-size: var(--text-sm);
+  color: var(--ink-900);
+  overflow-wrap: anywhere;
+}
+
+.section {
+  margin-bottom: 28px;
+}
+.h2 {
+  font-size: var(--text-lg);
+  font-weight: var(--fw-bold);
+  margin: 0 0 2px;
+}
+.blurb {
+  margin: 0 0 12px;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.row {
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 16px 18px;
+}
+.rowHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.trigger {
+  font-size: var(--text-base);
+  font-weight: var(--fw-bold);
+  color: var(--ink-900);
+  margin: 0;
+}
+/* The provenance is the point — anything doubtful can be read at source. */
+.source {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--text-2xs);
+  color: var(--text-muted);
+  background: var(--sand-100);
+  border-radius: var(--radius-sm, 6px);
+  padding: 3px 8px;
+  white-space: nowrap;
+  overflow-wrap: anywhere;
+}
+.effects {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px 20px;
+  margin: 0;
+}
+.effects dt {
+  font-size: var(--text-2xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  font-weight: var(--fw-bold);
+  color: var(--gold-700);
+}
+.effects dd {
+  margin: 2px 0 0;
+  font-size: var(--text-sm);
+  color: var(--text-body);
+  line-height: var(--leading-normal);
+}
+.wide {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 600px) {
+  .row {
+    padding: 14px;
+  }
+  .rowHead {
+    flex-direction: column;
+    gap: 4px;
+  }
+  .effects {
+    grid-template-columns: 1fr;
+  }
+}

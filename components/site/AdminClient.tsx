@@ -2137,6 +2137,10 @@ function ScreensPane() {
       <div className={styles.panel}>
         <span className={styles.panelTitle}>Screens &amp; links</span>
         <div className={styles.shortcuts}>
+          {/* The reference for "does that send an email?" — the question nobody could answer. */}
+          <a className={styles.shortcut} href="/admin/rules">
+            <Icon name="badge-check" size={16} color="var(--gold-700)" /> What happens automatically
+          </a>
           <a className={styles.shortcut} href="/screen" target="_blank" rel="noreferrer">
             <Icon name="monitor" size={16} color="var(--gold-700)" /> Entrance screen
           </a>
