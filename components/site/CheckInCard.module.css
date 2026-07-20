@@ -310,3 +310,14 @@
     margin-top: 12px;
   }
 }
+
+/* Only true on a phone, where the tab bar's centre button is the thing being pointed at. */
+.metaPhone {
+  display: none;
+}
+@media (max-width: 600px) {
+  .metaPhone {
+    display: block;
+    margin-top: 4px;
+  }
+}

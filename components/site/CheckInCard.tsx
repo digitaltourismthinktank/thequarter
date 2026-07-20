@@ -100,13 +100,17 @@ export function CheckInCard({ className }: { className?: string }) {
   const nextOpen = nextOpenDay(todayIso);
   const nextLabel = nextOpen === addDaysIso(todayIso, 1) ? 'tomorrow' : weekdayLong(nextOpen);
 
+  // The first question Home should answer is "when am I next in?" — so the heading states it
+  // rather than opening with a form. Planned days come back sorted, but don't rely on it.
+  const nextPlanned = (status?.planned ?? []).filter((p) => p.date > todayIso).sort((a, b) => a.date.localeCompare(b.date))[0];
+
   const plannedDates = status?.planned?.map((p) => p.date) ?? [];
   const pendingOnly = pending.filter((d) => !plannedDates.includes(d));
   const showPlanned = plannedDates.length > 0 || pendingOnly.length > 0;
 
   return (
     <div className={cn(styles.card, className)}>
-      <span className={styles.eyebrow}>Book a visit</span>
+      <span className={styles.eyebrow}>Your visits</span>
 
       {/* Unmissable acknowledgement that the check-in landed, and what it earned. */}
       {confirmed ? (
@@ -135,8 +139,21 @@ export function CheckInCard({ className }: { className?: string }) {
                 {status.length === 'Half' ? `Half day${status.period ? ` · ${status.period === 'am' ? 'morning' : 'afternoon'}` : ''}` : 'Full day'} — enjoy The Quarter.
               </p>
             </>
+          ) : nextPlanned ? (
+            <>
+              <h2 className={styles.title}>Next in {fmtDate(nextPlanned.date)}</h2>
+              <p className={styles.meta}>
+                {nextPlanned.length === 'Half'
+                  ? `Half day${nextPlanned.period ? ` · ${nextPlanned.period === 'am' ? 'morning' : 'afternoon'}` : ''}`
+                  : 'Full day'}
+                {nextPlanned.kind === 'pass' ? ' · day pass' : ''}
+              </p>
+            </>
           ) : (
-            <h2 className={styles.title}>Coming in?</h2>
+            <>
+              <h2 className={styles.title}>Nothing booked yet</h2>
+              <p className={cn(styles.meta, styles.metaPhone)}>Tap the check-in button below when you arrive, or plan a day.</p>
+            </>
           )}
 
           {/* Full / Half — applies to checking in today and to any days you plan. */}
