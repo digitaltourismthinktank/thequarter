@@ -258,11 +258,7 @@ export function Privatisation() {
           <div className={styles.field}>
             <span className={styles.label}>
               Which day{freq.days > 1 ? 's' : ''}? <span className={styles.hint}>pick {freq.days}</span>
-              {checking ? (
-                <span className={styles.hint}> · checking availability…</span>
-              ) : Object.values(avail).includes('taken') ? (
-                <span className={styles.hint}> · greyed days are taken on this room</span>
-              ) : null}
+              {checking ? <span className={styles.hint}> · checking availability…</span> : null}
             </span>
             <div className={styles.dayRow}>
               {WEEKDAYS.map((d) => {
@@ -281,6 +277,24 @@ export function Privatisation() {
                 );
               })}
             </div>
+            {/* Say plainly which days this room can actually take — a greyed button alone
+                left people thinking a taken day was still on offer. */}
+            {!checking && Object.keys(avail).length ? (
+              (() => {
+                const free = WEEKDAYS.filter((d) => avail[d.id] !== 'taken');
+                const taken = WEEKDAYS.filter((d) => avail[d.id] === 'taken');
+                const list = (ds: typeof WEEKDAYS) =>
+                  ds.length === 1 ? ds[0].label : `${ds.slice(0, -1).map((d) => d.label).join(', ')} and ${ds[ds.length - 1].label}`;
+                if (!taken.length) return <p className={styles.availNote}>Every weekday is free on {room.name}.</p>;
+                if (!free.length) return <p className={styles.availNoteTaken}>{room.name} is fully privatised — please choose another room.</p>;
+                return (
+                  <p className={styles.availNote}>
+                    <strong>{list(free)}</strong> {free.length === 1 ? 'is' : 'are'} free on {room.name}. {list(taken)}{' '}
+                    {taken.length === 1 ? 'is' : 'are'} already taken.
+                  </p>
+                );
+              })()
+            ) : null}
           </div>
         ) : null}
 

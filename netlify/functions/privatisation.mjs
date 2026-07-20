@@ -87,6 +87,22 @@ function privatisationDates(cadence, weekdays, startDate, months = HORIZON_MONTH
  */
 const parseSlots = (rec) => parsePrivatisationSlots(rec)?.weekdays ?? null;
 
+/**
+ * Fallback for a Privatisation row whose Notes carry no `slots=` token — e.g. one entered
+ * by hand in Airtable rather than through checkout. A confirmed privatisation IS a standing
+ * weekly/monthly arrangement, so the weekday of its own Date is the weekday it occupies.
+ * Deliberately NOT applied to Block/External rows: a one-off Tuesday block must not lock
+ * Tuesdays for privatisation forever. Weekdays only (1..5).
+ */
+function weekdaysFromDate(rec) {
+  const raw = rec.fields[F.bookings.date];
+  if (!raw) return null;
+  const s = String(raw).slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+  const dow = new Date(`${s}T00:00:00Z`).getUTCDay();
+  return dow >= 1 && dow <= 5 ? [dow] : null;
+}
+
 const normName = (s) => String(s ?? '').toLowerCase().replace(/[‘’']/g, "'").replace(/\s+/g, ' ').trim();
 async function spaceIdByName(name) {
   const recs = await listRecords(T.spaces, {});
@@ -119,8 +135,10 @@ async function takenWeekdaysForRoom(roomSlug) {
   for (const rec of recs) {
     const sp = rec.fields[F.bookings.space];
     if (!Array.isArray(sp) || !sp.includes(spaceId)) continue;
-    const weekdays = parseSlots(rec);
-    if (!weekdays) continue; // unparseable → skip (see parseSlots note)
+    // Token first; for a Privatisation with no token, fall back to its own date's weekday
+    // so hand-entered arrangements (the common case for long-standing tenants) still lock.
+    const weekdays = parseSlots(rec) ?? (rec.fields[F.bookings.kind] === 'Privatisation' ? weekdaysFromDate(rec) : null);
+    if (!weekdays) continue; // still unparseable → skip (see parseSlots note)
     for (const wd of weekdays) taken.add(wd);
   }
   return taken;

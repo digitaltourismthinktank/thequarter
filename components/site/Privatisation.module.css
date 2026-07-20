@@ -242,3 +242,23 @@
     position: static;
   }
 }
+
+/* Plain-English availability line under the weekday picker — a greyed-out button on its
+   own read as "still bookable" to enquirers, which is how a taken room looked free. */
+.availNote {
+  margin-top: 10px;
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  color: var(--text-body);
+}
+.availNote strong {
+  color: var(--ink-900);
+  font-weight: var(--fw-semibold);
+}
+.availNoteTaken {
+  margin-top: 10px;
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  color: var(--gold-700);
+  font-weight: var(--fw-semibold);
+}
