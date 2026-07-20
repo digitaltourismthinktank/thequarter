@@ -237,3 +237,28 @@
     padding: 24px var(--gutter) 72px;
   }
 }
+
+/* Phones: six tabs cannot fit across ~360px, so Rewards, Perks and Plan were scrolled off
+   the right edge with the scrollbar hidden — effectively undiscoverable. Show the icon only
+   for inactive tabs and keep the label on the current one, so the whole set fits on screen
+   and where you are stays obvious. */
+@media (max-width: 600px) {
+  .tabs {
+    gap: 2px;
+    overflow-x: visible;
+  }
+  .tab {
+    padding: 8px 10px;
+    gap: 0;
+  }
+  .tab span {
+    display: none;
+  }
+  .tabOn {
+    gap: 7px;
+    padding: 8px 14px;
+  }
+  .tabOn span {
+    display: inline;
+  }
+}

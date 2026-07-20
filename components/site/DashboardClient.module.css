@@ -378,3 +378,31 @@
 .email {
   overflow-wrap: anywhere;
 }
+
+/* Phones: the greeting block ate the top of the screen before anything useful, and the
+   busyness strip — which you read, not act on — sat above the check-in card, pushing the
+   primary action below the fold. Tighten the greeting and demote busyness below the things
+   members actually come here to do. */
+@media (max-width: 600px) {
+  .title {
+    font-size: var(--text-xl);
+    margin-top: 4px;
+  }
+  .email {
+    font-size: var(--text-xs);
+    margin-top: 4px;
+  }
+  .page {
+    gap: 16px;
+  }
+  .busy {
+    order: 7;
+    padding: 16px 18px;
+  }
+  .ordEvents { order: 8; }
+  .ordCarnet { order: 9; }
+  .ordBirthday { order: 10; }
+  .linksCard { order: 11; }
+  .ordInstall { order: 12; }
+  .ordNotif { order: 13; }
+}
