@@ -56,7 +56,7 @@ export function CheckInSheet({ open, onClose }: { open: boolean; onClose: () => 
   const [period, setPeriod] = useState<'am' | 'pm'>('am');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState<{ points: number } | null>(null);
+  const [done, setDone] = useState<{ points: number; usedCarnet?: boolean; passesLeft?: number | null } | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -94,7 +94,7 @@ export function CheckInSheet({ open, onClose }: { open: boolean; onClose: () => 
       setError(friendly(r.data?.error));
       haptic([8, 40, 8]); // a stutter, so a failure doesn't feel like a success
     } else {
-      setDone({ points: r.data?.pointsAwarded ?? 0 });
+      setDone({ points: r.data?.pointsAwarded ?? 0, usedCarnet: r.data?.usedCarnet, passesLeft: r.data?.carnetRemaining ?? null });
       haptic(18);
       playChime('success');
     }
@@ -116,6 +116,14 @@ export function CheckInSheet({ open, onClose }: { open: boolean; onClose: () => 
               {half ? `Half day · ${period === 'am' ? 'morning' : 'afternoon'}` : 'Full day'}
               {done.points > 0 ? ` · +${done.points} points` : ''}
             </p>
+            {/* Spending a pass without saying so would look like a pass going missing. */}
+            {done.usedCarnet ? (
+              <p className={styles.note}>
+                Your plan days were used up, so this came from a day pass in your carnet
+                {typeof done.passesLeft === 'number' ? ` — ${done.passesLeft} left` : ''}.
+                {half ? ' A pass covers a whole day.' : ''}
+              </p>
+            ) : null}
             <button type="button" className={styles.cta} onClick={onClose}>
               Done
             </button>

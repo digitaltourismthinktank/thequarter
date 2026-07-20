@@ -268,7 +268,7 @@ export const bookTour = (b: { date: string; time: string; name: string; email: s
 // Check-in
 export const getCheckinToday = () => call<CheckinStatus>('checkin?action=today');
 export const checkInToday = (length: 'Full' | 'Half', period?: DayPeriod | null) =>
-  call<{ ok: boolean; balance: string | null; pointsAwarded?: number; alreadyCheckedIn?: boolean }>('checkin', {
+  call<{ ok: boolean; balance: string | null; pointsAwarded?: number; alreadyCheckedIn?: boolean; usedCarnet?: boolean; carnetRemaining?: number | null }>('checkin', {
     method: 'POST',
     body: { action: 'checkin', length, ...(length === 'Half' && period ? { period } : {}) },
   });

@@ -177,23 +177,46 @@ export default async function handler(req) {
       return json({ ok: true, alreadyCheckedIn: true, balance: me.customFields?.['days-remaining'] ?? null });
     }
 
-    // Block a check-in when the allowance is exhausted — a metered member with fewer days
-    // left than this visit costs (e.g. a Hybrid member's SECOND check-in in a month, 0 < 1)
-    // can't check in. Runs AFTER the same-day idempotency guard so an already-checked-in
-    // member still returns alreadyCheckedIn, not no-allowance.
+    // Spend the plan's days first, and only fall back to a carnet pass once they're gone.
+    //
+    // That ordering is what a member expects — the days are already paid for this month and
+    // expire with it, whereas carnet passes are theirs to keep — but until now there was no
+    // fallback at all: check-in only ever looked at `days-remaining`, so someone holding ten
+    // paid passes was still told "no days left" and had to go and find a different button on
+    // a different card to use one. Being refused entry while holding passes you bought is
+    // the worst version of this, so the fallback is automatic and the response says which
+    // was spent.
     const current = parseDays(me.customFields?.['days-remaining']);
-    if (!unlimited && current !== null && current < cost) {
+    const outOfDays = !unlimited && current !== null && current < cost;
+
+    const carnet = me.metaData?.carnet || {};
+    const passesLeft = Math.max(0, Number(carnet.remaining) || 0);
+    const carnetLive = passesLeft > 0 && !(carnet.expires && carnet.expires < today);
+    const useCarnet = outOfDays && carnetLive;
+
+    if (outOfDays && !useCarnet) {
       return json({ error: 'no-allowance' }, 400);
     }
 
-    // Deduct from the Memberstack balance (unless unlimited).
+    // Deduct from the Memberstack balance (unless unlimited, or paying with a pass).
     let newBalance = me.customFields?.['days-remaining'] ?? null;
-    if (!unlimited) {
+    if (!unlimited && !useCarnet) {
       const next = current === null ? null : Math.max(0, current - cost);
       if (next !== null) {
         newBalance = String(next);
         await setDays(me.id, newBalance);
       }
+    }
+    // A carnet pass covers a whole day, so a half day still costs one — there is no half
+    // pass. Worth surfacing to the member rather than quietly charging a full one.
+    let carnetRemaining = null;
+    if (useCarnet) {
+      carnetRemaining = passesLeft - 1;
+      const msAdmin = memberstackAdmin.init(MS_SECRET);
+      await msAdmin.members.update({
+        id: me.id,
+        data: { metaData: { ...(me.metaData || {}), carnet: { ...carnet, remaining: carnetRemaining } } },
+      });
     }
 
     // Flip an existing Planned record to Checked-in, else create one.
@@ -203,8 +226,9 @@ export default async function handler(req) {
         [F.checkins.status]: 'Checked-in',
         [F.checkins.length]: length,
         [F.checkins.notes]: periodNote,
-        [F.checkins.dayCost]: unlimited ? 0 : cost,
+        [F.checkins.dayCost]: unlimited || useCarnet ? 0 : cost,
         [F.checkins.source]: 'Self',
+        ...(useCarnet ? { [F.checkins.notes]: `${periodNote ? periodNote + ' · ' : ''}Carnet pass` } : {}),
       });
     } else {
       await createRecord(T.checkins, {
@@ -233,7 +257,7 @@ export default async function handler(req) {
     } catch {
       /* points are best-effort; never block a check-in */
     }
-    return json({ ok: true, balance: newBalance, pointsAwarded });
+    return json({ ok: true, balance: newBalance, pointsAwarded, usedCarnet: useCarnet, carnetRemaining });
   }
 
   // Reserve a future day. No deduction until they actually check in. Weekends are
