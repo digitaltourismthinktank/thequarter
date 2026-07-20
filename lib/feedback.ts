@@ -1,14 +1,21 @@
 /**
  * Haptics and sound — the small physical cues that make a web app feel less like a page.
  *
- * HAPTICS, HONESTLY: `navigator.vibrate` works on Android (Chrome, Firefox, Samsung
- * Internet) and is NOT implemented in Safari on iOS, in the browser or in an installed PWA.
- * Apple has never shipped it. So on an iPhone every call here is a no-op — the code is safe
- * and does nothing. There is a known trick using an off-screen `<input type="checkbox"
- * switch>` (iOS 17.4+ plays a system haptic when a switch toggles), but it depends on an
- * undocumented side-effect of a UI control, needs a real element in the DOM to fake-click,
- * and Apple can take it away in a point release. Deliberately not used — see the note in
- * the account screen instead, which tells members the truth.
+ * HAPTICS: two mechanisms, because the platforms are not equal.
+ *
+ * Android (Chrome, Firefox, Samsung Internet) implements `navigator.vibrate`. Straightforward.
+ *
+ * iOS does not, and never has — not in Safari, not in an installed PWA. What it does have,
+ * since iOS 17.4, is a system haptic played when a `<label>`-wrapped `<input type="checkbox"
+ * switch>` is toggled. Clicking such a label programmatically produces that haptic. This is
+ * an undocumented side-effect of a UI control, not an API: Apple could remove it in any
+ * point release, and if they do this degrades to silence rather than breaking anything.
+ * The switch is hidden from assistive tech and takes no space.
+ *
+ * Known limits of the iOS trick, so nobody is surprised: it only fires inside a real user
+ * gesture, it plays ONE fixed system haptic — patterns and intensities are not available,
+ * so `haptic([8,40,8])` feels the same as `haptic(8)` — and it needs the device's System
+ * Haptics setting on.
  *
  * SOUND: synthesised with the Web Audio API rather than shipped as audio files — a chime
  * is a few sine tones, and this way there is nothing to download, nothing to cache and no
@@ -35,12 +42,62 @@ export function setSoundMuted(off: boolean): void {
   }
 }
 
-/** A short vibration. No-op where unsupported, which includes every iPhone. */
+/* The hidden iOS switch. Created once, on demand, and kept for the life of the page. */
+let iosSwitch: HTMLInputElement | null = null;
+let iosChecked = false;
+
+function iosHapticElement(): HTMLInputElement | null {
+  if (typeof document === 'undefined') return null;
+  if (iosSwitch?.isConnected) return iosSwitch;
+
+  const label = document.createElement('label');
+  // Off-screen rather than display:none — a hidden control can't be clicked meaningfully.
+  label.setAttribute('aria-hidden', 'true');
+  label.style.cssText = 'position:fixed;top:-100px;left:-100px;width:1px;height:1px;opacity:0;pointer-events:none;';
+
+  const input = document.createElement('input');
+  input.type = 'checkbox';
+  // The `switch` attribute is the whole point: iOS 17.4+ plays a system haptic when a
+  // control rendered as a switch toggles. Browsers that don't know it ignore it.
+  input.setAttribute('switch', '');
+  input.tabIndex = -1;
+
+  label.appendChild(input);
+  document.body.appendChild(label);
+  iosSwitch = input;
+  return input;
+}
+
+/** True for iOS/iPadOS, including iPadOS pretending to be a Mac (touch + MacIntel). */
+function isAppleTouch(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent;
+  return /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
+/**
+ * A short haptic tick. Uses navigator.vibrate where it exists, and the iOS switch trick
+ * where it doesn't. Silent — never throwing — anywhere neither works.
+ *
+ * The `pattern` argument is honoured on Android only; iOS has exactly one haptic to give.
+ */
 export function haptic(pattern: number | number[] = 8): void {
   try {
-    navigator.vibrate?.(pattern);
+    if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+      navigator.vibrate(pattern);
+      return;
+    }
+    if (!isAppleTouch()) return;
+    const el = iosHapticElement();
+    if (!el) return;
+    // Toggle rather than always-check: a switch only plays the haptic when its state
+    // actually changes, so re-checking an already-checked box would be silent.
+    iosChecked = !iosChecked;
+    el.checked = iosChecked;
+    el.dispatchEvent(new Event('change', { bubbles: false }));
+    el.click();
   } catch {
-    /* ignore */
+    /* a haptic is never worth an exception */
   }
 }
 
