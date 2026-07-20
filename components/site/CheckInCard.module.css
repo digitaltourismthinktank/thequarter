@@ -288,3 +288,25 @@
     display: flex;
   }
 }
+
+/* Phones: the tab bar's centre button owns "check in today" now, so this card stops being
+   a form and becomes a status: where you're next in, what's coming up, and a quiet way to
+   plan another day. The length/period pickers and the action buttons live in the sheet —
+   keeping them here was the duplication that made Home feel cluttered. */
+@media (max-width: 600px) {
+  .seg,
+  .periodSeg,
+  .actions {
+    display: none;
+  }
+  .card {
+    padding: 16px 18px;
+  }
+  .title {
+    font-size: var(--text-md);
+    margin: 6px 0 2px;
+  }
+  .planned {
+    margin-top: 12px;
+  }
+}
