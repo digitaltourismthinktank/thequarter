@@ -130,8 +130,12 @@ async function weekdayStatusForRoom(roomSlug) {
     console.warn(`privatisation: could not resolve space id for room "${room.name}" (${roomSlug}); weekday lock fails open`);
     return status; // fail open, but logged
   }
+  // Only what still lies ahead matters — a booking last spring says nothing about whether a
+  // weekday is available now. Includes 'Company' because the long-standing tenants are
+  // recorded that way (e.g. With You hold Tue+Thu as Kind='Company').
+  const today = new Date().toISOString().slice(0, 10);
   const recs = await listRecords(T.bookings, {
-    filterByFormula: `AND({Status}='Confirmed', OR({Kind}='Privatisation', {Kind}='Block', {Kind}='External'))`,
+    filterByFormula: `AND({Status}='Confirmed', DATETIME_FORMAT({Date}, 'YYYY-MM-DD')>='${esc(today)}', OR({Kind}='Privatisation', {Kind}='Block', {Kind}='External', {Kind}='Company'))`,
   });
   // 'taken' always wins over 'partial', whichever order the records arrive in.
   const mark = (wd, level) => {
@@ -149,9 +153,12 @@ async function weekdayStatusForRoom(roomSlug) {
       for (const wd of parsed.weekdays) mark(wd, parsed.cadence === 'month' ? 'partial' : 'taken');
       continue;
     }
-    // No token (hand-entered). Only privatisations imply a standing arrangement — a one-off
-    // Block must never lock a weekday forever.
-    if (rec.fields[F.bookings.kind] !== 'Privatisation') continue;
+    // No token — a standing arrangement entered by staff. Source tells these apart from
+    // ordinary self-serve/paid bookings ('Web'), which must NOT lock a weekday: a single
+    // paid Tuesday meeting can't make Tuesdays unavailable to privatise.
+    const kind = rec.fields[F.bookings.kind];
+    const staffEntered = rec.fields[F.bookings.source] === 'Admin';
+    if (!staffEntered && kind !== 'Privatisation') continue;
     const wds = weekdaysFromDate(rec);
     if (!wds) continue;
     const d = String(rec.fields[F.bookings.date]).slice(0, 10);
@@ -160,8 +167,9 @@ async function weekdayStatusForRoom(roomSlug) {
       datesByWeekday.get(wd).add(d);
     }
   }
-  // Token-less rows: several dates on one weekday reads as a standing weekly arrangement;
-  // one or two reads as occasional — offer a conversation rather than refusing outright.
+  // Several future dates on one weekday reads as a standing weekly arrangement; one or two
+  // reads as occasional or monthly (Walbrook's monthly Wednesdays) — offer a conversation
+  // rather than either refusing outright or, worse, selling a day someone already holds.
   for (const [wd, dates] of datesByWeekday) mark(wd, dates.size >= 3 ? 'taken' : 'partial');
   return status;
 }
