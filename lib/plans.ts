@@ -117,6 +117,33 @@ export const PLANS: Plan[] = [
   },
 ];
 
+/**
+ * Free meeting-room hours per calendar month, by plan — the number shown on the public plan
+ * pages and enforced server-side.
+ *
+ * MIRRORS PLAN_ROOM_HOURS in netlify/functions/_entitlement.mjs, which is the authority.
+ * Netlify functions are plain .mjs and cannot import this TypeScript module, so the two are
+ * kept in step by hand. If you change one, change the other — a mismatch here advertises an
+ * allowance the server will refuse, which is the worst of both.
+ *
+ * Pods are not covered by this: they're open to everyone on any plan, capped at two
+ * continuous hours so nobody holds one all day.
+ */
+export const PLAN_ROOM_HOURS: Record<string, number> = {
+  'day-pass': 0,
+  'hybrid-office': 0,
+  visitor: 2,
+  resident: 4,
+  citizen: 8,
+};
+
+/** "2 hours of meeting room a month, for you and your clients" — or null when none. */
+export function roomHoursLine(planId: string): string | null {
+  const h = PLAN_ROOM_HOURS[planId];
+  if (!h) return null;
+  return `${h} hours of meeting room a month — for you and your clients`;
+}
+
 export function getPlan(id: PlanId): Plan | undefined {
   return PLANS.find((p) => p.id === id);
 }

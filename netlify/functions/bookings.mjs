@@ -16,6 +16,7 @@ import { BUSINESS, hhmmToMin, isWeekday, londonWallClockToISO, isoToLondonMin, i
 import { isClosedDay } from './_holidays.mjs';
 import { isRecurringBlockRule, recurringBlockOccurrences, parsePrivatisationSlots, isPrivatisedOn } from './_privatisation.mjs';
 import { notifyAdmins, fmtDateTime, dayBar } from './_email.mjs';
+import { canBook } from './_entitlement.mjs';
 
 /** A released company hold no longer blocks the room. */
 const isReleased = (r, dateStr, nowMin, todayStr) =>
@@ -313,6 +314,16 @@ export default async function handler(req) {
 
     const s = hhmmToMin(start);
     const e = hhmmToMin(end);
+
+    // Entitlement. This endpoint used to check nothing beyond a valid token, so a day-pass
+    // visitor with no plan booked meeting rooms for a day he had not bought, and plan members
+    // could sail past their monthly cap by booking here rather than on the public page.
+    const spaceRecs = await listRecords(T.spaces, { filterByFormula: `RECORD_ID()='${esc(spaceId)}'`, maxRecords: 1 });
+    const spaceRec = spaceRecs[0];
+    if (!spaceRec) return json({ error: 'missing-space' }, 400);
+    const gate = await canBook({ member: me, email, spaceRec, dateStr: date, startMin: s, endMin: e });
+    if (!gate.ok) return json(gate, 403);
+
     const nowC = londonNow();
     const existing = await bookingsForSpaceDate(spaceId, date);
     const clash = existing.some((r) => {
@@ -387,6 +398,19 @@ export default async function handler(req) {
 
     const s = hhmmToMin(start);
     const e = hhmmToMin(end);
+
+    // Amending is booking again — without this, a member could book inside their allowance
+    // and then stretch the same booking to any length. Admins are exempt (they already
+    // amend paid bookings), and the booking being moved is excluded from the month's usage
+    // so it isn't counted against the member twice.
+    if (!admin) {
+      const spaceRecs = await listRecords(T.spaces, { filterByFormula: `RECORD_ID()='${esc(spaceId)}'`, maxRecords: 1 });
+      const spaceRec = spaceRecs[0];
+      if (!spaceRec) return json({ error: 'no-space' }, 400);
+      const gate = await canBook({ member: me, email, spaceRec, dateStr: date, startMin: s, endMin: e, excludeBookingId: bookingId });
+      if (!gate.ok) return json(gate, 403);
+    }
+
     const nowC = londonNow();
     const existing = await bookingsForSpaceDate(spaceId, date);
     const clash = existing.some((x) => {

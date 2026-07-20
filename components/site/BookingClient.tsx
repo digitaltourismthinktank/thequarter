@@ -427,6 +427,16 @@ function friendly(code?: string): string {
       return 'The Quarter is closed that day (bank holiday or seasonal closure).';
     case 'bad-increment':
       return 'Please use 30-minute increments.';
+    // Entitlement refusals. Each says what to do next rather than only what went wrong —
+    // these are the messages someone hits when they're keen to book, not doing anything odd.
+    case 'rooms-need-plan':
+      return 'Meeting rooms come with a membership plan. Phone pods are open to you today — or talk to us about a plan.';
+    case 'no-access-that-day':
+      return 'You don’t have access on that day yet — buy a day pass for it first, then book the space.';
+    case 'pod-too-long':
+      return 'Phone pods are two hours at a time, so everyone gets a turn. Longer than that is possible — just ask the team.';
+    case 'cap-exceeded':
+      return 'That would use more meeting-room hours than your plan includes this month. Ask the team, or book and pay for the extra time.';
     case 'network':
       return 'Network problem — please try again.';
     default:
