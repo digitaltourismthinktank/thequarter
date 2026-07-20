@@ -688,20 +688,31 @@
 .cardTurned {
   transform: rotateY(180deg);
 }
-/* The front defines the height; the back is laid over it, already turned. */
-.cardInner > .pointsCard {
-  margin-bottom: 0;
+/* The face is the 3D layer: it carries the rotation and the backface, and it deliberately
+   has NO overflow of its own. .pointsCard keeps its overflow:hidden (it needs it, to clip
+   the decorative arc) but is now a plain child rather than the transformed element.
+
+   That separation is the whole fix. WebKit flattens an element that is both 3D-transformed
+   and overflow-clipped: mid-turn the card's gradient dropped out entirely while its text
+   and ring carried on painting, which is why the animation looked like loose parts flying
+   about rather than a card turning. Clip inside the layer, transform the layer. */
+.face {
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
   cursor: pointer;
 }
+.face > .pointsCard {
+  margin-bottom: 0;
+  height: 100%;
+}
+.cardBack {
+  position: absolute;
+  inset: 0;
+  transform: rotateY(180deg);
+}
 
-/* backface-visibility alone is not enough here. WebKit ignores it on an element that also
-   has overflow:hidden — which .pointsCard needs, to clip its decorative arc — so on iOS the
-   front stayed painted and showed through the back, mirrored, ring and all. Hiding the
-   inactive face outright is the reliable fix. The visibility flips as a step exactly at the
-   halfway point of the 620ms turn, when the card is edge-on and nothing is legible anyway,
-   so the swap is invisible. */
+/* Belt and braces behind backface-visibility, which WebKit has been unreliable about here.
+   The step lands at the midpoint of the turn, when the card is edge-on and unreadable. */
 .cardFront,
 .cardBack {
   transition: visibility 0s linear 310ms;
@@ -723,10 +734,8 @@
     transition: none;
   }
 }
-.cardBack {
-  position: absolute;
-  inset: 0;
-  transform: rotateY(180deg);
+/* The back holds one column of text, so it reads better top-aligned than centred. */
+.cardBack > .pointsCard {
   align-items: flex-start;
 }
 .pcSince {
@@ -799,7 +808,7 @@
   .ringHole span {
     font-size: 9px;
   }
-  .cardBack {
+  .cardBack > .pointsCard {
     padding-top: 20px;
   }
   .backPerks {

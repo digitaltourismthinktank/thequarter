@@ -151,8 +151,9 @@ export function RewardsClient({ marketing }: { marketing: ReactNode }) {
       {/* Quarter Points Card — a real card, front and back. */}
       <div className={styles.cardFlip}>
         <div className={`${styles.cardInner} ${flipped ? styles.cardTurned : ''}`}>
+        <div className={`${styles.face} ${styles.cardFront}`}>
       <section
-        className={`${styles.pointsCard} ${styles.cardFront}`}
+        className={styles.pointsCard}
         onClick={() => setFlipped(true)}
         role="button"
         tabIndex={0}
@@ -184,10 +185,12 @@ export function RewardsClient({ marketing }: { marketing: ReactNode }) {
         </div>
         <span className={styles.flipHint} aria-hidden="true">Tap to turn over</span>
       </section>
+        </div>
 
       {/* Back — what this level actually gets you, and how long you've been here. */}
+        <div className={`${styles.face} ${styles.cardBack}`}>
       <section
-        className={`${styles.pointsCard} ${styles.cardBack}`}
+        className={styles.pointsCard}
         onClick={() => setFlipped(false)}
         role="button"
         tabIndex={flipped ? 0 : -1}
@@ -206,6 +209,7 @@ export function RewardsClient({ marketing }: { marketing: ReactNode }) {
         </div>
         <span className={styles.flipHint} aria-hidden="true">Tap to turn back</span>
       </section>
+        </div>
         </div>
       </div>
 
