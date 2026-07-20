@@ -79,6 +79,12 @@ export interface MemberstackDom {
   onAuthChange(cb: (member: Member | null) => void): { unsubscribe: () => boolean };
   sendMemberResetPasswordEmail(p: { email: string }): Promise<{ data: string }>;
   resetMemberPassword(p: { token: string; newPassword: string }): Promise<{ data: unknown }>;
+  /** Passwordless sign-in: email a one-time code, then exchange it for a session.
+      Verified against the CDN SDK — /auth/passwordless/login/send and /auth/passwordless/login.
+      loginMemberPasswordless stores the member + access token itself, exactly like the
+      password path, so no extra session handling is needed here. */
+  sendMemberLoginPasswordlessEmail(p: { email: string }): Promise<{ data: unknown }>;
+  loginMemberPasswordless(p: { email: string; passwordlessToken: string }): Promise<{ data: unknown }>;
   addPlan(p: { planId: string }): Promise<{ data: unknown }>;
   getPlan(p: { planId: string }): Promise<{ data: { id?: string; name?: string } | null }>;
   getPlans(): Promise<{ data: Array<{ id?: string; name?: string }> }>;

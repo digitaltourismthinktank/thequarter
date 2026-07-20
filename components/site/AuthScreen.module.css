@@ -172,3 +172,11 @@
     padding: 32px var(--gutter);
   }
 }
+
+/* Two links now sit here (passwordless + forgotten password) — space them and let them
+   wrap on a narrow phone rather than colliding. */
+.forgot {
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}

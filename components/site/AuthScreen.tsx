@@ -41,13 +41,17 @@ export function AuthScreen({
 }) {
   const isLogin = mode === 'login';
   const router = useRouter();
-  const [view, setView] = useState<'main' | 'forgot' | 'code'>('main');
+  const [view, setView] = useState<'main' | 'forgot' | 'code' | 'link'>('main');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   // Password reset: Memberstack emails a CODE, so we collect it here along with the new
   // password (the old flow only said "check your inbox" and gave nowhere to enter it).
   const [resetCode, setResetCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  // Passwordless sign-in — restored after we dropped the Memberstack pop-up modal, which
+  // was the only place members could use it.
+  const [linkCode, setLinkCode] = useState('');
+  const [linkSent, setLinkSent] = useState(false);
   const [notice, setNotice] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -63,6 +67,17 @@ export function AuthScreen({
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const params = new URLSearchParams(window.location.search);
+    // A passwordless email may link back with the token — go straight to that step. Checked
+    // first so it can't be mistaken for a password-reset code.
+    const pless = params.get('passwordlessToken');
+    if (pless && pless.trim()) {
+      setLinkCode(pless.trim());
+      setLinkSent(true);
+      setView('link');
+      const pre = params.get('email');
+      if (pre) setEmail(pre);
+      return;
+    }
     const tok = params.get('token') || params.get('code');
     if (tok && tok.trim()) {
       setResetCode(tok.trim());
@@ -198,6 +213,55 @@ export function AuthScreen({
     }
   }
 
+  /** Where a member lands once signed in — shared by the password and passwordless paths. */
+  function goAfterLogin(addr: string) {
+    const wanted = new URLSearchParams(window.location.search).get('redirect');
+    const safe = wanted && wanted.startsWith('/') && !wanted.startsWith('//') ? wanted : null;
+    router.push(safe ?? (isAdminEmail(addr) ? '/admin' : '/dashboard'));
+  }
+
+  /** Passwordless step 1 — email a one-time sign-in code. */
+  async function handleSendLink(e: FormEvent) {
+    e.preventDefault();
+    setStatus('submitting');
+    setError('');
+    const ms = await getMemberstack();
+    if (!ms) {
+      setStatus('error');
+      setError('Could not reach the member service. Please try again.');
+      return;
+    }
+    try {
+      await ms.sendMemberLoginPasswordlessEmail({ email });
+      setStatus('idle');
+      setLinkSent(true);
+      setNotice('We’ve emailed you a sign-in code — enter it below.');
+    } catch (err) {
+      setStatus('error');
+      setError(memberstackError(err));
+    }
+  }
+
+  /** Passwordless step 2 — exchange the code for a session. */
+  async function handlePasswordlessLogin(e: FormEvent) {
+    e.preventDefault();
+    setStatus('submitting');
+    setError('');
+    const ms = await getMemberstack();
+    if (!ms) {
+      setStatus('error');
+      setError('Could not reach the member service. Please try again.');
+      return;
+    }
+    try {
+      await ms.loginMemberPasswordless({ email, passwordlessToken: linkCode.trim() });
+      goAfterLogin(email);
+    } catch (err) {
+      setStatus('error');
+      setError(memberstackError(err));
+    }
+  }
+
   const reset = () => {
     setStatus('idle');
     setError('');
@@ -243,6 +307,75 @@ export function AuthScreen({
                   }}
                 >
                   Back to sign in
+                </button>
+              </p>
+            </>
+          ) : view === 'link' ? (
+            <>
+              <Badge tone="gold">Sign in</Badge>
+              <h1 className={styles.title}>Sign in without a password</h1>
+              <p className={styles.subtitle}>
+                {linkSent ? 'Enter the code we’ve just emailed you.' : 'We’ll email you a one-time code — no password needed.'}
+              </p>
+              {notice && linkSent ? (
+                <p className={styles.info}>
+                  <Icon name="check" size={16} color="var(--gold-700)" /> {notice}
+                </p>
+              ) : null}
+              <form className={styles.fields} onSubmit={linkSent ? handlePasswordlessLogin : handleSendLink}>
+                <Input
+                  label="Email"
+                  type="email"
+                  icon="user"
+                  placeholder="you@company.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  autoComplete="email"
+                />
+                {linkSent ? (
+                  <Input
+                    label="Sign-in code"
+                    type="text"
+                    placeholder="Paste the code from your email"
+                    value={linkCode}
+                    onChange={(e) => setLinkCode(e.target.value)}
+                    required
+                    autoComplete="one-time-code"
+                  />
+                ) : null}
+                {status === 'error' ? <p className={styles.error}>{error}</p> : null}
+                <Button type="submit" variant="primary" fullWidth disabled={status === 'submitting'} iconAfter="arrow-right">
+                  {status === 'submitting' ? (linkSent ? 'Signing in…' : 'Sending…') : linkSent ? 'Sign in' : 'Email me a code'}
+                </Button>
+              </form>
+              {linkSent ? (
+                <p className={styles.alt}>
+                  <button
+                    type="button"
+                    className={styles.linkBtn}
+                    onClick={() => {
+                      setLinkSent(false);
+                      setLinkCode('');
+                      setNotice('');
+                      reset();
+                    }}
+                  >
+                    Send me another code
+                  </button>
+                </p>
+              ) : null}
+              <p className={styles.alt}>
+                <button
+                  type="button"
+                  className={styles.linkBtn}
+                  onClick={() => {
+                    setView('main');
+                    setNotice('');
+                    reset();
+                  }}
+                >
+                  Sign in with a password instead
                 </button>
               </p>
             </>
@@ -372,6 +505,21 @@ export function AuthScreen({
                 />
                 {isLogin ? (
                   <div className={styles.forgot}>
+                    {/* Passwordless lived only in the Memberstack pop-up modal we dropped, so
+                        members lost it entirely — this is the way back to it. */}
+                    <button
+                      type="button"
+                      className={styles.linkBtn}
+                      onClick={() => {
+                        setView('link');
+                        setLinkSent(false);
+                        setLinkCode('');
+                        setNotice('');
+                        reset();
+                      }}
+                    >
+                      Email me a code instead
+                    </button>
                     <button
                       type="button"
                       className={styles.linkBtn}
