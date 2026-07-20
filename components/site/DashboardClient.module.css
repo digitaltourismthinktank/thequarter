@@ -99,6 +99,11 @@
     display: flex;
     flex-direction: column;
     gap: 16px;
+    /* The grid above sets align-items:start, which is right for two columns of unequal
+       height but wrong once this is a column stack: it makes every card shrink to its
+       content width, so short cards (the member card especially) sat at ~55% width while
+       everything below them was full-bleed. */
+    align-items: stretch;
   }
   .mainCol,
   .rail {

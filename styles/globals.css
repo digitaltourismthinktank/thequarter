@@ -38,3 +38,14 @@
 }
 
 html { scroll-behavior: smooth; }
+
+/* CookieScript injects a persistent "Cookie settings" badge into <body> at
+   position:fixed; left:10px; bottom:0; z-index:99999 — which lands squarely on top of the
+   member app's fixed tab bar, covering the Home and Book labels. It isn't ours to restyle
+   at source, and it must stay reachable (withdrawing consent is not optional), so lift it
+   clear of the bar rather than hiding it. The tab bar only exists below 860px. */
+@media (max-width: 860px) {
+  :root[data-member-app] #cookiescript_badge {
+    bottom: calc(72px + env(safe-area-inset-bottom)) !important;
+  }
+}

@@ -44,18 +44,17 @@ export function MemberShell({ children, wide = false }: { children: ReactNode; w
   const [checkInOpen, setCheckInOpen] = useState(false);
   const onAdmin = pathname.startsWith('/admin');
 
-  // The Crisp launcher floats bottom-right, directly on top of the new tab bar (and its
-  // raised check-in button). Inside the member app the bubble is hidden and chat is opened
-  // deliberately, from a "Talk to us" control; it re-hides when the conversation closes.
-  // The public marketing site keeps its launcher — this only applies while the shell is
-  // mounted. Pushing to $crisp before the script loads is safe: it's a queue Crisp replays.
+  // Crisp's launcher used to be hidden from here, but this shell remounts on every member
+  // route change and Crisp can reassert the bubble after its session loads — so ownership
+  // now sits in ThirdPartyScripts, which never remounts and creates the $crisp queue itself.
+  //
+  // Flag the member app on the root element so global CSS can move third-party floating
+  // widgets (CookieScript's "Cookie settings" badge) clear of the fixed tab bar.
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const w = window as unknown as { $crisp?: { push: (cmd: unknown[]) => void } };
-    if (!w.$crisp) return;
-    w.$crisp.push(['do', 'chat:hide']);
-    w.$crisp.push(['on', 'chat:closed', () => w.$crisp?.push(['do', 'chat:hide'])]);
-    return () => w.$crisp?.push(['do', 'chat:show']);
+    document.documentElement.dataset.memberApp = '1';
+    return () => {
+      delete document.documentElement.dataset.memberApp;
+    };
   }, []);
   const admin = isAdminEmail(member?.auth?.email);
 
