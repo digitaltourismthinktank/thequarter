@@ -822,3 +822,25 @@
     transition: none;
   }
 }
+
+/* A failed load has to say so. Showing zero points and an empty catalogue is indistinguishable
+   from a real empty state, and far more alarming — it looks like lost points. */
+.loadError {
+  margin: 0 0 18px;
+  padding: 12px 14px;
+  border: 1px solid var(--gold-400);
+  border-radius: var(--radius-lg);
+  background: var(--gold-100);
+  font-size: var(--text-sm);
+  color: var(--ink-900);
+}
+.retry {
+  border: none;
+  background: none;
+  padding: 0 2px;
+  font: inherit;
+  font-weight: var(--fw-bold);
+  color: var(--gold-700);
+  text-decoration: underline;
+  cursor: pointer;
+}

@@ -53,6 +53,7 @@ export function RewardsClient({ marketing }: { marketing: ReactNode }) {
   const [flipped, setFlipped] = useState(false);
   const [birthday, setBirthday] = useState<BirthdayState>({ bday: null, claimed: null });
   const [loaded, setLoaded] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const [confirm, setConfirm] = useState<RewardItem | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -89,6 +90,12 @@ export function RewardsClient({ marketing }: { marketing: ReactNode }) {
       setRedemptions(r.data.redemptions);
       setActivity(r.data.activity ?? []);
       setBirthday(r.data.birthday);
+      setLoadError(false);
+    } else {
+      // Previously there was no else at all: a failed load left the page showing 0 points
+      // and an empty catalogue, which reads as "you have earned nothing and there is
+      // nothing to spend on" rather than "we couldn't reach it".
+      setLoadError(true);
     }
     setLoaded(true);
   }, []);
@@ -140,6 +147,13 @@ export function RewardsClient({ marketing }: { marketing: ReactNode }) {
     <MemberShell>
     <div className={styles.wrap}>
       <RewardsTabs />
+
+      {loadError ? (
+        <p className={styles.loadError} role="status">
+          We couldn&rsquo;t load your points just now — your balance is safe, this is only the
+          display. <button type="button" className={styles.retry} onClick={load}>Try again</button>
+        </p>
+      ) : null}
 
       <header className={styles.header}>
         <span className={styles.eyebrow}>Quarter Rewards</span>
@@ -321,6 +335,11 @@ export function RewardsClient({ marketing }: { marketing: ReactNode }) {
       {/* Catalogue */}
       <section className={styles.catSection}>
         <h2 className={styles.h2}>Spend your points</h2>
+        {!loaded ? (
+          <p className={styles.meta}>Loading rewards…</p>
+        ) : catalogue.length === 0 && !loadError ? (
+          <p className={styles.meta}>No rewards available just now — we&rsquo;re topping up with our partners.</p>
+        ) : null}
         <div className={styles.catGrid}>
           {catalogue.map((r) => {
             const isCooling = cooling.has(r.id);
