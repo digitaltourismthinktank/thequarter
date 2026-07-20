@@ -3,16 +3,29 @@
  *
  * Lets the member/admin app render under `next dev` without the Netlify Functions
  * or a live Memberstack session, so we can iterate on design locally instead of
- * deploying to Netlify. Every branch here is gated on NODE_ENV — in the production
- * static export `PREVIEW` is `false`, so none of this runs (and the guards make it
- * dead code). Never rely on this for anything real.
+ * deploying to Netlify. Never rely on this for anything real.
+ *
+ * SECURITY — why the NODE_ENV check below is load-bearing, not belt-and-braces.
+ * This file used to gate only on window.location.hostname. That is a RUNTIME check, so
+ * webpack could not fold it at build time and could not eliminate anything: the whole
+ * module, including the sample member, was bundled into app/layout — i.e. served on every
+ * page of the public marketing site — and was readable by anyone who opened dev tools.
+ * A real door code and a real email address were sitting in it.
+ *
+ * `process.env.NODE_ENV` IS replaced with a literal at build time, so `PREVIEW` folds to
+ * `false` in a production build and the mock data becomes genuinely dead code. The sample
+ * values below are also obviously-fake now, so that even a future bundling change leaks
+ * nothing worth having.
  */
 import type { Member } from './memberstack';
 
-// True only when viewed on a local dev host — false during SSR and in the
-// deployed app (real domain), so this never activates in production.
+// NODE_ENV first, and deliberately so: it is a build-time constant, which is what lets the
+// bundler drop everything below it from the production build. The hostname check then keeps
+// it off any non-local host during development.
 export const PREVIEW =
-  typeof window !== 'undefined' && ['localhost', '127.0.0.1', '0.0.0.0'].includes(window.location.hostname);
+  process.env.NODE_ENV !== 'production' &&
+  typeof window !== 'undefined' &&
+  ['localhost', '127.0.0.1', '0.0.0.0'].includes(window.location.hostname);
 
 // Must match the dev-only seed added to PLAN_ID_TO_SLUG in memberstack.ts.
 export const PREVIEW_RESIDENT_PLAN_ID = 'pln_preview_resident';
@@ -20,10 +33,11 @@ export const PREVIEW_RESIDENT_PLAN_ID = 'pln_preview_resident';
 // An admin member, so both the member dashboard and /admin preview locally.
 export const previewMember: Member = {
   id: 'mem_preview0001',
-  auth: { email: 'nick.hall@thinkdigital.travel' },
+  auth: { email: 'preview@example.com' },
   planConnections: [{ planId: PREVIEW_RESIDENT_PLAN_ID, active: true }],
-  customFields: { 'days-remaining': '10', 'door-code': '1324#', 'renewal-date': '25/07/2026' },
-  metaData: { name: 'Nick Hall', bday: '05-14', company: 'Digital Tourism Think Tank' },
+  // Obviously-fake sample values. Never put a real door code here again.
+  customFields: { 'days-remaining': '10', 'door-code': '0000#', 'renewal-date': '25/07/2026' },
+  metaData: { name: 'Preview Member', bday: '05-14', company: 'Sample Co' },
 };
 
 const isoToday = () => new Date().toISOString().slice(0, 10);
