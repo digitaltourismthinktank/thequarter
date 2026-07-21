@@ -57,6 +57,8 @@ import {
   type PartnerStatement,
   type PayoutPartner,
   adminGetToday,
+  adminGetWeek,
+  type WeekDay,
   adminRemoveCheckin,
   getRoll,
   signOutGuest,
@@ -1850,6 +1852,91 @@ function NextEventCard() {
   );
 }
 
+/**
+ * Who's in across the working week — the glance the team asked for, so they can see the
+ * shape of the week rather than only today. Five day-columns, each a list of the people in;
+ * members, expected members, day guests and tours are colour-separated exactly as they are
+ * in the day view, so a chip means the same thing in both. Read-only by design: managing a
+ * check-in (undo, sign-out) stays in the focused day view; this is for seeing.
+ */
+function WeekWhosIn({
+  week,
+  loading,
+  onPrev,
+  onNext,
+  onThisWeek,
+}: {
+  week: { monday: string; days: WeekDay[] } | null;
+  loading: boolean;
+  onPrev: () => void;
+  onNext: () => void;
+  onThisWeek: () => void;
+}) {
+  const todayISO = toISO(new Date());
+  const label = (iso: string) => {
+    const d = new Date(`${iso}T12:00:00`);
+    return { dow: d.toLocaleDateString('en-GB', { weekday: 'short' }), day: d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) };
+  };
+  const rangeLabel = week
+    ? `${new Date(`${week.monday}T12:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} – ${new Date(`${addDaysISO(week.monday, 4)}T12:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`
+    : '';
+
+  return (
+    <div className={styles.week}>
+      <div className={styles.weekNav}>
+        <button type="button" className={styles.weekArrow} onClick={onPrev} aria-label="Previous week">
+          <Icon name="arrow-left" size={16} />
+        </button>
+        <span className={styles.weekRange}>{rangeLabel}</span>
+        <button type="button" className={styles.weekArrow} onClick={onNext} aria-label="Next week">
+          <Icon name="arrow-right" size={16} />
+        </button>
+        <button type="button" className={styles.weekToday} onClick={onThisWeek}>
+          This week
+        </button>
+      </div>
+
+      {loading || !week ? (
+        <p className={styles.state}>Loading…</p>
+      ) : (
+        <div className={styles.weekGrid}>
+          {week.days.map((d) => {
+            const total = d.checkins.length + d.tours.length;
+            return (
+              <div key={d.date} className={`${styles.weekCol} ${d.date === todayISO ? styles.weekColToday : ''}`}>
+                <div className={styles.weekColHead}>
+                  <span className={styles.weekColDow}>{label(d.date).dow}</span>
+                  <span className={styles.weekColDay}>{label(d.date).day}</span>
+                  <span className={styles.weekColCount}>{total || '—'}</span>
+                </div>
+                <div className={styles.weekColBody}>
+                  {d.checkins.map((c, i) => (
+                    <span
+                      key={`${c.email}-${i}`}
+                      className={`${styles.weekWho} ${c.dayPass ? styles.whoDayPass : ''} ${!c.dayPass && c.status !== 'Checked-in' ? styles.whoExpected : ''}`}
+                      title={c.dayPass ? `Day Pass${c.company ? ` · ${c.company}` : ''}` : c.status === 'Checked-in' ? 'Here' : 'Expected'}
+                    >
+                      {c.name}
+                      {c.length === 'Half' ? <em className={styles.weekHalf}>{c.period ? `½${c.period.toUpperCase()}` : '½'}</em> : null}
+                    </span>
+                  ))}
+                  {d.tours.map((t) => (
+                    <span key={t.id} className={`${styles.weekWho} ${styles.whoTour}`} title={`Tour · ${minToHHMM(t.startMin)}`}>
+                      {t.name}
+                      <em className={styles.weekTourTag}>Tour {minToHHMM(t.startMin)}</em>
+                    </span>
+                  ))}
+                  {total === 0 ? <span className={styles.weekEmpty}>Nobody yet</span> : null}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AdminTodayPane({ onAllBirthdays }: { onAllBirthdays: () => void }) {
   const [offset, setOffset] = useState(0); // 0 = today, 1 = next open day
   const [custom, setCustom] = useState<string>(''); // a hand-picked day (overrides offset)
@@ -1861,6 +1948,12 @@ function AdminTodayPane({ onAllBirthdays }: { onAllBirthdays: () => void }) {
   const [members, setMembers] = useState<AdminMember[]>([]);
   const [roll, setRoll] = useState<{ membersIn: number; headcount: number; guests: RollGuest[] }>({ membersIn: 0, headcount: 0, guests: [] });
   const [loading, setLoading] = useState(true);
+  // Day view is the daily-driver; week view is the "what does the week look like" glance the
+  // team asked for. weekFrom is any date in the shown week — the server snaps it to Monday.
+  const [view, setView] = useState<'day' | 'week'>('day');
+  const [weekFrom, setWeekFrom] = useState(() => toISO(new Date()));
+  const [week, setWeek] = useState<{ monday: string; days: WeekDay[] } | null>(null);
+  const [weekLoading, setWeekLoading] = useState(false);
 
   useEffect(() => {
     if (custom) {
@@ -1912,6 +2005,17 @@ function AdminTodayPane({ onAllBirthdays }: { onAllBirthdays: () => void }) {
   useEffect(() => {
     loadToday();
   }, [loadToday]);
+
+  const loadWeek = useCallback(async () => {
+    if (view !== 'week' || !weekFrom) return;
+    setWeekLoading(true);
+    const r = await adminGetWeek(weekFrom);
+    if (r.ok) setWeek(r.data);
+    setWeekLoading(false);
+  }, [view, weekFrom]);
+  useEffect(() => {
+    loadWeek();
+  }, [loadWeek]);
 
   async function undoCheckin(c: AdminCheckin) {
     if (!c.id) return;
@@ -1980,15 +2084,29 @@ function AdminTodayPane({ onAllBirthdays }: { onAllBirthdays: () => void }) {
           >
             {nextDayLabel}
           </button>
-          <button type="button" className={`${styles.segBtn} ${custom ? styles.segOn : ''}`} onClick={() => setPickerOpen(true)}>
+          <button type="button" className={`${styles.segBtn} ${view === 'day' && custom ? styles.segOn : ''}`} onClick={() => { setView('day'); setPickerOpen(true); }}>
             {custom ? new Date(`${custom}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : 'Pick a day'}
+          </button>
+          {/* The week glance the team asked for — who's in across Mon–Fri, not just today. */}
+          <button type="button" className={`${styles.segBtn} ${view === 'week' ? styles.segOn : ''}`} onClick={() => setView('week')}>
+            Week
           </button>
         </div>
       </div>
 
-      {loading ? (
+      {view === 'week' ? (
+        <WeekWhosIn
+          week={week}
+          loading={weekLoading}
+          onPrev={() => setWeekFrom((f) => addDaysISO(f, -7))}
+          onNext={() => setWeekFrom((f) => addDaysISO(f, 7))}
+          onThisWeek={() => setWeekFrom(toISO(new Date()))}
+        />
+      ) : null}
+
+      {view === 'day' && loading ? (
         <p className={styles.state}>Loading…</p>
-      ) : (
+      ) : view === 'day' ? (
         <div className={styles.todayGrid}>
           <div className={styles.todayCard}>
             <span className={styles.todayCardLabel}>Who&rsquo;s in</span>
@@ -2086,9 +2204,9 @@ function AdminTodayPane({ onAllBirthdays }: { onAllBirthdays: () => void }) {
             </button>
           </div>
         </div>
-      )}
+      ) : null}
 
-      {!closed ? <DaySchedule spaces={spaces} bookings={bookings} /> : null}
+      {view === 'day' && !closed ? <DaySchedule spaces={spaces} bookings={bookings} /> : null}
 
       {members.filter((m) => m.vatRequested).length ? (
         <div className={styles.panel} style={{ marginTop: 18, borderColor: 'var(--gold-400)' }}>

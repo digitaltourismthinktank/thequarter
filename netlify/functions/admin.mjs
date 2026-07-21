@@ -12,8 +12,8 @@
  */
 import memberstackAdmin from '@memberstack/admin';
 import { verifyMember, isAdmin, tokenFromRequest } from './_member.mjs';
-import { listRecords, createRecord, updateRecord, deleteRecord, T, F, airtableReady, esc } from './_airtable.mjs';
-import { londonWallClockToISO, isoToLondonMin, isoToLondonDate, hhmmToMin, londonNow, holdReleased } from './_time.mjs';
+import { listRecords, listAllRecords, createRecord, updateRecord, deleteRecord, T, F, airtableReady, esc } from './_airtable.mjs';
+import { londonWallClockToISO, isoToLondonMin, isoToLondonDate, hhmmToMin, londonNow, holdReleased, addDays } from './_time.mjs';
 import { PLAN_NAMES, allowanceForMember, setMemberPlan, renewMember, formatDate } from './_quarter-sync.mjs';
 import { listRewards, listPerks, listFloats, floatStatus, awardPoints, redeemReward, partnerPayouts, markPartnerPaid, partnerStatement } from './_rewards.mjs';
 import { sendEmail, emailShell, escapeHtml, OPS_EMAIL, fmtDateLong } from './_email.mjs';
@@ -259,6 +259,65 @@ const periodFromNotes = (n) => {
   return s === 'AM' ? 'am' : s === 'PM' ? 'pm' : null;
 };
 
+/** Map one Check-ins Airtable row to the admin who's-in shape. Shared by the day and week
+ *  views so a chip renders the same in both. */
+function mapCheckin(r) {
+  const status = r.fields[F.checkins.status] || 'Planned';
+  const source = r.fields[F.checkins.source] || '';
+  const dayPass = status === 'Paid' || source === 'Web';
+  let company = '';
+  if (dayPass) {
+    const parts = String(r.fields[F.checkins.notes] || '').split(' · ');
+    if (parts.length >= 4) company = parts.slice(3).join(' · ').trim();
+  }
+  const length = r.fields[F.checkins.length] || 'Full';
+  return {
+    id: r.id,
+    name: r.fields[F.checkins.name] || r.fields[F.checkins.email] || (dayPass ? 'Day guest' : 'Member'),
+    length,
+    period: !dayPass && length === 'Half' ? periodFromNotes(r.fields[F.checkins.notes]) : null,
+    status,
+    dayPass,
+    email: r.fields[F.checkins.email] || '',
+    company,
+  };
+}
+
+/**
+ * Who's in across a working week (Mon–Fri from `monday`). One ranged Airtable query for the
+ * check-ins and one for the tours, grouped by date here — five per-day queries would be five
+ * round-trips for a view that refreshes on every week change.
+ */
+async function weekWhosIn(monday) {
+  const days = Array.from({ length: 5 }, (_, i) => addDays(monday, i));
+  const fri = days[4];
+  const [checkinRecs, tourRecs] = await Promise.all([
+    listAllRecords(T.checkins, {
+      filterByFormula: `AND(DATETIME_FORMAT({Date}, 'YYYY-MM-DD')>='${esc(monday)}', DATETIME_FORMAT({Date}, 'YYYY-MM-DD')<='${esc(fri)}', OR({Status}='Checked-in', {Status}='Planned', {Status}='Paid'))`,
+    }),
+    listAllRecords(T.bookings, {
+      filterByFormula: `AND(DATETIME_FORMAT({Date}, 'YYYY-MM-DD')>='${esc(monday)}', DATETIME_FORMAT({Date}, 'YYYY-MM-DD')<='${esc(fri)}', {Status}='Confirmed', {Kind}='Tour')`,
+    }),
+  ]);
+  const byDay = new Map(days.map((d) => [d, { date: d, checkins: [], tours: [] }]));
+  for (const r of checkinRecs) {
+    const d = isoToLondonDate(r.fields[F.checkins.date]);
+    byDay.get(d)?.checkins.push(mapCheckin(r));
+  }
+  for (const r of tourRecs) {
+    const d = isoToLondonDate(r.fields[F.bookings.date]);
+    const bucket = byDay.get(d);
+    if (bucket) {
+      bucket.tours.push({
+        id: r.id,
+        name: r.fields[F.bookings.name] || 'Tour visitor',
+        startMin: isoToLondonMin(r.fields[F.bookings.start]),
+      });
+    }
+  }
+  return days.map((d) => byDay.get(d));
+}
+
 async function checkinsForDate(date) {
   // Include Planned (booked ahead, not yet arrived) as well as Checked-in, so
   // "who's in" reflects everyone expected that day — not just those on site now.
@@ -267,31 +326,7 @@ async function checkinsForDate(date) {
   const recs = await listRecords(T.checkins, {
     filterByFormula: `AND(DATETIME_FORMAT({Date}, 'YYYY-MM-DD')='${esc(date)}', OR({Status}='Checked-in', {Status}='Planned', {Status}='Paid'))`,
   });
-  return recs.map((r) => {
-    const status = r.fields[F.checkins.status] || 'Planned';
-    const source = r.fields[F.checkins.source] || '';
-    // A paid day-pass guest, not a member — flagged so the UI can mark them distinctly.
-    const dayPass = status === 'Paid' || source === 'Web';
-    // Day-pass rows carry the guest's company at the tail of the Notes field
-    // ("Day Pass · <pi> · £<total> · <company>") — surface it when present.
-    let company = '';
-    if (dayPass) {
-      const parts = String(r.fields[F.checkins.notes] || '').split(' · ');
-      if (parts.length >= 4) company = parts.slice(3).join(' · ').trim();
-    }
-    const length = r.fields[F.checkins.length] || 'Full';
-    return {
-      id: r.id,
-      name: r.fields[F.checkins.name] || r.fields[F.checkins.email] || (dayPass ? 'Day guest' : 'Member'),
-      length,
-      // Half-day morning/afternoon — only for member check-ins (a day-pass's Notes hold pass metadata).
-      period: !dayPass && length === 'Half' ? periodFromNotes(r.fields[F.checkins.notes]) : null,
-      status,
-      dayPass,
-      email: r.fields[F.checkins.email] || '',
-      company,
-    };
-  });
+  return recs.map(mapCheckin);
 }
 
 export default async function handler(req) {
@@ -321,6 +356,14 @@ export default async function handler(req) {
       if (!date) return json({ error: 'missing-date' }, 400);
       const [bookings, privs, rblocks] = await Promise.all([bookingsForDate(date), privatisationsForDate(date), recurringBlocksForDate(date)]);
       return json({ date, bookings: [...privs, ...rblocks, ...bookings] });
+    }
+    if (action === 'week') {
+      // `from` is any date in the target week; snap back to its Monday.
+      const from = new URL(req.url).searchParams.get('from') || londonNow().dateStr;
+      const d = new Date(`${from}T12:00:00Z`);
+      const dow = (d.getUTCDay() + 6) % 7; // Mon=0 … Sun=6
+      const monday = addDays(from, -dow);
+      return json({ monday, days: await weekWhosIn(monday) });
     }
     if (action === 'today') {
       const date = new URL(req.url).searchParams.get('date') || londonNow().dateStr;

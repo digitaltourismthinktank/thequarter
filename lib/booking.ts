@@ -503,6 +503,14 @@ export interface AdminCheckin {
 }
 export const adminGetToday = (date: string) =>
   call<{ date: string; checkins: AdminCheckin[]; bookings: AdminBooking[] }>(`admin?action=today&date=${date}`);
+
+export interface WeekDay {
+  date: string;
+  checkins: AdminCheckin[];
+  tours: { id: string; name: string; startMin: number }[];
+}
+export const adminGetWeek = (from: string) =>
+  call<{ monday: string; days: WeekDay[] }>(`admin?action=week&from=${from}`);
 // Undo/remove a check-in (cancels the row; refunds the day if it cost one and the member isn't unlimited).
 export const adminRemoveCheckin = (id: string) =>
   call<{ ok: boolean }>('admin', { method: 'POST', body: { action: 'removeCheckin', id } });

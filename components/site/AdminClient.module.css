@@ -1603,3 +1603,152 @@ select.input {
   padding: 2px 8px;
   white-space: nowrap;
 }
+
+/* ---- Week view: who's in across Mon–Fri --------------------------------------------- */
+.week {
+  margin-top: 4px;
+}
+.weekNav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.weekArrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill);
+  background: var(--surface-card);
+  color: var(--ink-900);
+  cursor: pointer;
+}
+.weekArrow:hover {
+  border-color: var(--gold-400);
+}
+.weekRange {
+  font-weight: var(--fw-bold);
+  font-size: var(--text-md);
+  color: var(--ink-900);
+  min-width: 150px;
+  text-align: center;
+}
+.weekToday {
+  margin-left: auto;
+  padding: 9px 15px;
+  min-height: 40px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill);
+  background: var(--surface-card);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--ink-900);
+  cursor: pointer;
+}
+.weekToday:hover {
+  border-color: var(--gold-400);
+}
+
+/* Five columns on a desktop; below that they scroll sideways rather than crush — a member
+   name has to stay readable, and admin is used on a phone at the door too. */
+.weekGrid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+@media (max-width: 900px) {
+  .weekGrid {
+    grid-auto-flow: column;
+    grid-auto-columns: 78%;
+    grid-template-columns: none;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 6px;
+  }
+  .weekCol {
+    scroll-snap-align: start;
+  }
+}
+.weekCol {
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+/* Today's column is picked out so the eye lands on it first. */
+.weekColToday {
+  border-color: var(--gold-500);
+  box-shadow: 0 0 0 1px var(--gold-500);
+}
+.weekColHead {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  gap: 2px 8px;
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.weekColDow {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  font-weight: var(--fw-bold);
+  color: var(--gold-700);
+}
+.weekColDay {
+  grid-column: 1;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+.weekColCount {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  font-size: var(--text-lg);
+  font-weight: var(--fw-bold);
+  color: var(--ink-900);
+}
+.weekColBody {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 12px 14px;
+  min-height: 60px;
+}
+/* Full-width names, one per line, so a column of ten reads cleanly. Colours mean the same
+   as the day view: filled gold = day guest, dashed = tour, muted outline = expected. */
+.weekWho {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--sand-50);
+  font-size: var(--text-sm);
+  color: var(--ink-900);
+  overflow-wrap: anywhere;
+}
+.weekHalf,
+.weekTourTag {
+  margin-left: auto;
+  flex: none;
+  font-style: normal;
+  font-size: var(--text-2xs);
+  font-weight: var(--fw-bold);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.weekEmpty {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  font-style: italic;
+}
