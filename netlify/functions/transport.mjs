@@ -36,13 +36,19 @@ async function trainDepartures(crs) {
     if (!r.ok) return [];
     const j = await r.json();
     const all = j?.departures?.all || [];
-    return all.slice(0, 4).map((d) => ({
-      time: hhmm(d.expected_departure_time || d.aimed_departure_time),
-      to: d.destination_name || '',
-      status: d.status || '',
-      platform: d.platform || null,
-      mins: Number.isFinite(d.best_departure_estimate_mins) ? d.best_departure_estimate_mins : null,
-    }));
+    // The API lists departures grouped, not strictly time-ordered, so sort by clock time before
+    // taking the soonest — otherwise "next train" could show a later one first.
+    return all
+      .map((d) => ({
+        time: hhmm(d.expected_departure_time || d.aimed_departure_time),
+        to: d.destination_name || '',
+        status: d.status || '',
+        platform: d.platform || null,
+        mins: Number.isFinite(d.best_departure_estimate_mins) ? d.best_departure_estimate_mins : null,
+      }))
+      .filter((d) => d.time)
+      .sort((a, b) => a.time.localeCompare(b.time))
+      .slice(0, 4);
   } catch {
     return [];
   }
