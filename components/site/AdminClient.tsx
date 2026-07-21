@@ -60,6 +60,8 @@ import {
   adminGetWeek,
   type WeekDay,
   adminRemoveCheckin,
+  adminAccessAudit,
+  type AccessFlag,
   getRoll,
   signOutGuest,
   adminGetMemberProfile,
@@ -289,6 +291,76 @@ export function AdminClient() {
   );
 }
 
+/**
+ * Access check — a run-on-demand audit that lists bookings and check-ins made by accounts
+ * with no plan, no carnet, and no paid day pass for the date. It's the broom for the two
+ * entitlement holes: the gates stop new ones, this finds what got through before them.
+ * Each flag clears in place with the same endpoints the rest of admin uses.
+ */
+function AccessAudit() {
+  const [flags, setFlags] = useState<AccessFlag[] | null>(null);
+  const [scanned, setScanned] = useState<{ members: number; checkins: number; bookings: number } | null>(null);
+  const [running, setRunning] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  async function run() {
+    setRunning(true);
+    const r = await adminAccessAudit();
+    if (r.ok) {
+      setFlags(r.data.flags);
+      setScanned(r.data.scanned);
+    }
+    setRunning(false);
+  }
+
+  async function clear(f: AccessFlag) {
+    if (!window.confirm(`Cancel this ${f.type === 'booking' ? 'room booking' : 'check-in'} by ${f.name} on ${f.date}?`)) return;
+    setBusyId(f.id);
+    const r = f.type === 'booking' ? await adminCancel(f.id) : await adminRemoveCheckin(f.id);
+    if (r.ok) setFlags((fs) => (fs ? fs.filter((x) => x.id !== f.id) : fs));
+    setBusyId(null);
+  }
+
+  return (
+    <div className={styles.panel} style={{ marginBottom: 16 }}>
+      <span className={styles.panelTitle}>Access check</span>
+      <p className={styles.muted}>
+        Finds bookings and check-ins from today onward by accounts with no plan, no passes and no day pass for the day —
+        the residue from before entry was gated. New ones are already blocked.
+      </p>
+      <button type="button" className={styles.smallBtn} onClick={run} disabled={running} style={{ marginTop: 8 }}>
+        {running ? 'Checking…' : 'Run access check'}
+      </button>
+
+      {flags && !flags.length ? <p className={styles.muted} style={{ marginTop: 10 }}>Nothing to worry about — everyone with a booking or check-in is entitled to it.</p> : null}
+
+      {flags && flags.length ? (
+        <div className={styles.list} style={{ marginTop: 12 }}>
+          {scanned ? (
+            <p className={styles.muted}>
+              {flags.length} to look at, across {scanned.members} members · {scanned.checkins} check-ins · {scanned.bookings} bookings scanned.
+            </p>
+          ) : null}
+          {flags.map((f) => (
+            <div key={f.id} className={styles.payRow}>
+              <span className={styles.payName}>
+                {f.name}
+                <span className={styles.muted} style={{ marginLeft: 8 }}>
+                  {f.type === 'booking' ? 'Room/pod' : 'Check-in'} · {new Date(`${f.date}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
+                </span>
+              </span>
+              <span className={styles.muted}>{f.email}</span>
+              <button type="button" className={styles.smallBtn} onClick={() => clear(f)} disabled={busyId === f.id}>
+                {busyId === f.id ? '…' : 'Cancel it'}
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function MembersPane() {
   const [members, setMembers] = useState<AdminMember[]>([]);
   const [loading, setLoading] = useState(true);
@@ -402,6 +474,7 @@ function MembersPane() {
 
   return (
     <div>
+      <AccessAudit />
       <div className={styles.mFilters}>
         <input className={styles.mSearch} placeholder="Search name, email or company" value={q} onChange={(e) => setQ(e.target.value)} />
         <div className={styles.mChips}>

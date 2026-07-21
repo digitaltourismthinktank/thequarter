@@ -29,6 +29,81 @@ const json = (b, s = 200) => new Response(JSON.stringify(b), { status: s, header
 
 const planIdOf = (c) => (typeof c === 'string' ? c : c?.planId);
 
+/**
+ * Find bookings and check-ins that shouldn't exist: made by an account with no plan, no
+ * carnet, and no paid day pass for that date. This is the residue of the two entitlement
+ * holes (room bookings and check-ins) that were open before they were gated — the gates
+ * stop new ones, but anything created earlier is still sitting in the data.
+ *
+ * Scoped to today onward, because those are the ones worth clearing; a free day already
+ * taken in the past can't be undone. Deliberately conservative: a member with a live carnet
+ * is left alone (their check-in legitimately spends a pass), so this flags the clear-cut
+ * "shouldn't be here at all" cases and keeps false positives near zero.
+ */
+async function accessAudit() {
+  const today = londonNow().dateStr;
+  const admin = memberstackAdmin.init(MS_SECRET);
+
+  // email → { hasPlan, hasCarnet, name }
+  const ent = new Map();
+  let after;
+  for (let i = 0; i < 20; i += 1) {
+    const res = await admin.members.list({ limit: 100, after });
+    for (const m of res?.data || []) {
+      const email = String(m.auth?.email || m.email || '').toLowerCase();
+      if (!email) continue;
+      const cf = m.customFields || {};
+      ent.set(email, {
+        hasPlan: allowanceForMember(m) !== undefined,
+        hasCarnet: Math.max(0, Number(m.metaData?.carnet?.remaining) || 0) > 0,
+        name: [cf['first-name'], cf['last-name']].filter(Boolean).join(' ').trim() || null,
+      });
+    }
+    if (!res?.hasNextPage || !(res?.data || []).length) break;
+    after = res?.endCursor;
+  }
+
+  const [checkinRows, bookingRows] = await Promise.all([
+    listAllRecords(T.checkins, {
+      filterByFormula: `AND(DATETIME_FORMAT({Date}, 'YYYY-MM-DD')>='${esc(today)}', OR({Status}='Checked-in', {Status}='Planned', {Status}='Paid'))`,
+    }),
+    listAllRecords(T.bookings, {
+      filterByFormula: `AND(DATETIME_FORMAT({Date}, 'YYYY-MM-DD')>='${esc(today)}', {Status}='Confirmed', {Kind}='Member')`,
+    }),
+  ]);
+
+  // Dates each email has actually paid a day pass for — those check-ins/bookings are fine.
+  const paidFor = new Set();
+  for (const r of checkinRows) {
+    if (r.fields[F.checkins.status] === 'Paid') {
+      paidFor.add(`${String(r.fields[F.checkins.email] || '').toLowerCase()}|${isoToLondonDate(r.fields[F.checkins.date])}`);
+    }
+  }
+
+  const entitled = (email, date) => {
+    const e = ent.get(email);
+    if (e?.hasPlan || e?.hasCarnet) return true; // has a plan, or passes to spend
+    return paidFor.has(`${email}|${date}`);
+  };
+
+  const flags = [];
+  for (const r of checkinRows) {
+    if (r.fields[F.checkins.status] === 'Paid') continue; // a paid day pass is legitimate
+    const email = String(r.fields[F.checkins.email] || '').toLowerCase();
+    const date = isoToLondonDate(r.fields[F.checkins.date]);
+    if (!email || entitled(email, date)) continue;
+    flags.push({ type: 'checkin', id: r.id, email, name: ent.get(email)?.name || r.fields[F.checkins.name] || email, date, detail: r.fields[F.checkins.status] });
+  }
+  for (const r of bookingRows) {
+    const email = String(r.fields[F.bookings.email] || '').toLowerCase();
+    const date = isoToLondonDate(r.fields[F.bookings.date]);
+    if (!email || entitled(email, date)) continue;
+    flags.push({ type: 'booking', id: r.id, email, name: ent.get(email)?.name || r.fields[F.bookings.name] || email, date, detail: r.fields[F.bookings.title] || 'Room/pod' });
+  }
+  flags.sort((a, b) => a.date.localeCompare(b.date) || a.email.localeCompare(b.email));
+  return { flags, scanned: { members: ent.size, checkins: checkinRows.length, bookings: bookingRows.length } };
+}
+
 async function listAllMembers() {
   const admin = memberstackAdmin.init(MS_SECRET);
   const out = [];
@@ -340,6 +415,7 @@ export default async function handler(req) {
   if (req.method === 'GET') {
     const action = new URL(req.url).searchParams.get('action');
     if (action === 'members') return json({ members: await listAllMembers() });
+    if (action === 'accessAudit') return json(await accessAudit());
     if (action === 'payouts') {
       const month = new URL(req.url).searchParams.get('month') || undefined;
       return json({ partners: await partnerPayouts({ month }) });

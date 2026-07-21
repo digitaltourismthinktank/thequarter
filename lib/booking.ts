@@ -514,6 +514,19 @@ export const adminGetWeek = (from: string) =>
 // Undo/remove a check-in (cancels the row; refunds the day if it cost one and the member isn't unlimited).
 export const adminRemoveCheckin = (id: string) =>
   call<{ ok: boolean }>('admin', { method: 'POST', body: { action: 'removeCheckin', id } });
+
+export interface AccessFlag {
+  type: 'checkin' | 'booking';
+  id: string;
+  name: string;
+  email: string;
+  date: string;
+  detail: string;
+}
+/** Bookings/check-ins by accounts with no plan, no carnet and no paid pass — the residue of
+ *  the entitlement holes, from today onward. */
+export const adminAccessAudit = () =>
+  call<{ flags: AccessFlag[]; scanned: { members: number; checkins: number; bookings: number } }>('admin?action=accessAudit');
 export interface MemberProfile {
   id: string;
   email: string;
