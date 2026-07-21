@@ -264,7 +264,14 @@ export interface TourSlot {
 export interface TrainDeparture { time: string; to: string; expected: string | null; onTime: boolean; cancelled: boolean }
 export interface BusDeparture { time: string; line: string; to: string }
 export const getTransport = () =>
-  call<{ configured: boolean; trains: { west: TrainDeparture[]; east: TrainDeparture[] }; buses: BusDeparture[] }>('transport', { auth: false });
+  call<{
+    configured: boolean;
+    /** True once the National Rail (Darwin) token is live; until then trains are empty by design. */
+    trainsLive?: boolean;
+    trains: { west: TrainDeparture[]; east: TrainDeparture[] };
+    buses: BusDeparture[];
+    busInfo?: { generated: string; coverage: { from: number; to: number } };
+  }>('transport', { auth: false });
 
 export const getTourSlots = (date: string) =>
   call<{ date: string; slots: TourSlot[]; closed?: boolean }>(`tour?date=${date}`, { auth: false });

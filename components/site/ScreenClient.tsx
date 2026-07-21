@@ -305,7 +305,7 @@ function EntranceScreen() {
   const [events, setEvents] = useState<QuarterEvent[]>([]);
   const [announcements, setAnnouncements] = useState<ScreenAnnouncement[]>([]);
   const [weather, setWeather] = useState<{ temp: number; emoji: string; change: string | null } | null>(null);
-  const [transport, setTransport] = useState<{ configured: boolean; trains: { west: TrainDeparture[]; east: TrainDeparture[] }; buses: BusDeparture[] } | null>(null);
+  const [transport, setTransport] = useState<{ configured: boolean; trainsLive?: boolean; trains: { west: TrainDeparture[]; east: TrainDeparture[] }; buses: BusDeparture[] } | null>(null);
   const [now, setNow] = useState<Date>(() => new Date());
   const [bankHoliday, setBankHoliday] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -422,8 +422,8 @@ function EntranceScreen() {
     return () => window.clearInterval(id);
   }, []);
 
-  // Live Canterbury trains + buses (TransportAPI, via our transport function). Refreshed each
-  // minute; fails soft — an empty/unconfigured response just hides the panel.
+  // Canterbury buses (static BODS timetable) + trains (National Rail Darwin, when live), via our
+  // transport function. Refreshed every few minutes; fails soft — an empty response hides the panel.
   useEffect(() => {
     const load = async () => {
       const r = await getTransport();
@@ -537,7 +537,9 @@ function EntranceScreen() {
                       </div>
                     ))
                   ) : (
-                    <div className={styles.depNone}>Nothing in the next hour</div>
+                    <div className={styles.depNone}>
+                      {transport.trainsLive ? 'Nothing in the next hour' : 'Live times switching on soon'}
+                    </div>
                   )}
                 </div>
               ))}

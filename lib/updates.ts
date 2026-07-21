@@ -24,7 +24,7 @@ export const UPDATES: Update[] = [
     items: [
       'The lobby screen now shows the whole week’s busyness, not just how today feels.',
       'Canterbury weather sits by the clock, with a heads-up when rain is on the way.',
-      'Live Canterbury West/East train and bus-station departures (switches on once the rail & bus data keys are approved).',
+      'Live Canterbury Bus Station departures — next hour, with route number and destination — running now from open bus-timetable data (no ongoing cost). Canterbury West/East train times switch on the moment the National Rail key is approved.',
       'The scheduled announcement now runs along the top as a headline, and the room layout no longer collapses on the older screen.',
     ],
   },
