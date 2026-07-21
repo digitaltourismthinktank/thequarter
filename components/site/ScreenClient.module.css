@@ -57,6 +57,8 @@
   color: var(--text-muted);
   text-align: right;
 }
+/* "Rain likely ~14:00" — a quieter forecast note beside the current temperature. */
+.weatherChange { color: #3d6ea5; font-weight: var(--fw-semibold); }
 
 /* Top-of-screen announcement — an unboxed headline centred between the logo and the clock. */
 .announceTop {
@@ -145,9 +147,9 @@
   align-items: flex-end;
   justify-content: center;
   gap: clamp(10px, 2vw, 24px);
-  height: clamp(84px, 13vh, 150px);
+  height: clamp(58px, 9vh, 104px);
   margin: 6px auto 0;
-  max-width: 460px;
+  max-width: 420px;
 }
 .weekCol {
   flex: 1;
@@ -158,36 +160,68 @@
   height: 100%;
   gap: 8px;
 }
-.weekBarWrap { flex: 1; width: 100%; display: flex; align-items: flex-end; }
+/* Bars: a FIXED width (centred in each column) so only the HEIGHT varies day to day — the
+   earlier full-width bars read as different widths as well as heights, which looked wrong. */
+.weekBarWrap { flex: 1; width: 100%; display: flex; align-items: flex-end; justify-content: center; }
 .weekBar {
-  width: 100%;
-  border-radius: var(--radius-md);
+  width: clamp(20px, 2.6vw, 32px);
+  border-radius: 8px 8px 3px 3px;
   background: currentColor;
-  opacity: 0.42;
+  opacity: 0.4;
   min-height: 8px;
 }
 .weekToday .weekBar { opacity: 1; }
-.weekDay { font-size: clamp(12px, 1.4vw, 17px); font-weight: var(--fw-semibold); opacity: 0.65; }
+.weekDay { font-size: clamp(11px, 1.3vw, 15px); font-weight: var(--fw-semibold); opacity: 0.65; }
 .weekToday .weekDay { opacity: 1; font-weight: var(--fw-bold); }
 
-/* Live Canterbury transport — trains + buses, compact centred rows under the week strip. */
-.transport {
-  margin: clamp(12px, 2vh, 22px) auto 0;
+/* Live transport — a proper departure board: West / East trains + the bus station, each row
+   a time, a destination, and a status (green on time, red for a slip). Green/red is the
+   universal transport convention, so it's used HERE only — the busyness scale stays gold. */
+.board {
+  margin: clamp(14px, 2vh, 24px) auto 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  max-width: 560px;
+  gap: clamp(9px, 1.5vh, 16px);
+  text-align: left;
+  max-width: 520px;
 }
-.transRow {
-  display: flex;
+.boardSection { display: flex; flex-direction: column; }
+.boardHead {
+  font-size: clamp(11px, 1.25vw, 15px);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  font-weight: var(--fw-bold);
+  opacity: 0.7;
+  margin-bottom: 3px;
+}
+.depRow {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+  font-size: clamp(14px, 1.5vw, 19px);
+  font-variant-numeric: tabular-nums;
+  padding: 3px 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.09);
+}
+.depTime { font-weight: var(--fw-bold); }
+.depTo { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.depGood { color: #2f7d4e; font-weight: var(--fw-semibold); white-space: nowrap; }
+.depBad { color: #b4231d; font-weight: var(--fw-bold); white-space: nowrap; }
+.depNone { font-size: clamp(13px, 1.3vw, 16px); opacity: 0.55; padding: 3px 0; }
+/* Bus route number as a destination blind — amber on black, like the front of the bus. */
+.busBlind {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  flex-wrap: wrap;
-  gap: 6px 16px;
-  font-size: clamp(13px, 1.5vw, 19px);
-  font-variant-numeric: tabular-nums;
+  min-width: 2.1em;
+  padding: 2px 8px;
+  background: var(--ink-900, #1e1a15);
+  color: #f4c430;
+  border-radius: 6px;
+  font-weight: var(--fw-bold);
+  font-size: 0.86em;
 }
-.transIcon { font-size: 1.15em; }
 
 .band_quiet {
   background: var(--sand-100);

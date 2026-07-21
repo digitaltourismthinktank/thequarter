@@ -13,12 +13,24 @@
  * `_timetables` forms with `live=true`, so we call those directly.
  */
 
+import { londonNow } from './_time.mjs';
+
 const APP_ID = process.env.TRANSPORTAPI_APP_ID;
 const APP_KEY = process.env.TRANSPORTAPI_APP_KEY;
 const BASE = 'https://transportapi.com/v3/uk';
+const WINDOW_MIN = 60; // only show departures within the next hour
 
 const json = (b, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { 'content-type': 'application/json' } });
 const auth = () => `app_id=${encodeURIComponent(APP_ID)}&app_key=${encodeURIComponent(APP_KEY)}`;
+
+/** Minutes from London-now until a 'HH:MM' today (handles a small after-midnight wrap). */
+function minsUntil(hhmmStr) {
+  if (!hhmmStr || !/^\d{2}:\d{2}$/.test(hhmmStr)) return null;
+  const [h, m] = hhmmStr.split(':').map(Number);
+  let diff = h * 60 + m - londonNow().min;
+  if (diff < -120) diff += 1440;
+  return diff;
+}
 
 // Canterbury bus station bays (Traveline ATCO codes). A handful of the main bays, merged.
 const BUS_BAYS = ['240098892', '240098894', '240098900', '240098902', '240098898'];
@@ -32,23 +44,26 @@ const hhmm = (t) => (typeof t === 'string' ? t.slice(0, 5) : '');
 
 async function trainDepartures(crs) {
   try {
-    const r = await fetch(`${BASE}/train/station_timetables/${crs}.json?${auth()}&live=true&train_status=passenger&limit=4`);
+    const r = await fetch(`${BASE}/train/station_timetables/${crs}.json?${auth()}&live=true&train_status=passenger&limit=15`);
     if (!r.ok) return [];
     const j = await r.json();
     const all = j?.departures?.all || [];
-    // The API lists departures grouped, not strictly time-ordered, so sort by clock time before
-    // taking the soonest — otherwise "next train" could show a later one first.
     return all
-      .map((d) => ({
-        time: hhmm(d.expected_departure_time || d.aimed_departure_time),
-        to: d.destination_name || '',
-        status: d.status || '',
-        platform: d.platform || null,
-        mins: Number.isFinite(d.best_departure_estimate_mins) ? d.best_departure_estimate_mins : null,
-      }))
-      .filter((d) => d.time)
-      .sort((a, b) => a.time.localeCompare(b.time))
-      .slice(0, 4);
+      .map((d) => {
+        const aimed = hhmm(d.aimed_departure_time);
+        const expected = hhmm(d.expected_departure_time);
+        const st = String(d.status || '').toUpperCase();
+        const cancelled = st.includes('CANCEL');
+        // "On time" unless the expected time has slipped, or the status says otherwise.
+        const onTime = !cancelled && (!expected || expected === aimed || st === 'ON TIME' || st === 'STARTS HERE' || st === 'EARLY');
+        const time = aimed || expected;
+        const mins = Number.isFinite(d.best_departure_estimate_mins) ? d.best_departure_estimate_mins : minsUntil(expected || aimed);
+        return { time, expected: onTime || cancelled ? null : expected, onTime, cancelled, to: d.destination_name || '', mins };
+      })
+      .filter((d) => d.time && d.mins != null && d.mins >= -2 && d.mins <= WINDOW_MIN)
+      .sort((a, b) => a.mins - b.mins)
+      .slice(0, 6)
+      .map(({ mins, ...rest }) => rest); // eslint-disable-line no-unused-vars
   } catch {
     return [];
   }
@@ -58,35 +73,32 @@ async function busDepartures() {
   const out = [];
   for (const code of BUS_BAYS) {
     try {
-      const r = await fetch(`${BASE}/bus/stop_timetables/${code}.json?${auth()}&live=true&limit=3`);
+      const r = await fetch(`${BASE}/bus/stop_timetables/${code}.json?${auth()}&live=true&limit=8`);
       if (!r.ok) continue;
       const j = await r.json();
       const deps = j?.departures || {};
-      for (const line of Object.keys(deps)) {
-        for (const d of deps[line] || []) {
-          out.push({
-            time: hhmm(d.best_departure_estimate || d.aimed_departure_time),
-            line: d.line_name || d.line || line,
-            to: d.direction || '',
-          });
+      for (const key of Object.keys(deps)) {
+        for (const d of deps[key] || []) {
+          const time = hhmm(d.best_departure_estimate || d.aimed_departure_time);
+          out.push({ time, line: String(d.line_name || d.line || key), to: d.direction || '', mins: minsUntil(time) });
         }
       }
     } catch {
       /* skip a bad bay */
     }
   }
-  // Merge, drop timeless rows, sort by clock time, de-dupe on line+time, keep the soonest few.
   const seen = new Set();
   return out
-    .filter((b) => b.time)
-    .sort((a, b) => a.time.localeCompare(b.time))
+    .filter((b) => b.time && b.mins != null && b.mins >= -2 && b.mins <= WINDOW_MIN)
+    .sort((a, b) => a.mins - b.mins)
     .filter((b) => {
-      const k = `${b.line}|${b.time}`;
+      const k = `${b.line}|${b.time}|${b.to}`;
       if (seen.has(k)) return false;
       seen.add(k);
       return true;
     })
-    .slice(0, 5);
+    .slice(0, 6)
+    .map(({ mins, ...rest }) => rest); // eslint-disable-line no-unused-vars
 }
 
 export default async function handler() {

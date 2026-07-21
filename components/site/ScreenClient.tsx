@@ -117,6 +117,30 @@ function weatherEmoji(code: number): string {
   return '☁️';
 }
 
+/** Rain in the WMO code set (drizzle/rain/showers/thunder) — used to spot a change in the forecast. */
+function isRainCode(c: number): boolean {
+  return (c >= 51 && c <= 67) || (c >= 80 && c <= 82) || c >= 95;
+}
+/**
+ * A short "what's changing" line from Open-Meteo's hourly forecast: rain arriving in the next few
+ * hours ("Rain likely ~14:00"), or — if it's already raining — when it eases. null when settled.
+ */
+function weatherChange(hourly: { time: string[]; weather_code: number[]; precipitation_probability?: number[] } | undefined, nowCode: number): string | null {
+  if (!hourly?.time?.length) return null;
+  const nowMs = Date.now();
+  const hh = (iso: string) => new Date(iso).toLocaleTimeString('en-GB', { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit', hour12: false });
+  const rainingNow = isRainCode(nowCode);
+  for (let i = 0; i < hourly.time.length; i += 1) {
+    const t = new Date(hourly.time[i]).getTime();
+    if (t < nowMs || t - nowMs > 6 * 3600_000) continue;
+    const c = hourly.weather_code[i];
+    const p = hourly.precipitation_probability?.[i] ?? 0;
+    if (!rainingNow && (isRainCode(c) || p >= 55)) return `Rain likely ~${hh(hourly.time[i])}`;
+    if (rainingNow && !isRainCode(c)) return `Easing ~${hh(hourly.time[i])}`;
+  }
+  return null;
+}
+
 /** Trim a rail destination so it fits the lobby transport strip (drop the parenthetical, cap length). */
 function shortDest(s: string): string {
   const t = String(s || '').replace(/\s*\(.*\)\s*$/, '').trim();
@@ -280,7 +304,7 @@ function EntranceScreen() {
   const [data, setData] = useState<ScreenData | null>(null);
   const [events, setEvents] = useState<QuarterEvent[]>([]);
   const [announcements, setAnnouncements] = useState<ScreenAnnouncement[]>([]);
-  const [weather, setWeather] = useState<{ temp: number; emoji: string } | null>(null);
+  const [weather, setWeather] = useState<{ temp: number; emoji: string; change: string | null } | null>(null);
   const [transport, setTransport] = useState<{ configured: boolean; trains: { west: TrainDeparture[]; east: TrainDeparture[] }; buses: BusDeparture[] } | null>(null);
   const [now, setNow] = useState<Date>(() => new Date());
   const [bankHoliday, setBankHoliday] = useState(false);
@@ -384,11 +408,11 @@ function EntranceScreen() {
   useEffect(() => {
     const load = async () => {
       try {
-        const r = await fetch('https://api.open-meteo.com/v1/forecast?latitude=51.28&longitude=1.08&current=temperature_2m,weather_code&timezone=Europe%2FLondon');
+        const r = await fetch('https://api.open-meteo.com/v1/forecast?latitude=51.28&longitude=1.08&current=temperature_2m,weather_code&hourly=weather_code,precipitation_probability&forecast_hours=8&timezone=Europe%2FLondon');
         const j = await r.json();
         const t = j?.current?.temperature_2m;
         const c = j?.current?.weather_code;
-        if (typeof t === 'number' && typeof c === 'number') setWeather({ temp: t, emoji: weatherEmoji(c) });
+        if (typeof t === 'number' && typeof c === 'number') setWeather({ temp: t, emoji: weatherEmoji(c), change: weatherChange(j?.hourly, c) });
       } catch {
         /* feed unavailable — the clock simply shows no weather */
       }
@@ -467,7 +491,12 @@ function EntranceScreen() {
         <div className={styles.when}>
           <div className={styles.date}>{dateLabel}</div>
           <div className={styles.time}>{timeLabel}</div>
-          {weather ? <div className={styles.weather}>{weather.emoji} {Math.round(weather.temp)}°</div> : null}
+          {weather ? (
+            <div className={styles.weather}>
+              {weather.emoji} {Math.round(weather.temp)}°
+              {weather.change ? <span className={styles.weatherChange}> · {weather.change}</span> : null}
+            </div>
+          ) : null}
         </div>
       </header>
 
@@ -478,7 +507,9 @@ function EntranceScreen() {
         </section>
       ) : band ? (
         <section className={`${styles.hero} ${styles[`band_${band.id}`]}`}>
-          <span className={styles.heroEyebrow}>The week at a glance</span>
+          <span className={styles.heroEyebrow}>
+            The week at a glance · today feels <strong>{band.label.toLowerCase()}</strong>
+          </span>
           <div className={styles.weekStrip}>
             {weekDays.map((d) => (
               <div key={d.label} className={`${styles.weekCol} ${d.isToday ? styles.weekToday : ''}`}>
@@ -489,30 +520,41 @@ function EntranceScreen() {
               </div>
             ))}
           </div>
-          <p className={styles.heroLine}>
-            Today feels <strong>{band.label.toLowerCase()}</strong>. Quieter Mondays and Fridays — spreading the week out keeps the place at its best.
-          </p>
-          {transport && (transport.trains.west[0] || transport.trains.east[0] || transport.buses[0]) ? (
-            <div className={styles.transport}>
-              {transport.trains.west[0] || transport.trains.east[0] ? (
-                <div className={styles.transRow}>
-                  <span className={styles.transIcon}>🚆</span>
-                  {transport.trains.west[0] ? (
-                    <span className={styles.transDep}><b>West</b> {transport.trains.west[0].time} {shortDest(transport.trains.west[0].to)}</span>
-                  ) : null}
-                  {transport.trains.east[0] ? (
-                    <span className={styles.transDep}><b>East</b> {transport.trains.east[0].time} {shortDest(transport.trains.east[0].to)}</span>
-                  ) : null}
+
+          {transport && (transport.trains.west.length || transport.trains.east.length || transport.buses.length) ? (
+            <div className={styles.board}>
+              {([['Canterbury West', transport.trains.west], ['Canterbury East', transport.trains.east]] as const).map(([name, list]) => (
+                <div key={name} className={styles.boardSection}>
+                  <span className={styles.boardHead}>🚆 {name}</span>
+                  {list.length ? (
+                    list.slice(0, 3).map((t, i) => (
+                      <div key={`${t.time}-${i}`} className={styles.depRow}>
+                        <span className={styles.depTime}>{t.time}</span>
+                        <span className={styles.depTo}>{shortDest(t.to)}</span>
+                        <span className={t.onTime ? styles.depGood : styles.depBad}>
+                          {t.cancelled ? 'Cancelled' : t.onTime ? 'On time' : `Exp. ${t.expected}`}
+                        </span>
+                      </div>
+                    ))
+                  ) : (
+                    <div className={styles.depNone}>Nothing in the next hour</div>
+                  )}
                 </div>
-              ) : null}
-              {transport.buses[0] ? (
-                <div className={styles.transRow}>
-                  <span className={styles.transIcon}>🚌</span>
-                  {transport.buses.slice(0, 3).map((bs, i) => (
-                    <span key={`${bs.line}-${bs.time}-${i}`} className={styles.transDep}>{bs.time} <b>{bs.line}</b></span>
-                  ))}
-                </div>
-              ) : null}
+              ))}
+              <div className={styles.boardSection}>
+                <span className={styles.boardHead}>🚌 Bus station</span>
+                {transport.buses.length ? (
+                  transport.buses.slice(0, 4).map((b, i) => (
+                    <div key={`${b.line}-${b.time}-${i}`} className={styles.depRow}>
+                      <span className={styles.depTime}>{b.time}</span>
+                      <span className={styles.busBlind}>{b.line}</span>
+                      <span className={styles.depTo}>{shortDest(b.to) || '—'}</span>
+                    </div>
+                  ))
+                ) : (
+                  <div className={styles.depNone}>Nothing in the next hour</div>
+                )}
+              </div>
             </div>
           ) : null}
         </section>

@@ -261,7 +261,7 @@ export interface TourSlot {
   available: boolean;
 }
 // ---- Live Canterbury transport for the lobby display (public) ----
-export interface TrainDeparture { time: string; to: string; status?: string; platform?: string | null; mins?: number | null }
+export interface TrainDeparture { time: string; to: string; expected: string | null; onTime: boolean; cancelled: boolean }
 export interface BusDeparture { time: string; line: string; to: string }
 export const getTransport = () =>
   call<{ configured: boolean; trains: { west: TrainDeparture[]; east: TrainDeparture[] }; buses: BusDeparture[] }>('transport', { auth: false });
