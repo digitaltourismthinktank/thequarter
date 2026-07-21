@@ -138,3 +138,8 @@
   font-size: var(--text-xs); color: var(--text-muted); overflow-wrap: anywhere;
 }
 .confirmBody .actions { justify-content: center; margin-top: 18px; }
+
+/* Welcome-screen announcement: two dates side by side, then the scheduled list. */
+.annDates { display: flex; gap: 12px; }
+.annDates .field { flex: 1; }
+.annList { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }

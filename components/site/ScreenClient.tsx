@@ -4,9 +4,11 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   getTodayScreen,
   getUpcomingEvents,
+  getAnnouncements,
   type ScreenSpace,
   type ScreenBooking,
   type QuarterEvent,
+  type ScreenAnnouncement,
 } from '@/lib/booking';
 import { busyness, type Band } from '@/lib/busyness';
 import { Icon } from '@/components/ds/Icon';
@@ -256,6 +258,7 @@ export function ScreenClient() {
 function EntranceScreen() {
   const [data, setData] = useState<ScreenData | null>(null);
   const [events, setEvents] = useState<QuarterEvent[]>([]);
+  const [announcements, setAnnouncements] = useState<ScreenAnnouncement[]>([]);
   const [now, setNow] = useState<Date>(() => new Date());
   const [bankHoliday, setBankHoliday] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -314,9 +317,10 @@ function EntranceScreen() {
   }, []);
 
   const load = useCallback(async () => {
-    const [s, e] = await Promise.all([getTodayScreen(), getUpcomingEvents()]);
+    const [s, e, a] = await Promise.all([getTodayScreen(), getUpcomingEvents(), getAnnouncements()]);
     if (s.ok) setData(s.data);
     if (e.ok) setEvents(e.data.events);
+    if (a.ok) setAnnouncements(a.data.announcements);
     setLoaded(true);
   }, []);
 
@@ -394,6 +398,15 @@ function EntranceScreen() {
           <div className={styles.time}>{timeLabel}</div>
         </div>
       </header>
+
+      {/* Scheduled announcement — a note the team sets for a date window (e.g. a national day,
+          a one-off change). Shown open OR closed, so a "back Monday" style notice still lands. */}
+      {announcements.length ? (
+        <div className={styles.announce} role="status">
+          <span className={styles.announceTitle}>{announcements[0].title}</span>
+          {announcements[0].body ? <span className={styles.announceBody}>{announcements[0].body}</span> : null}
+        </div>
+      ) : null}
 
       {closed ? (
         <section className={`${styles.hero} ${styles.bandClosed}`}>

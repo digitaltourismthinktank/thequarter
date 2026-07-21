@@ -4,13 +4,23 @@ import { useCallback, useEffect, useState } from 'react';
 import { Icon } from '@/components/ds/Icon';
 import {
   commsIndex, commsPreview, commsTest, commsSend, commsDismiss, commsPush,
-  type CommsIndex, type CommsTodoThank, type CommsTodoMember,
+  adminGetEvents, adminCreateEvent, adminDeleteEvent,
+  type CommsIndex, type CommsTodoThank, type CommsTodoMember, type QuarterEvent,
 } from '@/lib/booking';
 import styles from './CommsPane.module.css';
 
 const fmt = (iso: string) => {
   const [y, m, d] = iso.split('-').map(Number);
   return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
+};
+/** A date-only day label from a YYYY-MM-DD or full-ISO string. */
+const fmtDay = (iso: string) => fmt(iso.slice(0, 10));
+/** "Mon 21 Jul" for a single day, or "… – …" for a range. */
+const annWindow = (a: QuarterEvent) => {
+  if (!a.start) return '—';
+  const f = fmtDay(a.start);
+  const t = a.end ? fmtDay(a.end) : f;
+  return f === t ? f : `${f} – ${t}`;
 };
 
 /**
@@ -51,11 +61,25 @@ export function CommsPane() {
   const [pushTitle, setPushTitle] = useState('In the Pantry today');
   const [pushMsg, setPushMsg] = useState('');
 
+  // Welcome-screen announcements — stored as unpublished Category='Announcement' events, so
+  // they never leak onto the public what's-on or the .ics feed (both filter {Published}).
+  const [anns, setAnns] = useState<QuarterEvent[]>([]);
+  const [annText, setAnnText] = useState('');
+  const [annBody, setAnnBody] = useState('');
+  const [annFrom, setAnnFrom] = useState('');
+  const [annTo, setAnnTo] = useState('');
+
   const load = useCallback(async () => {
     const r = await commsIndex();
     if (r.ok) setData(r.data);
   }, []);
   useEffect(() => { load(); }, [load]);
+
+  const loadAnns = useCallback(async () => {
+    const r = await adminGetEvents();
+    if (r.ok) setAnns(r.data.events.filter((e) => e.category === 'Announcement'));
+  }, []);
+  useEffect(() => { loadAnns(); }, [loadAnns]);
 
   const tpl = data?.templates.find((t) => t.id === templateId) || null;
   const needsEvent = tpl?.audience === 'event' || audience === 'event-rsvps' || audience === 'members-not-rsvpd';
@@ -134,6 +158,36 @@ export function CommsPane() {
     setBusy(null);
     setNote(sent(r) ? `Pinged ${r.data.sent} ${r.data.sent === 1 ? 'person' : 'people'}.` : 'That didn’t go.');
     if (!email) setPushMsg('');
+  }
+
+  async function addAnnouncement() {
+    if (!annText.trim() || !annFrom) { setNote('Add the message and a start date.'); return; }
+    if (annTo && annTo < annFrom) { setNote('The end date can’t be before the start.'); return; }
+    setBusy('ann');
+    // published:false keeps it off every public event surface; the screen reads it by category.
+    const r = await adminCreateEvent({
+      title: annText.trim(),
+      description: annBody.trim() || undefined,
+      start: annFrom,
+      end: annTo || annFrom,
+      category: 'Announcement',
+      published: false,
+    });
+    setBusy(null);
+    if (r.ok) {
+      setAnnText(''); setAnnBody(''); setAnnFrom(''); setAnnTo('');
+      setNote('Announcement scheduled.');
+      loadAnns();
+    } else {
+      setNote('Could not save that announcement.');
+    }
+  }
+
+  async function removeAnnouncement(id: string) {
+    setBusy(id);
+    await adminDeleteEvent(id);
+    setBusy(null);
+    loadAnns();
   }
 
   if (!data) return <p className={styles.muted}>Loading…</p>;
@@ -312,6 +366,54 @@ export function CommsPane() {
             </div>
           </>
         ) : null}
+      </div>
+
+      {/* -------------------------------------------- welcome-screen announcement -- */}
+      <div className={styles.panel}>
+        <span className={styles.panelTitle}>Welcome-screen announcement</span>
+        <p className={styles.muted}>
+          A note shown on the entrance display for a date range — a national day, a one-off change. It stays off the public what’s-on and the calendar feed.
+        </p>
+
+        <label className={styles.field}>
+          <span>Message</span>
+          <input className={styles.input} placeholder="Today we’re celebrating Belgian National Day 🇧🇪" value={annText} onChange={(e) => setAnnText(e.target.value)} />
+        </label>
+        <label className={styles.field}>
+          <span>Second line (optional)</span>
+          <input className={styles.input} placeholder="Waffles in the Pantry from 11" value={annBody} onChange={(e) => setAnnBody(e.target.value)} />
+        </label>
+        <div className={styles.annDates}>
+          <label className={styles.field}>
+            <span>From</span>
+            <input className={styles.input} type="date" value={annFrom} onChange={(e) => setAnnFrom(e.target.value)} />
+          </label>
+          <label className={styles.field}>
+            <span>To (optional)</span>
+            <input className={styles.input} type="date" value={annTo} onChange={(e) => setAnnTo(e.target.value)} />
+          </label>
+        </div>
+        <div className={styles.actions}>
+          <button type="button" className={styles.primary} onClick={addAnnouncement} disabled={busy === 'ann'}>
+            {busy === 'ann' ? 'Scheduling…' : 'Schedule announcement'}
+          </button>
+        </div>
+
+        {anns.length ? (
+          <div className={styles.annList}>
+            {anns.map((a) => (
+              <div key={a.id} className={styles.row}>
+                <div className={styles.rowText}>
+                  <strong>{a.title}</strong>
+                  <span>{annWindow(a)}{a.description ? ` · ${a.description}` : ''}</span>
+                </div>
+                <button type="button" className={styles.x} onClick={() => removeAnnouncement(a.id)} disabled={busy === a.id} aria-label="Remove announcement">×</button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className={styles.muted}>No announcements scheduled.</p>
+        )}
       </div>
 
       {/* --------------------------------------------------------------- modals --- */}

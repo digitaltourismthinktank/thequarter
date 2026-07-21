@@ -680,3 +680,31 @@
 .evBody {
   gap: 6px;
 }
+
+/* Scheduled announcement — a warm banner across the top when the team has set a note for the
+   day (a national day, a one-off change). Prominent but calm; sits below the header, shown
+   whether the space is open or closed. */
+.announce {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+  margin: 0 0 clamp(14px, 1.8vw, 24px);
+  padding: clamp(14px, 1.8vw, 26px) clamp(22px, 3vw, 44px);
+  border-radius: var(--radius-xl);
+  background: linear-gradient(180deg, var(--gold-100, #f4ecd8), var(--gold-300, #e6d3a3));
+  border: 1px solid var(--gold-600, #b8933f);
+  color: var(--ink-900);
+}
+.announceTitle {
+  font-weight: var(--fw-bold);
+  font-size: clamp(1.4rem, 2.6vw, 2.7rem);
+  line-height: 1.15;
+  text-wrap: balance;
+}
+.announceBody {
+  font-weight: var(--fw-semibold);
+  font-size: clamp(0.95rem, 1.4vw, 1.45rem);
+  opacity: 0.82;
+}

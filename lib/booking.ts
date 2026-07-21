@@ -604,6 +604,16 @@ export const adminUpdateEvent = (id: string, e: Partial<QuarterEvent>) =>
 export const adminDeleteEvent = (id: string) =>
   call<{ ok: boolean }>('events', { method: 'POST', body: { action: 'delete', id } });
 
+// ---- Welcome-screen announcements ----
+// Stored as unpublished events tagged Category 'Announcement' (hidden from every {Published}
+// surface); managed with the admin event helpers above. This returns only the ones live today.
+export interface ScreenAnnouncement {
+  id: string;
+  title: string;
+  body: string | null;
+}
+export const getAnnouncements = () => call<{ announcements: ScreenAnnouncement[] }>('events?action=announcements', { auth: false });
+
 // Event RSVPs
 export type RsvpStatus = 'Going' | 'Cancelled';
 export const rsvpEvent = (id: string, status: RsvpStatus) =>

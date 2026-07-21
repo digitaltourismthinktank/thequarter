@@ -50,6 +50,27 @@ export default async function handler(req) {
       return json({ events });
     }
 
+    if (action === 'announcements') {
+      // Active welcome-screen announcements (public; entrance screen + dashboards). Stored as
+      // UNPUBLISHED events tagged Category 'Announcement', so they never surface on the public
+      // what's-on, the dashboard events rail, the member Events tab, or the .ics feed — every one
+      // of those filters {Published}. Only this action reads them. An announcement is live when
+      // today's London date falls within its [Start, End] window, inclusive; End defaults to
+      // Start, so a single date shows for that one day (e.g. Belgian National Day).
+      const recs = await listRecords(T.events, { filterByFormula: `{Category}='Announcement'` });
+      const today = londonNow().dateStr;
+      const announcements = recs
+        .filter((r) => {
+          const from = r.fields[F.events.start] ? isoToLondonDate(r.fields[F.events.start]) : null;
+          if (!from) return false;
+          const to = r.fields[F.events.end] ? isoToLondonDate(r.fields[F.events.end]) : from;
+          return today >= from && today <= to;
+        })
+        .map((r) => ({ id: r.id, title: r.fields[F.events.title] || '', body: r.fields[F.events.description] || null }))
+        .filter((a) => a.title);
+      return json({ announcements });
+    }
+
     if (action === 'published') {
       // All published events (past + upcoming) for the member Events tab. Published
       // events are public, so no auth is required.

@@ -127,7 +127,7 @@ export function AuthScreen({
     const ms = await getMemberstack();
     if (!ms) {
       setStatus('error');
-      setError('Could not reach the member service. Please try again.');
+      setError('Couldn’t reach the sign-in service. If this keeps happening, your browser may be out of date — try updating it, or sign in from another device.');
       return;
     }
     try {
@@ -169,7 +169,7 @@ export function AuthScreen({
     const ms = await getMemberstack();
     if (!ms) {
       setStatus('error');
-      setError('Could not reach the member service. Please try again.');
+      setError('Couldn’t reach the sign-in service. If this keeps happening, your browser may be out of date — try updating it, or sign in from another device.');
       return;
     }
     try {
@@ -196,7 +196,7 @@ export function AuthScreen({
     const ms = await getMemberstack();
     if (!ms) {
       setStatus('error');
-      setError('Could not reach the member service. Please try again.');
+      setError('Couldn’t reach the sign-in service. If this keeps happening, your browser may be out of date — try updating it, or sign in from another device.');
       return;
     }
     try {
@@ -228,7 +228,7 @@ export function AuthScreen({
     const ms = await getMemberstack();
     if (!ms) {
       setStatus('error');
-      setError('Could not reach the member service. Please try again.');
+      setError('Couldn’t reach the sign-in service. If this keeps happening, your browser may be out of date — try updating it, or sign in from another device.');
       return;
     }
     try {
@@ -250,7 +250,7 @@ export function AuthScreen({
     const ms = await getMemberstack();
     if (!ms) {
       setStatus('error');
-      setError('Could not reach the member service. Please try again.');
+      setError('Couldn’t reach the sign-in service. If this keeps happening, your browser may be out of date — try updating it, or sign in from another device.');
       return;
     }
     try {
