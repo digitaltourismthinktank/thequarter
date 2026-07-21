@@ -20,7 +20,13 @@ const APP_KEY = process.env.TRANSPORTAPI_APP_KEY;
 const BASE = 'https://transportapi.com/v3/uk';
 const WINDOW_MIN = 60; // only show departures within the next hour
 
-const json = (b, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { 'content-type': 'application/json' } });
+// TransportAPI's free tier has a LOW daily request cap, and each handler run makes several
+// upstream calls (2 stations + the bus bays). So: cache hard. The Cache-Control header lets
+// Netlify's CDN serve the same response to every polling screen without re-running the function,
+// and the in-memory cache covers a warm instance. Between them, upstream calls stay to a trickle.
+const CDN_CACHE = 'public, max-age=300, s-maxage=300';
+const json = (b, s = 200, cache = false) =>
+  new Response(JSON.stringify(b), { status: s, headers: { 'content-type': 'application/json', ...(cache ? { 'cache-control': CDN_CACHE } : {}) } });
 const auth = () => `app_id=${encodeURIComponent(APP_ID)}&app_key=${encodeURIComponent(APP_KEY)}`;
 
 /** Minutes from London-now until a 'HH:MM' today (handles a small after-midnight wrap). */
@@ -32,13 +38,14 @@ function minsUntil(hhmmStr) {
   return diff;
 }
 
-// Canterbury bus station bays (Traveline ATCO codes). A handful of the main bays, merged.
-const BUS_BAYS = ['240098892', '240098894', '240098900', '240098902', '240098898'];
+// Canterbury bus station bays (Traveline ATCO codes). Kept to two of the main bays — each is a
+// separate upstream call, so more bays = more quota burned for little extra on the board.
+const BUS_BAYS = ['240098892', '240098894'];
 
-// Warm-instance cache — Netlify functions may cold-start, but while an instance is warm this
-// keeps us to roughly one upstream fetch a minute regardless of how many screens are polling.
+// Warm-instance cache — with the CDN cache above this is belt-and-braces, but a long TTL keeps a
+// warm instance from re-fetching too.
 let cache = { at: 0, data: null };
-const CACHE_MS = 60_000;
+const CACHE_MS = 300_000; // 5 min
 
 const hhmm = (t) => (typeof t === 'string' ? t.slice(0, 5) : '');
 
@@ -104,12 +111,12 @@ async function busDepartures() {
 export default async function handler() {
   if (!APP_ID || !APP_KEY) return json({ configured: false, trains: { west: [], east: [] }, buses: [] });
   const now = Date.now();
-  if (cache.data && now - cache.at < CACHE_MS) return json(cache.data);
+  if (cache.data && now - cache.at < CACHE_MS) return json(cache.data, 200, true);
   try {
     const [west, east, buses] = await Promise.all([trainDepartures('CBW'), trainDepartures('CBE'), busDepartures()]);
     const data = { configured: true, trains: { west, east }, buses };
     cache = { at: now, data };
-    return json(data);
+    return json(data, 200, true);
   } catch {
     return json({ configured: true, trains: { west: [], east: [] }, buses: [] });
   }

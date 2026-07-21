@@ -430,7 +430,7 @@ function EntranceScreen() {
       if (r.ok && r.data?.configured) setTransport(r.data);
     };
     load();
-    const id = window.setInterval(load, 60 * 1000);
+    const id = window.setInterval(load, 3 * 60 * 1000);
     return () => window.clearInterval(id);
   }, []);
 
