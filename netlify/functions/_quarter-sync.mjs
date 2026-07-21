@@ -237,6 +237,35 @@ export async function setMemberPlan(secret, email, targetPlanId) {
   return { ok: true, memberId: member.id, targetPlanId, added, removed };
 }
 
+/**
+ * Strip every managed plan tag, leaving the member on no plan (day-pass / carnet only). The
+ * remove loop is the same one setMemberPlan proves — these are FREE Memberstack plan tags
+ * with billing driven separately through Stripe, so removeFreePlan is the right call. Their
+ * day allowance is not touched here; clear it separately if the intent is zero standing days.
+ */
+export async function clearMemberPlan(secret, email) {
+  if (!secret || !email) return { ok: false, reason: 'missing-args' };
+  const admin = memberstackAdmin.init(secret);
+  let member;
+  try {
+    const r = await admin.members.retrieve({ email });
+    member = r?.data;
+  } catch {
+    return { ok: false, reason: 'lookup-failed' };
+  }
+  if (!member) return { ok: false, reason: 'not-found' };
+  const planIdOf = (c) => (typeof c === 'string' ? c : c?.planId);
+  const current = (member.planConnections || []).map(planIdOf).filter(Boolean);
+  const removed = [];
+  for (const planId of current) {
+    if (MANAGED_PLANS.has(planId)) {
+      await admin.members.removeFreePlan({ id: member.id, data: { planId } });
+      removed.push(planId);
+    }
+  }
+  return { ok: true, memberId: member.id, removed };
+}
+
 /** Read the member + the last-applied event time/id (for the stale-event guard). */
 export async function getMemberSync(secret, email) {
   if (!secret || !email) return { member: null };

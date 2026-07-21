@@ -14,7 +14,7 @@ import memberstackAdmin from '@memberstack/admin';
 import { verifyMember, isAdmin, tokenFromRequest } from './_member.mjs';
 import { listRecords, listAllRecords, createRecord, updateRecord, deleteRecord, T, F, airtableReady, esc } from './_airtable.mjs';
 import { londonWallClockToISO, isoToLondonMin, isoToLondonDate, hhmmToMin, londonNow, holdReleased, addDays } from './_time.mjs';
-import { PLAN_NAMES, allowanceForMember, setMemberPlan, renewMember, formatDate } from './_quarter-sync.mjs';
+import { PLAN_NAMES, allowanceForMember, setMemberPlan, clearMemberPlan, renewMember, formatDate } from './_quarter-sync.mjs';
 import { listRewards, listPerks, listFloats, floatStatus, awardPoints, redeemReward, partnerPayouts, markPartnerPaid, partnerStatement } from './_rewards.mjs';
 import { sendEmail, emailShell, escapeHtml, OPS_EMAIL, fmtDateLong } from './_email.mjs';
 import { pushToEmail } from './_push.mjs';
@@ -983,8 +983,10 @@ export default async function handler(req) {
     const email = m.auth?.email || m.email || null;
     if (!email) return json({ error: 'no-email' }, 400);
 
-    // Plan change first (it runs its own add/remove-free-plan updates).
-    if (body.planId) await setMemberPlan(MS_SECRET, email, body.planId);
+    // Plan change first (it runs its own add/remove-free-plan updates). 'none' is the
+    // explicit "remove their plan — day pass / carnet only" sentinel from the profile.
+    if (body.planId === 'none') await clearMemberPlan(MS_SECRET, email);
+    else if (body.planId) await setMemberPlan(MS_SECRET, email, body.planId);
 
     const cf = {};
     // renewalDate: a 'DD/MM/YYYY' string, or '' to clear.

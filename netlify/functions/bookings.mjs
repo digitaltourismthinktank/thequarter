@@ -184,8 +184,30 @@ export default async function handler(req) {
         filterByFormula: `AND({Status}='Confirmed', OR({Kind}='Block', {Kind}='External'))`,
       });
       const occRecs = recurringBlockOccurrences(blockRecs, today.dateStr).map((o) => o.record);
+
+      // Privatisations were the missing piece: the admin day view merges them, this snapshot
+      // never did, so a privatised room (e.g. Chapter House held by With You) showed as
+      // "Available" on the entrance screen. A privatisation is one marker row on its START
+      // date carrying a cadence in Notes — it's in neither `recs` (wrong date) nor
+      // `blockRecs` (wrong Kind), so it has to be fetched and expanded for today separately.
+      const privRecs = await listRecords(T.bookings, {
+        filterByFormula: `AND({Status}='Confirmed', {Kind}='Privatisation')`,
+      });
+      const privBookings = [];
+      for (const r of privRecs) {
+        const parsed = parsePrivatisationSlots(r.fields[F.bookings.notes] || '');
+        if (!parsed) continue;
+        const startDate = isoToLondonDate(r.fields[F.bookings.date]) || '';
+        if (!isPrivatisedOn(today.dateStr, parsed.cadence, parsed.weekdays, startDate)) continue;
+        const sp = Array.isArray(r.fields[F.bookings.space]) ? r.fields[F.bookings.space][0] : null;
+        if (!sp) continue;
+        // A full business-day bar, so the screen marks the room reserved all day.
+        privBookings.push({ space: sp, startMin: BUSINESS.openMin, endMin: BUSINESS.closeMin, kind: 'Privatisation' });
+      }
+
       const bookings = recs
-        .filter((r) => !isRecurringBlockRule(r) && !isReleased(r, today.dateStr, today.min, today.dateStr))
+        // A stray Privatisation marker dated today would otherwise slip through with NaN times.
+        .filter((r) => r.fields[F.bookings.kind] !== 'Privatisation' && !isRecurringBlockRule(r) && !isReleased(r, today.dateStr, today.min, today.dateStr))
         .concat(occRecs)
         .map((r) => ({
           space: Array.isArray(r.fields[F.bookings.space]) ? r.fields[F.bookings.space][0] : null,
@@ -193,7 +215,7 @@ export default async function handler(req) {
           endMin: isoToLondonMin(r.fields[F.bookings.end]),
           kind: r.fields[F.bookings.kind],
         }));
-      return json({ date: today.dateStr, nowMin: today.min, spaces, bookings });
+      return json({ date: today.dateStr, nowMin: today.min, spaces, bookings: [...bookings, ...privBookings] });
     }
 
     if (action === 'floor') {

@@ -45,13 +45,25 @@ function roomView(space: ScreenSpace, bookings: ScreenBooking[], nowMin: number)
   const soon = !current && !!next && next.startMin - nowMin <= SOON_MIN;
   const free = space.bookable ? 'Available' : 'Open';
   const text = current
-    ? `${current.kind === 'Block' ? 'Reserved' : 'In use'} until ${minToHHMM(current.endMin)}`
+    ? `${current.kind === 'Block' || current.kind === 'Privatisation' ? 'Reserved' : 'In use'} until ${minToHHMM(current.endMin)}`
     : soon && next
       ? `Booked from ${minToHHMM(next.startMin)}`
       : next
         ? `${free} · next ${minToHHMM(next.startMin)}`
         : free;
   return { hot: !!current || soon, text, schedule };
+}
+
+/** Minutes since midnight in London — NOT the browser's timezone. The wall display's OS
+ *  clock can't be assumed to be on London time, and it shifts every "now" calculation. */
+function londonNowMin(): number {
+  const p = Object.fromEntries(
+    new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit', hour12: false })
+      .formatToParts(new Date())
+      .map((x) => [x.type, x.value]),
+  );
+  const h = p.hour === '24' ? 0 : Number(p.hour);
+  return h * 60 + Number(p.minute);
 }
 
 /** The business day the timeline spans (08:00–18:00), matching the booking window. */
@@ -73,7 +85,7 @@ function DayLine({ space, bookings, nowMin }: { space: ScreenSpace; bookings: Sc
         {mine.map((b, i) => (
           <span
             key={`${b.startMin}-${i}`}
-            className={`${styles.daySeg} ${b.kind === 'Block' ? styles.daySegBlock : ''}`}
+            className={`${styles.daySeg} ${b.kind === 'Block' || b.kind === 'Privatisation' ? styles.daySegBlock : ''}`}
             style={{ left: `${pct(b.startMin)}%`, width: `${Math.max(2, pct(b.endMin) - pct(b.startMin))}%` }}
           />
         ))}
@@ -348,7 +360,7 @@ function EntranceScreen() {
   const shutdown = (cm === 12 && cd >= 24) || (cm === 1 && cd === 1);
   const closed = b.closed || bankHoliday || shutdown;
   const band: Band | undefined = b.band;
-  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const nowMin = londonNowMin();
   // Only the next few events — a lobby screen shouldn't cycle through the whole calendar.
   const shownEvents = events.slice(0, MAX_EVENTS);
   const featured = shownEvents.length ? shownEvents[page % shownEvents.length] : null;

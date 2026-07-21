@@ -917,6 +917,8 @@ function MemberProfileModal({
               <div className={styles.formRow}>
                 <select className={styles.select} value={planSel} onChange={(e) => setPlanSel(e.target.value)} aria-label="Plan">
                   <option value="">Choose a plan…</option>
+              {/* Removes the plan — day-pass / carnet only. Non-empty, so the button enables. */}
+              <option value="none">No plan · day pass only</option>
                   {PLANS.filter((pl) => pl.id !== 'day-pass').map((pl) => (
                     <option key={pl.id} value={PLAN_MEMBERSTACK_ID[pl.id]}>
                       {pl.name}
