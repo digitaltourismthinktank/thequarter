@@ -49,6 +49,15 @@
   overflow: hidden;
 }
 
+/* Canterbury weather under the clock — quiet, right-aligned, never competes with the time. */
+.weather {
+  margin-top: 4px;
+  font-size: clamp(14px, 1.4vw, 22px);
+  font-weight: var(--fw-semibold);
+  color: var(--text-muted);
+  text-align: right;
+}
+
 /* Top-of-screen announcement — an unboxed headline centred between the logo and the clock. */
 .announceTop {
   flex: 1 1 auto;

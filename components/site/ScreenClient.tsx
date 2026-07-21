@@ -102,6 +102,18 @@ function DayLine({ space, bookings, nowMin }: { space: ScreenSpace; bookings: Sc
   );
 }
 
+/** WMO weather code → a simple emoji for the lobby clock. Open-Meteo's `weather_code`. */
+function weatherEmoji(code: number): string {
+  if (code === 0) return '☀️';
+  if (code <= 3) return '⛅';
+  if (code === 45 || code === 48) return '🌫️';
+  if (code >= 51 && code <= 67) return '🌧️';
+  if (code >= 71 && code <= 77) return '❄️';
+  if (code >= 80 && code <= 82) return '🌦️';
+  if (code >= 95) return '⛈️';
+  return '☁️';
+}
+
 function eventWhen(start: string): string {
   return new Date(start).toLocaleString('en-GB', {
     timeZone: 'Europe/London',
@@ -259,6 +271,7 @@ function EntranceScreen() {
   const [data, setData] = useState<ScreenData | null>(null);
   const [events, setEvents] = useState<QuarterEvent[]>([]);
   const [announcements, setAnnouncements] = useState<ScreenAnnouncement[]>([]);
+  const [weather, setWeather] = useState<{ temp: number; emoji: string } | null>(null);
   const [now, setNow] = useState<Date>(() => new Date());
   const [bankHoliday, setBankHoliday] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -357,6 +370,24 @@ function EntranceScreen() {
     })();
   }, []);
 
+  // Canterbury weather via Open-Meteo (open data, no key, CORS-friendly). Refreshed half-hourly.
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const r = await fetch('https://api.open-meteo.com/v1/forecast?latitude=51.28&longitude=1.08&current=temperature_2m,weather_code&timezone=Europe%2FLondon');
+        const j = await r.json();
+        const t = j?.current?.temperature_2m;
+        const c = j?.current?.weather_code;
+        if (typeof t === 'number' && typeof c === 'number') setWeather({ temp: t, emoji: weatherEmoji(c) });
+      } catch {
+        /* feed unavailable — the clock simply shows no weather */
+      }
+    };
+    load();
+    const id = window.setInterval(load, 30 * 60 * 1000);
+    return () => window.clearInterval(id);
+  }, []);
+
   const b = busyness(now);
   // Christmas/New Year shutdown (24 Dec – 1 Jan) layered on weekends + bank holidays.
   const cm = now.getMonth() + 1;
@@ -403,6 +434,7 @@ function EntranceScreen() {
         <div className={styles.when}>
           <div className={styles.date}>{dateLabel}</div>
           <div className={styles.time}>{timeLabel}</div>
+          {weather ? <div className={styles.weather}>{weather.emoji} {Math.round(weather.temp)}°</div> : null}
         </div>
       </header>
 
