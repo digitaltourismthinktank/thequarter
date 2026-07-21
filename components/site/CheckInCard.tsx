@@ -265,6 +265,8 @@ function friendly(code?: string): string {
       return 'Weekends are by request — pick a weekend day and we’ll confirm.';
     case 'weekend-pending':
       return 'Your weekend request is in — we’ll confirm by email before the day.';
+    case 'needs-plan-or-pass':
+      return 'Checking in needs a plan or a day pass. Grab a day pass, choose a plan, or have a word with the team.';
     case 'no-allowance':
       return 'You’ve used your allowance for this period — no days left.';
     case 'no-token':

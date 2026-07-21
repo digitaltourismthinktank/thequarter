@@ -159,6 +159,16 @@ export default async function handler(req) {
   // the Notes field as 'AM'/'PM' (no Airtable schema change); empty for full days.
   const periodNote = length === 'Half' ? (String(body.period).toLowerCase() === 'pm' ? 'PM' : 'AM') : '';
   const unlimited = allowanceForMember(me) === null;
+  // A plan is what entitles you to be here. allowanceForMember returns null for unlimited
+  // (Citizen) or a number for a metered plan; undefined means NO plan at all. That last
+  // case was the hole: with no plan and no days-remaining field, the allowance block below
+  // never fired (there were no days to run out of), so a no-plan account could check in and
+  // reserve days for free, indefinitely — which is exactly how someone with neither a
+  // membership nor a day pass ended up in the who's-in list.
+  const hasPlan = allowanceForMember(me) !== undefined;
+  const carnetState = me.metaData?.carnet || {};
+  const carnetPasses = Math.max(0, Number(carnetState.remaining) || 0);
+  const carnetLiveOn = (d) => carnetPasses > 0 && !(carnetState.expires && carnetState.expires < d);
 
   // Check in for TODAY (deducts unless unlimited). Idempotent per day.
   if (body.action === 'checkin') {
@@ -177,6 +187,15 @@ export default async function handler(req) {
       return json({ ok: true, alreadyCheckedIn: true, balance: me.customFields?.['days-remaining'] ?? null });
     }
 
+    // Entitlement. You may check in only if you have a plan, a paid day pass for today, or a
+    // carnet pass to spend. A staff-approved weekend Planned record also counts (handled
+    // above). Without one of these, checking in was silently free.
+    const paidPassToday = recs.some((r) => r.fields[F.checkins.status] === 'Paid');
+    const approvedToday = recs.some((r) => r.fields[F.checkins.status] === 'Planned');
+    if (!hasPlan && !carnetLiveOn(today) && !paidPassToday && !approvedToday) {
+      return json({ error: 'needs-plan-or-pass' }, 400);
+    }
+
     // Spend the plan's days first, and only fall back to a carnet pass once they're gone.
     //
     // That ordering is what a member expects — the days are already paid for this month and
@@ -192,7 +211,10 @@ export default async function handler(req) {
     const carnet = me.metaData?.carnet || {};
     const passesLeft = Math.max(0, Number(carnet.remaining) || 0);
     const carnetLive = passesLeft > 0 && !(carnet.expires && carnet.expires < today);
-    const useCarnet = outOfDays && carnetLive;
+    // Spend a carnet pass when a plan member has run out of days, AND when a member with no
+    // plan and no paid pass is here on a carnet — otherwise the gate above would let them in
+    // but nothing would be spent, which is the free check-in all over again.
+    const useCarnet = (outOfDays || (!hasPlan && !paidPassToday)) && carnetLive;
 
     if (outOfDays && !useCarnet) {
       return json({ error: 'no-allowance' }, 400);
@@ -269,6 +291,13 @@ export default async function handler(req) {
     const existing = await checkinsFor(email, date);
     if (existing.some((r) => r.fields[F.checkins.status] !== 'Cancelled')) {
       return json({ ok: true, alreadyReserved: true });
+    }
+    // Same gate as a live check-in: reserving is only meaningful if you could actually
+    // attend. A no-plan account with no carnet would otherwise plan days it can never use
+    // and show up in the admin who's-in list as expected. A future paid day pass already
+    // exists as a row, so it short-circuits above and never reaches here.
+    if (!hasPlan && !carnetLiveOn(date)) {
+      return json({ error: 'needs-plan-or-pass' }, 400);
     }
     // Weekends are by request (not a given): create a 'Requested' record + notify staff.
     // Weekdays reserve straight to 'Planned'.
