@@ -18,6 +18,7 @@ export function DatePickerModal({
   planned = [],
   single = false,
   allowWeekend = false,
+  allowAny = false,
   note,
 }: {
   open: boolean;
@@ -28,6 +29,9 @@ export function DatePickerModal({
   single?: boolean;
   /** Let members pick weekends too (outside regular hours, but open to members). */
   allowWeekend?: boolean;
+  /** Any future day is selectable — weekends, bank holidays and the shutdown included. For
+   *  scheduling that isn't a working-day booking (e.g. a welcome-screen announcement). */
+  allowAny?: boolean;
   /** Override the footer note (pass '' to hide it) — e.g. admin contexts where the
    *  member-facing "weekends are open to you" copy is irrelevant. */
   note?: string;
@@ -111,7 +115,9 @@ export function DatePickerModal({
             if (d === null) return <span key={`e${i}`} />;
             const ds = iso(ym.y, ym.m, d);
             const dow = new Date(ym.y, ym.m, d).getDay();
-            const closed = (!allowWeekend && (dow === 0 || dow === 6)) || ds < todayStr || holidays.has(ds) || shutdown(ds);
+            const closed = allowAny
+              ? ds < todayStr
+              : (!allowWeekend && (dow === 0 || dow === 6)) || ds < todayStr || holidays.has(ds) || shutdown(ds);
             const isToday = ds === todayStr;
             const isPlanned = plannedSet.has(ds) || justPicked.has(ds);
             return (

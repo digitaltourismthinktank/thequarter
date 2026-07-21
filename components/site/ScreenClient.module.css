@@ -35,6 +35,10 @@
 .entranceMain .block:first-child {
   flex: 1 1 auto;
   min-height: 0;
+  /* Clip the rooms grid to its share of the height. Without this, when the cards can't
+     compress far enough (a small screen, an extra child in the column) the grid overflows its
+     box and paints OVER the Workspaces heading below — the overlap seen on the old TV + laptop. */
+  overflow: hidden;
 }
 .entranceMain .block:first-child .spaceGrid {
   flex: 1 1 auto;
@@ -43,6 +47,23 @@
 }
 .entranceMain .spaceCard {
   overflow: hidden;
+}
+
+/* Top-of-screen announcement — an unboxed headline centred between the logo and the clock. */
+.announceTop {
+  flex: 1 1 auto;
+  min-width: 0;
+  align-self: center;
+  text-align: center;
+  padding: 0 clamp(10px, 2vw, 28px);
+}
+.announceLine {
+  display: inline-block;
+  font-weight: var(--fw-bold);
+  font-size: clamp(15px, 1.9vw, 32px);
+  line-height: 1.12;
+  color: var(--ink-900);
+  text-wrap: balance;
 }
 
 .top {

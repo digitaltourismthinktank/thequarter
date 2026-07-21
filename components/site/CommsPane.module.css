@@ -143,3 +143,16 @@
 .annDates { display: flex; gap: 12px; }
 .annDates .field { flex: 1; }
 .annList { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+/* Styled date trigger (opens the designed picker) — never a raw native date input. */
+.dateBtn {
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  border: 1px solid var(--border-subtle, #e7ddca);
+  border-radius: var(--radius-md, 10px);
+  background: var(--surface-card, #fff);
+  color: var(--ink-900);
+  font: inherit;
+  cursor: pointer;
+}
+.dateBtn:hover { border-color: var(--gold-600, #b8933f); }

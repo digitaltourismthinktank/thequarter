@@ -393,20 +393,18 @@ function EntranceScreen() {
       <header className={styles.top}>
         <img className={styles.logo} src="/brand/logo-wordmark-black.png" alt="The Quarter" />
         {floorLabel ? <span className={styles.floorTag}>{floorLabel}</span> : null}
+        {/* Scheduled announcement — sits along the top between the logo and the clock, unboxed,
+            so it reads as a headline for the day rather than a card competing with the rooms. */}
+        {announcements.length ? (
+          <div className={styles.announceTop} role="status">
+            <span className={styles.announceLine}>{announcements[0].title}</span>
+          </div>
+        ) : null}
         <div className={styles.when}>
           <div className={styles.date}>{dateLabel}</div>
           <div className={styles.time}>{timeLabel}</div>
         </div>
       </header>
-
-      {/* Scheduled announcement — a note the team sets for a date window (e.g. a national day,
-          a one-off change). Shown open OR closed, so a "back Monday" style notice still lands. */}
-      {announcements.length ? (
-        <div className={styles.announce} role="status">
-          <span className={styles.announceTitle}>{announcements[0].title}</span>
-          {announcements[0].body ? <span className={styles.announceBody}>{announcements[0].body}</span> : null}
-        </div>
-      ) : null}
 
       {closed ? (
         <section className={`${styles.hero} ${styles.bandClosed}`}>

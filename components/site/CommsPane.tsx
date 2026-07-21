@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { Icon } from '@/components/ds/Icon';
+import { DatePickerModal } from './DatePickerModal';
 import {
   commsIndex, commsPreview, commsTest, commsSend, commsDismiss, commsDismissAllWelcome, commsPush,
   adminGetEvents, adminCreateEvent, adminDeleteEvent,
@@ -71,6 +72,7 @@ export function CommsPane() {
   const [annBody, setAnnBody] = useState('');
   const [annFrom, setAnnFrom] = useState('');
   const [annTo, setAnnTo] = useState('');
+  const [annPicker, setAnnPicker] = useState<'from' | 'to' | null>(null);
 
   const load = useCallback(async () => {
     const r = await commsIndex();
@@ -437,14 +439,18 @@ export function CommsPane() {
           <input className={styles.input} placeholder="Waffles in the Pantry from 11" value={annBody} onChange={(e) => setAnnBody(e.target.value)} />
         </label>
         <div className={styles.annDates}>
-          <label className={styles.field}>
+          <div className={styles.field}>
             <span>From</span>
-            <input className={styles.input} type="date" value={annFrom} onChange={(e) => setAnnFrom(e.target.value)} />
-          </label>
-          <label className={styles.field}>
+            <button type="button" className={styles.dateBtn} onClick={() => setAnnPicker('from')}>
+              {annFrom ? fmtDay(annFrom) : 'Pick a date'}
+            </button>
+          </div>
+          <div className={styles.field}>
             <span>To (optional)</span>
-            <input className={styles.input} type="date" value={annTo} onChange={(e) => setAnnTo(e.target.value)} />
-          </label>
+            <button type="button" className={styles.dateBtn} onClick={() => setAnnPicker('to')}>
+              {annTo ? fmtDay(annTo) : 'Same day'}
+            </button>
+          </div>
         </div>
         <div className={styles.actions}>
           <button type="button" className={styles.primary} onClick={addAnnouncement} disabled={busy === 'ann'}>
@@ -468,6 +474,19 @@ export function CommsPane() {
           <p className={styles.muted}>No announcements scheduled.</p>
         )}
       </div>
+
+      <DatePickerModal
+        open={annPicker !== null}
+        onClose={() => setAnnPicker(null)}
+        single
+        allowAny
+        note={annPicker === 'to' ? 'Pick the last day it shows (or leave it as the start date).' : 'Pick the first day the announcement shows.'}
+        onPick={(d) => {
+          if (annPicker === 'from') setAnnFrom(d);
+          else setAnnTo(d);
+          setAnnPicker(null);
+        }}
+      />
 
       {/* --------------------------------------------------------------- modals --- */}
       {/* Rendered before the preview modal so "See it" stacks its preview on top of this. */}
