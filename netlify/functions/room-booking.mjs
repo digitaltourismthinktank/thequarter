@@ -112,8 +112,8 @@ async function bookingsForSpaceDate(spaceId, dateStr) {
   return [...dated, ...occ];
 }
 
-/** Standard meeting-room hourly rate = the half-day (4h) rate ÷ 4. */
-const roomHourlyRate = (price) => round2(price.half / 4);
+/** Standard meeting-room hourly rate = the full-day price ÷ 8. */
+const roomHourlyRate = (price) => round2(price.full / 8);
 
 /**
  * Resolve the time window + price for a request. Returns { error } or
@@ -152,12 +152,13 @@ function priceRequest(space, { date, pkg, people, lunch, memberRate }) {
       const rate = round2(roomHourlyRate(price) * (1 - memberRate.discount));
       const perHour = round2(memberRate.hours * rate);
       const packageEquiv = p.span === 'full' ? price.full : price.half;
+      const pct = Math.round(memberRate.discount * 100);
       if (perHour <= packageEquiv) {
         hire = perHour;
-        lines.push({ label: `${space.name} · ${memberRate.hours}h × £${rate.toFixed(2)} · ${memberRate.tierLabel} member rate`, amount: hire });
+        lines.push({ label: `${space.name} · ${memberRate.hours}h × £${rate.toFixed(2)}/hr · ${memberRate.tierLabel} rate (${pct}% off)`, amount: hire });
       } else {
         hire = packageEquiv;
-        lines.push({ label: `${space.name} · ${p.label} · ${memberRate.tierLabel} member rate`, amount: hire });
+        lines.push({ label: `${space.name} · ${p.label} · ${memberRate.tierLabel} rate (${pct}% off)`, amount: hire });
       }
     } else {
       hire = p.span === 'full' ? price.full : price.half;

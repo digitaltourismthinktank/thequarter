@@ -22,7 +22,7 @@ export const UPDATES: Update[] = [
     date: '2026-07-22',
     title: 'Pay-as-you-go room top-ups + a tidier admin',
     items: [
-      'Members who’ve used their included meeting-room hours can now book extra time, charged per hour at their plan’s member rate — Visitor 25%, Resident 33%, Citizen 50% off the standard rate (never more than the day rate).',
+      'Members who’ve used their included meeting-room hours can now book extra time, charged per hour at their plan’s member rate — Visitor 25%, Resident 50%, Citizen 75% off the standard rate — and pay for it right there in the dashboard.',
       'Rooms & bookings has a new “By room” view: every meeting room and pod as its own lane across the week, with a By-room / By-day toggle.',
       'The member profile is grouped under three tabs — Membership & days, Rewards & points, Details & access — instead of one long scroll.',
       'The lobby entrance screen’s transport board is paused for a redesign, so it’s off the display for now.',

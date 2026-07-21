@@ -139,6 +139,10 @@ export interface RoomBookingInput {
 }
 export const roomQuote = (b: RoomBookingInput) =>
   call<RoomQuote>('room-booking', { method: 'POST', auth: false, body: { action: 'quote', ...b } });
+// Authed quote — sends the member token so the server prices in the member's tier rate (for the
+// dashboard's inline "pay for extra time" preview). No PaymentIntent is created, unlike roomIntent.
+export const roomMemberQuote = (b: RoomBookingInput) =>
+  call<RoomQuote>('room-booking', { method: 'POST', auth: true, body: { action: 'quote', ...b } });
 // Authed: attaches the member JWT when signed in so a PAYING member earns the give-back
 // and the booking is linked to them. getMemberToken() returns null for guests, so a
 // guest sends no token and still pays (and books) exactly as before.

@@ -292,7 +292,7 @@ export function RoomBooking({ roomName, price }: { roomName: string; price: { ha
     // Member beyond their included hours → per-hour at their tier rate, capped at the day rate.
     const over = !!member && !!status && selHours > status.remaining + 1e-6;
     if (over && memberDiscount > 0) {
-      const rate = round2((price.half / 4) * (1 - memberDiscount));
+      const rate = round2((price.full / 8) * (1 - memberDiscount));
       const packageEquiv = span === 'full' ? price.full : price.half;
       const hire = Math.min(round2(selHours * rate), packageEquiv);
       return { hire, rate, memberRate: true, quiet: false, lunchTotal, total: round2(hire + lunchTotal) };
@@ -485,7 +485,7 @@ export function RoomBooking({ roomName, price }: { roomName: string; price: { ha
     (sel
       ? est?.memberRate
         ? [
-            { label: `${roomName} · ${selHours}h × ${money(est.rate ?? 0)} · member rate`, amount: est.hire },
+            { label: `${roomName} · ${selHours}h × ${money(est.rate ?? 0)}/hr`, amount: est.hire },
             ...(lunch ? [{ label: `Lunch · ${Math.max(1, people)} × £${LUNCH_PER_HEAD}`, amount: est?.lunchTotal ?? 0 }] : []),
           ]
         : [
@@ -502,7 +502,16 @@ export function RoomBooking({ roomName, price }: { roomName: string; price: { ha
           <div className={styles.memberBanner}>
             <Icon name="sparkles" size={16} color="var(--gold-700)" />
             <span>
-              Members book free — you have <strong>{Math.max(0, status.remaining)}h</strong> of {status.capHours}h left this month.
+              {status.remaining > 0 ? (
+                <>
+                  Members book free — you have <strong>{Math.max(0, status.remaining)}h</strong> of {status.capHours}h left this month.
+                </>
+              ) : (
+                <>
+                  You’ve used your <strong>{status.capHours}h</strong> of included room time this month — extra time is discounted for members
+                  {memberDiscount > 0 ? ` (${Math.round(memberDiscount * 100)}% off)` : ''}.
+                </>
+              )}
             </span>
           </div>
         ) : null}
@@ -665,8 +674,8 @@ export function RoomBooking({ roomName, price }: { roomName: string; price: { ha
             </div>
             {overCap ? (
               <p className={styles.quiet}>
-                You’ve used your included hours this month — extra time is charged per hour
-                {memberDiscount > 0 ? ` at your ${Math.round(memberDiscount * 100)}% member rate` : ''}.
+                You’ve used your included hours this month. Extra time is {money(est?.rate ?? 0)}/hr
+                {memberDiscount > 0 ? ` — ${Math.round(memberDiscount * 100)}% off the standard ${money(round2(price.full / 8))}/hr as a member` : ''}.
               </p>
             ) : null}
             {est?.quiet && !serverLines ? <p className={styles.quiet}>Quiet-day rate applied — 20% off room hire.</p> : null}

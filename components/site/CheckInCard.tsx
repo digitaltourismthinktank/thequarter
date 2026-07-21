@@ -103,8 +103,10 @@ export function CheckInCard({ className }: { className?: string }) {
   const nextLabel = nextOpen === addDaysIso(todayIso, 1) ? 'tomorrow' : weekdayLong(nextOpen);
 
   // The first question Home should answer is "when am I next in?" — so the heading states it
-  // rather than opening with a form. Planned days come back sorted, but don't rely on it.
-  const nextPlanned = (status?.planned ?? []).filter((p) => p.date > todayIso).sort((a, b) => a.date.localeCompare(b.date))[0];
+  // rather than opening with a form. Planned days come back sorted, but don't rely on it. Include
+  // TODAY (>=): a day planned for today but not yet checked in is still "next in" — it was being
+  // skipped, so a half-day booked for today showed tomorrow's date instead.
+  const nextPlanned = (status?.planned ?? []).filter((p) => p.date >= todayIso).sort((a, b) => a.date.localeCompare(b.date))[0];
 
   const plannedDates = status?.planned?.map((p) => p.date) ?? [];
   const pendingOnly = pending.filter((d) => !plannedDates.includes(d));
@@ -143,7 +145,7 @@ export function CheckInCard({ className }: { className?: string }) {
             </>
           ) : nextPlanned ? (
             <>
-              <h2 className={styles.title}>Next in {fmtDate(nextPlanned.date)}</h2>
+              <h2 className={styles.title}>{nextPlanned.date === todayIso ? 'In today' : `Next in ${fmtDate(nextPlanned.date)}`}</h2>
               <p className={styles.meta}>
                 {nextPlanned.length === 'Half'
                   ? `Half day${nextPlanned.period ? ` · ${nextPlanned.period === 'am' ? 'morning' : 'afternoon'}` : ''}`

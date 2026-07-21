@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ds/Button';
 import { useMember } from './useMember';
 import {
@@ -11,13 +11,52 @@ import {
   cancelBooking,
   amendBooking,
   sortBookings,
+  roomMemberStatus,
+  roomMemberQuote,
+  roomIntent,
   type Space,
   type MyBooking,
+  type RoomMemberStatus,
+  type RoomQuoteLine,
 } from '@/lib/booking';
+import { STRIPE_PUBLISHABLE_KEY } from '@/lib/commerce';
 import { WeekStrip } from './WeekStrip';
 import { DatePickerModal } from './DatePickerModal';
 import { PLAN_ROOM_HOURS, MEMBER_ROOM_DISCOUNT, planSlugFromMemberstackId } from '@/lib/plans';
 import styles from './BookingClient.module.css';
+
+const money = (n: number) => `£${n.toFixed(2)}`;
+/** Range → package span for pricing (13:00 split): wholly-AM/PM = half, crossing midday = full. */
+function pkgForRange(startMin: number, endMin: number): 'am' | 'pm' | 'full' {
+  if (endMin <= 13 * 60) return 'am';
+  if (startMin >= 13 * 60) return 'pm';
+  return 'full';
+}
+
+// Stripe.js loader (mirrors RoomBooking) — used for the inline "pay for extra room time" flow.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let stripePromise: Promise<any> | null = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function loadStripe(): Promise<any> {
+  if (typeof window === 'undefined') return Promise.resolve(null);
+  const w = window as unknown as { Stripe?: (k: string) => unknown };
+  if (w.Stripe) return Promise.resolve(w.Stripe(STRIPE_PUBLISHABLE_KEY));
+  if (!stripePromise) {
+    stripePromise = new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://js.stripe.com/v3/';
+      s.async = true;
+      s.onload = () => resolve(w.Stripe ? w.Stripe(STRIPE_PUBLISHABLE_KEY) : null);
+      s.onerror = () => reject(new Error('stripe-load-failed'));
+      document.head.appendChild(s);
+    });
+  }
+  return stripePromise;
+}
+async function waitForNode(ref: { current: HTMLDivElement | null }): Promise<HTMLDivElement | null> {
+  for (let i = 0; i < 40 && !ref.current; i++) await new Promise((r) => setTimeout(r, 16));
+  return ref.current;
+}
 
 const SLOT = 30;
 
@@ -84,6 +123,18 @@ export function BookingClient() {
   // held for a call. Always escapable: "Choose another room" shows everything.
   const [party, setParty] = useState<number | null>(null);
   const [showAllRooms, setShowAllRooms] = useState(false);
+  // Inline "pay for extra room time": member's monthly status, the server quote for the over-cap
+  // booking, and the Stripe Elements pay step — all handled here so the member never leaves Book.
+  const [roomStatus, setRoomStatus] = useState<RoomMemberStatus | null>(null);
+  const [payLines, setPayLines] = useState<RoomQuoteLine[] | null>(null);
+  const [payPence, setPayPence] = useState<number | null>(null);
+  const [payStep, setPayStep] = useState<'none' | 'pay'>('none');
+  const [payErr, setPayErr] = useState<string | null>(null);
+  const payMountRef = useRef<HTMLDivElement | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const stripeRef = useRef<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const elementsRef = useRef<any>(null);
 
   useEffect(() => {
     if (loading || member) return;
@@ -133,6 +184,60 @@ export function BookingClient() {
       active = false;
     };
   }, [spaceId, date]);
+
+  // Member's monthly meeting-room hours for the selected room + date (drives free-vs-pay). Pods and
+  // non-plan members don't have a cap, so they never fetch.
+  useEffect(() => {
+    const sp = spaces.find((s) => s.id === spaceId);
+    const isRoom = !!sp && sp.type !== 'Phone pod';
+    const memberHasPlan = (member?.planConnections?.length ?? 0) > 0;
+    if (!isRoom || !memberHasPlan || !date) {
+      setRoomStatus(null);
+      return;
+    }
+    let active = true;
+    (async () => {
+      const r = await roomMemberStatus(date);
+      if (active && r.ok) setRoomStatus(r.data);
+    })();
+    return () => {
+      active = false;
+    };
+  }, [spaceId, date, spaces, member]);
+
+  // On any selection change: cancel a half-done payment, and — if this booking runs over the
+  // member's included hours — fetch the tier-priced quote so they see the price before paying.
+  useEffect(() => {
+    setPayStep('none');
+    setPayErr(null);
+    const sp = spaces.find((s) => s.id === spaceId);
+    const isRoom = !!sp && sp.type !== 'Phone pod';
+    const hrs = sel ? (sel.end - sel.start) / 60 : 0;
+    const over = isRoom && !!roomStatus && !!sel && hrs > (roomStatus.remaining ?? 0) + 1e-6;
+    if (!over || !sel || !spaceId) {
+      setPayLines(null);
+      setPayPence(null);
+      return;
+    }
+    let active = true;
+    (async () => {
+      const r = await roomMemberQuote({
+        spaceId,
+        date,
+        pkg: pkgForRange(sel.start, sel.end),
+        start: minToHHMM(sel.start),
+        end: minToHHMM(sel.end),
+        people: Math.max(1, party ?? 1),
+      });
+      if (active && r.ok) {
+        setPayLines(r.data.lines);
+        setPayPence(r.data.amountPence);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [sel, spaceId, date, roomStatus, spaces, party]);
 
   const slotBusy = (s: number) => (avail?.busy || []).some((b) => s < b.endMin && s + SLOT > b.startMin);
   const rangeFree = (lo: number, hi: number) => {
@@ -196,6 +301,72 @@ export function BookingClient() {
     setBusyAction(false);
   }
 
+  // Over-cap room booking: start the paid flow (server prices the member rate + returns a
+  // client secret), then mount Stripe's Payment Element inline so the member pays without leaving.
+  async function toPayment() {
+    if (!sel || !spaceId) return;
+    setBusyAction(true);
+    setPayErr(null);
+    setMsg(null);
+    const r = await roomIntent({
+      spaceId,
+      date,
+      pkg: pkgForRange(sel.start, sel.end),
+      start: minToHHMM(sel.start),
+      end: minToHHMM(sel.end),
+      people: Math.max(1, party ?? 1),
+      company: 'Member booking',
+    });
+    setBusyAction(false);
+    if (!r.ok || !r.data.clientSecret) {
+      setPayErr(friendly((r.data as { error?: string } | undefined)?.error));
+      return;
+    }
+    setPayLines(r.data.lines || null);
+    setPayPence(r.data.amountPence);
+    setPayStep('pay');
+    try {
+      const stripe = await loadStripe();
+      const node = await waitForNode(payMountRef);
+      if (!stripe || !node) throw new Error('stripe');
+      stripeRef.current = stripe;
+      const elements = stripe.elements({ clientSecret: r.data.clientSecret, appearance: { theme: 'flat' } });
+      const payEl = elements.create('payment', { layout: 'tabs' });
+      payEl.mount(node);
+      elementsRef.current = elements;
+    } catch {
+      setPayErr('Couldn’t load the secure payment form — please try again.');
+      setPayStep('none');
+    }
+  }
+
+  async function pay() {
+    if (!stripeRef.current || !elementsRef.current) return;
+    setBusyAction(true);
+    setPayErr(null);
+    const { error, paymentIntent } = await stripeRef.current.confirmPayment({
+      elements: elementsRef.current,
+      confirmParams: { return_url: window.location.href },
+      redirect: 'if_required',
+    });
+    setBusyAction(false);
+    if (error) {
+      setPayErr(error.message || 'That payment didn’t go through — please try again.');
+      return;
+    }
+    if (paymentIntent && (paymentIntent.status === 'succeeded' || paymentIntent.status === 'processing')) {
+      setMsg('Booked & paid ✓ — it’ll appear in your bookings shortly.');
+      setPayStep('none');
+      clearSel();
+      await reloadAvail();
+      await loadMine();
+      const s = await roomMemberStatus(date);
+      if (s.ok) setRoomStatus(s.data);
+    } else {
+      setPayErr('Payment needs another step — please try again.');
+    }
+  }
+
   async function cancel(id: string) {
     setBusyAction(true);
     await cancelBooking(id);
@@ -244,6 +415,11 @@ export function BookingClient() {
   })();
   const includedHours = memberSlug ? PLAN_ROOM_HOURS[memberSlug] ?? 0 : 0;
   const memberPct = memberSlug ? Math.round((MEMBER_ROOM_DISCOUNT[memberSlug] || 0) * 100) : 0;
+  // Is the chosen booking over the member's included room hours? If so we show the inline pay flow.
+  const selectedSpace = spaces.find((s) => s.id === spaceId);
+  const selectedIsRoom = !!selectedSpace && selectedSpace.type !== 'Phone pod';
+  const selHours = sel ? Math.round(((sel.end - sel.start) / 60) * 100) / 100 : 0;
+  const overCap = selectedIsRoom && hasPlan && memberPct > 0 && !!roomStatus && !!sel && selHours > (roomStatus.remaining ?? 0) + 1e-6;
   const capOf = (sp: Space) => sp.capacity ?? 99;
   const fits = (sp: Space) => party === null || capOf(sp) >= party;
   // The best match is the smallest space that fits. Anything the same size is a fair
@@ -347,9 +523,9 @@ export function BookingClient() {
 
       {spaceId && spaces.find((s) => s.id === spaceId)?.type !== 'Phone pod' && hasPlan && includedHours > 0 ? (
         <p className={styles.roomNote}>
-          Your plan includes <strong>{includedHours}h</strong> of meeting-room time a month, free to book here. Need more?
-          Extra time is charged per hour at your{memberPct ? ` ${memberPct}% member rate` : ' member rate'} — book it on the{' '}
-          <a href="/meeting-rooms">meeting rooms</a> page. Phone pods are always free, up to 2 hours at a time.
+          Your plan includes <strong>{includedHours}h</strong> of meeting-room time a month, free to book here. Beyond that,
+          extra time is charged per hour{memberPct ? ` at ${memberPct}% off — your member rate` : ' at your member rate'}, and you
+          can pay right here. Phone pods are always free, up to 2 hours at a time.
         </p>
       ) : null}
 
@@ -417,14 +593,55 @@ export function BookingClient() {
             </p>
           ) : null}
 
-          <div className={styles.confirm}>
-            <span className={styles.selLabel}>
-              {sel ? `${spaceName(spaceId)} · ${dayLabel(date)} · ${fmtRange(sel.start, sel.end)}` : 'Choose a time above.'}
-            </span>
-            <Button variant="primary" onClick={confirm} disabled={!sel || busyAction}>
-              {busyAction ? 'Booking…' : isWeekendISO(date) ? 'Book the weekend' : 'Confirm booking'}
-            </Button>
-          </div>
+          {overCap ? (
+            // Over the member's included hours → pay for the extra time, inline, at their tier rate.
+            <div className={styles.payBox}>
+              <span className={styles.selLabel}>
+                {sel ? `${spaceName(spaceId)} · ${dayLabel(date)} · ${fmtRange(sel.start, sel.end)}` : ''}
+              </span>
+              <p className={styles.payNote}>
+                You’ve used your {includedHours}h of included room time this month. Extra time is charged per hour
+                {memberPct ? ` at ${memberPct}% off — your member rate` : ''}.
+              </p>
+              {payLines ? (
+                <div className={styles.payLines}>
+                  {payLines.map((l, i) => (
+                    <div key={i} className={styles.payLine}>
+                      <span>{l.label}</span>
+                      <span>{money(l.amount)}</span>
+                    </div>
+                  ))}
+                  <div className={styles.payLineTotal}>
+                    <span>Total</span>
+                    <span>{money((payPence ?? 0) / 100)} inc. VAT</span>
+                  </div>
+                </div>
+              ) : null}
+              {payStep === 'pay' ? (
+                <>
+                  <div ref={payMountRef} className={styles.payEl} />
+                  <Button variant="primary" fullWidth onClick={pay} disabled={busyAction} iconAfter="arrow-right">
+                    {busyAction ? 'Taking payment…' : `Pay ${money((payPence ?? 0) / 100)}`}
+                  </Button>
+                  <p className={styles.paySecure}>Paid securely with Stripe · Apple Pay &amp; cards.</p>
+                </>
+              ) : (
+                <Button variant="primary" fullWidth onClick={toPayment} disabled={!sel || busyAction} iconAfter="arrow-right">
+                  {busyAction ? 'Checking…' : payPence != null ? `Continue — pay ${money(payPence / 100)}` : 'Continue to payment'}
+                </Button>
+              )}
+              {payErr ? <p className={styles.msg}>{payErr}</p> : null}
+            </div>
+          ) : (
+            <div className={styles.confirm}>
+              <span className={styles.selLabel}>
+                {sel ? `${spaceName(spaceId)} · ${dayLabel(date)} · ${fmtRange(sel.start, sel.end)}` : 'Choose a time above.'}
+              </span>
+              <Button variant="primary" onClick={confirm} disabled={!sel || busyAction}>
+                {busyAction ? 'Booking…' : isWeekendISO(date) ? 'Book the weekend' : 'Confirm booking'}
+              </Button>
+            </div>
+          )}
           {msg ? <p className={styles.msg}>{msg}</p> : null}
         </>
       )}
@@ -495,6 +712,8 @@ function friendly(code?: string): string {
       return 'Bookings are Monday–Friday, 08:00–18:00.';
     case 'closed-weekend':
       return 'The Quarter is open Monday to Friday.';
+    case 'weekend':
+      return 'Paid extra time is Monday–Friday. For a weekend booking, chat to the team.';
     case 'closed-day':
       return 'The Quarter is closed that day (bank holiday or seasonal closure).';
     case 'bad-increment':

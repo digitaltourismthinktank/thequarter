@@ -71,8 +71,8 @@ export function planSlugForMember(member) {
  */
 export const MEMBER_ROOM_DISCOUNT = {
   visitor: 0.25,
-  resident: 0.33,
-  citizen: 0.5,
+  resident: 0.5,
+  citizen: 0.75,
 };
 
 /** The member's meeting-room discount fraction (0 when none / no plan / unknown plan). */

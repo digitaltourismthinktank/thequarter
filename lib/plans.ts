@@ -54,7 +54,7 @@ export const PLANS: Plan[] = [
     features: [
       'Five days’ access each month',
       '2 hours of meeting room a month — for you and your clients',
-      'Extra meeting-room time at your 25% member rate',
+      'Extra room time at 25% off — from £14.06/hr',
       'From £16.80 a working day',
       'Everything in the Day Pass, included',
       '24/7 access',
@@ -76,7 +76,7 @@ export const PLANS: Plan[] = [
     features: [
       'Ten days’ access each month',
       '4 hours of meeting room a month — for you and your clients',
-      'Extra meeting-room time at your 33% member rate',
+      'Extra room time at 50% off — from £9.38/hr',
       'From £13.80 a working day',
       'Everything in Visitor, included',
       '24/7 access',
@@ -96,7 +96,7 @@ export const PLANS: Plan[] = [
     features: [
       'Unlimited days — work here every day',
       '8 hours of meeting room a month — for you and your clients',
-      'Extra meeting-room time at your 50% member rate',
+      'Extra room time at 75% off — from £4.69/hr',
       'From £12.90 a working day',
       'Everything in Resident, included',
       'Priority room booking',
@@ -160,8 +160,8 @@ export function roomHoursLine(planId: string): string | null {
  */
 export const MEMBER_ROOM_DISCOUNT: Record<string, number> = {
   visitor: 0.25,
-  resident: 0.33,
-  citizen: 0.5,
+  resident: 0.5,
+  citizen: 0.75,
 };
 
 /** Reverse of PLAN_MEMBERSTACK_ID: a Memberstack plan id → our plan slug (or null). */
@@ -171,13 +171,13 @@ export function planSlugFromMemberstackId(planId: string | undefined | null): Pl
   return hit ?? null;
 }
 
-/** "Extra time from £27/hr" style line for a plan card — the discounted standard rate, or null. */
+/** "Extra time from £14/hr" style line for a plan card — the discounted standard rate, or null. */
 export function extraRoomLine(planId: string): string | null {
   const disc = MEMBER_ROOM_DISCOUNT[planId];
   if (!disc) return null;
-  // Standard hourly = the half-day rate ÷ 4. The Chapter House (our smaller room) is the entry price.
-  const from = Math.round(22.5 * (1 - disc) * 100) / 100;
-  return `Extra meeting-room time from £${from % 1 === 0 ? from : from.toFixed(2)}/hr — ${Math.round(disc * 100)}% member rate`;
+  // Standard hourly = the full-day rate ÷ 8. The Chapter House (our smaller room) is the entry price.
+  const from = Math.round(18.75 * (1 - disc) * 100) / 100;
+  return `Extra meeting-room time from £${from % 1 === 0 ? from : from.toFixed(2)}/hr — ${Math.round(disc * 100)}% off as a member`;
 }
 
 export function getPlan(id: PlanId): Plan | undefined {
