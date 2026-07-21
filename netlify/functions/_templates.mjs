@@ -19,7 +19,8 @@
  *         by the admin remembering.
  */
 
-import { emailShell, escapeHtml, fmtDateLong, SITE_URL } from './_email.mjs';
+import { emailShell, escapeHtml, SITE_URL } from './_email.mjs';
+import { londonNow } from './_time.mjs';
 
 const p = (html) => `<p style="margin:0 0 14px;">${html}</p>`;
 const h = (t) => `<p style="margin:22px 0 8px;font-size:15px;font-weight:700;color:#2b2620;">${escapeHtml(t)}</p>`;
@@ -37,7 +38,28 @@ const hi = (name) => {
 
 /* Rewards and plan language reused across templates, so a change lands everywhere. */
 const REWARDS_LINE =
-  'Every time you check in you earn Quarter Points — more on a quiet day — and they turn into real things: a coffee at Burgate, a treat at A.T. Patisserie, an evening at Corkk.';
+  'Every time you check in you earn Quarter Points, more on a quiet day, and they turn into real things: a coffee at Burgate, an evening at Corkk.';
+
+/**
+ * A natural, TIME-AWARE reference to when someone visited: "today", "yesterday", "on Friday"
+ * for this past week, or "recently" for anything older — so a thank-you sent a fortnight late
+ * never claims "on Friday". Returns '' when there's no date to work from.
+ */
+function visitWhen(dateStr) {
+  if (!dateStr || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return '';
+  const today = londonNow().dateStr;
+  if (dateStr === today) return 'today';
+  const d = Date.UTC(+dateStr.slice(0, 4), +dateStr.slice(5, 7) - 1, +dateStr.slice(8, 10));
+  const t = Date.UTC(+today.slice(0, 4), +today.slice(5, 7) - 1, +today.slice(8, 10));
+  const diff = Math.round((t - d) / 86400000);
+  if (diff === 1) return 'yesterday';
+  if (diff >= 2 && diff <= 6) return `on ${new Date(d).toLocaleDateString('en-GB', { weekday: 'long', timeZone: 'UTC' })}`;
+  return 'recently';
+}
+const thankLine = (c) => {
+  const w = visitWhen(c.visitDate);
+  return `Thank you for your day with us at The Quarter${w ? ` ${w}` : ''}. It was good to have you here.`;
+};
 
 export const TEMPLATES = {
   /* ------------------------------------------------------------------ day pass ---- */
@@ -50,17 +72,17 @@ export const TEMPLATES = {
     subject: () => 'Thank you for working with us',
     body: (c) =>
       p(hi(c.name)) +
-      p(`Thank you for spending ${c.visitDate ? `${escapeHtml(fmtDateLong(c.visitDate))}` : 'the day'} with us at The Quarter — it was good to have you here.`) +
+      p(thankLine(c)) +
       p(
         'We are a small, independent space and we grow almost entirely by word of mouth, so a review genuinely makes a difference to us. If you enjoyed your day, would you take a moment to say so?',
       ) +
-      button(c.reviewUrl || 'https://g.page/r/thequarter/review', 'Leave a Google review') +
+      button(c.reviewUrl || 'https://share.google/3VD689O42JMQVZUg8', 'Leave a Google review') +
       h('While you are here') +
       p(REWARDS_LINE) +
       p(
-        `If you are thinking of coming back, a <a href="${SITE_URL}/plans" style="color:#b08a3e;">plan</a> or a <a href="${SITE_URL}/plans" style="color:#b08a3e;">book of day passes</a> works out cheaper than paying day by day — and plans come with meeting-room time for you and your clients.`,
+        `If you are thinking of coming back, a <a href="${SITE_URL}/plans" style="color:#b08a3e;">plan</a> or a <a href="${SITE_URL}/plans" style="color:#b08a3e;">book of day passes</a> works out cheaper than paying day by day, and plans come with meeting-room time for you and your clients.`,
       ) +
-      p('Either way, we hope to see you again.'),
+      p('Either way, we hope to see you again 👋'),
   },
 
   'thanks-only': {
@@ -72,16 +94,16 @@ export const TEMPLATES = {
     subject: () => 'Thank you for working with us',
     body: (c) =>
       p(hi(c.name)) +
-      p(`Thank you for spending ${c.visitDate ? `${escapeHtml(fmtDateLong(c.visitDate))}` : 'the day'} with us at The Quarter — it was good to have you here.`) +
+      p(thankLine(c)) +
       p(
-        'If anything about the day was not quite right, we would genuinely like to know. Just reply to this email and it comes straight to us.',
+        'If anything about the day was not quite right, we would genuinely like to know. Just reply to this email and it comes straight to us at info@thequarter.work.',
       ) +
       h('While you are here') +
       p(REWARDS_LINE) +
       p(
         `If you are thinking of coming back, a <a href="${SITE_URL}/plans" style="color:#b08a3e;">plan</a> or a book of day passes works out cheaper than paying day by day.`,
       ) +
-      p('We hope to see you again.'),
+      p('We hope to see you again 👋'),
   },
 
   /* -------------------------------------------------------------------- welcome ---- */
@@ -109,6 +131,7 @@ export const TEMPLATES = {
         'The kitchen is yours. Coffee, teas, soft drinks, yoghurts, cereals, and whatever pastries or cake are on the counter — all included. We would rather you treated it like your own kitchen than asked.',
       ) +
       p('Bringing lunch? The fridge is upstairs — label it clearly. Anything left over the weekend gets thrown out. You have been warned.') +
+      p("We hope you enjoy the Arke filtered water. You'll find jugs upstairs and downstairs, and if you see one running a little low, please take a moment to refill it for the next person.") +
       h('The bit that keeps it pleasant') +
       p('We share the place, so a few small things:') +
       ul([
@@ -142,7 +165,7 @@ export const TEMPLATES = {
       ) +
       h('Spending') +
       p(
-        'Points turn into real things from people around the corner: a coffee at Burgate, a treat at A.T. Patisserie, a glass or a whole evening at Corkk. No vouchers to print — you show your phone.',
+        'Points turn into real things from people around the corner: a coffee at Burgate, a glass or a whole evening at Corkk. No vouchers to print, you show your phone.',
       ) +
       h('Levels') +
       p(

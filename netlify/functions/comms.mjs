@@ -68,7 +68,11 @@ const memberPlanName = (m) => {
   const named = ids.map((id) => PLAN_NAMES[id]).filter(Boolean);
   // NB: keyed 'planName', NOT 'name' — shape() spreads this, and calling it 'name' clobbered
   // the person's own name, so every To-Do row showed the plan ("Resident") instead of who it is.
-  return { hasPlan: ids.length > 0, paused, planName: paused ? 'Paused' : named[0] || (ids.length ? 'Member' : null) };
+  //
+  // hasPlan counts a RECOGNISED plan (or paused), not any connection. Members often carry a
+  // base/free Memberstack tag too, and counting those made "everyone on a plan" balloon to
+  // basically the whole member list.
+  return { hasPlan: named.length > 0 || paused, paused, planName: paused ? 'Paused' : named[0] || (ids.length ? 'Member' : null) };
 };
 
 const shape = (m) => ({
@@ -77,6 +81,9 @@ const shape = (m) => ({
   name: [m?.customFields?.['first-name'], m?.customFields?.['last-name']].filter(Boolean).join(' ').trim() || null,
   optOut: m?.metaData?.emailOptOut === true,
   pushOptOut: m?.metaData?.pushOptOut === true,
+  // Holds a live book of day passes (a carnet). These people have days to spend but no plan,
+  // so they'd otherwise be invisible to "everyone on a plan" — we don't want to exclude them.
+  holdsPasses: Math.max(0, Number(m?.metaData?.carnet?.remaining) || 0) > 0,
   sent: m?.metaData?.commsSent || {},
   // Kept so a commsSent stamp merges into the existing metaData instead of replacing it —
   // Memberstack's update overwrites the whole object.
@@ -166,10 +173,10 @@ async function resolveAudience(admin, audience, { eventId, emails } = {}, kind =
   } else {
     const members = (await allMembers(admin)).map(shape);
     const going = await rsvpEmailsFor(eventId);
-    if (audience === 'members-active') people = members.filter((m) => m.hasPlan);
+    if (audience === 'members-active') people = members.filter((m) => m.hasPlan || m.holdsPasses);
     else if (audience === 'event-rsvps') people = members.filter((m) => going.has(m.email));
     else if (audience === 'members-not-rsvpd') people = members.filter((m) => m.hasPlan && !going.has(m.email));
-    else people = members.filter((m) => m.hasPlan);
+    else people = members.filter((m) => m.hasPlan || m.holdsPasses);
   }
 
   const withEmail = people.filter((p) => p.email && p.email.includes('@'));
@@ -228,12 +235,12 @@ export default async function handler(req) {
       .filter((m) => m.hasPlan && !m.paused && m.sent?.welcome && !m.sent?.['rewards-intro'])
       .map((m) => ({ kind: 'rewards-intro', id: m.id, email: m.email, name: m.name }));
 
-    const active = members.filter((m) => m.hasPlan);
+    const active = members.filter((m) => m.hasPlan || m.holdsPasses);
     return json({
       templates: TEMPLATE_INDEX,
       events,
       audiences: [
-        { id: 'members-active', label: 'Everyone on a plan', hint: 'Includes paused members', count: active.filter((m) => !m.optOut).length },
+        { id: 'members-active', label: 'Everyone with a plan or passes', hint: 'Plans (incl. paused) + anyone holding day passes', count: active.filter((m) => !m.optOut).length },
         { id: 'daypass-4w', label: 'Day-pass visitors — last 4 weeks', count: null },
         { id: 'daypass-12m', label: 'Day-pass visitors — last 12 months', count: null },
         { id: 'event-rsvps', label: 'Coming to an event', hint: 'Pick the event', count: null },

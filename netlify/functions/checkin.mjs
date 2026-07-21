@@ -103,7 +103,11 @@ export async function consumePlannedDay(me, { dateStr, length, row }) {
   const allowance = allowanceForMember(me);
   const unlimited = allowance === null;
   const hasPlan = allowance !== undefined;
-  const current = parseDays(me.customFields?.['days-remaining']);
+  let current = parseDays(me.customFields?.['days-remaining']);
+  // A metered plan member whose balance was never seeded (the field is absent, not '0') would
+  // otherwise be treated as 'over allowance' and spend nothing — a silent free day. Fall back to
+  // their monthly allowance so the day actually deducts and the field gets written.
+  if (current === null && !unlimited && hasPlan) current = allowance;
   const carnet = me.metaData?.carnet || {};
   const passesLeft = Math.max(0, Number(carnet.remaining) || 0);
   const carnetLive = passesLeft > 0 && !(carnet.expires && carnet.expires < dateStr);
@@ -365,7 +369,15 @@ export default async function handler(req) {
     // a different card to use one. Being refused entry while holding passes you bought is
     // the worst version of this, so the fallback is automatic and the response says which
     // was spent.
-    const current = parseDays(me.customFields?.['days-remaining']);
+    let current = parseDays(me.customFields?.['days-remaining']);
+    // A metered plan member whose balance was never seeded (field absent) would check in FREE:
+    // parseDays returns null and the deduction below no-ops. Fall back to their monthly allowance
+    // so the day is actually spent. This is the most likely cause of "I checked in but my days
+    // didn't go down" for a plan member (the other being an unlimited plan, or a day-pass/carnet).
+    if (current === null && !unlimited && hasPlan) {
+      const a = allowanceForMember(me);
+      if (typeof a === 'number') current = a;
+    }
     const outOfDays = !unlimited && current !== null && current < cost;
 
     const carnet = me.metaData?.carnet || {};
