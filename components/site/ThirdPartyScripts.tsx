@@ -8,7 +8,7 @@ import { useEffect } from 'react';
    on the wall-display / kiosk routes, where they'd overlay the full-screen design. A
    dedicated kiosk loads one of these routes directly (fresh, standalone), so the scripts
    never inject there. Everywhere else they load exactly as before. */
-const DISPLAY_ROUTES = ['/screen', '/kiosk', '/arrive', '/guest'];
+const DISPLAY_ROUTES = ['/screen', '/kiosk', '/arrive', '/guest', '/invite', '/unsubscribe'];
 
 /* Inside the member app the Crisp launcher floats bottom-right, directly over the tab bar's
    Events tab. There, chat is opened deliberately from a "Talk to us" control instead. The
