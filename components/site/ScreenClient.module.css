@@ -132,11 +132,62 @@
   margin: 10px 0 0;
 }
 .heroLine {
-  font-size: clamp(18px, 2.4vw, 28px);
+  font-size: clamp(16px, 2vw, 24px);
   line-height: 1.4;
-  max-width: 24ch;
+  max-width: 30ch;
   margin: 14px auto 0;
 }
+
+/* Week-at-a-glance busyness strip — five day columns, bar height from the model's expected
+   people, today picked out. Bars use currentColor so they read on every band background. */
+.weekStrip {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: clamp(10px, 2vw, 24px);
+  height: clamp(84px, 13vh, 150px);
+  margin: 6px auto 0;
+  max-width: 460px;
+}
+.weekCol {
+  flex: 1;
+  max-width: 64px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  gap: 8px;
+}
+.weekBarWrap { flex: 1; width: 100%; display: flex; align-items: flex-end; }
+.weekBar {
+  width: 100%;
+  border-radius: var(--radius-md);
+  background: currentColor;
+  opacity: 0.42;
+  min-height: 8px;
+}
+.weekToday .weekBar { opacity: 1; }
+.weekDay { font-size: clamp(12px, 1.4vw, 17px); font-weight: var(--fw-semibold); opacity: 0.65; }
+.weekToday .weekDay { opacity: 1; font-weight: var(--fw-bold); }
+
+/* Live Canterbury transport — trains + buses, compact centred rows under the week strip. */
+.transport {
+  margin: clamp(12px, 2vh, 22px) auto 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 560px;
+}
+.transRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  font-size: clamp(13px, 1.5vw, 19px);
+  font-variant-numeric: tabular-nums;
+}
+.transIcon { font-size: 1.15em; }
 
 .band_quiet {
   background: var(--sand-100);

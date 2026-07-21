@@ -5,12 +5,15 @@ import {
   getTodayScreen,
   getUpcomingEvents,
   getAnnouncements,
+  getTransport,
   type ScreenSpace,
   type ScreenBooking,
   type QuarterEvent,
   type ScreenAnnouncement,
+  type TrainDeparture,
+  type BusDeparture,
 } from '@/lib/booking';
-import { busyness, type Band } from '@/lib/busyness';
+import { busyness, expectedPeople, type Band } from '@/lib/busyness';
 import { Icon } from '@/components/ds/Icon';
 import { eventThemeIcon } from '@/lib/eventThemes';
 import { FloorScreen } from './FloorScreen';
@@ -112,6 +115,12 @@ function weatherEmoji(code: number): string {
   if (code >= 80 && code <= 82) return '🌦️';
   if (code >= 95) return '⛈️';
   return '☁️';
+}
+
+/** Trim a rail destination so it fits the lobby transport strip (drop the parenthetical, cap length). */
+function shortDest(s: string): string {
+  const t = String(s || '').replace(/\s*\(.*\)\s*$/, '').trim();
+  return t.length > 18 ? `${t.slice(0, 17)}…` : t;
 }
 
 function eventWhen(start: string): string {
@@ -272,6 +281,7 @@ function EntranceScreen() {
   const [events, setEvents] = useState<QuarterEvent[]>([]);
   const [announcements, setAnnouncements] = useState<ScreenAnnouncement[]>([]);
   const [weather, setWeather] = useState<{ temp: number; emoji: string } | null>(null);
+  const [transport, setTransport] = useState<{ configured: boolean; trains: { west: TrainDeparture[]; east: TrainDeparture[] }; buses: BusDeparture[] } | null>(null);
   const [now, setNow] = useState<Date>(() => new Date());
   const [bankHoliday, setBankHoliday] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -388,6 +398,18 @@ function EntranceScreen() {
     return () => window.clearInterval(id);
   }, []);
 
+  // Live Canterbury trains + buses (TransportAPI, via our transport function). Refreshed each
+  // minute; fails soft — an empty/unconfigured response just hides the panel.
+  useEffect(() => {
+    const load = async () => {
+      const r = await getTransport();
+      if (r.ok && r.data?.configured) setTransport(r.data);
+    };
+    load();
+    const id = window.setInterval(load, 60 * 1000);
+    return () => window.clearInterval(id);
+  }, []);
+
   const b = busyness(now);
   // Christmas/New Year shutdown (24 Dec – 1 Jan) layered on weekends + bank holidays.
   const cm = now.getMonth() + 1;
@@ -412,6 +434,17 @@ function EntranceScreen() {
   const workspaces = spaces.filter((s) => s.type === 'Workspace');
   const dateLabel = now.toLocaleDateString('en-GB', { timeZone: 'Europe/London', weekday: 'long', day: 'numeric', month: 'long' });
   const timeLabel = now.toLocaleTimeString('en-GB', { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit', hour12: false });
+
+  // The week at a glance — the busyness rhythm (Mon–Fri) from the model, today marked. Tuesdays
+  // and Thursdays run busiest, Mondays and Fridays quietest.
+  const weekStart = new Date(now);
+  weekStart.setDate(now.getDate() - ((now.getDay() + 6) % 7)); // this week's Monday
+  const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].map((label, i) => {
+    const d = new Date(weekStart);
+    d.setDate(weekStart.getDate() + i);
+    return { label, val: expectedPeople(d), isToday: d.toDateString() === now.toDateString() };
+  });
+  const weekMax = Math.max(...weekDays.map((x) => x.val), 1);
 
   return (
     <div className={styles.screen}>
@@ -445,9 +478,43 @@ function EntranceScreen() {
         </section>
       ) : band ? (
         <section className={`${styles.hero} ${styles[`band_${band.id}`]}`}>
-          <span className={styles.heroEyebrow}>Today feels</span>
-          <span className={styles.heroLabel}>{band.label}</span>
-          <p className={styles.heroLine}>{band.line}</p>
+          <span className={styles.heroEyebrow}>The week at a glance</span>
+          <div className={styles.weekStrip}>
+            {weekDays.map((d) => (
+              <div key={d.label} className={`${styles.weekCol} ${d.isToday ? styles.weekToday : ''}`}>
+                <div className={styles.weekBarWrap}>
+                  <div className={styles.weekBar} style={{ height: `${Math.max(10, Math.round((d.val / weekMax) * 100))}%` }} />
+                </div>
+                <span className={styles.weekDay}>{d.label}</span>
+              </div>
+            ))}
+          </div>
+          <p className={styles.heroLine}>
+            Today feels <strong>{band.label.toLowerCase()}</strong>. Quieter Mondays and Fridays — spreading the week out keeps the place at its best.
+          </p>
+          {transport && (transport.trains.west[0] || transport.trains.east[0] || transport.buses[0]) ? (
+            <div className={styles.transport}>
+              {transport.trains.west[0] || transport.trains.east[0] ? (
+                <div className={styles.transRow}>
+                  <span className={styles.transIcon}>🚆</span>
+                  {transport.trains.west[0] ? (
+                    <span className={styles.transDep}><b>West</b> {transport.trains.west[0].time} {shortDest(transport.trains.west[0].to)}</span>
+                  ) : null}
+                  {transport.trains.east[0] ? (
+                    <span className={styles.transDep}><b>East</b> {transport.trains.east[0].time} {shortDest(transport.trains.east[0].to)}</span>
+                  ) : null}
+                </div>
+              ) : null}
+              {transport.buses[0] ? (
+                <div className={styles.transRow}>
+                  <span className={styles.transIcon}>🚌</span>
+                  {transport.buses.slice(0, 3).map((bs, i) => (
+                    <span key={`${bs.line}-${bs.time}-${i}`} className={styles.transDep}>{bs.time} <b>{bs.line}</b></span>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </section>
       ) : null}
 
