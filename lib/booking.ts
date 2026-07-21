@@ -272,6 +272,14 @@ export const checkInToday = (length: 'Full' | 'Half', period?: DayPeriod | null)
     method: 'POST',
     body: { action: 'checkin', length, ...(length === 'Half' && period ? { period } : {}) },
   });
+/** Shared-kiosk check-in: no login — the member is identified by the id from the privacy-safe
+ *  name search. Runs the same server-side check-in as checkInToday (Source is recorded 'Kiosk'). */
+export const kioskCheckIn = (memberId: string, length: 'Full' | 'Half', period?: DayPeriod | null) =>
+  call<{ ok: boolean; balance?: string | null; pointsAwarded?: number; alreadyCheckedIn?: boolean; alreadyCounted?: boolean; usedCarnet?: boolean; error?: string }>('checkin', {
+    method: 'POST',
+    auth: false,
+    body: { action: 'kioskCheckin', memberId, length, ...(length === 'Half' && period ? { period } : {}) },
+  });
 export const reserveDay = (date: string, length: 'Full' | 'Half', period?: DayPeriod | null) =>
   call<{ ok: boolean; requested?: boolean }>('checkin', { method: 'POST', body: { action: 'reserve', date, length, ...(length === 'Half' && period ? { period } : {}) } });
 export const cancelReservation = (id: string) =>

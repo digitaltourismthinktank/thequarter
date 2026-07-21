@@ -17,7 +17,7 @@ import { useMember } from './useMember';
    The wall displays (/screen, /kiosk, /guest, /arrive) are full-bleed kiosk designs —
    the marketing announcement bar, navbar and footer must never render on them, or the
    layout collapses on a big TV (the footer ends up floating beside the display). */
-const ALWAYS_APP = ['/dashboard', '/book', '/plan', '/admin', '/arrive', '/whats-on', '/screen', '/kiosk', '/guest', '/invite', '/unsubscribe'];
+const ALWAYS_APP = ['/dashboard', '/book', '/plan', '/admin', '/arrive', '/whats-on', '/screen', '/kiosk', '/guest', '/reception', '/signage', '/invite', '/unsubscribe'];
 const MEMBER_WHEN_AUTHED = ['/perks', '/rewards'];
 
 function matches(prefixes: string[], pathname: string | null): boolean {

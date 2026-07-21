@@ -278,9 +278,31 @@ export default async function handler(req) {
   if (req.method !== 'POST') return json({ error: 'method-not-allowed' }, 405);
 
   const body = await req.json().catch(() => ({}));
-  const vm = await verifyMember(tokenFromRequest(req, body));
-  if (!vm.ok) return json({ error: vm.reason }, 401);
-  const me = vm.member;
+  // A KIOSK check-in carries no login: the member is identified by the id from the privacy-safe
+  // name search (kiosk.mjs memberSearch) — the same low-security lobby model as kiosk.mjs
+  // bookFor, fine for a small trusted space. Everything else needs the member's own token. Once
+  // identified, a kiosk check-in is rewritten to the ordinary 'checkin' action and runs the
+  // EXACT same code below (no money logic duplicated); only the recorded Source differs. Kiosk
+  // identification is limited to check-in — reserve/cancel always require a real token.
+  const kiosk = body.action === 'kioskCheckin';
+  let me;
+  if (kiosk) {
+    if (!body.memberId) return json({ error: 'missing-member' }, 400);
+    const admin = memberstackAdmin.init(MS_SECRET);
+    try {
+      const r = await admin.members.retrieve({ id: body.memberId });
+      me = r?.data || null;
+    } catch {
+      me = null;
+    }
+    if (!me) return json({ error: 'unknown-member' }, 404);
+    body.action = 'checkin';
+  } else {
+    const vm = await verifyMember(tokenFromRequest(req, body));
+    if (!vm.ok) return json({ error: vm.reason }, 401);
+    me = vm.member;
+  }
+  const source = kiosk ? 'Kiosk' : 'Self';
   const email = (memberEmail(me) || '').toLowerCase();
   const name = memberName(me);
   const length = body.length === 'Half' ? 'Half' : 'Full';
@@ -321,7 +343,7 @@ export default async function handler(req) {
     // for today). This tap is just physical arrival — record it, don't charge the day again.
     const plannedRec = recs.find((r) => r.fields[F.checkins.status] === 'Planned');
     if (plannedRec && plannedConsumed(plannedRec)) {
-      await updateRecord(T.checkins, plannedRec.id, { [F.checkins.status]: 'Checked-in', [F.checkins.source]: 'Self' });
+      await updateRecord(T.checkins, plannedRec.id, { [F.checkins.status]: 'Checked-in', [F.checkins.source]: source });
       return json({ ok: true, alreadyCounted: true, balance: me.customFields?.['days-remaining'] ?? null });
     }
 
@@ -387,7 +409,7 @@ export default async function handler(req) {
         [F.checkins.length]: length,
         [F.checkins.notes]: periodNote,
         [F.checkins.dayCost]: unlimited || useCarnet ? 0 : cost,
-        [F.checkins.source]: 'Self',
+        [F.checkins.source]: source,
         ...(useCarnet ? { [F.checkins.notes]: `${periodNote ? periodNote + ' · ' : ''}Carnet pass` } : {}),
       });
     } else {
@@ -400,7 +422,7 @@ export default async function handler(req) {
         [F.checkins.notes]: periodNote,
         [F.checkins.dayCost]: unlimited ? 0 : cost,
         [F.checkins.status]: 'Checked-in',
-        [F.checkins.source]: 'Self',
+        [F.checkins.source]: source,
       });
     }
     // Award Quarter Rewards points for being in (quiet days earn double; monthly cap).
@@ -451,7 +473,7 @@ export default async function handler(req) {
         [F.checkins.notes]: periodNote,
         [F.checkins.dayCost]: 0,
         [F.checkins.status]: weekend ? 'Requested' : 'Planned',
-        [F.checkins.source]: 'Self',
+        [F.checkins.source]: source,
       },
       { typecast: true },
     );

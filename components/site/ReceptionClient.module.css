@@ -1,0 +1,196 @@
+/* The reception kiosk — a calm, full-bleed lobby screen with one centred card. Big touch
+   targets for a shared iPad; brand gold accents over a warm ground. */
+.screen {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(20px, 4vw, 56px);
+  background: var(--surface-page, #faf7f0);
+  color: var(--ink-900);
+  font-family: var(--font-sans);
+}
+
+.card {
+  width: 100%;
+  max-width: 560px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 14px;
+}
+
+.logo {
+  width: clamp(140px, 22vw, 190px);
+  height: auto;
+  margin-bottom: 6px;
+}
+
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps, 0.12em);
+  font-size: 0.8rem;
+  font-weight: var(--fw-bold);
+  color: var(--gold-700);
+}
+
+.h1 {
+  font-size: clamp(1.9rem, 4vw, 2.8rem);
+  font-weight: var(--fw-bold);
+  line-height: 1.1;
+  text-wrap: balance;
+  margin: 0;
+}
+
+.lead {
+  font-size: clamp(1rem, 1.7vw, 1.25rem);
+  color: var(--ink-700, #4a4038);
+  margin: 0;
+}
+
+.muted {
+  color: var(--text-muted, #8a7f72);
+  font-size: 0.95rem;
+}
+
+/* Landing two-up choice */
+.choices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  width: 100%;
+  margin-top: 10px;
+}
+@media (max-width: 520px) {
+  .choices { grid-template-columns: 1fr; }
+}
+.choice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: clamp(22px, 3.5vw, 34px) 18px;
+  border: 1px solid var(--sand-200, #e7ddca);
+  border-radius: var(--radius-xl, 20px);
+  background: var(--pure-white, #fff);
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.05s;
+}
+.choice:hover { border-color: var(--gold-600, #b8933f); }
+.choice:active { transform: translateY(1px); }
+.choice strong { font-size: 1.3rem; font-weight: var(--fw-bold); }
+.choice span { color: var(--text-muted, #8a7f72); font-size: 0.95rem; }
+
+/* Inputs + fields */
+.field {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+}
+.field > span { font-weight: var(--fw-semibold); font-size: 0.95rem; }
+.input {
+  width: 100%;
+  padding: 15px 16px;
+  font-size: 1.15rem;
+  border: 1px solid var(--sand-200, #e7ddca);
+  border-radius: var(--radius-lg, 14px);
+  background: var(--pure-white, #fff);
+  color: var(--ink-900);
+}
+.input:focus { outline: 2px solid var(--gold-600, #b8933f); outline-offset: 1px; }
+
+/* Search results */
+.matches {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+.match {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--sand-200, #e7ddca);
+  border-radius: var(--radius-lg, 14px);
+  background: var(--pure-white, #fff);
+  cursor: pointer;
+  text-align: left;
+}
+.match:hover { border-color: var(--gold-600, #b8933f); }
+.matchAvatar {
+  width: 38px; height: 38px; flex: none;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  background: var(--gold-100, #f4ecd8);
+  color: var(--gold-700);
+  font-weight: var(--fw-bold);
+}
+.matchName { font-weight: var(--fw-semibold); font-size: 1.1rem; }
+.matchCo { color: var(--text-muted, #8a7f72); margin-left: auto; font-size: 0.9rem; }
+
+.hostLocked {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 13px 15px;
+  border: 1px solid var(--gold-600, #b8933f);
+  border-radius: var(--radius-lg, 14px);
+  background: var(--gold-100, #f4ecd8);
+  font-weight: var(--fw-semibold);
+}
+.change {
+  border: none; background: none; cursor: pointer;
+  color: var(--gold-700); font-weight: var(--fw-bold); font-size: 0.9rem;
+}
+
+/* Day-length segmented control */
+.seg {
+  display: flex; width: 100%;
+  border: 1px solid var(--sand-200, #e7ddca);
+  border-radius: var(--radius-full, 999px);
+  padding: 4px; gap: 4px;
+}
+.segBtn {
+  flex: 1; padding: 12px; border: none; background: none; cursor: pointer;
+  border-radius: var(--radius-full, 999px);
+  font-size: 1.05rem; font-weight: var(--fw-semibold); color: var(--ink-700, #4a4038);
+}
+.segOn { background: var(--ink-900); color: var(--sand-50, #faf7f0); }
+
+/* Buttons */
+.primary {
+  width: 100%;
+  padding: 17px;
+  border: none;
+  border-radius: var(--radius-full, 999px);
+  background: var(--gold-600, #b8933f);
+  color: var(--pure-white, #fff);
+  font-size: 1.2rem;
+  font-weight: var(--fw-bold);
+  cursor: pointer;
+}
+.primary:disabled { opacity: 0.6; cursor: default; }
+.linkBtn {
+  border: none; background: none; cursor: pointer;
+  color: var(--gold-700); font-weight: var(--fw-semibold); font-size: 0.98rem;
+  padding: 4px;
+}
+.back {
+  align-self: flex-start;
+  display: inline-flex; align-items: center; gap: 6px;
+  border: none; background: none; cursor: pointer;
+  color: var(--text-muted, #8a7f72); font-weight: var(--fw-semibold);
+}
+.error { color: var(--danger-600, #b4231d); font-weight: var(--fw-semibold); }
+
+/* Confirmation */
+.confirm { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.tick {
+  width: 84px; height: 84px;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  background: var(--gold-100, #f4ecd8);
+}
