@@ -54,6 +54,7 @@ export const PLANS: Plan[] = [
     features: [
       'Five days’ access each month',
       '2 hours of meeting room a month — for you and your clients',
+      'Extra meeting-room time at your 25% member rate',
       'From £16.80 a working day',
       'Everything in the Day Pass, included',
       '24/7 access',
@@ -75,6 +76,7 @@ export const PLANS: Plan[] = [
     features: [
       'Ten days’ access each month',
       '4 hours of meeting room a month — for you and your clients',
+      'Extra meeting-room time at your 33% member rate',
       'From £13.80 a working day',
       'Everything in Visitor, included',
       '24/7 access',
@@ -94,6 +96,7 @@ export const PLANS: Plan[] = [
     features: [
       'Unlimited days — work here every day',
       '8 hours of meeting room a month — for you and your clients',
+      'Extra meeting-room time at your 50% member rate',
       'From £12.90 a working day',
       'Everything in Resident, included',
       'Priority room booking',
@@ -146,6 +149,35 @@ export function roomHoursLine(planId: string): string | null {
   const h = PLAN_ROOM_HOURS[planId];
   if (!h) return null;
   return `${h} hours of meeting room a month — for you and your clients`;
+}
+
+/**
+ * Member discount on PAID meeting-room hire, once a plan's included monthly hours are used —
+ * the extra time is charged per hour at this discount off the standard rate.
+ *
+ * MIRRORS MEMBER_ROOM_DISCOUNT in netlify/functions/_entitlement.mjs, which is the £ authority.
+ * Netlify functions can't import this TS module, so keep the two in step by hand.
+ */
+export const MEMBER_ROOM_DISCOUNT: Record<string, number> = {
+  visitor: 0.25,
+  resident: 0.33,
+  citizen: 0.5,
+};
+
+/** Reverse of PLAN_MEMBERSTACK_ID: a Memberstack plan id → our plan slug (or null). */
+export function planSlugFromMemberstackId(planId: string | undefined | null): PlanId | null {
+  if (!planId) return null;
+  const hit = (Object.keys(PLAN_MEMBERSTACK_ID) as PlanId[]).find((k) => PLAN_MEMBERSTACK_ID[k] === planId);
+  return hit ?? null;
+}
+
+/** "Extra time from £27/hr" style line for a plan card — the discounted standard rate, or null. */
+export function extraRoomLine(planId: string): string | null {
+  const disc = MEMBER_ROOM_DISCOUNT[planId];
+  if (!disc) return null;
+  // Standard hourly = the half-day rate ÷ 4. The Chapter House (our smaller room) is the entry price.
+  const from = Math.round(22.5 * (1 - disc) * 100) / 100;
+  return `Extra meeting-room time from £${from % 1 === 0 ? from : from.toFixed(2)}/hr — ${Math.round(disc * 100)}% member rate`;
 }
 
 export function getPlan(id: PlanId): Plan | undefined {

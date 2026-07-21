@@ -633,6 +633,8 @@ function MemberProfileModal({
   const [confirmAdjust, setConfirmAdjust] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  // The adjustments are grouped under three tabs so the modal isn't one long scroll.
+  const [ptab, setPtab] = useState<'membership' | 'rewards' | 'details'>('membership');
 
   useEffect(() => {
     setDoor(doorCode ?? '');
@@ -665,6 +667,7 @@ function MemberProfileModal({
     setRewardId('');
     setConfirmAdjust(false);
     setPlanSel('');
+    setPtab('membership');
     load();
   }, [id, load]);
 
@@ -872,213 +875,231 @@ function MemberProfileModal({
               </div>
             </div>
 
-            <div className={styles.profSection}>
-              <span className={styles.profSectionTitle}>Edit details</span>
-              <div className={styles.formRow}>
-                <input className={styles.label} placeholder="First name" value={firstName} onChange={(e) => setFirstName(e.target.value)} aria-label="First name" />
-                <input className={styles.label} placeholder="Last name" value={lastName} onChange={(e) => setLastName(e.target.value)} aria-label="Last name" />
-                <input
-                  className={styles.dayInput}
-                  type="number"
-                  min={0}
-                  placeholder="4h"
-                  value={capOverride}
-                  onChange={(e) => setCapOverride(e.target.value)}
-                  aria-label="Free meeting-room hours per month"
-                  title="Free meeting-room hours per month (blank = default 4)"
-                />
-                <button type="button" className={styles.smallBtn} onClick={saveDetails} disabled={busy}>
-                  Save
-                </button>
-              </div>
-              <span className={styles.muted}>Fixes a wrong name; the number is their free meeting-room hours/month (blank = 4).</span>
+            <div className={styles.profTabs} role="tablist" aria-label="Member settings">
+              <button type="button" role="tab" aria-selected={ptab === 'membership'} className={`${styles.profTab} ${ptab === 'membership' ? styles.profTabOn : ''}`} onClick={() => setPtab('membership')}>
+                Membership &amp; days
+              </button>
+              <button type="button" role="tab" aria-selected={ptab === 'rewards'} className={`${styles.profTab} ${ptab === 'rewards' ? styles.profTabOn : ''}`} onClick={() => setPtab('rewards')}>
+                Rewards &amp; points
+              </button>
+              <button type="button" role="tab" aria-selected={ptab === 'details'} className={`${styles.profTab} ${ptab === 'details' ? styles.profTabOn : ''}`} onClick={() => setPtab('details')}>
+                Details &amp; access
+              </button>
             </div>
 
-            <div className={styles.profSection}>
-              <span className={styles.profSectionTitle}>
-                Membership
-                <span className={p.manualBilling ? styles.pausedTag : styles.billTag}>{p.manualBilling ? 'Manual billing' : 'Stripe'}</span>
-              </span>
-
-              {/* Plan */}
-              <div className={styles.formRow}>
-                <select className={styles.select} value={planSel} onChange={(e) => setPlanSel(e.target.value)} aria-label="Plan">
-                  <option value="">Choose a plan…</option>
-              {/* Removes the plan — day-pass / carnet only. Non-empty, so the button enables. */}
-              <option value="none">No plan · day pass only</option>
-                  {PLANS.filter((pl) => pl.id !== 'day-pass').map((pl) => (
-                    <option key={pl.id} value={PLAN_MEMBERSTACK_ID[pl.id]}>
-                      {pl.name}
-                    </option>
-                  ))}
-                </select>
-                <button type="button" className={styles.smallBtn} onClick={saveMembershipPlan} disabled={busy || !planSel}>
-                  Assign / change plan
-                </button>
-              </div>
-              <span className={styles.muted}>Current plan: {p.plan || 'None yet'}.</span>
-
-              {/* Renewal / reset date */}
-              <div className={styles.formRow} style={{ marginTop: 12 }}>
-                <button type="button" className={styles.dateTrigger} onClick={() => setRenewalPickerOpen(true)} aria-label="Renewal date">
-                  <Icon name="calendar" size={15} color="var(--gold-700)" />
-                  {p.renewal ? `Renews ${p.renewal}` : 'Set renewal date'}
-                </button>
-                <span className={styles.muted}>Resets their days on this date (manual members).</span>
-              </div>
-
-              {/* Custom monthly days (overrides the plan) */}
-              <div className={styles.formRow} style={{ marginTop: 12 }}>
-                <input
-                  className={styles.dayInput}
-                  type="number"
-                  min={0}
-                  placeholder="—"
-                  value={allowanceEdit}
-                  onChange={(e) => setAllowanceEdit(e.target.value)}
-                  aria-label="Custom monthly days"
-                />
-                <button type="button" className={styles.smallBtn} onClick={saveAllowance} disabled={busy}>
-                  Save days/mo
-                </button>
-                <span className={styles.muted}>
-                  Custom monthly days (overrides plan).{' '}
-                  {p.allowanceOverride != null ? `Currently ${p.allowanceOverride}` : 'Using plan default'}
-                  {planDefaultLabel ? ` · plan default ${planDefaultLabel}` : ''}. Empty clears the override.
-                </span>
-              </div>
-
-              {/* Days remaining this cycle */}
-              <div className={styles.formRow} style={{ marginTop: 12 }}>
-                <input
-                  className={styles.dayInput}
-                  type="number"
-                  placeholder="days"
-                  value={daysEdit}
-                  onChange={(e) => setDaysEdit(e.target.value)}
-                  aria-label="Days remaining"
-                />
-                <button type="button" className={styles.smallBtn} onClick={saveDaysBalance} disabled={busy}>
-                  Save balance
-                </button>
-                <span className={styles.muted}>Days remaining this cycle.</span>
-              </div>
-
-              {/* Renew now */}
-              <div className={styles.formRow} style={{ marginTop: 12 }}>
-                {confirmRenew ? (
-                  <>
-                    <span className={styles.caution}>Reset days &amp; roll the renewal date forward a month?</span>
-                    <button type="button" className={styles.smallBtn} onClick={renewNow} disabled={busy}>
-                      Confirm renew
-                    </button>
-                    <button type="button" className={styles.smallBtn} onClick={() => setConfirmRenew(false)}>
-                      Cancel
-                    </button>
-                  </>
-                ) : (
-                  <button type="button" className={styles.smallBtn} onClick={() => setConfirmRenew(true)} disabled={busy}>
-                    Renew now
-                  </button>
-                )}
-              </div>
-            </div>
-
-            <div className={styles.profSection}>
-              <span className={styles.profSectionTitle}>Redeem a reward (deducts points)</span>
-              <div className={styles.formRow}>
-                <select className={styles.select} value={rewardId} onChange={(e) => setRewardId(e.target.value)} aria-label="Reward">
-                  <option value="">Choose a reward…</option>
-                  {rewards.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.title} — {r.cost} pts
-                    </option>
-                  ))}
-                </select>
-                <button type="button" className={styles.smallBtn} onClick={redeem} disabled={busy || !rewardId}>
-                  Deduct
-                </button>
-              </div>
-            </div>
-
-            <div className={styles.profSection}>
-              <span className={styles.profSectionTitle}>Adjust points</span>
-              <div className={styles.formRow}>
-                <input
-                  className={styles.dayInput}
-                  type="number"
-                  placeholder="+/−"
-                  value={delta}
-                  onChange={(e) => {
-                    setDelta(e.target.value);
-                    setConfirmAdjust(false);
-                  }}
-                />
-                <input className={styles.label} placeholder="Reason (recorded)" value={reason} onChange={(e) => setReason(e.target.value)} />
-                {confirmAdjust ? (
-                  <>
-                    <span className={styles.caution}>
-                      Apply {d > 0 ? '+' : ''}
-                      {d} to {p.name}?
-                    </span>
-                    <button type="button" className={styles.smallBtn} onClick={adjust} disabled={busy}>
-                      Confirm
-                    </button>
-                    <button type="button" className={styles.smallBtn} onClick={() => setConfirmAdjust(false)}>
-                      Cancel
-                    </button>
-                  </>
-                ) : (
-                  <button type="button" className={styles.smallBtn} onClick={() => d && setConfirmAdjust(true)} disabled={!d}>
-                    Adjust
-                  </button>
-                )}
-              </div>
-            </div>
-
-            <div className={styles.profSection}>
-              <span className={styles.profSectionTitle}>Day passes</span>
-              <div className={styles.formRow}>
-                <input
-                  className={styles.dayInput}
-                  type="number"
-                  placeholder="+/−"
-                  value={passes}
-                  onChange={(e) => setPasses(e.target.value)}
-                />
-                <button type="button" className={styles.smallBtn} onClick={grant} disabled={busy || !passes}>
-                  Grant passes
-                </button>
-                <span className={styles.muted}>For comps or to test a purchase.</span>
-              </div>
-            </div>
-
-            <div className={styles.profSection}>
-              <span className={styles.profSectionTitle}>Door code</span>
-              <div className={styles.formRow}>
-                <input className={styles.dayInput} value={door} onChange={(e) => setDoor(e.target.value)} placeholder="e.g. 1324#" aria-label="Door code" />
-                <button type="button" className={styles.smallBtn} onClick={saveDoor} disabled={busy}>
-                  Save code
-                </button>
-              </div>
-            </div>
-
-            {p.recentLedger.length ? (
+            {ptab === 'membership' ? (
               <div className={styles.profSection}>
-                <span className={styles.profSectionTitle}>Recent points</span>
-                <div className={styles.profHist}>
-                  {p.recentLedger.map((l, i) => (
-                    <div key={i} className={styles.profHistRow}>
-                      <span>{l.reason}</span>
-                      <span className={l.delta < 0 ? styles.histNeg : styles.histPos}>
-                        {l.delta > 0 ? '+' : ''}
-                        {l.delta}
-                      </span>
-                    </div>
-                  ))}
+                <span className={styles.profSectionTitle}>
+                  Membership
+                  <span className={p.manualBilling ? styles.pausedTag : styles.billTag}>{p.manualBilling ? 'Manual billing' : 'Stripe'}</span>
+                </span>
+
+                {/* Plan */}
+                <div className={styles.formRow}>
+                  <select className={styles.select} value={planSel} onChange={(e) => setPlanSel(e.target.value)} aria-label="Plan">
+                    <option value="">Choose a plan…</option>
+                    {/* Removes the plan — day-pass / carnet only. Non-empty, so the button enables. */}
+                    <option value="none">No plan · day pass only</option>
+                    {PLANS.filter((pl) => pl.id !== 'day-pass').map((pl) => (
+                      <option key={pl.id} value={PLAN_MEMBERSTACK_ID[pl.id]}>
+                        {pl.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button type="button" className={styles.smallBtn} onClick={saveMembershipPlan} disabled={busy || !planSel}>
+                    Assign / change plan
+                  </button>
+                </div>
+                <span className={styles.muted}>Current plan: {p.plan || 'None yet'}.</span>
+
+                {/* Renewal / reset date */}
+                <div className={styles.formRow} style={{ marginTop: 12 }}>
+                  <button type="button" className={styles.dateTrigger} onClick={() => setRenewalPickerOpen(true)} aria-label="Renewal date">
+                    <Icon name="calendar" size={15} color="var(--gold-700)" />
+                    {p.renewal ? `Renews ${p.renewal}` : 'Set renewal date'}
+                  </button>
+                  <span className={styles.muted}>Resets their days on this date (manual members).</span>
+                </div>
+
+                {/* Custom monthly days (overrides the plan) */}
+                <div className={styles.formRow} style={{ marginTop: 12 }}>
+                  <input
+                    className={styles.dayInput}
+                    type="number"
+                    min={0}
+                    placeholder="—"
+                    value={allowanceEdit}
+                    onChange={(e) => setAllowanceEdit(e.target.value)}
+                    aria-label="Custom monthly days"
+                  />
+                  <button type="button" className={styles.smallBtn} onClick={saveAllowance} disabled={busy}>
+                    Save days/mo
+                  </button>
+                  <span className={styles.muted}>
+                    Custom monthly days (overrides plan).{' '}
+                    {p.allowanceOverride != null ? `Currently ${p.allowanceOverride}` : 'Using plan default'}
+                    {planDefaultLabel ? ` · plan default ${planDefaultLabel}` : ''}. Empty clears the override.
+                  </span>
+                </div>
+
+                {/* Days remaining this cycle */}
+                <div className={styles.formRow} style={{ marginTop: 12 }}>
+                  <input
+                    className={styles.dayInput}
+                    type="number"
+                    placeholder="days"
+                    value={daysEdit}
+                    onChange={(e) => setDaysEdit(e.target.value)}
+                    aria-label="Days remaining"
+                  />
+                  <button type="button" className={styles.smallBtn} onClick={saveDaysBalance} disabled={busy}>
+                    Save balance
+                  </button>
+                  <span className={styles.muted}>Days remaining this cycle.</span>
+                </div>
+
+                {/* Renew now */}
+                <div className={styles.formRow} style={{ marginTop: 12 }}>
+                  {confirmRenew ? (
+                    <>
+                      <span className={styles.caution}>Reset days &amp; roll the renewal date forward a month?</span>
+                      <button type="button" className={styles.smallBtn} onClick={renewNow} disabled={busy}>
+                        Confirm renew
+                      </button>
+                      <button type="button" className={styles.smallBtn} onClick={() => setConfirmRenew(false)}>
+                        Cancel
+                      </button>
+                    </>
+                  ) : (
+                    <button type="button" className={styles.smallBtn} onClick={() => setConfirmRenew(true)} disabled={busy}>
+                      Renew now
+                    </button>
+                  )}
                 </div>
               </div>
-            ) : null}
+            ) : ptab === 'rewards' ? (
+              <>
+                <div className={styles.profSection}>
+                  <span className={styles.profSectionTitle}>Redeem a reward (deducts points)</span>
+                  <div className={styles.formRow}>
+                    <select className={styles.select} value={rewardId} onChange={(e) => setRewardId(e.target.value)} aria-label="Reward">
+                      <option value="">Choose a reward…</option>
+                      {rewards.map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {r.title} — {r.cost} pts
+                        </option>
+                      ))}
+                    </select>
+                    <button type="button" className={styles.smallBtn} onClick={redeem} disabled={busy || !rewardId}>
+                      Deduct
+                    </button>
+                  </div>
+                </div>
+
+                <div className={styles.profSection}>
+                  <span className={styles.profSectionTitle}>Adjust points</span>
+                  <div className={styles.formRow}>
+                    <input
+                      className={styles.dayInput}
+                      type="number"
+                      placeholder="+/−"
+                      value={delta}
+                      onChange={(e) => {
+                        setDelta(e.target.value);
+                        setConfirmAdjust(false);
+                      }}
+                    />
+                    <input className={styles.label} placeholder="Reason (recorded)" value={reason} onChange={(e) => setReason(e.target.value)} />
+                    {confirmAdjust ? (
+                      <>
+                        <span className={styles.caution}>
+                          Apply {d > 0 ? '+' : ''}
+                          {d} to {p.name}?
+                        </span>
+                        <button type="button" className={styles.smallBtn} onClick={adjust} disabled={busy}>
+                          Confirm
+                        </button>
+                        <button type="button" className={styles.smallBtn} onClick={() => setConfirmAdjust(false)}>
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <button type="button" className={styles.smallBtn} onClick={() => d && setConfirmAdjust(true)} disabled={!d}>
+                        Adjust
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {p.recentLedger.length ? (
+                  <div className={styles.profSection}>
+                    <span className={styles.profSectionTitle}>Recent points</span>
+                    <div className={styles.profHist}>
+                      {p.recentLedger.map((l, i) => (
+                        <div key={i} className={styles.profHistRow}>
+                          <span>{l.reason}</span>
+                          <span className={l.delta < 0 ? styles.histNeg : styles.histPos}>
+                            {l.delta > 0 ? '+' : ''}
+                            {l.delta}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </>
+            ) : (
+              <>
+                <div className={styles.profSection}>
+                  <span className={styles.profSectionTitle}>Edit details</span>
+                  <div className={styles.formRow}>
+                    <input className={styles.label} placeholder="First name" value={firstName} onChange={(e) => setFirstName(e.target.value)} aria-label="First name" />
+                    <input className={styles.label} placeholder="Last name" value={lastName} onChange={(e) => setLastName(e.target.value)} aria-label="Last name" />
+                    <input
+                      className={styles.dayInput}
+                      type="number"
+                      min={0}
+                      placeholder="4h"
+                      value={capOverride}
+                      onChange={(e) => setCapOverride(e.target.value)}
+                      aria-label="Free meeting-room hours per month"
+                      title="Free meeting-room hours per month (blank = default 4)"
+                    />
+                    <button type="button" className={styles.smallBtn} onClick={saveDetails} disabled={busy}>
+                      Save
+                    </button>
+                  </div>
+                  <span className={styles.muted}>Fixes a wrong name; the number is their free meeting-room hours/month (blank = 4).</span>
+                </div>
+
+                <div className={styles.profSection}>
+                  <span className={styles.profSectionTitle}>Day passes</span>
+                  <div className={styles.formRow}>
+                    <input
+                      className={styles.dayInput}
+                      type="number"
+                      placeholder="+/−"
+                      value={passes}
+                      onChange={(e) => setPasses(e.target.value)}
+                    />
+                    <button type="button" className={styles.smallBtn} onClick={grant} disabled={busy || !passes}>
+                      Grant passes
+                    </button>
+                    <span className={styles.muted}>For comps or to test a purchase.</span>
+                  </div>
+                </div>
+
+                <div className={styles.profSection}>
+                  <span className={styles.profSectionTitle}>Door code</span>
+                  <div className={styles.formRow}>
+                    <input className={styles.dayInput} value={door} onChange={(e) => setDoor(e.target.value)} placeholder="e.g. 1324#" aria-label="Door code" />
+                    <button type="button" className={styles.smallBtn} onClick={saveDoor} disabled={busy}>
+                      Save code
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
 
             {msg ? <p className={styles.msg}>{msg}</p> : null}
           </>
@@ -1218,6 +1239,9 @@ function RoomsPane() {
   const [weekStart, setWeekStart] = useState<string>(() => mondayISO(firstWeekday()));
   const [focusDay, setFocusDay] = useState<string>(() => firstWeekday());
   const [weekBookings, setWeekBookings] = useState<Record<string, AdminBooking[]>>({});
+  // Two ways to read the week: "By room" stacks each meeting room + pod as its own lane across the
+  // five weekdays (spot a room's free/busy at a glance); "By day" is the original day-column view.
+  const [viewMode, setViewMode] = useState<'room' | 'day'>('room');
 
   const [kind, setKind] = useState<'block' | 'external' | 'company'>('block');
   const [spaceId, setSpaceId] = useState<string>('');
@@ -1258,6 +1282,12 @@ function RoomsPane() {
   }, []);
 
   const weekDays = Array.from({ length: 5 }, (_, i) => addDaysISO(weekStart, i)); // Mon–Fri ISO
+  // Meeting rooms first, phone pods last — the order lanes stack in the "By room" view. Hot-desk
+  // workspaces aren't room-booked, so they're left out of this schedule.
+  const orderedSpaces = [...spaces]
+    .filter((s) => s.type !== 'Workspace')
+    .sort((a, b) => (a.type === 'Phone pod' ? 1 : 0) - (b.type === 'Phone pod' ? 1 : 0));
+  const sortDay = (a: AdminBooking, b: AdminBooking) => (b.allDay ? 1 : 0) - (a.allDay ? 1 : 0) || a.startMin - b.startMin;
 
   // Fetch the whole visible week — one calendar call per weekday, in parallel. Each response
   // already carries expanded recurring-rule occurrences + privatisations, so the week view and the
@@ -1505,16 +1535,24 @@ function RoomsPane() {
   return (
     <div>
       <div className={styles.weekSection}>
-        <span className={styles.panelTitle}>This week’s bookings</span>
+        <div className={styles.weekHead}>
+          <span className={styles.panelTitle}>This week’s bookings</span>
+          <div className={styles.viewToggle} role="group" aria-label="Booking view">
+            <button type="button" className={`${styles.viewBtn} ${viewMode === 'room' ? styles.viewOn : ''}`} onClick={() => setViewMode('room')} aria-pressed={viewMode === 'room'}>
+              By room
+            </button>
+            <button type="button" className={`${styles.viewBtn} ${viewMode === 'day' ? styles.viewOn : ''}`} onClick={() => setViewMode('day')} aria-pressed={viewMode === 'day'}>
+              By day
+            </button>
+          </div>
+        </div>
         <WeekStrip value={focusDay} onSelect={setFocusDay} onWeekChange={handleWeekChange} />
         {loading ? (
           <p className={styles.state}>Loading…</p>
-        ) : (
+        ) : viewMode === 'day' ? (
           <div className={styles.weekGrid}>
             {weekDays.map((d) => {
-              const list = [...(weekBookings[d] || [])].sort(
-                (a, b) => (b.allDay ? 1 : 0) - (a.allDay ? 1 : 0) || a.startMin - b.startMin,
-              );
+              const list = [...(weekBookings[d] || [])].sort(sortDay);
               const dObj = new Date(`${d}T12:00:00`);
               return (
                 <div key={d} className={`${styles.weekCol} ${d === focusDay ? styles.weekColOn : ''}`}>
@@ -1530,6 +1568,41 @@ function RoomsPane() {
                 </div>
               );
             })}
+          </div>
+        ) : (
+          // By-room: a lane per meeting room + pod, five weekday columns, so each room's week reads
+          // top-to-bottom. One CSS grid keeps the header and every lane's columns aligned.
+          <div className={styles.roomScroll}>
+            <div className={styles.roomMatrix}>
+              <span className={styles.roomCorner} aria-hidden />
+              {weekDays.map((d) => {
+                const dObj = new Date(`${d}T12:00:00`);
+                return (
+                  <div key={d} className={`${styles.roomMatrixHead} ${d === focusDay ? styles.roomHeadOn : ''}`}>
+                    <span className={styles.weekColDow}>{dObj.toLocaleDateString('en-GB', { weekday: 'short' })}</span>
+                    <span className={styles.weekColDate}>{dObj.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>
+                  </div>
+                );
+              })}
+              {orderedSpaces.length === 0 ? (
+                <p className={styles.weekEmpty}>No rooms found.</p>
+              ) : (
+                orderedSpaces.flatMap((sp) => [
+                  <div key={`${sp.id}-label`} className={styles.roomLaneLabel}>
+                    <span className={styles.roomLaneName}>{sp.name}</span>
+                    <span className={styles.roomLaneType}>{sp.type === 'Phone pod' ? 'Pod' : 'Room'}</span>
+                  </div>,
+                  ...weekDays.map((d) => {
+                    const list = (weekBookings[d] || []).filter((b) => b.space === sp.id).sort(sortDay);
+                    return (
+                      <div key={`${sp.id}-${d}`} className={`${styles.roomCell} ${d === focusDay ? styles.weekColOn : ''}`}>
+                        {list.length === 0 ? <span className={styles.roomFree}>Free</span> : list.map((b) => <BookingCard key={b.id} b={b} day={d} />)}
+                      </div>
+                    );
+                  }),
+                ])
+              )}
+            </div>
           </div>
         )}
       </div>

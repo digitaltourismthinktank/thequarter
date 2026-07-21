@@ -611,6 +611,103 @@ select.input {
   text-align: center;
   padding: 10px 0;
 }
+
+/* Week header row: title on the left, the By-room / By-day toggle on the right. */
+.weekHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.viewToggle {
+  display: inline-flex;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-full, 999px);
+  overflow: hidden;
+  flex: none;
+}
+.viewBtn {
+  border: none;
+  background: none;
+  padding: 7px 16px;
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.viewOn {
+  background: var(--ink-900);
+  color: var(--pure-white, #fff);
+}
+
+/* By-room lanes: one grid so the header + every room row share the same column tracks. Scrolls
+   sideways on a narrow screen rather than crushing the columns. */
+.roomScroll {
+  overflow-x: auto;
+}
+.roomMatrix {
+  display: grid;
+  grid-template-columns: minmax(108px, 150px) repeat(5, minmax(150px, 1fr));
+  gap: 8px;
+  min-width: 760px;
+  align-items: stretch;
+}
+.roomCorner {
+  /* empty top-left cell above the room labels */
+}
+.roomMatrixHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.roomHeadOn {
+  border-bottom-color: var(--gold-500);
+}
+.roomLaneLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  justify-content: center;
+  padding: 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+}
+.roomLaneName {
+  font-size: var(--text-sm);
+  font-weight: var(--fw-bold);
+  color: var(--ink-900);
+  line-height: 1.2;
+}
+.roomLaneType {
+  font-size: var(--text-2xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  color: var(--text-muted);
+  font-weight: var(--fw-semibold);
+}
+.roomCell {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  min-height: 64px;
+}
+.roomFree {
+  margin: auto;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  opacity: 0.75;
+}
 .bCard {
   display: flex;
   flex-direction: column;
@@ -1502,6 +1599,34 @@ select.input {
   letter-spacing: 0.05em;
   color: var(--text-muted);
   font-weight: var(--fw-semibold);
+}
+/* Tabs that group the member adjustments — Membership / Rewards / Details. Sits under the stat
+   summary so the modal reads as three tidy panels rather than one long scroll. */
+.profTabs {
+  display: flex;
+  gap: 4px;
+  margin-top: 18px;
+  padding: 4px;
+  background: var(--surface-sunken);
+  border-radius: var(--radius-full, 999px);
+}
+.profTab {
+  flex: 1;
+  border: none;
+  background: none;
+  padding: 9px 12px;
+  border-radius: var(--radius-full, 999px);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.profTabOn {
+  background: var(--surface-card, #fff);
+  color: var(--ink-900);
+  box-shadow: 0 1px 2px rgba(30, 26, 21, 0.12);
 }
 .profSection {
   margin-top: 18px;

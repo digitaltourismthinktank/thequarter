@@ -16,6 +16,7 @@ import {
 } from '@/lib/booking';
 import { WeekStrip } from './WeekStrip';
 import { DatePickerModal } from './DatePickerModal';
+import { PLAN_ROOM_HOURS, MEMBER_ROOM_DISCOUNT, planSlugFromMemberstackId } from '@/lib/plans';
 import styles from './BookingClient.module.css';
 
 const SLOT = 30;
@@ -235,6 +236,14 @@ export function BookingClient() {
 
   // A plan is what carries meeting-room hours; a day-pass visitor gets the pods.
   const hasPlan = (member?.planConnections?.length ?? 0) > 0;
+  // This member's plan → included room hours + their extra-time discount, for the booking note.
+  const memberSlug = (() => {
+    const conns = (member?.planConnections || []) as { planId?: string; active?: boolean; status?: string }[];
+    const active = conns.find((c) => c?.active || c?.status === 'ACTIVE') || conns[0];
+    return active ? planSlugFromMemberstackId(active.planId) : null;
+  })();
+  const includedHours = memberSlug ? PLAN_ROOM_HOURS[memberSlug] ?? 0 : 0;
+  const memberPct = memberSlug ? Math.round((MEMBER_ROOM_DISCOUNT[memberSlug] || 0) * 100) : 0;
   const capOf = (sp: Space) => sp.capacity ?? 99;
   const fits = (sp: Space) => party === null || capOf(sp) >= party;
   // The best match is the smallest space that fits. Anything the same size is a fair
@@ -333,6 +342,14 @@ export function BookingClient() {
       {party === 1 ? (
         <p className={styles.podNudge}>
           A phone pod is usually best for calls — it keeps the meeting rooms free for groups. Rooms are there if you need one.
+        </p>
+      ) : null}
+
+      {spaceId && spaces.find((s) => s.id === spaceId)?.type !== 'Phone pod' && hasPlan && includedHours > 0 ? (
+        <p className={styles.roomNote}>
+          Your plan includes <strong>{includedHours}h</strong> of meeting-room time a month, free to book here. Need more?
+          Extra time is charged per hour at your{memberPct ? ` ${memberPct}% member rate` : ' member rate'} — book it on the{' '}
+          <a href="/meeting-rooms">meeting rooms</a> page. Phone pods are always free, up to 2 hours at a time.
         </p>
       ) : null}
 

@@ -16,6 +16,7 @@ import {
   type RoomMemberStatus,
 } from '@/lib/booking';
 import { useMember } from './useMember';
+import { MEMBER_ROOM_DISCOUNT, planSlugFromMemberstackId } from '@/lib/plans';
 import { Confirmation, signupHref, type ConfirmationRow } from './Confirmation';
 import { TalkToUs } from './TalkToUs';
 import { DatePickerModal } from './DatePickerModal';
@@ -276,15 +277,32 @@ export function RoomBooking({ roomName, price }: { roomName: string; price: { ha
   const span: 'half' | 'full' = pkg === 'full' ? 'full' : 'half';
   const selHours = sel ? round2((sel.end - sel.start) / 60) : 0;
 
+  // This member's meeting-room discount (0 unless they're on Visitor/Resident/Citizen).
+  const memberDiscount = useMemo(() => {
+    const conns =
+      ((member as unknown as { planConnections?: { planId?: string; active?: boolean; status?: string }[] })?.planConnections) || [];
+    const active = conns.find((c) => c?.active || c?.status === 'ACTIVE') || conns[0];
+    const slug = active ? planSlugFromMemberstackId(active.planId) : null;
+    return slug ? MEMBER_ROOM_DISCOUNT[slug] || 0 : 0;
+  }, [member]);
+
   const est = useMemo(() => {
     if (!sel) return null;
+    const lunchTotal = lunch ? Math.max(1, people) * LUNCH_PER_HEAD : 0;
+    // Member beyond their included hours → per-hour at their tier rate, capped at the day rate.
+    const over = !!member && !!status && selHours > status.remaining + 1e-6;
+    if (over && memberDiscount > 0) {
+      const rate = round2((price.half / 4) * (1 - memberDiscount));
+      const packageEquiv = span === 'full' ? price.full : price.half;
+      const hire = Math.min(round2(selHours * rate), packageEquiv);
+      return { hire, rate, memberRate: true, quiet: false, lunchTotal, total: round2(hire + lunchTotal) };
+    }
     let hire = span === 'full' ? price.full : price.half;
     const dow = date ? new Date(`${date}T00:00:00`).getDay() : -1;
     const quiet = QUIET_DAYS.includes(dow);
     if (quiet) hire = round2(hire * 0.8);
-    const lunchTotal = lunch ? Math.max(1, people) * LUNCH_PER_HEAD : 0;
-    return { hire, quiet, lunchTotal, total: round2(hire + lunchTotal) };
-  }, [sel, span, price, date, lunch, people]);
+    return { hire, rate: null as number | null, memberRate: false, quiet, lunchTotal, total: round2(hire + lunchTotal) };
+  }, [sel, span, price, date, lunch, people, member, status, selHours, memberDiscount]);
 
   const todayStr = useMemo(() => {
     const d = new Date();
@@ -465,11 +483,16 @@ export function RoomBooking({ roomName, price }: { roomName: string; price: { ha
   const lines: RoomQuoteLine[] =
     serverLines ??
     (sel
-      ? [
-          { label: `${roomName} · ${fmtRange(sel.start, sel.end)}`, amount: span === 'full' ? price.full : price.half },
-          ...(est?.quiet ? [{ label: 'Quiet-day discount (20%)', amount: -round2((span === 'full' ? price.full : price.half) * 0.2) }] : []),
-          ...(lunch ? [{ label: `Lunch · ${Math.max(1, people)} × £${LUNCH_PER_HEAD}`, amount: est?.lunchTotal ?? 0 }] : []),
-        ]
+      ? est?.memberRate
+        ? [
+            { label: `${roomName} · ${selHours}h × ${money(est.rate ?? 0)} · member rate`, amount: est.hire },
+            ...(lunch ? [{ label: `Lunch · ${Math.max(1, people)} × £${LUNCH_PER_HEAD}`, amount: est?.lunchTotal ?? 0 }] : []),
+          ]
+        : [
+            { label: `${roomName} · ${fmtRange(sel.start, sel.end)}`, amount: span === 'full' ? price.full : price.half },
+            ...(est?.quiet ? [{ label: 'Quiet-day discount (20%)', amount: -round2((span === 'full' ? price.full : price.half) * 0.2) }] : []),
+            ...(lunch ? [{ label: `Lunch · ${Math.max(1, people)} × £${LUNCH_PER_HEAD}`, amount: est?.lunchTotal ?? 0 }] : []),
+          ]
       : []);
 
   return (
@@ -640,7 +663,12 @@ export function RoomBooking({ roomName, price }: { roomName: string; price: { ha
                 </span>
               </div>
             </div>
-            {overCap ? <p className={styles.quiet}>You’ve used your free hours this month — this booking is paid.</p> : null}
+            {overCap ? (
+              <p className={styles.quiet}>
+                You’ve used your included hours this month — extra time is charged per hour
+                {memberDiscount > 0 ? ` at your ${Math.round(memberDiscount * 100)}% member rate` : ''}.
+              </p>
+            ) : null}
             {est?.quiet && !serverLines ? <p className={styles.quiet}>Quiet-day rate applied — 20% off room hire.</p> : null}
 
             {step === 'pay' ? (

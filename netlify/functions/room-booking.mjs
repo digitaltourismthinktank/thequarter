@@ -29,7 +29,7 @@ import { verifyMember, memberEmail, memberName, tokenFromRequest } from './_memb
 import { sendEmail, emailShell, escapeHtml, OPS_EMAIL, fmtDateTime } from './_email.mjs';
 import { pushToEmail } from './_push.mjs';
 import { isRecurringBlockRule, recurringBlockOccurrences } from './_privatisation.mjs';
-import { roomHoursCap } from './_entitlement.mjs';
+import { roomHoursCap, memberRoomDiscount, planSlugForMember } from './_entitlement.mjs';
 
 /* Free meeting-room hours are per plan and live in _entitlement.mjs, which both this path
    and the dashboard's bookings.mjs now share. Pods are free and never counted. */
@@ -112,11 +112,19 @@ async function bookingsForSpaceDate(spaceId, dateStr) {
   return [...dated, ...occ];
 }
 
+/** Standard meeting-room hourly rate = the half-day (4h) rate ÷ 4. */
+const roomHourlyRate = (price) => round2(price.half / 4);
+
 /**
  * Resolve the time window + price for a request. Returns { error } or
  * { start, end, amountPence, lines, span, isPod }.
+ *
+ * `memberRate` (optional): when a plan member books meeting-room time beyond their included hours,
+ * they pay PER HOUR at their plan's member rate instead of a full-day/half-day package — the room's
+ * standard hourly rate less their tier discount (Visitor 25% / Resident 33% / Citizen 50%). No
+ * quiet-day discount stacks on top (the member rate already beats it); lunch is unchanged.
  */
-function priceRequest(space, { date, pkg, people, lunch }) {
+function priceRequest(space, { date, pkg, people, lunch, memberRate }) {
   const isPod = /pod/.test(norm(space.type));
   const heads = Math.max(1, Math.min(50, Number(people) || 1));
   const lines = [];
@@ -138,13 +146,28 @@ function priceRequest(space, { date, pkg, people, lunch }) {
     if (!price) return { error: 'no-price' };
     start = p.start;
     end = p.end;
-    hire = p.span === 'full' ? price.full : price.half;
-    const quiet = QUIET_DAYS.includes(weekdayOf(date));
-    lines.push({ label: `${space.name} · ${p.label}`, amount: hire });
-    if (quiet) {
-      const off = round2(hire * QUIET_DISCOUNT);
-      hire = round2(hire - off);
-      lines.push({ label: 'Quiet-day discount (20%)', amount: -off });
+    if (memberRate && memberRate.hours > 0) {
+      // Member beyond their included hours: pay per hour at their tier rate, not a package —
+      // but never more than the equivalent day rate, so a long booking can't cost more than a guest's.
+      const rate = round2(roomHourlyRate(price) * (1 - memberRate.discount));
+      const perHour = round2(memberRate.hours * rate);
+      const packageEquiv = p.span === 'full' ? price.full : price.half;
+      if (perHour <= packageEquiv) {
+        hire = perHour;
+        lines.push({ label: `${space.name} · ${memberRate.hours}h × £${rate.toFixed(2)} · ${memberRate.tierLabel} member rate`, amount: hire });
+      } else {
+        hire = packageEquiv;
+        lines.push({ label: `${space.name} · ${p.label} · ${memberRate.tierLabel} member rate`, amount: hire });
+      }
+    } else {
+      hire = p.span === 'full' ? price.full : price.half;
+      const quiet = QUIET_DAYS.includes(weekdayOf(date));
+      lines.push({ label: `${space.name} · ${p.label}`, amount: hire });
+      if (quiet) {
+        const off = round2(hire * QUIET_DISCOUNT);
+        hire = round2(hire - off);
+        lines.push({ label: 'Quiet-day discount (20%)', amount: -off });
+      }
     }
     if (lunch) {
       const lunchTotal = round2(heads * LUNCH_PER_HEAD);
@@ -229,7 +252,27 @@ export default async function handler(req) {
   const space = await getSpace(spaceId);
   if (!space || !space.bookable) return json({ error: 'no-space' }, 404);
 
-  const priced = priceRequest(space, { date, pkg, people, lunch });
+  // Tiered member pricing. A Visitor/Resident/Citizen booking meeting-room time beyond their
+  // included hours (the client only routes them to the paid path once their free hours are used)
+  // pays PER HOUR at their tier rate. Resolve the member once here and reuse for the intent
+  // metadata below. Guests, no-plan accounts, other plans, and pods carry no memberRate and price
+  // exactly as before. verifyMember is best-effort — a missing/invalid token just means "guest".
+  const payer = action === 'quote' || action === 'intent' ? await verifyMember(tokenFromRequest(req, body)) : { ok: false };
+  let memberRate = null;
+  if (payer.ok && memberRoomDiscount(payer.member) > 0 && !/pod/.test(norm(space.type)) && ROOM_PRICE[norm(space.name)]) {
+    const rs = String(body.start || '');
+    const re = String(body.end || '');
+    if (/^\d{2}:\d{2}$/.test(rs) && /^\d{2}:\d{2}$/.test(re) && hhmmToMin(re) > hhmmToMin(rs)) {
+      const slug = planSlugForMember(payer.member);
+      memberRate = {
+        hours: round2((hhmmToMin(re) - hhmmToMin(rs)) / 60),
+        discount: memberRoomDiscount(payer.member),
+        tierLabel: slug ? slug[0].toUpperCase() + slug.slice(1) : 'Member',
+      };
+    }
+  }
+
+  const priced = priceRequest(space, { date, pkg, people, lunch, memberRate });
   if (priced.error) return json({ error: priced.error }, 400);
 
   // Meeting-room RECORD window: honour the caller's explicit start/end (the real
@@ -324,10 +367,10 @@ export default async function handler(req) {
       return json({ ok: true, comped: true });
     }
 
-    // Best-effort member resolution: attach the payer's member id/email to the PI metadata so
+    // The payer resolved above (best-effort): attach their member id/email to the PI metadata so
     // the webhook awards the spend give-back and links the booking to them. NEVER hard-fails —
     // a guest (no/invalid token) simply carries no member metadata and pays exactly as before.
-    const vm = await verifyMember(tokenFromRequest(req, body));
+    const vm = payer;
     const memberMeta = vm.ok ? { 'metadata[memberId]': vm.member.id, 'metadata[memberEmail]': memberEmail(vm.member) || '' } : {};
 
     const pi = await stripe('/v1/payment_intents', 'POST', {

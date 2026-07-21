@@ -18,6 +18,17 @@ export interface Update {
 
 export const UPDATES: Update[] = [
   {
+    id: '2026-07-22-rooms-admin-tiered',
+    date: '2026-07-22',
+    title: 'Pay-as-you-go room top-ups + a tidier admin',
+    items: [
+      'Members who’ve used their included meeting-room hours can now book extra time, charged per hour at their plan’s member rate — Visitor 25%, Resident 33%, Citizen 50% off the standard rate (never more than the day rate).',
+      'Rooms & bookings has a new “By room” view: every meeting room and pod as its own lane across the week, with a By-room / By-day toggle.',
+      'The member profile is grouped under three tabs — Membership & days, Rewards & points, Details & access — instead of one long scroll.',
+      'The lobby entrance screen’s transport board is paused for a redesign, so it’s off the display for now.',
+    ],
+  },
+  {
     id: '2026-07-21-entrance-transport',
     date: '2026-07-21',
     title: 'Entrance screen: the week at a glance, weather & live transport',

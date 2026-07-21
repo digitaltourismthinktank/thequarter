@@ -60,6 +60,28 @@ export function planSlugForMember(member) {
   return PLAN_ID_TO_SLUG[planIdOf(active)] ?? null;
 }
 
+/**
+ * Member discount on PAID meeting-room hire, once a member's included monthly hours are used.
+ * A membership perk: the more you commit, the cheaper extra room time is. Applied to the room
+ * HIRE only (never lunch), in the paid booking path, and never to guests or no-plan accounts.
+ * Pods are already free for members, so this never touches them.
+ *
+ * COMMERCIAL SETTING — change here and nowhere else. Mirrored in lib/plans.ts (MEMBER_ROOM_DISCOUNT)
+ * for the client estimate + the public plan pages; keep the two in step by hand.
+ */
+export const MEMBER_ROOM_DISCOUNT = {
+  visitor: 0.25,
+  resident: 0.33,
+  citizen: 0.5,
+};
+
+/** The member's meeting-room discount fraction (0 when none / no plan / unknown plan). */
+export function memberRoomDiscount(member) {
+  if (!hasPlan(member)) return 0;
+  const slug = planSlugForMember(member);
+  return MEMBER_ROOM_DISCOUNT[slug] || 0;
+}
+
 /** Anyone on a plan we don't recognise gets the old default rather than zero — failing
  *  closed here would lock out a member because of a naming mismatch, which is worse. */
 const FALLBACK_ROOM_HOURS = 4;

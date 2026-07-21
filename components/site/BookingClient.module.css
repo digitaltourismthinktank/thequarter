@@ -435,3 +435,18 @@
   color: var(--text-muted);
   max-width: 60ch;
 }
+.roomNote {
+  margin: -4px 0 16px;
+  padding: 12px 14px;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--text-body, #4a4038);
+  background: var(--surface-sunken, #f6f1e7);
+  border-radius: var(--radius-md, 10px);
+  max-width: 64ch;
+}
+.roomNote a {
+  color: var(--gold-700, #b0862f);
+  font-weight: var(--fw-semibold);
+  text-decoration: underline;
+}
