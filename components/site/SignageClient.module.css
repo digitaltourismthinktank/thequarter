@@ -1,5 +1,5 @@
-/* Printable signage. On screen: a padded grey desk with each A4 sheet shown as a white page.
-   In print: each .sheet is exactly A4, one per page, and all the on-screen controls vanish. */
+/* Printable signage. On screen: a padded warm desk with each A4 sheet shown as a white page.
+   In print: each .sheet is exactly A4, one per page, and every on-screen control vanishes. */
 
 .wrap {
   min-height: 100dvh;
@@ -64,71 +64,99 @@
   background: var(--pure-white, #fff);
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
   display: flex;
-  align-items: stretch;
-  justify-content: center;
   overflow: hidden;
 }
 
-/* Poster content — a calm, centred layout with a strong gold rule at the foot. */
+/* Poster: a full-height column — brand header, the message in the middle, the QR in a quiet
+   strip at the foot. The gold hairline frame ties it to the site without shouting. */
 .poster {
   flex: 1;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  text-align: center;
-  justify-content: center;
-  gap: 22px;
-  padding: 28mm 22mm;
-  border: 6px solid var(--gold-600, #b8933f);
-  margin: 10mm;
+  margin: 12mm;
+  border: 2px solid var(--gold-600, #b8933f);
+  border-radius: 3mm;
+  padding: 16mm 15mm;
+  gap: 10mm;
 }
-.card {
-  gap: 16px;
-  padding: 16mm;
-  margin: 30mm 24mm;
-  border-width: 4px;
-}
+.card { margin: 26mm 20mm; padding: 14mm; gap: 7mm; }
 
-.logo { width: 58mm; height: auto; margin-bottom: 4px; }
-.card .logo { width: 44mm; }
-
+.head { display: flex; flex-direction: column; align-items: flex-start; gap: 5mm; }
+.logo { width: 52mm; height: auto; }
+.card .logo { width: 42mm; }
 .eyebrow {
   text-transform: uppercase;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.18em;
   font-weight: var(--fw-bold);
   color: var(--gold-700);
-  font-size: 12pt;
+  font-size: 11pt;
 }
+
+.mid { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 7mm; }
+.card .mid { gap: 4mm; text-align: center; align-items: center; }
+
 .title {
-  font-size: 34pt;
-  line-height: 1.08;
+  font-size: 32pt;
+  line-height: 1.05;
   font-weight: var(--fw-bold);
   text-wrap: balance;
   margin: 0;
+  max-width: 165mm;
 }
 .card .title { font-size: 24pt; }
-.body {
+.lead {
   font-size: 15pt;
   line-height: 1.4;
   color: var(--ink-700, #4a4038);
-  max-width: 150mm;
   margin: 0;
+  max-width: 155mm;
 }
-.card .body { font-size: 11pt; }
+.card .lead { font-size: 11pt; }
 
-.qrBox { display: flex; flex-direction: column; align-items: center; gap: 10px; margin: 6px 0; }
-.scan { font-size: 11pt; color: var(--text-muted, #8a7f72); font-weight: var(--fw-semibold); }
-
-.foot {
-  font-size: 12pt;
-  color: var(--ink-900);
+/* Benefit list — the reason to act, led with a gold tick. */
+.benefits { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4mm; }
+.benefits li {
+  display: flex;
+  align-items: flex-start;
+  gap: 3.5mm;
+  font-size: 14pt;
+  line-height: 1.3;
   font-weight: var(--fw-semibold);
-  border-top: 2px solid var(--sand-200, #e7ddca);
-  padding-top: 14px;
-  margin: 0;
-  max-width: 150mm;
 }
-.card .foot { font-size: 9.5pt; border: none; padding-top: 4px; }
+.tick {
+  flex: none;
+  width: 8mm; height: 8mm;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  background: var(--gold-100, #f4ecd8);
+  margin-top: 0.5mm;
+}
+
+/* The "install the app" nudge — a soft filled block so it reads as a helpful aside. */
+.note {
+  display: flex;
+  flex-direction: column;
+  gap: 2mm;
+  padding: 6mm 7mm;
+  background: var(--sand-100, #f0e9db);
+  border-radius: 2.5mm;
+  border-left: 3px solid var(--gold-600, #b8933f);
+}
+.note strong { font-size: 12.5pt; }
+.note span { font-size: 11pt; line-height: 1.35; color: var(--ink-700, #4a4038); }
+
+/* Scan strip — QR + a short label, side by side at the foot. A way in, not the headline. */
+.scanStrip {
+  display: flex;
+  align-items: center;
+  gap: 8mm;
+  padding-top: 8mm;
+  border-top: 1.5px solid var(--sand-200, #e7ddca);
+}
+.card .scanStrip { flex-direction: column; text-align: center; border-top: none; padding-top: 2mm; gap: 4mm; }
+.scanText { display: flex; flex-direction: column; gap: 2mm; }
+.scanText strong { font-size: 15pt; font-weight: var(--fw-bold); }
+.scanText span { font-size: 11pt; color: var(--text-muted, #8a7f72); }
 
 /* ---------------------------------------------------------------- print ---- */
 @page { size: A4; margin: 0; }
@@ -146,6 +174,5 @@
     page-break-after: always;
     break-after: page;
   }
-  /* Force the browser to keep the gold border + backgrounds when printing. */
-  .poster, .card { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .poster, .card, .note, .tick { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }

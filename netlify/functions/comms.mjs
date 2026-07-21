@@ -66,7 +66,9 @@ const memberPlanName = (m) => {
   const ids = (m?.planConnections || []).map(planIdOf).filter(Boolean);
   const paused = ids.includes(PAUSED_PLAN_ID);
   const named = ids.map((id) => PLAN_NAMES[id]).filter(Boolean);
-  return { hasPlan: ids.length > 0, paused, name: paused ? 'Paused' : named[0] || (ids.length ? 'Member' : null) };
+  // NB: keyed 'planName', NOT 'name' — shape() spreads this, and calling it 'name' clobbered
+  // the person's own name, so every To-Do row showed the plan ("Resident") instead of who it is.
+  return { hasPlan: ids.length > 0, paused, planName: paused ? 'Paused' : named[0] || (ids.length ? 'Member' : null) };
 };
 
 const shape = (m) => ({
@@ -220,7 +222,7 @@ export default async function handler(req) {
 
     const needWelcome = members
       .filter((m) => m.hasPlan && !m.paused && !m.sent?.welcome)
-      .map((m) => ({ kind: 'welcome', id: m.id, email: m.email, name: m.name, plan: m.name }));
+      .map((m) => ({ kind: 'welcome', id: m.id, email: m.email, name: m.name, plan: m.planName }));
 
     const needRewards = members
       .filter((m) => m.hasPlan && !m.paused && m.sent?.welcome && !m.sent?.['rewards-intro'])
