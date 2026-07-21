@@ -90,7 +90,9 @@ export function CheckInCard({ className }: { className?: string }) {
 
   async function doCancel(id: string) {
     setBusy(true);
-    await cancelReservation(id);
+    const r = await cancelReservation(id);
+    // Never call it a "refund" — cancelling returns the day (or pass) to their balance.
+    if (r.ok) setNote(r.data?.refunded ? 'Cancelled — that day’s been credited back to your balance.' : 'Cancelled.');
     await refresh();
     setBusy(false);
   }

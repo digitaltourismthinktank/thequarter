@@ -76,7 +76,7 @@ export const TEMPLATES = {
       p(
         'We are a small, independent space and we grow almost entirely by word of mouth, so a review genuinely makes a difference to us. If you enjoyed your day, would you take a moment to say so?',
       ) +
-      button(c.reviewUrl || 'https://share.google/3VD689O42JMQVZUg8', 'Leave a Google review') +
+      button(c.reviewUrl || 'https://www.google.com/maps?cid=14888036256644861689', 'Leave a Google review') +
       h('While you are here') +
       p(REWARDS_LINE) +
       p(

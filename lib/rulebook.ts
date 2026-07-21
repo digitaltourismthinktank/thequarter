@@ -95,7 +95,7 @@ export const RULE_SECTIONS: RuleSection[] = [
         trigger: 'Member cancels their own reservation',
         source: 'checkin.mjs · action:"cancel"',
         records: 'Status → Cancelled',
-        notes: 'Only Planned and Requested days can be cancelled.',
+        notes: 'Only Planned and Requested days can be cancelled. If the day had already been spent (a same-day cancel), it is credited straight back to their balance — never described as a refund.',
       },
       {
         trigger: 'Member spends a carnet pass directly',

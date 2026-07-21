@@ -2060,7 +2060,7 @@ function AdminTodayPane({ onAllBirthdays }: { onAllBirthdays: () => void }) {
 
   async function undoCheckin(c: AdminCheckin) {
     if (!c.id) return;
-    if (!window.confirm(`Undo check-in for ${c.name}? Any day it cost is refunded.`)) return;
+    if (!window.confirm(`Undo check-in for ${c.name}? Any day it cost is credited back to their balance.`)) return;
     await adminRemoveCheckin(c.id);
     await loadToday();
   }
