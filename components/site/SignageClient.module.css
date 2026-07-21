@@ -33,6 +33,27 @@
   font-weight: var(--fw-bold);
   cursor: pointer;
 }
+.sizeToggle {
+  flex: none;
+  display: inline-flex;
+  border: 1px solid var(--sand-200, #e7ddca);
+  border-radius: var(--radius-full, 999px);
+  overflow: hidden;
+}
+.sizeBtn {
+  border: none;
+  background: none;
+  padding: 10px 18px;
+  font: inherit;
+  font-weight: var(--fw-bold);
+  cursor: pointer;
+  color: var(--ink-700, #4a4038);
+}
+.sizeOn { background: var(--ink-900, #211c15); color: var(--pure-white, #fff); }
+
+/* A6: the same poster at half scale, centred on the A4 sheet — print on A4 paper, cut it out.
+   Everything (type, QR, frame) scales uniformly, so an A6 is a true miniature of the A4. */
+.wrap[data-size='A6'] .poster { transform: scale(0.5); transform-origin: center; }
 
 .sheets { display: flex; flex-direction: column; align-items: center; gap: 32px; }
 .sheetHolder { width: 210mm; max-width: 100%; }

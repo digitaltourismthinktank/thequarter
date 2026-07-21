@@ -96,6 +96,7 @@ const POSTERS: Poster[] = [
 
 export function SignageClient() {
   const [only, setOnly] = useState<string | null>(null);
+  const [size, setSize] = useState<'A4' | 'A6'>('A4');
 
   useEffect(() => {
     const after = () => setOnly(null);
@@ -113,11 +114,17 @@ export function SignageClient() {
   }
 
   return (
-    <div className={styles.wrap}>
+    <div className={styles.wrap} data-size={size}>
       <div className={styles.controls}>
         <div>
           <strong className={styles.controlsTitle}>Signage</strong>
-          <span className={styles.controlsHint}>Print on the office printer — A4, one per page. QR codes go to the live site.</span>
+          <span className={styles.controlsHint}>
+            Print on the office printer, one per page. QR codes go to the live site. {size === 'A6' ? 'A6 prints small and centred on an A4 sheet — cut it out.' : 'Full A4.'}
+          </span>
+        </div>
+        <div className={styles.sizeToggle}>
+          <button type="button" className={`${styles.sizeBtn} ${size === 'A4' ? styles.sizeOn : ''}`} onClick={() => setSize('A4')}>A4</button>
+          <button type="button" className={`${styles.sizeBtn} ${size === 'A6' ? styles.sizeOn : ''}`} onClick={() => setSize('A6')}>A6</button>
         </div>
         <button type="button" className={styles.printAll} onClick={printAll}>Print all</button>
       </div>

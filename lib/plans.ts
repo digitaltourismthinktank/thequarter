@@ -94,6 +94,7 @@ export const PLANS: Plan[] = [
     features: [
       'Unlimited days — work here every day',
       '8 hours of meeting room a month — for you and your clients',
+      'From £12.90 a working day',
       'Everything in Resident, included',
       'Priority room booking',
       '24/7 access',
