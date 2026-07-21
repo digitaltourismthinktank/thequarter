@@ -405,6 +405,10 @@ select.input {
 }
 .schedInner {
   min-width: 640px;
+  /* The 18:00 tick label is centred on left:100%, so its right half spilled a few px past
+     the edge — enough to trigger a stray horizontal scrollbar. A pad the width of that
+     overhang absorbs it; border-box is global, so nothing below shifts. */
+  padding-right: 14px;
 }
 .schedScaleRow {
   position: relative;
@@ -1211,8 +1215,37 @@ select.input {
 }
 .todayGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  /* Who's-in takes half, the next two cards a quarter each — who's-in usually has the most
+     to show and guests the least. Collapses to a single column when there isn't room. */
+  grid-template-columns: 2fr 1fr 1fr;
   gap: 14px;
+  align-items: start;
+}
+@media (max-width: 860px) {
+  .todayGrid {
+    grid-template-columns: 1fr;
+  }
+}
+/* The wide who's-in + guests panel. */
+.todayCardWide {
+  grid-column: 1;
+}
+.guestsSection {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-subtle);
+}
+.guestsHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.guestsCount {
+  font-size: var(--text-md);
+  font-weight: var(--fw-bold);
+  color: var(--ink-900);
 }
 .todayCard {
   display: flex;

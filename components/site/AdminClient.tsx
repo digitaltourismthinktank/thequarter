@@ -2139,8 +2139,11 @@ function AdminTodayPane({ onAllBirthdays }: { onAllBirthdays: () => void }) {
         <div className={styles.seg}>
           <button
             type="button"
-            className={`${styles.segBtn} ${!custom && offset === 0 ? styles.segOn : ''}`}
+            className={`${styles.segBtn} ${view === 'day' && !custom && offset === 0 ? styles.segOn : ''}`}
             onClick={() => {
+              // Must switch the view back too — in week mode this button did nothing, because
+              // offset was already 0, so the highlight was stuck on Today with no way back.
+              setView('day');
               setCustom('');
               setOffset(0);
             }}
@@ -2149,8 +2152,9 @@ function AdminTodayPane({ onAllBirthdays }: { onAllBirthdays: () => void }) {
           </button>
           <button
             type="button"
-            className={`${styles.segBtn} ${!custom && offset === 1 ? styles.segOn : ''}`}
+            className={`${styles.segBtn} ${view === 'day' && !custom && offset === 1 ? styles.segOn : ''}`}
             onClick={() => {
+              setView('day');
               setCustom('');
               setOffset(1);
             }}
@@ -2181,7 +2185,10 @@ function AdminTodayPane({ onAllBirthdays }: { onAllBirthdays: () => void }) {
         <p className={styles.state}>Loading…</p>
       ) : view === 'day' ? (
         <div className={styles.todayGrid}>
-          <div className={styles.todayCard}>
+          {/* Who's in usually holds a lot of people and guests are rare — so who's-in gets a
+              half-width panel to breathe, with guests as a quieter section beneath a divider
+              rather than an equal-sized card of its own. */}
+          <div className={`${styles.todayCard} ${styles.todayCardWide}`}>
             <span className={styles.todayCardLabel}>Who&rsquo;s in</span>
             <strong className={styles.todayBig}>{checkins.length}</strong>
             <span className={styles.todayCardSub}>
@@ -2231,31 +2238,35 @@ function AdminTodayPane({ onAllBirthdays }: { onAllBirthdays: () => void }) {
                 ))}
               </div>
             ) : null}
-          </div>
-          {isLiveToday ? (
-            <div className={styles.todayCard}>
-              <span className={styles.todayCardLabel}>Guests today</span>
-              <strong className={styles.todayBig}>{roll.guests.length}</strong>
-              {roll.guests.length ? (
-                <div className={styles.bdayList}>
-                  {roll.guests.map((g) => (
-                    <div key={g.id} className={styles.bdayItem}>
-                      <Icon name="user" size={15} color="var(--gold-700)" />
-                      <span>
-                        {g.name}
-                        {g.host ? ` → ${g.host}` : ''}
-                      </span>
-                      <button type="button" className={styles.smallBtn} style={{ marginLeft: 'auto' }} onClick={() => signOut(g.id)}>
-                        Sign out
-                      </button>
-                    </div>
-                  ))}
+
+            {/* Guests, folded into the who's-in panel beneath a divider. */}
+            {isLiveToday ? (
+              <div className={styles.guestsSection}>
+                <div className={styles.guestsHead}>
+                  <span className={styles.todayCardLabel}>Guests today</span>
+                  <span className={styles.guestsCount}>{roll.guests.length}</span>
                 </div>
-              ) : (
-                <span className={styles.todayCardSub}>No guests signed in.</span>
-              )}
-            </div>
-          ) : null}
+                {roll.guests.length ? (
+                  <div className={styles.bdayList}>
+                    {roll.guests.map((g) => (
+                      <div key={g.id} className={styles.bdayItem}>
+                        <Icon name="user" size={15} color="var(--gold-700)" />
+                        <span>
+                          {g.name}
+                          {g.host ? ` → ${g.host}` : ''}
+                        </span>
+                        <button type="button" className={styles.smallBtn} style={{ marginLeft: 'auto' }} onClick={() => signOut(g.id)}>
+                          Sign out
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <span className={styles.todayCardSub}>No guests signed in.</span>
+                )}
+              </div>
+            ) : null}
+          </div>
           <NextEventCard />
           <div className={styles.todayCard}>
             <span className={styles.todayCardLabel}>Birthdays in the next 30 days</span>

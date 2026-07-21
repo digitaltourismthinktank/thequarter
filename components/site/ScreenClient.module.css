@@ -208,9 +208,9 @@
 }
 .eventFeature {
   display: flex;
-  align-items: center;
-  gap: 18px;
-  padding: 20px 22px;
+  align-items: flex-start;
+  gap: 28px;
+  padding: 22px 26px;
   background: var(--surface-card);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
@@ -674,8 +674,8 @@
 /* The event icon sat tight against the title and description at TV scale — give the tile
    real breathing room and let the text block keep its own rhythm. */
 .eventFeature {
-  gap: clamp(20px, 2.2vw, 40px);
-  padding: clamp(20px, 1.8vw, 30px) clamp(22px, 2vw, 34px);
+  gap: clamp(32px, 3vw, 56px);
+  padding: clamp(24px, 1.8vw, 34px) clamp(28px, 2.2vw, 40px);
 }
 .evBody {
   gap: 6px;
