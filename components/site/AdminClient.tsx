@@ -6,6 +6,8 @@ import { useMember } from './useMember';
 import { WeekStrip } from './WeekStrip';
 import { DatePickerModal } from './DatePickerModal';
 import { CompanyInput } from './CompanyInput';
+import { WhatsNew } from './WhatsNew';
+import { LATEST_UPDATE_ID } from '@/lib/updates';
 import { Checkbox } from '@/components/ds/Checkbox';
 import { Icon, type IconName } from '@/components/ds/Icon';
 import { Qr } from '@/components/ds/Qr';
@@ -218,6 +220,24 @@ export function AdminClient() {
     return () => clearTimeout(t);
   }, [loading, member]);
 
+  // "What's new" — open once per admin after a new update lands, remembered by the newest id.
+  const [whatsNewOpen, setWhatsNewOpen] = useState(false);
+  useEffect(() => {
+    try {
+      if (localStorage.getItem('q-updates-seen-v1') !== LATEST_UPDATE_ID) setWhatsNewOpen(true);
+    } catch {
+      /* private mode — skip */
+    }
+  }, []);
+  function closeWhatsNew() {
+    setWhatsNewOpen(false);
+    try {
+      localStorage.setItem('q-updates-seen-v1', LATEST_UPDATE_ID);
+    } catch {
+      /* ignore */
+    }
+  }
+
   if (loading) return <p className={styles.state}>Loading…</p>;
   if (!member) return <p className={styles.state}>Please sign in…</p>;
   if (!isAdminEmail(member.auth?.email)) {
@@ -230,6 +250,7 @@ export function AdminClient() {
 
   return (
     <div>
+      <WhatsNew open={whatsNewOpen} onClose={closeWhatsNew} />
       <div className={styles.head}>
         <div>
           <h1 className={styles.title}>Admin</h1>
@@ -282,7 +303,7 @@ export function AdminClient() {
       ) : tab === 'partners' ? (
         <PartnersPane />
       ) : tab === 'screens' ? (
-        <ScreensPane />
+        <ScreensPane onWhatsNew={() => setWhatsNewOpen(true)} />
       ) : (
         <BirthdaysPane />
       )}
@@ -2298,7 +2319,7 @@ function AdminTodayPane({ onAllBirthdays }: { onAllBirthdays: () => void }) {
 }
 
 // ------------------------------------------------------- Screens, links & resources
-function ScreensPane() {
+function ScreensPane({ onWhatsNew }: { onWhatsNew: () => void }) {
   const [spaces, setSpaces] = useState<AdminSpace[]>([]);
   const [copied, setCopied] = useState(false);
 
@@ -2381,6 +2402,9 @@ function ScreensPane() {
       <div className={styles.panel}>
         <span className={styles.panelTitle}>Print &amp; reference</span>
         <div className={styles.shortcuts}>
+          <button type="button" className={styles.shortcut} onClick={onWhatsNew}>
+            <Icon name="badge-check" size={16} color="var(--gold-700)" /> What’s new (recent updates)
+          </button>
           <a className={styles.shortcut} href="/signage" target="_blank" rel="noreferrer">
             <Icon name="book-open" size={16} color="var(--gold-700)" /> Printable signage set (A4 posters)
           </a>
