@@ -297,6 +297,8 @@ export interface AdminMember {
   allowanceOverride: string | null;
   /** Effective monthly day allowance (override-aware); null = unlimited. */
   allowance: number | null;
+  /** Effective monthly meeting-room hours (override or plan default). Editable on the list. */
+  roomHoursCap: number;
   /** Admin-managed (non-Stripe): the renewal cron owns renewals, not the Stripe webhook. */
   manualBilling: boolean;
   /** Holds no managed plan tag (needs a plan assigned). */
@@ -574,6 +576,9 @@ export const adminUpdateMember = (
   memberId: string,
   fields: { firstName?: string; lastName?: string; company?: string; phone?: string; meetingRoomHoursCap?: number | null },
 ) => call<{ ok: boolean }>('admin', { method: 'POST', body: { action: 'updateMember', memberId, ...fields } });
+/** Clear every per-member meeting-room-hours override, so all members revert to their plan's standard allocation. */
+export const adminResetRoomHours = () =>
+  call<{ ok: boolean; cleared: number }>('admin', { method: 'POST', body: { action: 'resetRoomHours' } });
 export const adminAssignPlan = (memberId: string, planId: string) =>
   call<{ ok: boolean }>('admin', { method: 'POST', body: { action: 'assignPlan', memberId, planId } });
 // Manually-managed (non-Stripe) membership: apply any subset of plan / renewal date /

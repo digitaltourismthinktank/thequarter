@@ -68,6 +68,7 @@ import {
   adminUpdateMembership,
   adminRenewNow,
   adminUpdateMember,
+  adminResetRoomHours,
   type AdminMember,
   type AdminBooking,
   type AdminSpace,
@@ -298,6 +299,7 @@ function MembersPane() {
   const [msg, setMsg] = useState<string | null>(null);
   const [checkedInIds, setCheckedInIds] = useState<Set<string>>(new Set());
   const [q, setQ] = useState('');
+  const [hoursEdits, setHoursEdits] = useState<Record<string, string>>({});
   const [planFilter, setPlanFilter] = useState('All');
   const [dismissed, setDismissed] = useState<Set<string>>(() => {
     if (typeof window === 'undefined') return new Set();
@@ -352,6 +354,25 @@ function MembersPane() {
     await refresh();
     setBusyId(null);
   }
+  async function saveHours(m: AdminMember) {
+    // Blank clears the override (revert to the plan's standard); a number — INCLUDING 0 — sets it.
+    const raw = hoursEdits[m.id] ?? String(m.roomHoursCap);
+    setBusyId(m.id);
+    setMsg(null);
+    const r = await adminUpdateMember(m.id, { meetingRoomHoursCap: raw.trim() === '' ? null : Number(raw) });
+    if (!r.ok) setMsg(r.data?.error || 'Save failed');
+    await refresh();
+    setBusyId(null);
+  }
+  async function resetAllHours() {
+    if (!window.confirm('Reset every member to their plan’s standard meeting-room hours? This clears all per-member overrides.')) return;
+    setBusyId('reset-hours');
+    setMsg(null);
+    const r = await adminResetRoomHours();
+    setMsg(r.ok ? `Reset ${r.data.cleared} override${r.data.cleared === 1 ? '' : 's'} to standard.` : 'Reset failed');
+    await refresh();
+    setBusyId(null);
+  }
   async function checkIn(m: AdminMember, length: 'Full' | 'Half') {
     setBusyId(m.id);
     setMsg(null);
@@ -402,17 +423,6 @@ function MembersPane() {
 
   return (
     <div>
-      <div className={styles.mFilters}>
-        <input className={styles.mSearch} placeholder="Search name, email or company" value={q} onChange={(e) => setQ(e.target.value)} />
-        <div className={styles.mChips}>
-          {FILTERS.map((f) => (
-            <button key={f} type="button" className={`${styles.mChip} ${planFilter === f ? styles.mChipOn : ''}`} onClick={() => setPlanFilter(f)}>
-              {f}
-            </button>
-          ))}
-        </div>
-      </div>
-
       {attention.length > 0 ? (
         <div style={{ border: '1px solid var(--gold-300)', background: 'var(--gold-100)', borderRadius: 'var(--radius-lg)', padding: '14px 16px', marginBottom: 16 }}>
           <div style={{ fontSize: 'var(--text-xs)', fontWeight: 700, letterSpacing: 'var(--tracking-caps)', textTransform: 'uppercase', color: 'var(--gold-700)', marginBottom: 10 }}>
@@ -449,9 +459,25 @@ function MembersPane() {
         </div>
       ) : null}
 
-      <p className={styles.count}>
-        {filtered.length} {planFilter === 'All' ? 'members' : planFilter}
-      </p>
+      <div className={styles.mFilters}>
+        <input className={styles.mSearch} placeholder="Search name, email or company" value={q} onChange={(e) => setQ(e.target.value)} />
+        <div className={styles.mChips}>
+          {FILTERS.map((f) => (
+            <button key={f} type="button" className={`${styles.mChip} ${planFilter === f ? styles.mChipOn : ''}`} onClick={() => setPlanFilter(f)}>
+              {f}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+        <p className={styles.count} style={{ margin: 0 }}>
+          {filtered.length} {planFilter === 'All' ? 'members' : planFilter}
+        </p>
+        <button type="button" className={styles.smallBtn} onClick={resetAllHours} disabled={busyId === 'reset-hours'} title="Clear all per-member room-hour overrides so everyone reverts to their plan's standard">
+          {busyId === 'reset-hours' ? 'Resetting…' : 'Reset room hours to standard'}
+        </button>
+      </div>
       <div className={styles.tableWrap}>
         <table className={styles.table}>
           <thead>
@@ -460,6 +486,7 @@ function MembersPane() {
               <th>Plan</th>
               <th>Days</th>
               <th>Passes</th>
+              <th>Room hrs</th>
               <th>Points</th>
               <th>Renewal</th>
               <th aria-label="actions" />
@@ -503,6 +530,18 @@ function MembersPane() {
                     aria-label={`Day passes for ${m.name || m.email}`}
                   />
                   <button type="button" className={styles.smallBtn} onClick={() => savePasses(m)} disabled={busyId === m.id}>
+                    Save
+                  </button>
+                </td>
+                <td>
+                  <input
+                    className={styles.dayInput}
+                    value={hoursEdits[m.id] ?? String(m.roomHoursCap)}
+                    onChange={(e) => setHoursEdits({ ...hoursEdits, [m.id]: e.target.value })}
+                    aria-label={`Monthly meeting-room hours for ${m.name || m.email}`}
+                    title="Monthly free meeting-room hours. Blank = plan standard; 0 = none."
+                  />
+                  <button type="button" className={styles.smallBtn} onClick={() => saveHours(m)} disabled={busyId === m.id}>
                     Save
                   </button>
                 </td>

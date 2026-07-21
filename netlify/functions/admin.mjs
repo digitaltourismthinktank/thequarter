@@ -18,6 +18,7 @@ import { PLAN_NAMES, allowanceForMember, setMemberPlan, clearMemberPlan, renewMe
 import { listRewards, listPerks, listFloats, floatStatus, awardPoints, redeemReward, partnerPayouts, markPartnerPaid, partnerStatement } from './_rewards.mjs';
 import { sendEmail, emailShell, escapeHtml, OPS_EMAIL, fmtDateLong } from './_email.mjs';
 import { pushToEmail } from './_push.mjs';
+import { roomHoursCap } from './_entitlement.mjs';
 import { parsePrivatisationSlots, isPrivatisedOn, isRecurringBlockRule, recurringBlockOccurrences, parseSkipDates } from './_privatisation.mjs';
 
 const PERK_TYPES = ['Discount', 'On the house', 'Upgrade', 'Extra', 'Bundle', 'Priority', 'Welcome gift', 'Experience'];
@@ -125,6 +126,7 @@ async function listAllMembers() {
         renewal: cf['renewal-date'] ?? null,
         allowanceOverride: cf['allowance-override'] || null,
         allowance: allowanceForMember(m), // effective allowance (override-aware); null = unlimited
+        roomHoursCap: roomHoursCap(m), // effective monthly meeting-room hours (override or plan default)
         doorCode: cf['door-code'] ?? null,
         paused: planId === PAUSED,
         manualBilling: !!md.manualBilling, // admin-managed (renewal cron owns them, not Stripe)
@@ -677,16 +679,50 @@ export default async function handler(req) {
         const p = body.phone.trim();
         md.phone = p || null;
       }
-      // Per-member override for free meeting-room hours/month (blank/0 → default 4).
+      // Per-member override for free meeting-room hours/month. Distinguish CLEARING the override
+      // (null / '' → revert to the plan default) from a real value of ZERO — 0 is a valid cap
+      // (no free hours). Previously 0 was treated as "clear" and silently reverted to 4, so a
+      // member could never actually be set to zero, and editing to 0 appeared to do nothing.
       if (body.meetingRoomHoursCap !== undefined) {
-        const n = Number(body.meetingRoomHoursCap);
-        md.meetingRoomHoursCap = Number.isFinite(n) && n > 0 ? n : null;
+        const raw = body.meetingRoomHoursCap;
+        if (raw === null || raw === '') {
+          md.meetingRoomHoursCap = null;
+        } else {
+          const n = Number(raw);
+          md.meetingRoomHoursCap = Number.isFinite(n) && n >= 0 ? n : null;
+        }
       }
       data.metaData = md;
     }
     if (!Object.keys(data).length) return json({ error: 'nothing-to-update' }, 400);
     await admin.members.update({ id: body.memberId, data });
     return json({ ok: true });
+  }
+
+  // Clear EVERY per-member meeting-room-hours override, so everyone falls back to their plan's
+  // standard allocation. A one-time reset for introducing the hours rule cleanly. Best-effort
+  // per member; returns how many overrides were actually cleared.
+  if (action === 'resetRoomHours') {
+    const admin = memberstackAdmin.init(MS_SECRET);
+    let after;
+    let cleared = 0;
+    for (let i = 0; i < 20; i += 1) {
+      const res = await admin.members.list({ limit: 100, after });
+      const data = res?.data || [];
+      for (const m of data) {
+        const md = m.metaData || {};
+        if (md.meetingRoomHoursCap === undefined || md.meetingRoomHoursCap === null) continue;
+        try {
+          await admin.members.update({ id: m.id, data: { metaData: { ...md, meetingRoomHoursCap: null } } });
+          cleared += 1;
+        } catch (e) {
+          console.error('[resetRoomHours] failed', m?.id, e);
+        }
+      }
+      if (!res?.hasNextPage || data.length === 0) break;
+      after = res?.endCursor;
+    }
+    return json({ ok: true, cleared });
   }
 
   // Settle a partner's owed redemptions (running balance resets to zero).
