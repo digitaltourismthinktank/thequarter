@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Icon } from '@/components/ds/Icon';
 import {
-  commsIndex, commsPreview, commsTest, commsSend, commsDismiss, commsPush,
+  commsIndex, commsPreview, commsTest, commsSend, commsDismiss, commsDismissAllWelcome, commsPush,
   adminGetEvents, adminCreateEvent, adminDeleteEvent,
   type CommsIndex, type CommsTodoThank, type CommsTodoMember, type QuarterEvent,
 } from '@/lib/booking';
@@ -61,6 +61,9 @@ export function CommsPane() {
   const [pushTitle, setPushTitle] = useState('In the Pantry today');
   const [pushMsg, setPushMsg] = useState('');
 
+  // One-tap To-Do sends go through this confirm first (with an optional "See it" preview).
+  const [confirmSend, setConfirmSend] = useState<{ who: string; what: string; templateId: string; name?: string; visitDate?: string; run: () => Promise<void> } | null>(null);
+
   // Welcome-screen announcements — stored as unpublished Category='Announcement' events, so
   // they never leak onto the public what's-on or the .ics feed (both filter {Published}).
   const [anns, setAnns] = useState<QuarterEvent[]>([]);
@@ -84,7 +87,9 @@ export function CommsPane() {
   const tpl = data?.templates.find((t) => t.id === templateId) || null;
   const needsEvent = tpl?.audience === 'event' || audience === 'event-rsvps' || audience === 'members-not-rsvpd';
 
-  async function thank(v: CommsTodoThank, withReview: boolean) {
+  // The To-Do sends are one-tap and irreversible, so they open a confirm first — with a
+  // "See it" that renders the real email — rather than firing on the first click.
+  async function actuallyThank(v: CommsTodoThank, withReview: boolean) {
     setBusy(v.id);
     const r = await commsSend({
       templateId: withReview ? 'thanks-review' : 'thanks-only',
@@ -98,6 +103,16 @@ export function CommsPane() {
     setNote(sent(r) ? `Thanked ${v.name || v.email}.` : 'That didn’t send — it stays on the list, so nothing is lost.');
     load();
   }
+  function thank(v: CommsTodoThank, withReview: boolean) {
+    setConfirmSend({
+      who: v.name || v.email,
+      what: withReview ? 'Thank-you + review request' : 'Thank-you',
+      templateId: withReview ? 'thanks-review' : 'thanks-only',
+      name: v.name || undefined,
+      visitDate: v.date,
+      run: () => actuallyThank(v, withReview),
+    });
+  }
 
   async function skipVisit(v: CommsTodoThank) {
     setBusy(v.id);
@@ -106,11 +121,36 @@ export function CommsPane() {
     load();
   }
 
-  async function sendOnce(m: CommsTodoMember, id: string) {
+  async function actuallySendOnce(m: CommsTodoMember, id: string) {
     setBusy(m.id);
     const r = await commsSend({ templateId: id, audience: 'explicit', emails: [m.email] });
     setBusy(null);
     setNote(sent(r) ? `Sent to ${m.name || m.email}.` : 'That didn’t send — try again.');
+    load();
+  }
+  function sendOnce(m: CommsTodoMember, id: string) {
+    setConfirmSend({
+      who: m.name || m.email,
+      what: id === 'welcome' ? 'Welcome email' : 'Rewards intro',
+      templateId: id,
+      name: m.name || undefined,
+      run: () => actuallySendOnce(m, id),
+    });
+  }
+
+  /** Preview the pending To-Do email in the existing preview modal. */
+  async function seeConfirm() {
+    if (!confirmSend) return;
+    const r = await commsPreview({ templateId: confirmSend.templateId, name: confirmSend.name, visitDate: confirmSend.visitDate });
+    if (r.ok) setPreview({ subject: r.data.subject, html: r.data.html });
+  }
+
+  /** Stamp the whole welcome back-catalogue as handled, so the To-Do only shows new members. */
+  async function clearWelcomeBacklog() {
+    setBusy('clearWelcome');
+    const r = await commsDismissAllWelcome();
+    setBusy(null);
+    setNote(r.ok ? `Cleared ${r.data.cleared} from the welcome list.` : 'Could not clear those.');
     load();
   }
 
@@ -239,6 +279,19 @@ export function CommsPane() {
             </div>
           </div>
         ))}
+
+        {data.todo.welcome.length > 1 ? (
+          <div className={styles.row}>
+            <div className={styles.rowText}>
+              <span>{data.todo.welcome.length} members have never had a welcome. If most aren’t new, clear the back-catalogue and keep only genuinely new ones from here.</span>
+            </div>
+            <div className={styles.rowActions}>
+              <button type="button" className={styles.ghost} onClick={clearWelcomeBacklog} disabled={busy === 'clearWelcome'}>
+                {busy === 'clearWelcome' ? 'Clearing…' : 'Mark all as welcomed'}
+              </button>
+            </div>
+          </div>
+        ) : null}
 
         {data.todo.rewards.map((m) => (
           <div key={`r-${m.id}`} className={styles.row}>
@@ -417,6 +470,34 @@ export function CommsPane() {
       </div>
 
       {/* --------------------------------------------------------------- modals --- */}
+      {/* Rendered before the preview modal so "See it" stacks its preview on top of this. */}
+      {confirmSend ? (
+        <div className={styles.overlay} onClick={() => setConfirmSend(null)} role="dialog" aria-modal="true">
+          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.confirmBody}>
+              <span className={styles.warnIcon}><Icon name="mail" size={22} color="var(--ink-900)" /></span>
+              <h3 className={styles.confirmTitle}>Send the {confirmSend.what.toLowerCase()} to {confirmSend.who}?</h3>
+              <p className={styles.muted}>It goes out as soon as you confirm. Have a look first if you’d like.</p>
+              <div className={styles.actions}>
+                <button type="button" className={styles.ghost} onClick={seeConfirm}>See it</button>
+                <button type="button" className={styles.ghost} onClick={() => setConfirmSend(null)}>Not yet</button>
+                <button
+                  type="button"
+                  className={styles.primary}
+                  onClick={async () => {
+                    const run = confirmSend.run;
+                    setConfirmSend(null);
+                    await run();
+                  }}
+                >
+                  Send it
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {preview ? (
         <div className={styles.overlay} onClick={() => setPreview(null)} role="dialog" aria-modal="true">
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>

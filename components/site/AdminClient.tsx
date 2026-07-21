@@ -335,7 +335,7 @@ function AccessAudit() {
       {flags && !flags.length ? <p className={styles.muted} style={{ marginTop: 10 }}>Nothing to worry about — everyone with a booking or check-in is entitled to it.</p> : null}
 
       {flags && flags.length ? (
-        <div className={styles.list} style={{ marginTop: 12 }}>
+        <div className={styles.auditList}>
           {scanned ? (
             <p className={styles.muted}>
               {flags.length} to look at, across {scanned.members} members · {scanned.checkins} check-ins · {scanned.bookings} bookings scanned.

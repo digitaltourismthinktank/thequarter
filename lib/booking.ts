@@ -947,7 +947,7 @@ export interface CommsIndex {
 }
 
 export const commsIndex = () => call<CommsIndex>('comms');
-export const commsPreview = (b: { templateId: string; eventId?: string; subject?: string; message?: string; visitDate?: string }) =>
+export const commsPreview = (b: { templateId: string; eventId?: string; subject?: string; message?: string; visitDate?: string; name?: string }) =>
   call<{ ok: boolean; subject: string; html: string }>('comms', { method: 'POST', body: { action: 'preview', ...b } });
 export const commsTest = (b: { templateId: string; eventId?: string; subject?: string; message?: string }) =>
   call<{ ok: boolean; sentTo: string }>('comms', { method: 'POST', body: { action: 'test', ...b } });
@@ -970,6 +970,9 @@ export const commsSend = (b: {
   );
 export const commsDismiss = (b: { visitId?: string; memberId?: string; templateId?: string }) =>
   call<{ ok: boolean }>('comms', { method: 'POST', body: { action: 'dismiss', ...b } });
+/** Clear the whole welcome back-catalogue at once (stamps every un-welcomed member as handled). */
+export const commsDismissAllWelcome = () =>
+  call<{ ok: boolean; cleared: number }>('comms', { method: 'POST', body: { action: 'dismissAllWelcome' } });
 export const commsPush = (b: { title: string; message: string; email?: string }) =>
   call<{ ok: boolean; sent: number; note?: string }>('comms', { method: 'POST', body: { action: 'push', ...b } });
 

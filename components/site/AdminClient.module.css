@@ -356,6 +356,14 @@ select.input {
   border-radius: var(--radius-md);
   background: var(--surface-card);
 }
+/* Access-check results: each row is its own bordered card, so the list is just a spaced
+   column — no outer frame, real gaps between rows (they were touching / squashed). */
+.auditList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
 .bRow {
   display: flex;
   align-items: center;

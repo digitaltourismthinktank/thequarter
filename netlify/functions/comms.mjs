@@ -255,7 +255,9 @@ export default async function handler(req) {
     const t = TEMPLATES[body.templateId];
     if (!t) return json({ error: 'unknown-template' }, 400);
     const ev = body.eventId ? (await upcomingEvents()).find((e) => e.id === body.eventId) : null;
-    const me = { name: memberName(vm.member) || 'there', email: memberEmail(vm.member), visitDate: body.visitDate || today };
+    // Prefer the recipient's name when the caller passes one, so a To-Do preview shows the
+    // real person, not the admin previewing it. Falls back to the admin for a blank test.
+    const me = { name: body.name || memberName(vm.member) || 'there', email: memberEmail(vm.member), visitDate: body.visitDate || today };
     const rendered = renderTemplate(t.id, ctxFor(me, body, ev));
     if (action === 'preview') return json({ ok: true, ...rendered });
     const r = await sendEmail({ to: me.email, subject: `[TEST] ${rendered.subject}`, html: rendered.html, replyTo: OPS_EMAIL });
@@ -338,6 +340,24 @@ export default async function handler(req) {
     }
 
     return json({ ok: result.ok, sent: result.sent, failed: result.failed, skippedAlreadySent, errors: result.errors.slice(0, 2) });
+  }
+
+  /* ------------------------------------------------- clear the welcome backlog ---- */
+  // First run of the welcome To-Do lists EVERY member who's never been welcomed — the whole
+  // back catalogue. This stamps them all as handled in one go, so the queue only shows genuinely
+  // new members from here on. Stamps 'skipped' (same as an individual dismiss), never sends.
+  if (action === 'dismissAllWelcome') {
+    const members = (await allMembers(admin)).map(shape);
+    const targets = members.filter((m) => m.id && m.hasPlan && !m.paused && !m.sent?.welcome);
+    await Promise.allSettled(
+      targets.map((m) =>
+        admin.members.update({
+          id: m.id,
+          data: { metaData: { ...(m.rawMeta || {}), commsSent: { ...(m.sent || {}), welcome: `skipped ${today}` } } },
+        }),
+      ),
+    );
+    return json({ ok: true, cleared: targets.length });
   }
 
   /* ---------------------------------------------------------------- dismiss ------- */
