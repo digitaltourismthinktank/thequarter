@@ -2344,13 +2344,11 @@ function ScreensPane() {
 
   return (
     <div>
+      {/* Wall displays — the always-on screens. Open on the device, then Full screen. */}
       <div className={styles.panel}>
-        <span className={styles.panelTitle}>Screens &amp; links</span>
+        <span className={styles.panelTitle}>Wall displays</span>
+        <p className={styles.muted}>Always-on screens. Open on the device and tap Full screen.</p>
         <div className={styles.shortcuts}>
-          {/* The reference for "does that send an email?" — the question nobody could answer. */}
-          <a className={styles.shortcut} href="/admin/rules">
-            <Icon name="badge-check" size={16} color="var(--gold-700)" /> What happens automatically
-          </a>
           <a className={styles.shortcut} href="/screen" target="_blank" rel="noreferrer">
             <Icon name="monitor" size={16} color="var(--gold-700)" /> Entrance screen
           </a>
@@ -2360,14 +2358,39 @@ function ScreensPane() {
           <a className={styles.shortcut} href="/screen?floor=2" target="_blank" rel="noreferrer">
             <Icon name="monitor" size={16} color="var(--gold-700)" /> Second-floor screen
           </a>
+        </div>
+      </div>
+
+      {/* Check-in & sign-in — the shared iPads by the door and the per-room door kiosks. */}
+      <div className={styles.panel}>
+        <span className={styles.panelTitle}>Check-in &amp; sign-in</span>
+        <p className={styles.muted}>Shared iPads — no login. Reception is the one that checks anyone in.</p>
+        <div className={styles.shortcuts}>
+          <a className={styles.shortcut} href="/reception" target="_blank" rel="noreferrer">
+            <Icon name="users" size={16} color="var(--gold-700)" /> Reception — check members &amp; guests in
+          </a>
           <a className={styles.shortcut} href="/arrive" target="_blank" rel="noreferrer">
-            <Icon name="check" size={16} color="var(--gold-700)" /> Arrival check-in
+            <Icon name="check" size={16} color="var(--gold-700)" /> Arrival check-in (member phones)
           </a>
           <a className={styles.shortcut} href="/guest" target="_blank" rel="noreferrer">
             <Icon name="users" size={16} color="var(--gold-700)" /> Guest sign-in
           </a>
+          {spaces
+            .filter((s) => s.bookable)
+            .map((s) => (
+              <a key={s.id} className={styles.shortcut} href={`/kiosk?room=${s.id}`} target="_blank" rel="noreferrer">
+                <Icon name="door-open" size={16} color="var(--gold-700)" /> {s.name} door
+              </a>
+            ))}
+        </div>
+      </div>
+
+      {/* Sign-up & sharing — bringing new members on board. */}
+      <div className={styles.panel}>
+        <span className={styles.panelTitle}>Sign-up &amp; sharing</span>
+        <div className={styles.shortcuts}>
           <a className={styles.shortcut} href="/enrol" target="_blank" rel="noreferrer">
-            <Icon name="users" size={16} color="var(--gold-700)" /> New member sign-up
+            <Icon name="user" size={16} color="var(--gold-700)" /> New member sign-up
           </a>
           <button
             type="button"
@@ -2385,16 +2408,22 @@ function ScreensPane() {
           <a className={styles.shortcut} href="/dashboard">
             <Icon name="user" size={16} color="var(--gold-700)" /> My member view
           </a>
+        </div>
+      </div>
+
+      {/* Print & reference — signage to print, and the "what happens automatically" guides. */}
+      <div className={styles.panel}>
+        <span className={styles.panelTitle}>Print &amp; reference</span>
+        <div className={styles.shortcuts}>
+          <a className={styles.shortcut} href="/signage" target="_blank" rel="noreferrer">
+            <Icon name="book-open" size={16} color="var(--gold-700)" /> Printable signage set (A4 posters)
+          </a>
+          <a className={styles.shortcut} href="/admin/rules">
+            <Icon name="badge-check" size={16} color="var(--gold-700)" /> What happens automatically
+          </a>
           <a className={styles.shortcut} href="/admin-guide">
             <Icon name="book-open" size={16} color="var(--gold-700)" /> How it works (rewards &amp; partners)
           </a>
-          {spaces
-            .filter((s) => s.bookable)
-            .map((s) => (
-              <a key={s.id} className={styles.shortcut} href={`/kiosk?room=${s.id}`} target="_blank" rel="noreferrer">
-                <Icon name="door-open" size={16} color="var(--gold-700)" /> {s.name} door
-              </a>
-            ))}
         </div>
       </div>
 
