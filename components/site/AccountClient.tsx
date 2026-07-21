@@ -8,9 +8,11 @@ import { memberName, getMemberstack } from '@/lib/memberstack';
 import { MemberShell } from './MemberShell';
 import { CharacterPicker } from './CharacterPicker';
 import { ProfileEditor } from './ProfileEditor';
+import { NotificationToggle } from './NotificationToggle';
 import { QuarterCharacter } from './QuarterCharacter';
 import { characterById } from '@/lib/characters';
 import { soundMuted, setSoundMuted, playChime, unlockSound } from '@/lib/feedback';
+import { saveProfile } from '@/lib/booking';
 import styles from './AccountClient.module.css';
 
 /* Mirrors GeoCheckIn — the offer to use your location is dismissed permanently, and until
@@ -29,6 +31,7 @@ export function AccountClient() {
   const [editing, setEditing] = useState(false);
   const [geoDismissed, setGeoDismissed] = useState(false);
   const [muted, setMuted] = useState(false);
+  const [savingPref, setSavingPref] = useState<'emailOptOut' | 'pushOptOut' | null>(null);
 
   useEffect(() => {
     try {
@@ -61,6 +64,20 @@ export function AccountClient() {
     setGeoDismissed(false);
   }
 
+  /* Both toggles are opt-OUTs stored on metaData — flip the current value and save. The member
+     object refreshes afterwards, so the button label reflects what actually persisted. */
+  async function togglePref(key: 'emailOptOut' | 'pushOptOut') {
+    if (savingPref) return;
+    const current = (member?.metaData as Record<string, unknown> | undefined)?.[key] === true;
+    setSavingPref(key);
+    try {
+      await saveProfile({ [key]: !current });
+      await refresh();
+    } finally {
+      setSavingPref(null);
+    }
+  }
+
   async function logout() {
     const ms = await getMemberstack();
     await ms?.logout();
@@ -79,6 +96,8 @@ export function AccountClient() {
   const character = characterById(characterId);
   const meta = (member?.metaData || {}) as Record<string, unknown>;
   const detail = (k: string) => (typeof meta[k] === 'string' && meta[k] ? (meta[k] as string) : null);
+  const emailOptOut = meta.emailOptOut === true;
+  const pushOptOut = meta.pushOptOut === true;
 
   return (
     <MemberShell>
@@ -134,6 +153,41 @@ export function AccountClient() {
         <p className={styles.note}>
           Your email address is the one your membership is billed against — ask the team if it needs changing.
         </p>
+      </section>
+
+      <section className={styles.card}>
+        <h2 className={styles.h2}>Notifications</h2>
+        <p className={styles.note}>
+          The essentials — receipts, booking confirmations, plan changes — always reach you. These are the friendly extras, and they’re yours to turn on or off by channel.
+        </p>
+
+        <div className={styles.row}>
+          <div className={styles.rowText}>
+            <strong>Email updates</strong>
+            <span>{emailOptOut ? 'Off — you’ll still get essential emails.' : 'News, events and the occasional note from the team.'}</span>
+          </div>
+          <button type="button" className={styles.btnSm} onClick={() => togglePref('emailOptOut')} disabled={savingPref === 'emailOptOut'}>
+            {savingPref === 'emailOptOut' ? '…' : emailOptOut ? 'Turn on' : 'Turn off'}
+          </button>
+        </div>
+
+        <div className={styles.row}>
+          <div className={styles.rowText}>
+            <strong>In-app notifications</strong>
+            <span>Booking confirmations and reminders on this device — turn them on here.</span>
+          </div>
+          <NotificationToggle />
+        </div>
+
+        <div className={styles.row}>
+          <div className={styles.rowText}>
+            <strong>Space-wide announcements</strong>
+            <span>{pushOptOut ? 'Off — you’ll still get your own booking alerts.' : 'Notes to everyone in that day — events, celebrations, the odd surprise.'}</span>
+          </div>
+          <button type="button" className={styles.btnSm} onClick={() => togglePref('pushOptOut')} disabled={savingPref === 'pushOptOut'}>
+            {savingPref === 'pushOptOut' ? '…' : pushOptOut ? 'Turn on' : 'Turn off'}
+          </button>
+        </div>
       </section>
 
       <section className={styles.card}>

@@ -29,9 +29,12 @@ const isWeekend = (dateStr) => {
   const d = new Date(`${dateStr}T00:00:00Z`).getUTCDay();
   return d === 0 || d === 6;
 };
-/** A half day's period ('am'|'pm') is stored in the Check-in's Notes field as 'AM'/'PM'. */
+/** A half day's period ('am'|'pm') is stored in the Check-in's Notes field as 'AM'/'PM'.
+ *  The Notes field is overloaded — it may also carry 'Carnet pass', 'Unlimited' or a comms
+ *  token after a ' · ' — so read the FIRST segment, not the whole string, or a half-day's
+ *  morning/afternoon would be lost the moment anything else was appended. */
 const periodFromNotes = (n) => {
-  const s = String(n || '').trim().toUpperCase();
+  const s = String(n || '').split('·')[0].trim().toUpperCase();
   return s === 'AM' ? 'am' : s === 'PM' ? 'pm' : null;
 };
 async function sendWeekendRequestEmails({ email, name, date }) {
@@ -71,6 +74,133 @@ async function checkinsFor(email, dateStr) {
   return listRecords(T.checkins, {
     filterByFormula: `AND(LOWER({Member email})='${esc(email)}', DATETIME_FORMAT({Date}, 'YYYY-MM-DD')='${esc(dateStr)}')`,
   });
+}
+
+/**
+ * Has a Planned reservation already had its day SPENT?
+ *
+ * A planned day now counts as attendance — the overnight sweep (renew-cron) spends it on the
+ * morning of, so a member needn't physically check in. The marker lives in the row itself, not
+ * a separate table: a positive dayCost means a plan-day was deducted, and the note carries the
+ * carnet / unlimited / over-allowance cases (which legitimately cost 0 days). Either way a
+ * second sweep, or a later physical check-in, can read it and know not to charge twice.
+ */
+export function plannedConsumed(row) {
+  const dc = Number(row?.fields?.[F.checkins.dayCost]);
+  const notes = String(row?.fields?.[F.checkins.notes] || '');
+  return (Number.isFinite(dc) && dc > 0) || /carnet pass|unlimited|over allowance/i.test(notes);
+}
+
+/**
+ * Spend the day a member reserved: deduct from their plan balance (or a carnet pass, or simply
+ * note it for an unlimited member), award the check-in points, and stamp the Check-ins row so
+ * it can never be charged twice. Called by the morning sweep for every future reservation, and
+ * inline for a same-day one. Kept deliberately close to the live check-in deduction below —
+ * same ordering (plan days first, carnet as the fallback), same points rules.
+ */
+export async function consumePlannedDay(me, { dateStr, length, row }) {
+  const cost = length === 'Half' ? 0.5 : 1;
+  const allowance = allowanceForMember(me);
+  const unlimited = allowance === null;
+  const hasPlan = allowance !== undefined;
+  const current = parseDays(me.customFields?.['days-remaining']);
+  const carnet = me.metaData?.carnet || {};
+  const passesLeft = Math.max(0, Number(carnet.remaining) || 0);
+  const carnetLive = passesLeft > 0 && !(carnet.expires && carnet.expires < dateStr);
+  const outOfDays = !unlimited && current !== null && current < cost;
+  // Plan days first, carnet as the fallback — out of days, or no plan at all (a carnet-only
+  // member who reserved a day). A future paid Day Pass is its own 'Paid' row, never a Planned.
+  const useCarnet = (outOfDays || !hasPlan) && carnetLive;
+
+  // Decide the funding as PURE values first — what to spend, what to mark, what to write to
+  // Memberstack — WITHOUT touching Memberstack yet.
+  let newBalance = me.customFields?.['days-remaining'] ?? null;
+  let carnetRemaining = null;
+  let dayCost = 0;
+  let mark = '';
+  let spend = null; // null | { kind: 'carnet' } | { kind: 'days', value }
+
+  if (unlimited) {
+    mark = 'Unlimited';
+  } else if (useCarnet) {
+    carnetRemaining = passesLeft - 1;
+    mark = 'Carnet pass';
+    spend = { kind: 'carnet' };
+  } else if (current !== null && !outOfDays) {
+    newBalance = String(Math.max(0, current - cost));
+    dayCost = cost;
+    spend = { kind: 'days', value: newBalance };
+  } else {
+    // A plan member who over-committed — reserved more days than they hold, with no carnet to
+    // fall back on. Let them in (they pay for the month), spend whatever's left, and flag the
+    // shortfall so the office can see it rather than a silent free day.
+    if (current !== null && current > 0) {
+      dayCost = current;
+      newBalance = '0';
+      spend = { kind: 'days', value: '0' };
+    }
+    mark = 'Over allowance';
+  }
+
+  // Stamp the row FIRST — this is the ONLY idempotency marker (plannedConsumed reads dayCost +
+  // the note). Writing it BEFORE the irreversible Memberstack decrement means the worst a
+  // failure between the two can do is leave an UN-charged (free) day, which a re-run simply
+  // skips — never a double-charge or a lost carnet pass, which is the harm that actually costs a
+  // member. dayCost carries the plan-day spend; the machine note carries the rest. Keep any AM/PM.
+  const period = length === 'Half' ? String(periodFromNotes(row?.fields?.[F.checkins.notes]) || '').toUpperCase() : '';
+  const notes = [period, mark].filter(Boolean).join(' · ');
+  await updateRecord(T.checkins, row.id, {
+    [F.checkins.dayCost]: dayCost,
+    ...(notes ? { [F.checkins.notes]: notes } : {}),
+  });
+
+  // Only now the irreversible external decrement, with the row already marked spent.
+  if (spend?.kind === 'carnet') {
+    const admin = memberstackAdmin.init(MS_SECRET);
+    await admin.members.update({ id: me.id, data: { metaData: { ...(me.metaData || {}), carnet: { ...carnet, remaining: carnetRemaining } } } });
+  } else if (spend?.kind === 'days') {
+    await setDays(me.id, spend.value);
+  }
+
+  // Points for being in — quiet days earn double, capped monthly. Best-effort, never blocks.
+  let pointsAwarded = 0;
+  try {
+    const email = (memberEmail(me) || '').toLowerCase();
+    const used = await checkinBonusesThisMonth(email, dateStr.slice(0, 7));
+    if (used < CHECKIN_BONUS_CAP) {
+      const quiet = isQuietDay(dateStr);
+      const mult = earnBoostForMember(me);
+      pointsAwarded = Math.round((quiet ? CHECKIN_QUIET_BONUS : CHECKIN_BONUS) * mult);
+      await awardPoints(me, pointsAwarded, quiet ? 'checkin-quiet' : 'checkin', dateStr);
+    }
+  } catch {
+    /* points never block attendance */
+  }
+
+  return { dayCost, newBalance, usedCarnet: useCarnet, carnetRemaining, pointsAwarded };
+}
+
+/**
+ * Reverse a spent reservation when a member cancels ON the day (their chosen policy: free to
+ * cancel a future day, a same-day cancel gives the day back). Gives back a carnet pass, or the
+ * deducted plan-day(s); an unlimited member spent nothing to return. Points are left as they
+ * were — a soft loyalty currency already capped monthly, not worth clawing back.
+ */
+async function refundPlannedDay(me, row) {
+  const notes = String(row.fields[F.checkins.notes] || '');
+  if (/unlimited/i.test(notes)) return;
+  const admin = memberstackAdmin.init(MS_SECRET);
+  if (/carnet pass/i.test(notes)) {
+    const carnet = me.metaData?.carnet || {};
+    const passesLeft = Math.max(0, Number(carnet.remaining) || 0);
+    await admin.members.update({ id: me.id, data: { metaData: { ...(me.metaData || {}), carnet: { ...carnet, remaining: passesLeft + 1 } } } });
+    return;
+  }
+  const dc = Number(row.fields[F.checkins.dayCost]);
+  if (Number.isFinite(dc) && dc > 0) {
+    const current = parseDays(me.customFields?.['days-remaining']);
+    if (current !== null) await setDays(me.id, String(current + dc));
+  }
 }
 
 export default async function handler(req) {
@@ -185,6 +315,14 @@ export default async function handler(req) {
     const already = recs.find((r) => r.fields[F.checkins.status] === 'Checked-in');
     if (already) {
       return json({ ok: true, alreadyCheckedIn: true, balance: me.customFields?.['days-remaining'] ?? null });
+    }
+
+    // A planned day already spent for real (auto-attended by the morning sweep, or reserved
+    // for today). This tap is just physical arrival — record it, don't charge the day again.
+    const plannedRec = recs.find((r) => r.fields[F.checkins.status] === 'Planned');
+    if (plannedRec && plannedConsumed(plannedRec)) {
+      await updateRecord(T.checkins, plannedRec.id, { [F.checkins.status]: 'Checked-in', [F.checkins.source]: 'Self' });
+      return json({ ok: true, alreadyCounted: true, balance: me.customFields?.['days-remaining'] ?? null });
     }
 
     // Entitlement. You may check in only if you have a plan, a paid day pass for today, or a
@@ -317,8 +455,18 @@ export default async function handler(req) {
       },
       { typecast: true },
     );
-    if (weekend) await sendWeekendRequestEmails({ email, name, date });
-    return json({ ok: true, id: rec.id, requested: weekend });
+    if (weekend) {
+      await sendWeekendRequestEmails({ email, name, date });
+      return json({ ok: true, id: rec.id, requested: true });
+    }
+    // A weekday reservation now IS attendance — the day gets spent. Future days are swept
+    // overnight (renew-cron), so a reservation for TODAY has to be spent here and now: the
+    // sweep for today already ran this morning and won't run again.
+    if (date === londonNow().dateStr) {
+      const c = await consumePlannedDay(me, { dateStr: date, length, row: rec });
+      return json({ ok: true, id: rec.id, balance: c.newBalance, pointsAwarded: c.pointsAwarded, usedCarnet: c.usedCarnet, carnetRemaining: c.carnetRemaining });
+    }
+    return json({ ok: true, id: rec.id });
   }
 
   // Cancel an own Planned reservation.
@@ -330,8 +478,25 @@ export default async function handler(req) {
     if (String(r.fields[F.checkins.email] || '').toLowerCase() !== email) return json({ error: 'forbidden' }, 403);
     const st = r.fields[F.checkins.status];
     if (st !== 'Planned' && st !== 'Requested') return json({ error: 'only-planned-cancellable' }, 400);
+    // Their chosen policy: a future day was never charged, but a day already spent (a same-day
+    // cancel, or one the overnight sweep has reached) is given back.
+    //
+    // Mark it Cancelled BEFORE crediting the refund. The cancellable-status guard above then
+    // rejects any retry, so a transient failure of the refund write becomes a rare, logged,
+    // staff-fixable MISSED credit — never a DOUBLE credit, and never a still-'Planned'+spent row
+    // the member could also walk in on for free. Capture the spent state before the write flips it.
+    const wasConsumed = plannedConsumed(r);
     await updateRecord(T.checkins, body.id, { [F.checkins.status]: 'Cancelled' });
-    return json({ ok: true });
+    let refunded = false;
+    if (wasConsumed) {
+      try {
+        await refundPlannedDay(me, r);
+        refunded = true;
+      } catch (e) {
+        console.error('[checkin] refund-after-cancel failed', body.id, e);
+      }
+    }
+    return json({ ok: true, refunded });
   }
 
   return json({ error: 'unknown-action' }, 400);

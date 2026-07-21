@@ -768,9 +768,12 @@ export interface ProfileFields {
   dietary?: string;
   /** Chosen Quarter Character id (see lib/characters.ts), or '' to clear. */
   character?: string;
+  /** Notification preferences — both opt-OUTs (true = don't send). Essential mail always sends. */
+  emailOptOut?: boolean; // the news/events/updates emails
+  pushOptOut?: boolean; // the space-wide announcement pushes
 }
 export const saveProfile = (body: ProfileFields) =>
-  call<{ ok: boolean; bday: string | null; company: string | null; phone: string | null; role: string | null; dietary: string | null }>(
+  call<{ ok: boolean; bday: string | null; company: string | null; phone: string | null; role: string | null; dietary: string | null; emailOptOut?: boolean; pushOptOut?: boolean }>(
     'member-profile',
     { method: 'POST', body },
   );

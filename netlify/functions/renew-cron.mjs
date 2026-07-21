@@ -23,6 +23,8 @@
 import memberstackAdmin from '@memberstack/admin';
 import { renewMember, formatDate, HYBRID_PLAN_ID, isHybridMember, PLAN_ALLOWANCE } from './_quarter-sync.mjs';
 import { londonNow } from './_time.mjs';
+import { listRecords, T, F, esc } from './_airtable.mjs';
+import { consumePlannedDay, plannedConsumed } from './checkin.mjs';
 
 const MS_SECRET = process.env.MEMBERSTACK_SECRET_KEY;
 
@@ -56,6 +58,7 @@ export default async function handler() {
   let renewed = 0;
   let failed = 0;
   let hybridReset = 0;
+  let attended = 0;
 
   let after;
   for (let i = 0; i < 50; i += 1) {
@@ -131,7 +134,47 @@ export default async function handler() {
     after = res?.endCursor;
   }
 
-  const summary = { scanned, renewed, failed, hybridReset, date: today };
+  // ---- Planned days count as attendance ----
+  // A member who said they'd be in today needn't physically check in: their day is spent this
+  // morning, and they still show as "expected" (Planned) until they actually walk in. This is
+  // the sweep for FUTURE reservations reaching their day — a same-day reservation is spent the
+  // moment it's made.
+  //
+  // Runs AFTER the renewal/Hybrid-reset loop, deliberately. Those resets are FLAT overwrites of
+  // days-remaining (Hybrid especially: no rollover, set straight to the allowance), so if the
+  // sweep deducted first, the reset that follows would wipe the deduction and hand back a free
+  // day. Reset first, THEN deduct today's attendance from the fresh balance. Each planned member
+  // is re-read here, so the deduction lands on the post-reset number.
+  //
+  // Idempotent: consumePlannedDay stamps each row before it touches Memberstack, and
+  // plannedConsumed skips a row already spent — so a manual re-run is a no-op.
+  try {
+    const plannedToday = await listRecords(T.checkins, {
+      filterByFormula: `AND({Status}='Planned', DATETIME_FORMAT({Date}, 'YYYY-MM-DD')='${esc(today)}')`,
+    });
+    for (const row of plannedToday) {
+      try {
+        if (plannedConsumed(row)) continue;
+        const email = String(row.fields[F.checkins.email] || '').trim().toLowerCase();
+        if (!email) continue;
+        // A raw Day Pass buyer has no member record — their access is the 'Paid' row itself, not
+        // a Planned one, so a Planned row without a member is a data oddity we simply skip.
+        const r = await admin.members.retrieve({ email });
+        const m = r?.data;
+        if (!m) continue;
+        const length = row.fields[F.checkins.length] === 'Half' ? 'Half' : 'Full';
+        await consumePlannedDay(m, { dateStr: today, length, row });
+        attended += 1;
+      } catch (e) {
+        failed += 1;
+        console.error('[renew-cron] attendance failed', row?.id, e);
+      }
+    }
+  } catch (e) {
+    console.error('[renew-cron] planned scan failed', e);
+  }
+
+  const summary = { scanned, renewed, failed, hybridReset, attended, date: today };
   console.log('[renew-cron]', JSON.stringify(summary));
   return new Response(JSON.stringify(summary), { status: 200, headers: { 'content-type': 'application/json' } });
 }

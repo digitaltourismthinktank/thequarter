@@ -45,6 +45,14 @@ export default async function handler(req) {
   if (typeof body.character === 'string') {
     meta.character = CHARACTER_IDS.includes(body.character) ? body.character : null;
   }
+  // Notification preferences. Both are opt-OUTs (default false = opted in) so the friendly
+  // extras keep reaching people who never touch this screen. They gate only non-essential
+  // mail/pushes — receipts, bookings, plan changes and security always send regardless.
+  //   emailOptOut — the news/events/updates emails (also set by the unsubscribe link)
+  //   pushOptOut  — the space-wide announcement pushes ("we're celebrating…")
+  if (typeof body.emailOptOut === 'boolean') meta.emailOptOut = body.emailOptOut;
+  if (typeof body.pushOptOut === 'boolean') meta.pushOptOut = body.pushOptOut;
+
   // A VAT-invoice request — flagged for admin to action manually (our Stripe prices
   // are VAT-inclusive). Stamped with the request time; admin clears it when done.
   if (body.vatRequest === true) meta.vatRequested = new Date().toISOString();
@@ -85,5 +93,7 @@ export default async function handler(req) {
     role: meta.role || null,
     dietary: meta.dietary || null,
     vatRequested: meta.vatRequested || null,
+    emailOptOut: meta.emailOptOut === true,
+    pushOptOut: meta.pushOptOut === true,
   });
 }

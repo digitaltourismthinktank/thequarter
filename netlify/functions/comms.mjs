@@ -74,6 +74,7 @@ const shape = (m) => ({
   email: lower(memberEmail(m)),
   name: [m?.customFields?.['first-name'], m?.customFields?.['last-name']].filter(Boolean).join(' ').trim() || null,
   optOut: m?.metaData?.emailOptOut === true,
+  pushOptOut: m?.metaData?.pushOptOut === true,
   sent: m?.metaData?.commsSent || {},
   // Kept so a commsSent stamp merges into the existing metaData instead of replacing it —
   // Memberstack's update overwrites the whole object.
@@ -368,10 +369,16 @@ export default async function handler(req) {
     if (body.email) {
       targets = [lower(body.email)];
     } else {
+      // Everyone AT The Quarter today, not just those already at a desk: a planned day (and a
+      // paid day pass) now counts as being in, so a space-wide note should reach them too.
       const rows = await listAllRecords(T.checkins, {
-        filterByFormula: `AND(DATETIME_FORMAT({Date},'YYYY-MM-DD')='${esc(today)}', {Status}='Checked-in')`,
+        filterByFormula: `AND(DATETIME_FORMAT({Date},'YYYY-MM-DD')='${esc(today)}', OR({Status}='Checked-in', {Status}='Planned', {Status}='Paid'))`,
       });
-      targets = [...new Set(rows.map((r) => lower(r.fields[F.checkins.email])).filter(Boolean))];
+      const inToday = [...new Set(rows.map((r) => lower(r.fields[F.checkins.email])).filter(Boolean))];
+      // Honour a member's opt-out of these space-wide notifications. Transactional pushes
+      // (a booking confirmed, a weekend approved) don't check this — only broadcasts do.
+      const muted = new Set((await allMembers(admin)).map(shape).filter((m) => m.pushOptOut).map((m) => m.email));
+      targets = inToday.filter((e) => !muted.has(e));
     }
     if (!targets.length) return json({ ok: true, sent: 0, note: 'nobody-in-today' });
 
