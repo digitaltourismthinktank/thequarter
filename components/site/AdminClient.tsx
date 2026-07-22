@@ -330,7 +330,7 @@ export function AdminClient() {
           onClick={() => setMoreOpen(true)}
           aria-haspopup="dialog"
         >
-          <Icon name="grid" size={21} />
+          <Icon name="menu" size={21} />
           More
         </button>
       </nav>
