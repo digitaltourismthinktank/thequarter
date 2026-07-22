@@ -622,8 +622,12 @@ function MembersPane() {
               <div className={styles.memCardMain}>
                 <div className={styles.memCardHead}>
                   <span className={styles.mName}>{m.name || '—'}</span>
-                  {m.plan ? <span className={styles.memPlanTag}>{m.plan}</span> : null}
-                  {m.paused ? <span className={styles.pausedTag}>Paused</span> : null}
+                  {/* Paused shows ONE tag — the plan tag is 'Paused' too, so it doubled up before. */}
+                  {m.paused ? (
+                    <span className={styles.pausedTag}>Paused</span>
+                  ) : m.plan ? (
+                    <span className={styles.memPlanTag}>{m.plan}</span>
+                  ) : null}
                   {m.paymentIssue ? <span className={styles.issueTag}>Card issue</span> : null}
                 </div>
                 <div className={styles.mEmail}>{m.email}</div>
@@ -636,6 +640,9 @@ function MembersPane() {
                 <div className={styles.memStats}>
                   <span>
                     <strong>{m.days ?? '—'}</strong> days
+                  </span>
+                  <span>
+                    <strong>{m.roomHoursCap}</strong>h room
                   </span>
                   {m.carnet ? (
                     <span>

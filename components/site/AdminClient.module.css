@@ -903,9 +903,9 @@ select.input {
 }
 .roomMatrix {
   display: grid;
-  /* The room-name lane was eating ~20% of the width; trim it right down so the day columns —
-     where the actual bookings live — get the room to breathe. */
-  grid-template-columns: minmax(78px, 104px) repeat(5, minmax(146px, 1fr));
+  /* The room-name lane was eating ~20% of the width; trimmed down — but not so far that a longer
+     name like "The Scriptorium" gets clipped, so a touch wider + the name wraps (see roomLaneName). */
+  grid-template-columns: minmax(92px, 118px) repeat(5, minmax(144px, 1fr));
   gap: 8px;
   min-width: 720px;
   align-items: stretch;
@@ -939,6 +939,7 @@ select.input {
   font-weight: var(--fw-bold);
   color: var(--ink-900);
   line-height: 1.2;
+  overflow-wrap: anywhere;
 }
 .roomLaneType {
   font-size: var(--text-2xs);

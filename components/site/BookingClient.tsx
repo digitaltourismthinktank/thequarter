@@ -127,6 +127,7 @@ export function BookingClient() {
   // Booking a room means they'll be in that day, so we offer to mark them in (no separate check-in).
   const [offerInDate, setOfferInDate] = useState<string | null>(null);
   const [inNote, setInNote] = useState<string | null>(null);
+  const offerRef = useRef<HTMLDivElement>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   // Who's it for? Asked before the room list so the smallest space that fits is what you
   // see first — otherwise the instinct is to take the nicest room, and the six-seater gets
@@ -354,6 +355,12 @@ export function BookingClient() {
       setInNote(null);
     }
   }, [justBooked]);
+
+  // Nudge the "mark you in for the day?" prompt into view — otherwise it sits below the fold after a
+  // booking and reads as unrelated, not as the follow-up question it is.
+  useEffect(() => {
+    if (offerInDate) offerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [offerInDate]);
 
   // Booking a room = they'll be in that day. Offer to mark them in (a reservation the overnight
   // sweep will spend), so they needn't separately "book to be in" or check in on arrival.
@@ -656,17 +663,21 @@ export function BookingClient() {
             </button>
           </div>
 
-          <div className={styles.presets}>
-            <button type="button" className={styles.preset} onClick={() => preset(8 * 60, 13 * 60)}>
-              Morning · 08–13
-            </button>
-            <button type="button" className={styles.preset} onClick={() => preset(13 * 60, 18 * 60)}>
-              Afternoon · 13–18
-            </button>
-            <button type="button" className={styles.preset} onClick={() => preset(8 * 60, 18 * 60)}>
-              Full day
-            </button>
-          </div>
+          {/* Presets are half-/full-day blocks — meaningless for a phone pod (2 hours max), so a pod
+              just uses the time grid below. */}
+          {spaces.find((s) => s.id === spaceId)?.type !== 'Phone pod' ? (
+            <div className={styles.presets}>
+              <button type="button" className={styles.preset} onClick={() => preset(8 * 60, 13 * 60)}>
+                Morning · 08–13
+              </button>
+              <button type="button" className={styles.preset} onClick={() => preset(13 * 60, 18 * 60)}>
+                Afternoon · 13–18
+              </button>
+              <button type="button" className={styles.preset} onClick={() => preset(8 * 60, 18 * 60)}>
+                Full day
+              </button>
+            </div>
+          ) : null}
 
           <div className={styles.hintRow}>
             <span className={styles.hint}>{hint}</span>
@@ -804,7 +815,7 @@ export function BookingClient() {
 
       {/* Booking a room = they'll be in that day, so offer to mark them in (no separate check-in). */}
       {justBooked && offerInDate ? (
-        <div className={styles.inOffer}>
+        <div className={styles.inOffer} ref={offerRef}>
           {inNote ? (
             <span className={styles.inOfferDone}>✓ {inNote}</span>
           ) : (
