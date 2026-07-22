@@ -608,8 +608,9 @@ export function BookingClient() {
       {spaceId && spaces.find((s) => s.id === spaceId)?.type !== 'Phone pod' && hasPlan && includedHours > 0 ? (
         <p className={styles.roomNote}>
           Your plan includes <strong>{includedHours}h</strong> of meeting-room time a month, free to book here. Beyond that,
-          extra time is charged per hour{memberPct ? ` at ${memberPct}% off — your member rate` : ' at your member rate'}, and you
-          can pay right here. Phone pods are always free, up to 2 hours at a time.
+          extra time is charged per hour{memberPct ? ` at ${memberPct}% off — your member rate` : ' at your member rate'} — once
+          you&rsquo;ve picked a room and date below, you can pay for the extra time right here at checkout. Phone pods are always
+          free, up to 2 hours at a time.
         </p>
       ) : null}
 

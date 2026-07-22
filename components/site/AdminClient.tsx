@@ -586,12 +586,12 @@ function MembersPane() {
                     </div>
                   ) : null}
                 </td>
-                <td>
+                <td data-label="Plan">
                   {m.plan || '—'}
                   {m.paused ? <span className={styles.pausedTag}>Paused</span> : null}
                   {m.paymentIssue ? <span className={styles.issueTag}>Card issue</span> : null}
                 </td>
-                <td>
+                <td data-label="Days">
                   <input
                     className={styles.dayInput}
                     value={edits[m.id] ?? m.days ?? ''}
@@ -602,7 +602,7 @@ function MembersPane() {
                     Save
                   </button>
                 </td>
-                <td>
+                <td data-label="Passes">
                   <input
                     className={styles.dayInput}
                     value={passEdits[m.id] ?? (m.carnet ? String(m.carnet) : '')}
@@ -613,7 +613,7 @@ function MembersPane() {
                     Save
                   </button>
                 </td>
-                <td>
+                <td data-label="Room hrs">
                   <input
                     className={styles.dayInput}
                     value={hoursEdits[m.id] ?? String(m.roomHoursCap)}
@@ -625,8 +625,8 @@ function MembersPane() {
                     Save
                   </button>
                 </td>
-                <td className={styles.muted}>{m.points.toLocaleString('en-GB')}</td>
-                <td className={styles.muted}>{m.renewal || '—'}</td>
+                <td className={styles.muted} data-label="Points">{m.points.toLocaleString('en-GB')}</td>
+                <td className={styles.muted} data-label="Renewal">{m.renewal || '—'}</td>
                 <td>
                   <button type="button" className={styles.smallBtn} onClick={() => setProfileId(m.id)}>
                     Profile

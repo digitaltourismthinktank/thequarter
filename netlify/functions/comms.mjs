@@ -248,9 +248,23 @@ export default async function handler(req) {
       ],
       todo: { thank: toThank, welcome: needWelcome, rewards: needRewards },
       optedOut: members.filter((m) => m.optOut).length,
-      checkedInToday: (await listAllRecords(T.checkins, {
-        filterByFormula: `AND(DATETIME_FORMAT({Date},'YYYY-MM-DD')='${esc(today)}', {Status}='Checked-in')`,
-      })).map((r) => ({ email: lower(r.fields[F.checkins.email]), name: r.fields[F.checkins.name] || null })),
+      // "In today" = everyone AT The Quarter today, not just those who physically tapped check-in:
+      // a booked day (Planned) or a paid day pass (Paid) counts as being in, so the admin's count
+      // and roll-call match the push audience (which already targets all three). De-duped by email.
+      checkedInToday: await (async () => {
+        const rows = await listAllRecords(T.checkins, {
+          filterByFormula: `AND(DATETIME_FORMAT({Date},'YYYY-MM-DD')='${esc(today)}', OR({Status}='Checked-in', {Status}='Planned', {Status}='Paid'))`,
+        });
+        const seen = new Set();
+        const out = [];
+        for (const r of rows) {
+          const email = lower(r.fields[F.checkins.email]);
+          if (!email || seen.has(email)) continue;
+          seen.add(email);
+          out.push({ email, name: r.fields[F.checkins.name] || null });
+        }
+        return out;
+      })(),
     });
   }
 
