@@ -33,9 +33,24 @@ export function NotificationToggle() {
     setState('idle');
     if (Notification.permission === 'granted') {
       navigator.serviceWorker.ready
-        .then((reg) => reg.pushManager.getSubscription())
-        .then((s) => {
-          if (s) setState('on');
+        .then(async (reg) => {
+          let s = await reg.pushManager.getSubscription();
+          if (!s && VAPID) {
+            // Permission is granted but the subscription was dropped (browser rebuild, reinstall,
+            // rotation) — re-create it so notifications actually resume.
+            try {
+              s = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(VAPID) });
+            } catch {
+              /* key changed / blocked — leave the toggle idle */
+            }
+          }
+          if (s) {
+            setState('on');
+            // Keep the stored subscription CURRENT. Push services rotate endpoints, and a stale one
+            // 410s silently — which is exactly how admins quietly stop getting activity alerts. The
+            // server dedupes by endpoint, so re-saving on each load is safe and self-healing.
+            pushSubscribe(s.toJSON()).catch(() => {});
+          }
         })
         .catch(() => {});
     }

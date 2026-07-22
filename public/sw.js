@@ -1,14 +1,17 @@
 /* The Quarter — service worker (PWA installability + a light asset cache).
  * Deliberately conservative for a member portal: navigations and API calls always
  * go to the network (so auth state + live data are never stale); only same-origin
- * static assets are cached (cache-first, revalidated in the background). */
-/* Bump this on any release that changes cached assets. The activate handler deletes every
- * cache whose key isn't the current one, so changing the version purges stale HTML and CSS
- * for everyone on their next open. Without a bump the name never changes, nothing is ever
- * evicted, and a device that cached an old page keeps serving it — that page references the
- * old hashed CSS, which is also still cached, so the staleness is self-consistent and can
- * persist indefinitely. */
-const CACHE = 'quarter-v48';
+ * static assets are cached.
+ *
+ * TWO caches, on purpose:
+ *   STATIC  — immutable build assets under /_next/static/ (content-hashed filenames). NEVER purged
+ *             by a version bump, so a tab still running the OLD build can always find its chunks
+ *             even after a new deploy. This is what stops the "ChunkLoadError / obscure update
+ *             error" — previously the version bump deleted the old chunks out from under open tabs.
+ *   PAGES   — visited HTML (so a page + the Quarter Card open offline). Versioned + purged on bump. */
+const VERSION = 'quarter-v49';
+const STATIC = 'quarter-static';
+const PAGES = VERSION;
 
 self.addEventListener('install', () => {
   self.skipWaiting();
@@ -17,8 +20,9 @@ self.addEventListener('install', () => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     (async () => {
+      // Keep the persistent static cache and the current pages cache; drop only OLD page caches.
       const keys = await caches.keys();
-      await Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)));
+      await Promise.all(keys.filter((k) => k !== STATIC && k !== PAGES).map((k) => caches.delete(k)));
       await self.clients.claim();
     })(),
   );
@@ -55,6 +59,22 @@ self.addEventListener('notificationclick', (event) => {
   );
 });
 
+/* The push service occasionally rotates a subscription's endpoint. Re-subscribe with the same VAPID
+ * key so pushes keep flowing; the app re-saves the fresh endpoint to the member record on next load
+ * (which is what stops admin/member notifications silently dying against a stale endpoint). */
+self.addEventListener('pushsubscriptionchange', (event) => {
+  event.waitUntil(
+    (async () => {
+      try {
+        const key = event.oldSubscription && event.oldSubscription.options && event.oldSubscription.options.applicationServerKey;
+        if (key) await self.registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
+      } catch {
+        /* best-effort — the app resubscribes on next open */
+      }
+    })(),
+  );
+});
+
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   if (request.method !== 'GET') return;
@@ -67,8 +87,31 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Pages: network-first, but cache each visited page so it (and the Quarter Card)
-  // still open offline; fall back to the cached page, else the cached dashboard.
+  // Immutable build assets (content-hashed): cache-first in the PERSISTENT cache. They never go
+  // stale (the hash changes when the content does), and keeping them means an open tab from the
+  // previous deploy can still load its chunks — no ChunkLoadError when a new version ships.
+  if (url.pathname.startsWith('/_next/static/')) {
+    event.respondWith(
+      (async () => {
+        const cached = await caches.match(request);
+        if (cached) return cached;
+        try {
+          const res = await fetch(request);
+          if (res && res.status === 200) {
+            const copy = res.clone();
+            caches.open(STATIC).then((c) => c.put(request, copy));
+          }
+          return res;
+        } catch {
+          return Response.error();
+        }
+      })(),
+    );
+    return;
+  }
+
+  // Pages: network-first, but cache each visited page so it (and the Quarter Card) still open
+  // offline; fall back to the cached page, else the cached dashboard.
   if (request.mode === 'navigate') {
     event.respondWith(
       (async () => {
@@ -76,7 +119,7 @@ self.addEventListener('fetch', (event) => {
           const res = await fetch(request);
           if (res && res.status === 200) {
             const copy = res.clone();
-            caches.open(CACHE).then((c) => c.put(request, copy));
+            caches.open(PAGES).then((c) => c.put(request, copy));
           }
           return res;
         } catch {
@@ -87,7 +130,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Static assets: serve from cache immediately, refresh in the background.
+  // Other same-origin static (icons, images): serve from cache immediately, refresh in background.
   event.respondWith(
     (async () => {
       const cached = await caches.match(request);
@@ -95,7 +138,7 @@ self.addEventListener('fetch', (event) => {
         .then((res) => {
           if (res && res.status === 200 && res.type === 'basic') {
             const copy = res.clone();
-            caches.open(CACHE).then((c) => c.put(request, copy));
+            caches.open(PAGES).then((c) => c.put(request, copy));
           }
           return res;
         })
