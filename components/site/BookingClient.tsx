@@ -645,6 +645,14 @@ export function BookingClient() {
             ) : null}
           </div>
 
+          {/* Feedback sits HERE — right under the presets/grid where the tap happened — so a
+              "that block's taken" notice is seen, not buried at the foot of a long page. */}
+          {msg ? (
+            <p className={styles.bookMsg} role="status">
+              {msg}
+            </p>
+          ) : null}
+
           {loadingAvail ? (
             <p className={styles.state}>Checking availability…</p>
           ) : (
@@ -755,7 +763,6 @@ export function BookingClient() {
               </Button>
             </div>
           )}
-          {msg ? <p className={styles.msg}>{msg}</p> : null}
         </>
       )}
 

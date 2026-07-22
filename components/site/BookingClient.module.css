@@ -346,6 +346,19 @@
   font-size: var(--text-sm);
   color: var(--gold-700);
 }
+/* Booking feedback shown right under the presets — a soft banner so it's noticed, not a faint
+   line lost at the foot of the page. */
+.bookMsg {
+  margin: 10px 0 14px;
+  padding: 11px 14px;
+  font-size: var(--text-sm);
+  font-weight: var(--fw-semibold);
+  line-height: 1.4;
+  color: var(--ink-900);
+  background: var(--gold-100, #f4ecd8);
+  border-left: 3px solid var(--gold-600, #b8933f);
+  border-radius: var(--radius-md, 10px);
+}
 
 .mine {
   margin-top: 32px;
