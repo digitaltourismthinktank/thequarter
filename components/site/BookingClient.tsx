@@ -14,6 +14,7 @@ import {
   roomMemberStatus,
   roomMemberQuote,
   roomIntent,
+  roomSetSave,
   type Space,
   type MyBooking,
   type RoomMemberStatus,
@@ -137,6 +138,7 @@ export function BookingClient() {
   const [savedCard, setSavedCard] = useState<SavedCard | null>(null);
   const [useNewCard, setUseNewCard] = useState(false);
   const [saveCardChecked, setSaveCardChecked] = useState(true);
+  const [payIntentId, setPayIntentId] = useState<string | null>(null);
   const payMountRef = useRef<HTMLDivElement | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const stripeRef = useRef<any>(null);
@@ -279,14 +281,37 @@ export function BookingClient() {
     }
   }
 
-  function preset(lo: number, hi: number) {
+  // Presets select the LARGEST FREE stretch within the block, clamped to the room's open/close and
+  // (on today) to the next bookable slot. All-or-nothing was the bug: if any slot in the afternoon
+  // was already booked, "Afternoon" and "Full day" did nothing. Now they grab whatever's free.
+  function preset(loRaw: number, hiRaw: number) {
     setMsg(null);
-    if (rangeFree(lo, hi)) {
-      setSel({ start: lo, end: hi });
-      setStart(null);
-    } else {
-      setMsg('That block isn’t free.');
+    const lo0 = Math.max(loRaw, open, firstSlot);
+    const hi0 = Math.min(hiRaw, close);
+    if (hi0 <= lo0) {
+      setMsg('That block has already passed today — pick another time.');
+      return;
     }
+    let bestLo = -1;
+    let bestHi = -1;
+    let curLo = -1;
+    for (let s = lo0; s < hi0; s += SLOT) {
+      if (!slotBusy(s)) {
+        if (curLo < 0) curLo = s;
+        if (s + SLOT - curLo > bestHi - bestLo) {
+          bestLo = curLo;
+          bestHi = s + SLOT;
+        }
+      } else {
+        curLo = -1;
+      }
+    }
+    if (bestLo < 0) {
+      setMsg('That block is fully booked — pick another time.');
+      return;
+    }
+    setSel({ start: bestLo, end: bestHi });
+    setStart(null);
   }
 
   function clearSel() {
@@ -388,6 +413,7 @@ export function BookingClient() {
     }
     setPayLines(r.data.lines || null);
     setPayPence(r.data.amountPence);
+    setPayIntentId(r.data.clientSecret.split('_secret')[0]);
     setPayStep('pay');
     try {
       const stripe = await loadStripe();
@@ -408,6 +434,8 @@ export function BookingClient() {
     if (!stripeRef.current || !elementsRef.current) return;
     setBusyAction(true);
     setPayErr(null);
+    // Sync the save-card choice (made beside the card) onto the PaymentIntent before confirming.
+    if (payIntentId) await roomSetSave(payIntentId, saveCardChecked);
     const { error, paymentIntent } = await stripeRef.current.confirmPayment({
       elements: elementsRef.current,
       confirmParams: { return_url: window.location.href },
@@ -674,16 +702,17 @@ export function BookingClient() {
                 </div>
               ) : null}
               {payStep === 'pay' ? (
-                // Entering a new card via Stripe Elements. The save-card choice was made below,
-                // before this step, so it's already baked into the payment.
+                // Entering a new card via Stripe Elements, with the save-card choice right beside it.
                 <>
                   <div ref={payMountRef} className={styles.payEl} />
+                  <label className={styles.saveRow}>
+                    <input type="checkbox" checked={saveCardChecked} onChange={() => setSaveCardChecked((v) => !v)} />
+                    <span>Save this card for faster booking next time</span>
+                  </label>
                   <Button variant="primary" fullWidth onClick={pay} disabled={busyAction} iconAfter="arrow-right">
                     {busyAction ? 'Taking payment…' : `Pay ${money((payPence ?? 0) / 100)}`}
                   </Button>
-                  <p className={styles.paySecure}>
-                    {saveCardChecked ? 'Card saved for next time · ' : ''}Paid securely with Stripe · Apple Pay &amp; cards.
-                  </p>
+                  <p className={styles.paySecure}>Paid securely with Stripe · Apple Pay &amp; cards.</p>
                 </>
               ) : savedCard && !useNewCard ? (
                 // One-tap: pay with the card already on file (you always see which card).
@@ -709,10 +738,6 @@ export function BookingClient() {
                       ‹ Use {prettyBrand(savedCard.brand)} •••• {savedCard.last4} instead
                     </button>
                   ) : null}
-                  <label className={styles.saveRow}>
-                    <input type="checkbox" checked={saveCardChecked} onChange={() => setSaveCardChecked((v) => !v)} />
-                    <span>Save this card for faster booking next time</span>
-                  </label>
                   <Button variant="primary" fullWidth onClick={toPayment} disabled={!sel || busyAction} iconAfter="arrow-right">
                     {busyAction ? 'Checking…' : 'Continue to payment'}
                   </Button>

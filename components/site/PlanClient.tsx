@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ds/Button';
 import { useMember, memberPlanSlug } from './useMember';
 import { PLANS, PLAN_STRIPE_PRICE, type PlanId } from '@/lib/plans';
 import { ANNUAL_PLANS, annualSaving } from '@/lib/rewards';
 import { memberIsPaused, memberDaysRemaining, memberRenewalDate, memberHasPaymentIssue } from '@/lib/memberstack';
-import { switchPlan, pausePlan, resumePlan, requestVatInvoice, getInvoices, type Invoice } from '@/lib/booking';
+import { switchPlan, pausePlan, resumePlan, requestVatInvoice, getInvoices, getMyCard, setInstantBook, requestDataDeletion, type Invoice } from '@/lib/booking';
 import { CarnetCard } from './CarnetCard';
 import { CardUpdate } from './CardUpdate';
 import styles from './PlanClient.module.css';
@@ -51,13 +51,51 @@ export function PlanClient() {
   const [done, setDone] = useState<string | null>(null);
   const [vatMsg, setVatMsg] = useState<string | null>(null);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [card, setCard] = useState<{ brand: string; last4: string; exp: string } | null>(null);
+  const [instantOff, setInstantOff] = useState(false);
+  const [payMsg, setPayMsg] = useState<string | null>(null);
+  const [payBusy, setPayBusy] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  const loadCard = useCallback(() => {
+    getMyCard().then((r) => {
+      if (r.ok) {
+        const cards = r.data.cards || [];
+        const c = cards.find((x) => x.default) || cards[0] || null;
+        setCard(c ? { brand: c.brand, last4: c.last4, exp: c.exp } : null);
+        setInstantOff(!!r.data.instantBookOff);
+      }
+    });
+  }, []);
 
   useEffect(() => {
     if (!member) return;
     getInvoices().then((r) => {
       if (r.ok) setInvoices(r.data.invoices);
     });
-  }, [member]);
+    loadCard();
+  }, [member, loadCard]);
+
+  async function toggleInstant() {
+    setPayBusy(true);
+    setPayMsg(null);
+    const next = !instantOff;
+    const r = await setInstantBook(next);
+    setPayBusy(false);
+    if (r.ok) {
+      setInstantOff(next);
+      setPayMsg(next ? 'Instant book is off — we won’t use your saved card.' : 'Instant book is on — pay in one tap next time.');
+    } else setPayMsg('Couldn’t update that just now — please try again.');
+  }
+
+  async function doRequestDeletion() {
+    setPayBusy(true);
+    setPayMsg(null);
+    const r = await requestDataDeletion();
+    setPayBusy(false);
+    setConfirmDelete(false);
+    setPayMsg(r.ok ? 'Request received — our team will be in touch to complete your account and data deletion.' : 'Couldn’t send that just now — please try again.');
+  }
 
   async function requestVat() {
     setVatMsg(null);
@@ -165,7 +203,10 @@ export function PlanClient() {
               Pause membership
             </Button>
           ) : null}
-          <CardUpdate onDone={refresh} />
+          <CardUpdate onDone={() => {
+            refresh();
+            loadCard();
+          }} />
           <button type="button" className={styles.linkBtn} onClick={requestVat}>
             Request a VAT invoice
           </button>
@@ -284,6 +325,65 @@ export function PlanClient() {
           <p className={styles.note}>No invoices yet.</p>
         )}
         <p className={styles.note}>Our prices include VAT. Need a formal VAT invoice? Use &ldquo;Request a VAT invoice&rdquo; above.</p>
+      </section>
+
+      {/* Payment card, one-tap booking and data controls — full self-management. */}
+      <section className={styles.card}>
+        <div className={styles.switchHead}>
+          <h2 className={styles.h2}>Payment &amp; privacy</h2>
+        </div>
+
+        <div className={styles.payRow}>
+          <div>
+            <strong className={styles.payLabel}>Card on file</strong>
+            <span className={styles.payValue}>
+              {card ? `${card.brand.charAt(0).toUpperCase() + card.brand.slice(1)} •••• ${card.last4}${card.exp && card.exp !== '/' ? ` · exp ${card.exp}` : ''}` : 'No card saved.'}
+            </span>
+          </div>
+          <CardUpdate onDone={() => {
+            refresh();
+            loadCard();
+          }} />
+        </div>
+
+        <div className={styles.payRow}>
+          <div>
+            <strong className={styles.payLabel}>Instant book (one-tap pay)</strong>
+            <span className={styles.payValue}>
+              {instantOff
+                ? 'Off — we won’t use your saved card; you’ll enter it each time.'
+                : 'On — pay for extra room time or a day pass in one tap, using the card above (you always confirm and see the card).'}
+            </span>
+          </div>
+          <Button variant="secondary" size="sm" onClick={toggleInstant} disabled={payBusy}>
+            {instantOff ? 'Turn on' : 'Turn off'}
+          </Button>
+        </div>
+
+        <div className={styles.payRow}>
+          <div>
+            <strong className={styles.payLabel}>Delete account &amp; data</strong>
+            <span className={styles.payValue}>
+              Remove your card and erase your data with us. As your card may fund a live membership, our team completes this with you.
+            </span>
+          </div>
+          {confirmDelete ? (
+            <div className={styles.confirmActions}>
+              <Button variant="secondary" size="sm" onClick={doRequestDeletion} disabled={payBusy}>
+                {payBusy ? 'Sending…' : 'Confirm request'}
+              </Button>
+              <button type="button" className={styles.linkBtn} onClick={() => setConfirmDelete(false)} disabled={payBusy}>
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button type="button" className={styles.linkBtn} onClick={() => setConfirmDelete(true)}>
+              Request deletion
+            </button>
+          )}
+        </div>
+
+        {payMsg ? <p className={styles.done}>{payMsg}</p> : null}
       </section>
     </div>
   );

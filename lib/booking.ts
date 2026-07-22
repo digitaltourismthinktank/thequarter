@@ -160,6 +160,10 @@ export const roomQuote = (b: RoomBookingInput) =>
 // dashboard's inline "pay for extra time" preview). No PaymentIntent is created, unlike roomIntent.
 export const roomMemberQuote = (b: RoomBookingInput) =>
   call<RoomQuote>('room-booking', { method: 'POST', auth: true, body: { action: 'quote', ...b } });
+// Toggle whether the card being entered gets saved — lets the "Save this card" checkbox sit beside
+// the card and still take effect (setup_future_usage is a create-time param, updated here on toggle).
+export const roomSetSave = (paymentIntentId: string, save: boolean) =>
+  call<{ ok: boolean }>('room-booking', { method: 'POST', auth: true, body: { action: 'set-save', paymentIntentId, save } });
 // Authed: attaches the member JWT when signed in so a PAYING member earns the give-back
 // and the booking is linked to them. getMemberToken() returns null for guests, so a
 // guest sends no token and still pays (and books) exactly as before.
@@ -828,14 +832,26 @@ export interface ProfileFields {
   /** Notification preferences — both opt-OUTs (true = don't send). Essential mail always sends. */
   emailOptOut?: boolean; // the news/events/updates emails
   pushOptOut?: boolean; // the space-wide announcement pushes
+  /** Instant Book (one-tap saved-card pay) opt-OUT. True = don't offer/use their saved card. */
+  instantBookOff?: boolean;
 }
 export const saveProfile = (body: ProfileFields) =>
-  call<{ ok: boolean; bday: string | null; company: string | null; phone: string | null; role: string | null; dietary: string | null; emailOptOut?: boolean; pushOptOut?: boolean }>(
+  call<{ ok: boolean; bday: string | null; company: string | null; phone: string | null; role: string | null; dietary: string | null; emailOptOut?: boolean; pushOptOut?: boolean; instantBookOff?: boolean; deletionRequested?: string | null }>(
     'member-profile',
     { method: 'POST', body },
   );
 export const requestVatInvoice = () =>
   call<{ ok: boolean; vatRequested: string | null }>('member-profile', { method: 'POST', body: { vatRequest: true } });
+// Payment self-management: the card(s) on file + whether one-tap ("instant book") is off.
+export const getMyCard = () =>
+  call<{ cards: { id: string; brand: string; last4: string; exp: string; default: boolean }[]; instantBookOff: boolean }>(
+    'invoices',
+    { method: 'POST', body: { action: 'card' } },
+  );
+export const setInstantBook = (off: boolean) =>
+  call<{ ok: boolean; instantBookOff?: boolean }>('member-profile', { method: 'POST', body: { instantBookOff: off } });
+export const requestDataDeletion = () =>
+  call<{ ok: boolean; deletionRequested: string | null }>('member-profile', { method: 'POST', body: { deletionRequest: true } });
 export const adminClearVat = (memberId: string) =>
   call<{ ok: boolean }>('admin', { method: 'POST', body: { action: 'clearVat', memberId } });
 

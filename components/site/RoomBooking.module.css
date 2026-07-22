@@ -369,6 +369,41 @@
   color: var(--text-muted);
   text-align: center;
 }
+.saveRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--text-sm);
+  color: var(--text-body, #4a4038);
+  cursor: pointer;
+}
+.saveRow input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--gold-600, #b8933f);
+  flex: none;
+}
+.savedCardRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: var(--text-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--ink-900);
+}
+.linkLike {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--gold-700, #b0862f);
+  text-decoration: underline;
+  cursor: pointer;
+}
 
 .err {
   margin: 0;

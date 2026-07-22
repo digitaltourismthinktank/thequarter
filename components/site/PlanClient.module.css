@@ -388,6 +388,34 @@
   color: var(--text-muted);
 }
 
+/* Payment & privacy rows: label + description on the left, the action on the right; stacks on mobile. */
+.payRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 14px 0;
+  border-top: 1px solid var(--border-subtle, #e7ddca);
+}
+.payRow:first-of-type {
+  border-top: none;
+}
+.payLabel {
+  display: block;
+  font-size: var(--text-sm);
+  font-weight: var(--fw-bold);
+  color: var(--ink-900);
+}
+.payValue {
+  display: block;
+  margin-top: 3px;
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  color: var(--text-muted);
+  max-width: 46ch;
+}
+
 /* Mobile audit: Stripe invoice ids are unbreakable strings and spilled out of the row.
    The first pass set min-width:0, which fixed the horizontal spill by turning it into a
    vertical one — with flex-basis 0 the reference won only the ~25px the fixed columns left

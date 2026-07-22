@@ -11,9 +11,12 @@ import {
   roomIntent,
   roomMemberStatus,
   roomMemberFree,
+  roomMemberQuote,
+  roomSetSave,
   type BusyRange,
   type RoomQuoteLine,
   type RoomMemberStatus,
+  type SavedCard,
 } from '@/lib/booking';
 import { useMember } from './useMember';
 import { MEMBER_ROOM_DISCOUNT, planSlugFromMemberstackId } from '@/lib/plans';
@@ -112,6 +115,7 @@ const ERRORS: Record<string, string> = {
   weekend: 'Meeting rooms are bookable Monday to Friday.',
   'closed-day': 'We’re closed that day — please pick another date.',
   'cap-exceeded': 'That would take you over your free hours this month — you can still book it below and pay.',
+  'card-declined': 'That card was declined — try a different card.',
   'bad-email': 'Please enter a valid email address.',
   'missing-company': 'Please add the company or organisation name.',
   'no-space': 'This room isn’t bookable online just now — please enquire below.',
@@ -148,6 +152,11 @@ export function RoomBooking({ roomName, price }: { roomName: string; price: { ha
   const [serverLines, setServerLines] = useState<RoomQuoteLine[] | null>(null);
   // TEST COMP: a secret ?test=<code> routes to the server's env-gated comp path (skips Stripe).
   const [testCode, setTestCode] = useState('');
+  // Saved cards (Model A) for signed-in members over their cap: card on file, one-tap vs new card.
+  const [savedCard, setSavedCard] = useState<SavedCard | null>(null);
+  const [useNewCard, setUseNewCard] = useState(false);
+  const [saveCardChecked, setSaveCardChecked] = useState(true);
+  const [payIntentId, setPayIntentId] = useState<string | null>(null);
 
   const mountRef = useRef<HTMLDivElement | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -313,6 +322,23 @@ export function RoomBooking({ roomName, price }: { roomName: string; price: { ha
   const freeEligible = !!member && !!status && !!sel && selHours <= status.remaining + 1e-6;
   const overCap = !!member && !!status && !!sel && selHours > status.remaining + 1e-6;
 
+  // A member over their cap: fetch their card on file so we can offer one-tap pay.
+  useEffect(() => {
+    if (!overCap || memberDiscount <= 0 || !spaceId || !sel || !pkg) {
+      setSavedCard(null);
+      setUseNewCard(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const r = await roomMemberQuote({ spaceId, date, pkg, start: minToHHMM(sel.start), end: minToHHMM(sel.end), people });
+      if (!cancelled && r.ok) setSavedCard(r.data.savedCard ?? null);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [overCap, memberDiscount, spaceId, sel, date, pkg, people]);
+
   function validate(): string | null {
     if (!date) return 'Please choose a date.';
     if (new Date(`${date}T00:00:00`).getDay() % 6 === 0) return ERRORS.weekend;
@@ -370,6 +396,7 @@ export function RoomBooking({ roomName, price }: { roomName: string; price: { ha
       phone: phone.trim(),
       email: email.trim() || memberEmailOf(member),
       test: testCode || undefined,
+      saveCard: !!member && saveCardChecked,
     });
     setWorking(false);
     // TEST COMP: server skipped Stripe and already recorded + emailed the £0 booking — jump
@@ -383,6 +410,7 @@ export function RoomBooking({ roomName, price }: { roomName: string; price: { ha
       return;
     }
     setServerLines(r.data.lines || null);
+    setPayIntentId(r.data.clientSecret.split('_secret')[0]);
     setStep('pay');
     try {
       const stripe = await loadStripe();
@@ -403,6 +431,8 @@ export function RoomBooking({ roomName, price }: { roomName: string; price: { ha
     if (!stripeRef.current || !elementsRef.current) return;
     setWorking(true);
     setError(null);
+    // Sync the save-card choice (made beside the card) onto the PaymentIntent before confirming.
+    if (payIntentId && member) await roomSetSave(payIntentId, saveCardChecked);
     const { error: payErr, paymentIntent } = await stripeRef.current.confirmPayment({
       elements: elementsRef.current,
       confirmParams: { return_url: window.location.href },
@@ -412,6 +442,46 @@ export function RoomBooking({ roomName, price }: { roomName: string; price: { ha
     if (payErr) return setError(payErr.message || 'That payment didn’t go through — please try again.');
     if (paymentIntent && (paymentIntent.status === 'succeeded' || paymentIntent.status === 'processing')) setStep('done');
     else setError('Payment needs another step — please try again.');
+  }
+
+  // One-tap: charge the member's saved card. The server confirms it; if the bank wants an extra
+  // step we run it here. Never sees the card number.
+  async function payWithSaved() {
+    if (!sel || !spaceId || !savedCard) return;
+    setWorking(true);
+    setError(null);
+    const r = await roomIntent({
+      spaceId,
+      date,
+      pkg: pkg!,
+      start: minToHHMM(sel.start),
+      end: minToHHMM(sel.end),
+      people,
+      lunch,
+      company: (company || 'Member booking').trim(),
+      name: name.trim(),
+      email: email.trim() || memberEmailOf(member),
+      savedPaymentMethod: savedCard.id,
+    });
+    if (r.ok && r.data.paid) {
+      setWorking(false);
+      return setStep('done');
+    }
+    if (r.ok && r.data.requiresAction && r.data.clientSecret) {
+      try {
+        const stripe = await loadStripe();
+        const { error: e2, paymentIntent } = await stripe.handleCardAction(r.data.clientSecret);
+        setWorking(false);
+        if (e2) return setError(e2.message || 'That payment didn’t go through — please try again.');
+        if (paymentIntent && (paymentIntent.status === 'succeeded' || paymentIntent.status === 'processing')) return setStep('done');
+        return setError('Payment needs another step — please try again.');
+      } catch {
+        setWorking(false);
+        return setError('Couldn’t complete the payment — please try again.');
+      }
+    }
+    setWorking(false);
+    setError(ERRORS[(r.data as { error?: string } | undefined)?.error ?? ''] ?? 'That card was declined — try another.');
   }
 
   if (step === 'done') {
@@ -684,6 +754,12 @@ export function RoomBooking({ roomName, price }: { roomName: string; price: { ha
               <div className={styles.payBox}>
                 <span className={styles.label}>Payment</span>
                 <div ref={mountRef} className={styles.payEl} />
+                {member ? (
+                  <label className={styles.saveRow}>
+                    <input type="checkbox" checked={saveCardChecked} onChange={() => setSaveCardChecked((v) => !v)} />
+                    <span>Save this card for faster booking next time</span>
+                  </label>
+                ) : null}
                 <Button variant="accent" fullWidth onClick={pay} disabled={working} iconAfter="arrow-right">
                   {working ? 'Taking payment…' : `Pay ${money(payTotal)}`}
                 </Button>
@@ -692,10 +768,33 @@ export function RoomBooking({ roomName, price }: { roomName: string; price: { ha
                 </button>
                 <p className={styles.secure}>Paid securely with Stripe · Apple Pay &amp; cards.</p>
               </div>
+            ) : savedCard && !useNewCard ? (
+              // One-tap with the card on file (signed-in member).
+              <div className={styles.payBox}>
+                <div className={styles.savedCardRow}>
+                  <span>
+                    Paying with {savedCard.brand.charAt(0).toUpperCase() + savedCard.brand.slice(1)} •••• {savedCard.last4}
+                  </span>
+                  <button type="button" className={styles.linkLike} onClick={() => setUseNewCard(true)}>
+                    Use a different card
+                  </button>
+                </div>
+                <Button variant="accent" fullWidth onClick={payWithSaved} disabled={working || resolving} iconAfter="arrow-right">
+                  {working ? 'Taking payment…' : `Pay ${money(payTotal)}`}
+                </Button>
+                <p className={styles.secure}>One tap — paid securely with Stripe.</p>
+              </div>
             ) : (
-              <Button variant="accent" fullWidth onClick={toPayment} disabled={working || resolving} iconAfter="arrow-right">
-                {working ? 'Checking…' : 'Continue to payment'}
-              </Button>
+              <>
+                {savedCard && useNewCard ? (
+                  <button type="button" className={styles.linkLike} onClick={() => setUseNewCard(false)}>
+                    ‹ Use {savedCard.brand.charAt(0).toUpperCase() + savedCard.brand.slice(1)} •••• {savedCard.last4} instead
+                  </button>
+                ) : null}
+                <Button variant="accent" fullWidth onClick={toPayment} disabled={working || resolving} iconAfter="arrow-right">
+                  {working ? 'Checking…' : 'Continue to payment'}
+                </Button>
+              </>
             )}
           </>
         )}

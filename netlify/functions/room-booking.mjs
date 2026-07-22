@@ -276,6 +276,17 @@ export default async function handler(req) {
     return json({ capHours: cap, usedHours: round2(used), remaining: round2(Math.max(0, cap - used)) });
   }
 
+  // Toggle whether the card entered for THIS payment gets saved (setup_future_usage), so the
+  // "Save this card" checkbox can sit beside the card and still take effect before payment.
+  if (action === 'set-save') {
+    const vm = await verifyMember(tokenFromRequest(req, body));
+    if (!vm.ok) return json({ error: 'auth' }, 401);
+    const pmiId = String(body.paymentIntentId || '').trim();
+    if (!/^pi_[A-Za-z0-9_]+$/.test(pmiId)) return json({ error: 'bad-id' }, 400);
+    const r = await stripe(`/v1/payment_intents/${pmiId}`, 'POST', { setup_future_usage: body.save ? 'off_session' : '' });
+    return json({ ok: !r?.error });
+  }
+
   if (!spaceId || !date) return json({ error: 'missing-params' }, 400);
 
   const space = await getSpace(spaceId);
@@ -323,9 +334,10 @@ export default async function handler(req) {
   if (!(await isFree(spaceId, date, priced.start, priced.end))) return json({ error: 'slot-taken' }, 409);
 
   if (action === 'quote') {
-    // For a signed-in member, also surface their saved card so the client can offer one-tap pay.
+    // For a signed-in member, also surface their saved card so the client can offer one-tap pay —
+    // unless they've turned Instant Book off (then we never touch their card).
     let savedCard = null;
-    if (payer.ok) {
+    if (payer.ok && !payer.member?.metaData?.instantBookOff) {
       const custId = await findCustomerId(String(memberEmail(payer.member) || ''));
       savedCard = custId ? await defaultCard(custId) : null;
     }
@@ -413,9 +425,11 @@ export default async function handler(req) {
     // Saved cards (members only): attach the Stripe customer so a card can be reused/saved.
     //  • savedPaymentMethod → charge that saved card NOW (member is present → on-session).
     //  • saveCard → save the newly-entered card to the customer for next time (with their consent).
+    // Instant Book off → we neither reuse nor save their card (a normal card-entry payment).
+    const instantOff = !!vm.member?.metaData?.instantBookOff;
     const customerId = vm.ok ? await findCustomerId(email) : null;
-    const savedPm = String(body.savedPaymentMethod || '').trim();
-    const saveCard = body.saveCard === true || body.saveCard === 'true';
+    const savedPm = vm.ok && !instantOff ? String(body.savedPaymentMethod || '').trim() : '';
+    const saveCard = !instantOff && (body.saveCard === true || body.saveCard === 'true');
 
     const piParams = {
       amount: String(priced.amountPence),

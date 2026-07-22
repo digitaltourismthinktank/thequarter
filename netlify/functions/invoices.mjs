@@ -90,6 +90,15 @@ export default async function handler(req) {
 
   if (req.method !== 'POST') return json({ error: 'method-not-allowed' }, 405);
 
+  // --- The card(s) on file, for the member's payment-management panel ---
+  if (body.action === 'card') {
+    const cust = await stripe(`/v1/customers/${customerId}`, 'GET');
+    const defPm = cust?.invoice_settings?.default_payment_method;
+    const pms = await stripe(`/v1/payment_methods?customer=${customerId}&type=card&limit=10`, 'GET');
+    const cards = (pms?.data || []).map((p) => ({ id: p.id, brand: p.card?.brand || 'card', last4: p.card?.last4 || '', exp: `${p.card?.exp_month || ''}/${String(p.card?.exp_year || '').slice(-2)}`, default: p.id === defPm }));
+    return json({ cards, instantBookOff: member?.metaData?.instantBookOff === true });
+  }
+
   // --- Start a card update: a SetupIntent the client confirms with Stripe Elements ---
   if (body.action === 'setup-intent') {
     const si = await stripe('/v1/setup_intents', 'POST', { customer: customerId, 'payment_method_types[0]': 'card' });

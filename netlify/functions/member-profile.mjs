@@ -52,10 +52,17 @@ export default async function handler(req) {
   //   pushOptOut  — the space-wide announcement pushes ("we're celebrating…")
   if (typeof body.emailOptOut === 'boolean') meta.emailOptOut = body.emailOptOut;
   if (typeof body.pushOptOut === 'boolean') meta.pushOptOut = body.pushOptOut;
+  // Instant book (one-tap saved-card pay). Opt-OUT: default off = feature ON. When true, we neither
+  // offer nor charge their saved card for room/day-pass payments — read by room-booking.mjs.
+  if (typeof body.instantBookOff === 'boolean') meta.instantBookOff = body.instantBookOff;
 
   // A VAT-invoice request — flagged for admin to action manually (our Stripe prices
   // are VAT-inclusive). Stamped with the request time; admin clears it when done.
   if (body.vatRequest === true) meta.vatRequested = new Date().toISOString();
+  // A GDPR account & data deletion request. We DON'T hard-delete here: the card usually funds a
+  // live subscription and data spans Stripe/Memberstack/Airtable, so it's flagged for the team to
+  // action properly (cancel billing, erase, confirm). Stamped so admin sees and clears it.
+  if (body.deletionRequest === true) meta.deletionRequested = new Date().toISOString();
 
   const admin = memberstackAdmin.init(MS_SECRET);
   await admin.members.update({ id: vm.member.id, data: { metaData: meta } });
@@ -85,6 +92,34 @@ export default async function handler(req) {
     await pushToAdmins({ title: 'VAT invoice requested', body: `${email || vm.member.id}`, url: '/admin/' });
   }
 
+  // Acknowledge a data-deletion request (member + ops). Best-effort. The team then processes it.
+  if (body.deletionRequest === true) {
+    const email = memberEmail(vm.member);
+    const fn = String(vm.member?.customFields?.['first-name'] || '').trim();
+    if (email) {
+      await sendEmail({
+        to: email,
+        replyTo: OPS_EMAIL,
+        subject: 'Your data deletion request',
+        html: emailShell(
+          'We’ve received your request',
+          `<p>Hi${fn ? ` ${escapeHtml(fn)}` : ''},</p><p>We’ve logged your request to delete your account and data. Our team will action it and be in touch — if you have an active membership we’ll confirm the billing side with you first. You can cancel this request any time by replying to this email.</p>`,
+          'We’ve logged your data deletion request',
+        ),
+      });
+    }
+    await sendEmail({
+      to: OPS_EMAIL,
+      subject: `⚠️ Data deletion requested — ${email || vm.member.id}`,
+      html: emailShell(
+        'Data deletion requested',
+        `<p><strong>${escapeHtml(email || '')}</strong> (${escapeHtml(vm.member.id)}) has requested account &amp; data deletion.</p><p>Action: cancel any live subscription, detach the card, and erase across Stripe / Memberstack / Airtable, then confirm with them.</p>`,
+        'A member requested account & data deletion',
+      ),
+    });
+    await pushToAdmins({ title: 'Data deletion requested', body: `${email || vm.member.id}`, url: '/admin/' });
+  }
+
   return json({
     ok: true,
     bday: meta.bday || null,
@@ -95,5 +130,7 @@ export default async function handler(req) {
     vatRequested: meta.vatRequested || null,
     emailOptOut: meta.emailOptOut === true,
     pushOptOut: meta.pushOptOut === true,
+    instantBookOff: meta.instantBookOff === true,
+    deletionRequested: meta.deletionRequested || null,
   });
 }
