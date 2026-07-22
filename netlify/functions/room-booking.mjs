@@ -299,9 +299,11 @@ export default async function handler(req) {
   }
 
   if (action === 'intent') {
-    const email = String(body.email || '').trim();
-    const name = String(body.name || '').trim();
-    const company = String(body.company || '').trim();
+    // A signed-in member (the dashboard's inline pay flow) needn't re-type their details: fall back
+    // to their own email/name from the verified token. Guests still supply these on the public form.
+    const email = String(body.email || '').trim() || (payer.ok ? String(memberEmail(payer.member) || '').trim() : '');
+    const name = String(body.name || '').trim() || (payer.ok ? String(memberName(payer.member) || '').trim() : '');
+    const company = String(body.company || '').trim() || (payer.ok ? 'Member booking' : '');
     const jobTitle = String(body.jobTitle || '').trim();
     const phone = String(body.phone || '').trim();
     if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: 'bad-email' }, 400);

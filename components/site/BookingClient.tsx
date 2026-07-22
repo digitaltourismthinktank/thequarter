@@ -627,7 +627,7 @@ export function BookingClient() {
                 </>
               ) : (
                 <Button variant="primary" fullWidth onClick={toPayment} disabled={!sel || busyAction} iconAfter="arrow-right">
-                  {busyAction ? 'Checking…' : payPence != null ? `Continue — pay ${money(payPence / 100)}` : 'Continue to payment'}
+                  {busyAction ? 'Checking…' : 'Continue to payment'}
                 </Button>
               )}
               {payErr ? <p className={styles.msg}>{payErr}</p> : null}
