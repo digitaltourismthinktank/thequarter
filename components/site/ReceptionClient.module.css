@@ -3,26 +3,32 @@
 .screen {
   min-height: 100dvh;
   display: flex;
-  align-items: center;
+  /* Top-align (not centre) + scrollable: when a field is tapped the on-screen keyboard shrinks
+     the viewport, and centred content would jump or hide behind it. Top-aligned with a generous
+     top band looks intentional on a big iPad AND keeps every input reachable above the keyboard. */
+  align-items: flex-start;
   justify-content: center;
-  padding: clamp(20px, 4vw, 56px);
+  overflow-y: auto;
+  padding: clamp(32px, 8vh, 104px) clamp(20px, 4vw, 56px) clamp(32px, 8vh, 96px);
   background: var(--surface-page, #faf7f0);
   color: var(--ink-900);
   font-family: var(--font-sans);
+  -webkit-text-size-adjust: 100%;
 }
 
 .card {
   width: 100%;
-  max-width: 560px;
+  /* Fill more of a large lobby screen — the old 560px left an iPad Pro mostly empty. */
+  max-width: 780px;
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
-  gap: 14px;
+  gap: clamp(14px, 2.2vh, 22px);
 }
 
 .logo {
-  width: clamp(140px, 22vw, 190px);
+  width: clamp(150px, 22vw, 210px);
   height: auto;
   margin-bottom: 6px;
 }
@@ -54,33 +60,64 @@
   font-size: 0.95rem;
 }
 
-/* Landing two-up choice */
+/* Landing choices — auto-fit so two or three options both fill the row nicely. */
 .choices {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(clamp(200px, 26vw, 240px), 1fr));
+  gap: clamp(14px, 2vw, 22px);
   width: 100%;
-  margin-top: 10px;
-}
-@media (max-width: 520px) {
-  .choices { grid-template-columns: 1fr; }
+  margin-top: 8px;
 }
 .choice {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: clamp(22px, 3.5vw, 34px) 18px;
-  border: 1px solid var(--sand-200, #e7ddca);
+  gap: 10px;
+  padding: clamp(26px, 4vw, 42px) 20px;
+  border: 1.5px solid var(--sand-200, #e7ddca);
   border-radius: var(--radius-xl, 20px);
   background: var(--pure-white, #fff);
   cursor: pointer;
-  transition: border-color 0.15s, transform 0.05s;
+  transition: border-color 0.15s, transform 0.05s, box-shadow 0.15s;
+  /* iOS paints button text (and its <strong>) system-blue unless the fill colour is pinned —
+     which is exactly why the labels read blue on the iPad but black on desktop. */
+  color: var(--ink-900);
+  -webkit-text-fill-color: currentColor;
+  -webkit-appearance: none;
+  -webkit-tap-highlight-color: transparent;
 }
 .choice:hover { border-color: var(--gold-600, #b8933f); }
 .choice:active { transform: translateY(1px); }
-.choice strong { font-size: 1.3rem; font-weight: var(--fw-bold); }
-.choice span { color: var(--text-muted, #8a7f72); font-size: 0.95rem; }
+.choiceIcon {
+  width: clamp(72px, 9vw, 104px);
+  height: clamp(72px, 9vw, 104px);
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--gold-100, #f4ecd8);
+  margin-bottom: 2px;
+}
+.choiceTitle {
+  font-size: clamp(1.35rem, 2.4vw, 1.85rem);
+  font-weight: var(--fw-bold);
+  color: var(--ink-900);
+}
+.choiceSub {
+  color: var(--text-muted, #8a7f72);
+  font-size: clamp(0.95rem, 1.4vw, 1.1rem);
+}
+/* A clear colour difference so a member spots their tile instantly — theirs is warm gold, the
+   others stay a calm neutral. */
+.choiceMember {
+  background: var(--gold-100, #f4ecd8);
+  border-color: var(--gold-300, #e6d3a3);
+}
+.choiceMember .choiceIcon {
+  background: var(--pure-white, #fff);
+}
+.choiceMember:hover {
+  box-shadow: 0 8px 24px rgba(184, 147, 63, 0.18);
+}
 
 /* Inputs + fields */
 .field {
@@ -114,12 +151,16 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 14px;
+  padding: 14px 16px;
   border: 1px solid var(--sand-200, #e7ddca);
   border-radius: var(--radius-lg, 14px);
   background: var(--pure-white, #fff);
   cursor: pointer;
   text-align: left;
+  /* Same iOS fix as .choice — keep the picked name black, not system-blue. */
+  color: var(--ink-900);
+  -webkit-text-fill-color: currentColor;
+  -webkit-appearance: none;
 }
 .match:hover { border-color: var(--gold-600, #b8933f); }
 .matchAvatar {

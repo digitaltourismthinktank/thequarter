@@ -140,15 +140,19 @@ export function ReceptionClient() {
             <h1 className={styles.h1}>Checking in?</h1>
             <p className={styles.lead}>Tap whichever is you — no phone or password needed.</p>
             <div className={styles.choices}>
-              <button type="button" className={styles.choice} onClick={() => setMode('member')}>
-                <Icon name="user" size={26} color="var(--gold-700)" />
-                <strong>I’m a member</strong>
-                <span>Check in for the day</span>
+              <button type="button" className={`${styles.choice} ${styles.choiceMember}`} onClick={() => setMode('member')}>
+                <span className={styles.choiceIcon}>
+                  <Icon name="user" size={44} color="var(--gold-700)" />
+                </span>
+                <strong className={styles.choiceTitle}>I’m a member</strong>
+                <span className={styles.choiceSub}>Check in for the day</span>
               </button>
               <button type="button" className={styles.choice} onClick={() => setMode('guest')}>
-                <Icon name="users" size={26} color="var(--gold-700)" />
-                <strong>I’m a guest</strong>
-                <span>Here for a meeting or visit</span>
+                <span className={styles.choiceIcon}>
+                  <Icon name="users" size={44} color="var(--gold-700)" />
+                </span>
+                <strong className={styles.choiceTitle}>I’m a guest</strong>
+                <span className={styles.choiceSub}>Here for a meeting or visit</span>
               </button>
             </div>
           </>
