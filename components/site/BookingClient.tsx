@@ -18,6 +18,7 @@ import {
   type MyBooking,
   type RoomMemberStatus,
   type RoomQuoteLine,
+  type SavedCard,
 } from '@/lib/booking';
 import { STRIPE_PUBLISHABLE_KEY } from '@/lib/commerce';
 import { WeekStrip } from './WeekStrip';
@@ -26,6 +27,7 @@ import { PLAN_ROOM_HOURS, MEMBER_ROOM_DISCOUNT, planSlugFromMemberstackId } from
 import styles from './BookingClient.module.css';
 
 const money = (n: number) => `£${n.toFixed(2)}`;
+const prettyBrand = (b: string) => (b === 'amex' ? 'Amex' : b.charAt(0).toUpperCase() + b.slice(1));
 /** Range → package span for pricing (13:00 split): wholly-AM/PM = half, crossing midday = full. */
 function pkgForRange(startMin: number, endMin: number): 'am' | 'pm' | 'full' {
   if (endMin <= 13 * 60) return 'am';
@@ -130,6 +132,11 @@ export function BookingClient() {
   const [payPence, setPayPence] = useState<number | null>(null);
   const [payStep, setPayStep] = useState<'none' | 'pay'>('none');
   const [payErr, setPayErr] = useState<string | null>(null);
+  // Saved-card (one-tap) state: the member's card on file, a toggle to enter a different card,
+  // and whether to save a newly-entered card for next time.
+  const [savedCard, setSavedCard] = useState<SavedCard | null>(null);
+  const [useNewCard, setUseNewCard] = useState(false);
+  const [saveCardChecked, setSaveCardChecked] = useState(true);
   const payMountRef = useRef<HTMLDivElement | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const stripeRef = useRef<any>(null);
@@ -210,6 +217,7 @@ export function BookingClient() {
   useEffect(() => {
     setPayStep('none');
     setPayErr(null);
+    setUseNewCard(false);
     const sp = spaces.find((s) => s.id === spaceId);
     const isRoom = !!sp && sp.type !== 'Phone pod';
     const hrs = sel ? (sel.end - sel.start) / 60 : 0;
@@ -217,6 +225,7 @@ export function BookingClient() {
     if (!over || !sel || !spaceId) {
       setPayLines(null);
       setPayPence(null);
+      setSavedCard(null);
       return;
     }
     let active = true;
@@ -232,6 +241,7 @@ export function BookingClient() {
       if (active && r.ok) {
         setPayLines(r.data.lines);
         setPayPence(r.data.amountPence);
+        setSavedCard(r.data.savedCard ?? null);
       }
     })();
     return () => {
@@ -301,8 +311,61 @@ export function BookingClient() {
     setBusyAction(false);
   }
 
-  // Over-cap room booking: start the paid flow (server prices the member rate + returns a
-  // client secret), then mount Stripe's Payment Element inline so the member pays without leaving.
+  // Shared success path: the booking itself is created by the Stripe webhook, so we just reset,
+  // confirm to the member, and refresh what we can.
+  async function bookedOk() {
+    setBusyAction(false);
+    setMsg('Booked & paid ✓ — it’ll appear in your bookings shortly.');
+    setPayStep('none');
+    clearSel();
+    await reloadAvail();
+    await loadMine();
+    const s = await roomMemberStatus(date);
+    if (s.ok) setRoomStatus(s.data);
+  }
+
+  // One-tap: charge the member's saved card. The server confirms it; occasionally the bank wants
+  // an extra step (handleCardAction), which we run here. Never stores or sees the card number.
+  async function payWithSaved() {
+    if (!sel || !spaceId || !savedCard) return;
+    setBusyAction(true);
+    setPayErr(null);
+    setMsg(null);
+    const r = await roomIntent({
+      spaceId,
+      date,
+      pkg: pkgForRange(sel.start, sel.end),
+      start: minToHHMM(sel.start),
+      end: minToHHMM(sel.end),
+      people: Math.max(1, party ?? 1),
+      company: 'Member booking',
+      savedPaymentMethod: savedCard.id,
+    });
+    if (r.ok && r.data.paid) return bookedOk();
+    if (r.ok && r.data.requiresAction && r.data.clientSecret) {
+      try {
+        const stripe = await loadStripe();
+        const { error, paymentIntent } = await stripe.handleCardAction(r.data.clientSecret);
+        if (error) {
+          setBusyAction(false);
+          setPayErr(error.message || 'That payment didn’t go through — please try again.');
+          return;
+        }
+        if (paymentIntent && (paymentIntent.status === 'succeeded' || paymentIntent.status === 'processing')) return bookedOk();
+        setBusyAction(false);
+        setPayErr('Payment needs another step — please try again.');
+      } catch {
+        setBusyAction(false);
+        setPayErr('Couldn’t complete the payment — please try again.');
+      }
+      return;
+    }
+    setBusyAction(false);
+    setPayErr(friendly((r.data as { error?: string } | undefined)?.error) || 'That card was declined — try another.');
+  }
+
+  // New card (or "use a different card"): start the paid flow, then mount Stripe's Payment Element
+  // inline. `saveCard` keeps it on file for next time, with the member's consent (the checkbox).
   async function toPayment() {
     if (!sel || !spaceId) return;
     setBusyAction(true);
@@ -316,6 +379,7 @@ export function BookingClient() {
       end: minToHHMM(sel.end),
       people: Math.max(1, party ?? 1),
       company: 'Member booking',
+      saveCard: saveCardChecked,
     });
     setBusyAction(false);
     if (!r.ok || !r.data.clientSecret) {
@@ -349,22 +413,14 @@ export function BookingClient() {
       confirmParams: { return_url: window.location.href },
       redirect: 'if_required',
     });
-    setBusyAction(false);
     if (error) {
+      setBusyAction(false);
       setPayErr(error.message || 'That payment didn’t go through — please try again.');
       return;
     }
-    if (paymentIntent && (paymentIntent.status === 'succeeded' || paymentIntent.status === 'processing')) {
-      setMsg('Booked & paid ✓ — it’ll appear in your bookings shortly.');
-      setPayStep('none');
-      clearSel();
-      await reloadAvail();
-      await loadMine();
-      const s = await roomMemberStatus(date);
-      if (s.ok) setRoomStatus(s.data);
-    } else {
-      setPayErr('Payment needs another step — please try again.');
-    }
+    if (paymentIntent && (paymentIntent.status === 'succeeded' || paymentIntent.status === 'processing')) return bookedOk();
+    setBusyAction(false);
+    setPayErr('Payment needs another step — please try again.');
   }
 
   async function cancel(id: string) {
@@ -618,17 +674,49 @@ export function BookingClient() {
                 </div>
               ) : null}
               {payStep === 'pay' ? (
+                // Entering a new card via Stripe Elements. The save-card choice was made below,
+                // before this step, so it's already baked into the payment.
                 <>
                   <div ref={payMountRef} className={styles.payEl} />
                   <Button variant="primary" fullWidth onClick={pay} disabled={busyAction} iconAfter="arrow-right">
                     {busyAction ? 'Taking payment…' : `Pay ${money((payPence ?? 0) / 100)}`}
                   </Button>
-                  <p className={styles.paySecure}>Paid securely with Stripe · Apple Pay &amp; cards.</p>
+                  <p className={styles.paySecure}>
+                    {saveCardChecked ? 'Card saved for next time · ' : ''}Paid securely with Stripe · Apple Pay &amp; cards.
+                  </p>
+                </>
+              ) : savedCard && !useNewCard ? (
+                // One-tap: pay with the card already on file (you always see which card).
+                <>
+                  <div className={styles.savedCardRow}>
+                    <span>
+                      Paying with {prettyBrand(savedCard.brand)} •••• {savedCard.last4}
+                    </span>
+                    <button type="button" className={styles.linkBtn} onClick={() => setUseNewCard(true)}>
+                      Use a different card
+                    </button>
+                  </div>
+                  <Button variant="primary" fullWidth onClick={payWithSaved} disabled={busyAction} iconAfter="arrow-right">
+                    {busyAction ? 'Taking payment…' : `Pay ${money((payPence ?? 0) / 100)}`}
+                  </Button>
+                  <p className={styles.paySecure}>One tap — paid securely with Stripe.</p>
                 </>
               ) : (
-                <Button variant="primary" fullWidth onClick={toPayment} disabled={!sel || busyAction} iconAfter="arrow-right">
-                  {busyAction ? 'Checking…' : 'Continue to payment'}
-                </Button>
+                // No saved card, or the member chose to enter a different one.
+                <>
+                  {savedCard && useNewCard ? (
+                    <button type="button" className={styles.linkBtn} onClick={() => setUseNewCard(false)}>
+                      ‹ Use {prettyBrand(savedCard.brand)} •••• {savedCard.last4} instead
+                    </button>
+                  ) : null}
+                  <label className={styles.saveRow}>
+                    <input type="checkbox" checked={saveCardChecked} onChange={() => setSaveCardChecked((v) => !v)} />
+                    <span>Save this card for faster booking next time</span>
+                  </label>
+                  <Button variant="primary" fullWidth onClick={toPayment} disabled={!sel || busyAction} iconAfter="arrow-right">
+                    {busyAction ? 'Checking…' : 'Continue to payment'}
+                  </Button>
+                </>
               )}
               {payErr ? <p className={styles.msg}>{payErr}</p> : null}
             </div>
@@ -714,6 +802,8 @@ function friendly(code?: string): string {
       return 'The Quarter is open Monday to Friday.';
     case 'weekend':
       return 'Paid extra time is Monday–Friday. For a weekend booking, chat to the team.';
+    case 'card-declined':
+      return 'That card was declined — try a different card.';
     case 'closed-day':
       return 'The Quarter is closed that day (bank holiday or seasonal closure).';
     case 'bad-increment':

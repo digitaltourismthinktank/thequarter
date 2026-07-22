@@ -61,13 +61,41 @@ const PACKAGES = {
 
 const json = (b, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { 'content-type': 'application/json' } });
 
-async function stripe(path, method, form) {
+async function stripe(path, method, form, idempotencyKey) {
+  const headers = { authorization: `Bearer ${STRIPE_SECRET}`, 'content-type': 'application/x-www-form-urlencoded' };
+  // A stable key means a retried one-tap charge returns the SAME PaymentIntent — never a second charge.
+  if (idempotencyKey) headers['Idempotency-Key'] = idempotencyKey;
   const res = await fetch(`https://api.stripe.com${path}`, {
     method,
-    headers: { authorization: `Bearer ${STRIPE_SECRET}`, 'content-type': 'application/x-www-form-urlencoded' },
+    headers,
     body: form ? new URLSearchParams(form).toString() : undefined,
   });
   return res.json();
+}
+
+/** The member's Stripe customer (prefer one carrying a subscription) — for saved-card pay. */
+async function findCustomerId(email) {
+  if (!email) return null;
+  const customers = await stripe(`/v1/customers?email=${encodeURIComponent(email)}&limit=10`, 'GET');
+  const list = customers?.data || [];
+  if (!list.length) return null;
+  for (const c of list) {
+    const subs = await stripe(`/v1/subscriptions?customer=${c.id}&status=all&limit=1`, 'GET');
+    if (subs?.data?.length) return c.id;
+  }
+  return list[0].id;
+}
+
+/** The saved card to offer for one-tap: the customer's default, else their most recent card. */
+async function defaultCard(customerId) {
+  if (!customerId) return null;
+  const cust = await stripe(`/v1/customers/${customerId}`, 'GET');
+  const defPm = cust?.invoice_settings?.default_payment_method;
+  const pms = await stripe(`/v1/payment_methods?customer=${customerId}&type=card&limit=10`, 'GET');
+  const cards = pms?.data || [];
+  if (!cards.length) return null;
+  const chosen = cards.find((p) => p.id === defPm) || cards[0];
+  return { id: chosen.id, brand: chosen.card?.brand || 'card', last4: chosen.card?.last4 || '' };
 }
 
 /** London weekday (0=Sun) for a YYYY-MM-DD date — stable regardless of server TZ. */
@@ -295,7 +323,13 @@ export default async function handler(req) {
   if (!(await isFree(spaceId, date, priced.start, priced.end))) return json({ error: 'slot-taken' }, 409);
 
   if (action === 'quote') {
-    return json({ amountPence: priced.amountPence, lines: priced.lines, start: priced.start, end: priced.end });
+    // For a signed-in member, also surface their saved card so the client can offer one-tap pay.
+    let savedCard = null;
+    if (payer.ok) {
+      const custId = await findCustomerId(String(memberEmail(payer.member) || ''));
+      savedCard = custId ? await defaultCard(custId) : null;
+    }
+    return json({ amountPence: priced.amountPence, lines: priced.lines, start: priced.start, end: priced.end, savedCard });
   }
 
   if (action === 'intent') {
@@ -376,7 +410,14 @@ export default async function handler(req) {
     const vm = payer;
     const memberMeta = vm.ok ? { 'metadata[memberId]': vm.member.id, 'metadata[memberEmail]': memberEmail(vm.member) || '' } : {};
 
-    const pi = await stripe('/v1/payment_intents', 'POST', {
+    // Saved cards (members only): attach the Stripe customer so a card can be reused/saved.
+    //  • savedPaymentMethod → charge that saved card NOW (member is present → on-session).
+    //  • saveCard → save the newly-entered card to the customer for next time (with their consent).
+    const customerId = vm.ok ? await findCustomerId(email) : null;
+    const savedPm = String(body.savedPaymentMethod || '').trim();
+    const saveCard = body.saveCard === true || body.saveCard === 'true';
+
+    const piParams = {
       amount: String(priced.amountPence),
       currency: 'gbp',
       'payment_method_types[0]': 'card',
@@ -396,7 +437,29 @@ export default async function handler(req) {
       'metadata[phone]': phone,
       'metadata[email]': email,
       ...memberMeta,
-    });
+      ...(customerId ? { customer: customerId } : {}),
+    };
+    if (savedPm && customerId) {
+      // One-tap: confirm against the saved card right now. The member is present, so this is an
+      // on-session charge (off_session defaults false) — if the bank wants SCA we get requires_action.
+      piParams.payment_method = savedPm;
+      piParams.confirm = 'true';
+    } else if (customerId && saveCard) {
+      // Keep the new card on file for faster booking next time.
+      piParams.setup_future_usage = 'off_session';
+    }
+
+    // Idempotency for the one-tap charge only: same member + slot + amount within 24h → same PI.
+    const idem = savedPm ? `room-${vm.ok ? vm.member.id : 'g'}-${spaceId}-${date}-${priced.start}-${priced.end}-${priced.amountPence}-${savedPm}` : undefined;
+    const pi = await stripe('/v1/payment_intents', 'POST', piParams, idem);
+
+    if (savedPm) {
+      // Server-confirmed saved-card charge: report the outcome the client should act on.
+      if (pi?.error) return json({ error: 'card-declined', detail: pi.error.message || '' }, 402);
+      if (pi.status === 'succeeded' || pi.status === 'processing') return json({ ok: true, paid: true });
+      if (pi.status === 'requires_action' && pi.client_secret) return json({ requiresAction: true, clientSecret: pi.client_secret });
+      return json({ error: 'card-declined', detail: pi.last_payment_error?.message || '' }, 402);
+    }
     if (pi?.error || !pi?.client_secret) return json({ error: 'stripe', detail: pi?.error?.message }, 502);
     return json({ clientSecret: pi.client_secret, amountPence: priced.amountPence, lines: priced.lines, start: priced.start, end: priced.end });
   }

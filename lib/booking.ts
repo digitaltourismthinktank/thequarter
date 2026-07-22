@@ -104,16 +104,29 @@ export interface RoomQuoteLine {
   label: string;
   amount: number;
 }
+/** A member's saved card, surfaced for one-tap pay (Model A saved cards). */
+export interface SavedCard {
+  id: string;
+  brand: string;
+  last4: string;
+}
 export interface RoomQuote {
   amountPence: number;
   lines: RoomQuoteLine[];
   start: string;
   end: string;
+  /** The member's card on file, if any — offer one-tap pay. Null/absent = none / guest. */
+  savedCard?: SavedCard | null;
 }
 export interface RoomIntent extends RoomQuote {
-  clientSecret: string;
+  /** Present for the new-card (Stripe Elements) flow. Absent when a saved card was charged. */
+  clientSecret?: string;
   /** TEST COMP: true when the server skipped Stripe and recorded the booking at £0. */
   comped?: boolean;
+  /** Saved-card one-tap: the charge already succeeded server-side. */
+  paid?: boolean;
+  /** Saved-card one-tap: the bank wants extra authentication — confirm clientSecret client-side. */
+  requiresAction?: boolean;
 }
 export interface RoomBookingInput {
   spaceId: string;
@@ -136,6 +149,10 @@ export interface RoomBookingInput {
   /** TEST COMP (secret, env-gated). When it matches the server's TEST_COMP_CODE the booking is
    *  recorded + confirmed at £0 without Stripe; otherwise ignored. Never set for normal users. */
   test?: string;
+  /** Saved cards: a member's saved payment-method id to charge one-tap (their card on file). */
+  savedPaymentMethod?: string;
+  /** Saved cards: save the newly-entered card to the member for next time (their consent). */
+  saveCard?: boolean;
 }
 export const roomQuote = (b: RoomBookingInput) =>
   call<RoomQuote>('room-booking', { method: 'POST', auth: false, body: { action: 'quote', ...b } });
