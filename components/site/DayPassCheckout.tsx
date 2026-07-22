@@ -83,6 +83,19 @@ export function DayPassCheckout() {
     if (t) setTestCode(t);
   }, []);
 
+  // Walk-in (reception QR → /day-pass?walkin=1): they're standing at the door NOW, so pre-fill
+  // today's date and round the arrival to the current half-hour. They can still change either.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const p = new URLSearchParams(window.location.search);
+    if (p.get('walkin') !== '1' && p.get('today') !== '1') return;
+    const d = new Date();
+    setDate(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+    const mins = Math.min(Math.max(d.getHours() * 60 + d.getMinutes(), 8 * 60), 17 * 60 + 30);
+    const rm = mins % 60 < 30 ? 0 : 30;
+    setArrival(`${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(rm).padStart(2, '0')}`);
+  }, []);
+
   const mountRef = useRef<HTMLDivElement | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const stripeRef = useRef<any>(null);
@@ -172,7 +185,12 @@ export function DayPassCheckout() {
           cta: 'Create your account',
           href: signupHref(email, { firstName, lastName, phone }),
         }}
-        footnote={<>Breakfast, coffee and a desk are waiting on the 1st &amp; 2nd floors, 27–28 Burgate.</>}
+        footnote={
+          <>
+            Breakfast, coffee and a desk are waiting on the 1st &amp; 2nd floors, 27–28 Burgate. Need somewhere private for a
+            call or a meeting? <a href="/meeting-rooms">Book a phone pod or a room by the hour ›</a>
+          </>
+        }
       />
     );
   }

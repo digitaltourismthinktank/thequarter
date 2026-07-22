@@ -26,7 +26,7 @@ import {
 import { pointsForGBP, appendLedger, WELCOME_BONUS, creditReferral, CARNET_AMOUNT_TO_PASSES } from './_rewards.mjs';
 import { listRecords, createRecord, T, F, airtableReady, esc } from './_airtable.mjs';
 import { londonWallClockToISO, hhmmToMin } from './_time.mjs';
-import { sendEmail, emailShell, escapeHtml, OPS_EMAIL, fmtDateLong, fmtDateTime, dayBar } from './_email.mjs';
+import { sendEmail, emailShell, escapeHtml, OPS_EMAIL, fmtDateLong, fmtDateTime, dayBar, SITE_URL } from './_email.mjs';
 import { pushToEmail, pushToAdmins } from './_push.mjs';
 
 const MS_SECRET = process.env.MEMBERSTACK_SECRET_KEY;
@@ -257,6 +257,16 @@ async function sendDayPassEmails({ email, name, date, total, arrival = '09:00', 
     <p style="margin:0 0 6px;"><strong>Day Pass</strong> · ${escapeHtml(dateLong)}</p>
     <p style="margin:0 0 6px;">Arrival: <strong>${escapeHtml(arrival)}</strong>${outOfHours ? ' — requested, we’ll confirm this early start with you' : ''}</p>
     <p style="margin:0 0 6px;">Total paid: <strong>£${total.toFixed(2)}</strong> (inc VAT)</p>`;
+  // A gentle "come back" nudge for a guest with no account: create one (pre-filled) to save visits,
+  // book rooms/pods, and start earning Quarter Rewards. This is the invite the walk-in flow promised.
+  const first = (name || '').trim().split(/\s+/)[0];
+  const signupUrl = `${SITE_URL}/signup?email=${encodeURIComponent(email || '')}${first ? `&first=${encodeURIComponent(first)}` : ''}`;
+  const invite = `
+    <div style="margin:18px 0 0;padding:16px 18px;background:#f7f2e7;border:1px solid #eee2cc;border-radius:14px;">
+      <p style="margin:0 0 8px;font-weight:700;color:#1e1a15;">Thinking of coming back?</p>
+      <p style="margin:0 0 12px;color:#4a4038;">Create a free account to save your visits, book meeting rooms and phone pods, and start earning <strong>Quarter Rewards</strong> — points on every visit toward free days and local perks.</p>
+      <a href="${signupUrl}" style="display:inline-block;background:#b8933f;color:#ffffff;text-decoration:none;font-weight:700;padding:11px 20px;border-radius:999px;">Create your account ›</a>
+    </div>`;
   if (email) {
     await sendEmail({
       to: email,
@@ -264,7 +274,7 @@ async function sendDayPassEmails({ email, name, date, total, arrival = '09:00', 
       subject: 'Your Day Pass is booked — The Quarter',
       html: emailShell(
         'Your Day Pass is booked',
-        `<p>Thanks${name ? `, ${escapeHtml(name)}` : ''} — you’re in for ${escapeHtml(dateLong)}.</p>${body}<p style="margin:12px 0 0;">Come up to the 1st &amp; 2nd floors, 27–28 Burgate — breakfast, coffee and a desk are waiting. Just let the team know you have a Day Pass.</p>`,
+        `<p>Thanks${name ? `, ${escapeHtml(name)}` : ''} — you’re in for ${escapeHtml(dateLong)}.</p>${body}<p style="margin:12px 0 0;">Come up to the 1st &amp; 2nd floors, 27–28 Burgate — breakfast, coffee and a desk are waiting. Just let the team know you have a Day Pass.</p>${invite}`,
         'Your Quarter Day Pass is booked',
       ),
     });

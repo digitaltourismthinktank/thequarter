@@ -14,6 +14,7 @@ import { busyness, expectedPeople, type Band } from '@/lib/busyness';
 import { Icon } from '@/components/ds/Icon';
 import { eventThemeIcon } from '@/lib/eventThemes';
 import { FloorScreen } from './FloorScreen';
+import { ReceptionClient } from './ReceptionClient';
 import styles from './ScreenClient.module.css';
 
 /** The lobby screen rotates through the next few events only. */
@@ -151,15 +152,16 @@ function eventWhen(start: string): string {
 }
 
 /** One installed /screen app can BE any of these displays — persisted so a reopen returns to it. */
-type ScreenChoice = 'entrance' | 'floor1' | 'floor2';
+type ScreenChoice = 'entrance' | 'floor1' | 'floor2' | 'reception';
 type ScreenView = ScreenChoice | 'chooser';
 const SCREEN_KEY = 'q-screen';
-const isChoice = (v: unknown): v is ScreenChoice => v === 'entrance' || v === 'floor1' || v === 'floor2';
+const isChoice = (v: unknown): v is ScreenChoice => v === 'entrance' || v === 'floor1' || v === 'floor2' || v === 'reception';
 
 const CHOICES: { id: ScreenChoice; label: string; hint: string }[] = [
   { id: 'entrance', label: 'Entrance', hint: 'Lobby busyness & what’s on' },
   { id: 'floor1', label: 'First floor', hint: 'Rooms, pods & workspaces' },
   { id: 'floor2', label: 'Second floor', hint: 'Rooms, pods & workspaces' },
+  { id: 'reception', label: 'Reception', hint: 'Door check-in — members, guests & day passes' },
 ];
 
 /**
@@ -241,10 +243,12 @@ export function ScreenClient() {
   }, []);
   const openChooser = useCallback(() => setView('chooser'), []);
 
-  // Lock the page to the viewport for the /screen kiosk ONLY — no rubber-band, no page
-  // scroll behind the fixed display. Scoped to this route: styles are restored on unmount
-  // so normal site pages are untouched.
+  // Lock the page to the viewport for the WALL displays only — no rubber-band, no page scroll
+  // behind the fixed display. Reception needs to scroll (its fields + the on-screen keyboard) and
+  // the chooser is a normal page, so neither is locked. Re-runs on view change; the cleanup
+  // restores styles when switching away, so normal site pages are untouched.
   useEffect(() => {
+    if (view !== 'entrance' && view !== 'floor1' && view !== 'floor2') return;
     const html = document.documentElement;
     const body = document.body;
     const prev = {
@@ -272,12 +276,20 @@ export function ScreenClient() {
       body.style.width = prev.bodyWidth;
       body.style.height = prev.bodyHeight;
     };
-  }, []);
+  }, [view]);
   if (view === null) return null;
   if (view === 'chooser') return <Chooser current={saved} onPick={choose} />;
 
   const screen =
-    view === 'floor1' ? <FloorScreen floor={1} /> : view === 'floor2' ? <FloorScreen floor={2} /> : <EntranceScreen />;
+    view === 'floor1' ? (
+      <FloorScreen floor={1} />
+    ) : view === 'floor2' ? (
+      <FloorScreen floor={2} />
+    ) : view === 'reception' ? (
+      <ReceptionClient />
+    ) : (
+      <EntranceScreen />
+    );
 
   return (
     <>

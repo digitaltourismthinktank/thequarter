@@ -2,11 +2,18 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Icon } from '@/components/ds/Icon';
+import { Qr } from '@/components/ds/Qr';
+import { SITE } from '@/lib/site';
 import {
   kioskMemberSearch, kioskCheckIn, getHosts, signInGuest,
   type MemberMatch, type GuestHost,
 } from '@/lib/booking';
 import styles from './ReceptionClient.module.css';
+
+/** Walk-in day pass: the QR sends the guest to the normal Day Pass checkout on THEIR OWN phone
+ *  (card / Apple Pay — never a card typed on the shared iPad). `walkin=1` pre-fills today, since
+ *  they're standing here now. Paying writes a Paid check-in for today = they're in as a guest. */
+const DAYPASS_URL = `${SITE.url.replace(/\/$/, '')}/day-pass?walkin=1`;
 
 /**
  * The reception kiosk — one shared iPad by the door that checks ANYONE in without a login:
@@ -19,7 +26,7 @@ import styles from './ReceptionClient.module.css';
  * picked from a privacy-safe search); the server records these as Source 'Kiosk'.
  */
 
-type Mode = 'landing' | 'member' | 'guest';
+type Mode = 'landing' | 'member' | 'guest' | 'daypass';
 const RESET_MS = 8000;
 
 function firstName(n: string) {
@@ -54,6 +61,14 @@ export function ReceptionClient() {
     resetTimer.current = setTimeout(() => reset(), RESET_MS);
   };
   useEffect(() => () => { if (resetTimer.current) clearTimeout(resetTimer.current); }, []);
+
+  // The day-pass QR has no on-screen confirmation (the guest pays on their phone), so give it its
+  // own gentle idle timeout — an abandoned QR drifts back to the landing for the next person.
+  useEffect(() => {
+    if (mode !== 'daypass') return;
+    const t = setTimeout(() => reset(), 45000);
+    return () => clearTimeout(t);
+  }, [mode]);
 
   // ---- Member path ----
   const [mq, setMq] = useState('');
@@ -153,6 +168,13 @@ export function ReceptionClient() {
                 </span>
                 <strong className={styles.choiceTitle}>I’m a guest</strong>
                 <span className={styles.choiceSub}>Here for a meeting or visit</span>
+              </button>
+              <button type="button" className={`${styles.choice} ${styles.choiceDaypass}`} onClick={() => setMode('daypass')}>
+                <span className={styles.choiceIcon}>
+                  <Icon name="ticket" size={44} color="var(--gold-700)" />
+                </span>
+                <strong className={styles.choiceTitle}>Buy a day pass</strong>
+                <span className={styles.choiceSub}>Just turned up? Pay for today</span>
               </button>
             </div>
           </>
@@ -282,6 +304,25 @@ export function ReceptionClient() {
             </p>
             <button type="button" className={styles.linkBtn} onClick={reset}>Done</button>
           </div>
+        ) : null}
+
+        {/* -------------------------------------------------------------- day pass -- */}
+        {mode === 'daypass' ? (
+          <>
+            <button type="button" className={styles.back} onClick={reset}>
+              <Icon name="arrow-left" size={16} /> Back
+            </button>
+            <h1 className={styles.h1}>Buy a day pass</h1>
+            <p className={styles.lead}>Point your phone camera at the code — you pay on your phone and you’re in for the day.</p>
+            <div className={styles.qrWrap}>
+              <Qr value={DAYPASS_URL} size={228} />
+            </div>
+            <span className={styles.qrUrl}>thequarter.work/day-pass</span>
+            <p className={styles.daypassMeta}>
+              <strong>£21.60</strong> for the full day — breakfast, bean-to-cup coffee, fast wifi and the phone pods. Pay by
+              card or Apple&nbsp;Pay on your own phone. Want a private room or a pod for a call? You can add one after you pay.
+            </p>
+          </>
         ) : null}
       </div>
     </div>
