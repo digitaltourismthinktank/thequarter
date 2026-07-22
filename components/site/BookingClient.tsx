@@ -8,6 +8,7 @@ import {
   getAvailability,
   getMyBookings,
   createBooking,
+  reserveDay,
   cancelBooking,
   amendBooking,
   sortBookings,
@@ -120,6 +121,12 @@ export function BookingClient() {
   const [eEnd, setEEnd] = useState('');
   const [amendErr, setAmendErr] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  // Sticky success: after a booking the confirm button reads "Booked ✓" and holds until the member
+  // changes the room / date / time — instead of snapping straight back to a greyed "Confirm booking".
+  const [justBooked, setJustBooked] = useState(false);
+  // Booking a room means they'll be in that day, so we offer to mark them in (no separate check-in).
+  const [offerInDate, setOfferInDate] = useState<string | null>(null);
+  const [inNote, setInNote] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   // Who's it for? Asked before the room list so the smallest space that fits is what you
   // see first — otherwise the instinct is to take the nicest room, and the six-seater gets
@@ -260,6 +267,7 @@ export function BookingClient() {
   // Two-tap selection: tap a start time, then an end time.
   function clickSlot(s: number) {
     setMsg(null);
+    setJustBooked(false);
     if (slotBusy(s)) return;
     if (sel) {
       // already have a range -> start a fresh selection
@@ -286,6 +294,7 @@ export function BookingClient() {
   // was already booked, "Afternoon" and "Full day" did nothing. Now they grab whatever's free.
   function preset(loRaw: number, hiRaw: number) {
     setMsg(null);
+    setJustBooked(false);
     const lo0 = Math.max(loRaw, open, firstSlot);
     const hi0 = Math.min(hiRaw, close);
     if (hi0 <= lo0) {
@@ -327,6 +336,8 @@ export function BookingClient() {
     const r = await createBooking({ spaceId, date, start: minToHHMM(sel.start), end: minToHHMM(sel.end) });
     if (r.ok) {
       setMsg('Booked ✓');
+      setJustBooked(true);
+      setOfferInDate(date);
       clearSel();
       await reloadAvail();
       await loadMine();
@@ -336,11 +347,31 @@ export function BookingClient() {
     setBusyAction(false);
   }
 
+  // Clearing the sticky "Booked ✓" (member changed the room/date/time) also clears the check-in offer.
+  useEffect(() => {
+    if (!justBooked) {
+      setOfferInDate(null);
+      setInNote(null);
+    }
+  }, [justBooked]);
+
+  // Booking a room = they'll be in that day. Offer to mark them in (a reservation the overnight
+  // sweep will spend), so they needn't separately "book to be in" or check in on arrival.
+  async function markInForDay(length: 'Full' | 'Half') {
+    if (!offerInDate) return;
+    setBusyAction(true);
+    const r = await reserveDay(offerInDate, length, null);
+    setBusyAction(false);
+    setInNote(r.ok ? `You’re marked in for ${dayLabel(offerInDate)}${length === 'Half' ? ' · half day' : ''} — no need to check in on the day.` : 'Couldn’t mark you in — you can still check in on the day.');
+  }
+
   // Shared success path: the booking itself is created by the Stripe webhook, so we just reset,
   // confirm to the member, and refresh what we can.
   async function bookedOk() {
     setBusyAction(false);
     setMsg('Booked & paid ✓ — it’ll appear in your bookings shortly.');
+    setJustBooked(true);
+    setOfferInDate(date);
     setPayStep('none');
     clearSel();
     await reloadAvail();
@@ -582,7 +613,7 @@ export function BookingClient() {
             key={s.id}
             type="button"
             className={`${styles.space} ${spaceId === s.id ? styles.spaceOn : ''}`}
-            onClick={() => setSpaceId(s.id)}
+            onClick={() => { setSpaceId(s.id); setJustBooked(false); }}
           >
             <span className={styles.spaceName}>{s.name}</span>
             <span className={styles.spaceMeta}>
@@ -619,7 +650,7 @@ export function BookingClient() {
       ) : (
         <>
           <div className={styles.bookDate}>
-            <WeekStrip value={date} onSelect={setDate} />
+            <WeekStrip value={date} onSelect={(d) => { setDate(d); setJustBooked(false); }} />
             <button type="button" className={styles.dateBtn} onClick={() => setPickerOpen(true)}>
               + Pick a date
             </button>
@@ -757,15 +788,46 @@ export function BookingClient() {
           ) : (
             <div className={styles.confirm}>
               <span className={styles.selLabel}>
-                {sel ? `${spaceName(spaceId)} · ${dayLabel(date)} · ${fmtRange(sel.start, sel.end)}` : 'Choose a time above.'}
+                {justBooked
+                  ? 'Booked ✓ — it’s in your bookings below.'
+                  : sel
+                    ? `${spaceName(spaceId)} · ${dayLabel(date)} · ${fmtRange(sel.start, sel.end)}`
+                    : 'Choose a time above.'}
               </span>
-              <Button variant="primary" onClick={confirm} disabled={!sel || busyAction}>
-                {busyAction ? 'Booking…' : isWeekendISO(date) ? 'Book the weekend' : 'Confirm booking'}
+              <Button variant={justBooked ? 'accent' : 'primary'} onClick={confirm} disabled={busyAction || !sel}>
+                {busyAction ? 'Booking…' : justBooked ? 'Booked ✓' : isWeekendISO(date) ? 'Book the weekend' : 'Confirm booking'}
               </Button>
             </div>
           )}
         </>
       )}
+
+      {/* Booking a room = they'll be in that day, so offer to mark them in (no separate check-in). */}
+      {justBooked && offerInDate ? (
+        <div className={styles.inOffer}>
+          {inNote ? (
+            <span className={styles.inOfferDone}>✓ {inNote}</span>
+          ) : (
+            <>
+              <span className={styles.inOfferText}>
+                You’ll be in on {dayLabel(offerInDate)} for this — shall we mark you in for the day too? Then there’s nothing to
+                check in on arrival.
+              </span>
+              <div className={styles.inOfferBtns}>
+                <button type="button" className={styles.inOfferBtn} onClick={() => markInForDay('Full')} disabled={busyAction}>
+                  Yes · full day
+                </button>
+                <button type="button" className={styles.inOfferBtn} onClick={() => markInForDay('Half')} disabled={busyAction}>
+                  Half day
+                </button>
+                <button type="button" className={styles.inOfferSkip} onClick={() => setOfferInDate(null)} disabled={busyAction}>
+                  No thanks
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      ) : null}
 
       {mine.length ? (
         <div className={styles.mine}>

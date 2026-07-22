@@ -554,3 +554,54 @@
   font-weight: var(--fw-semibold);
   text-decoration: underline;
 }
+
+/* "Also mark you in for the day?" offer after a room booking. */
+.inOffer {
+  margin-top: 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--gold-300, #e6d3a3);
+  border-radius: var(--radius-lg, 14px);
+  background: var(--gold-100, #f4ecd8);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.inOfferText {
+  color: var(--ink-900);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+.inOfferBtns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.inOfferBtn {
+  padding: 9px 16px;
+  border: none;
+  border-radius: var(--radius-pill, 999px);
+  background: var(--gold-600, #b8933f);
+  color: #fff;
+  font-weight: var(--fw-bold);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+.inOfferBtn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.inOfferSkip {
+  padding: 9px 16px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill, 999px);
+  background: transparent;
+  color: var(--text-muted);
+  font-weight: var(--fw-semibold);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+.inOfferDone {
+  color: var(--ink-900);
+  font-weight: var(--fw-semibold);
+  font-size: var(--text-sm);
+}

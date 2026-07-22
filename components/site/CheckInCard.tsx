@@ -107,6 +107,9 @@ export function CheckInCard({ className }: { className?: string }) {
   // TODAY (>=): a day planned for today but not yet checked in is still "next in" — it was being
   // skipped, so a half-day booked for today showed tomorrow's date instead.
   const nextPlanned = (status?.planned ?? []).filter((p) => p.date >= todayIso).sort((a, b) => a.date.localeCompare(b.date))[0];
+  // Booked for TODAY = already counted as in (the overnight sweep spends the day), so there's no
+  // need to tap "I'm in today" — we say so and drop the redundant button.
+  const bookedToday = !!nextPlanned && nextPlanned.date === todayIso;
 
   const plannedDates = status?.planned?.map((p) => p.date) ?? [];
   const pendingOnly = pending.filter((d) => !plannedDates.includes(d));
@@ -145,12 +148,13 @@ export function CheckInCard({ className }: { className?: string }) {
             </>
           ) : nextPlanned ? (
             <>
-              <h2 className={styles.title}>{nextPlanned.date === todayIso ? 'In today' : `Next in ${fmtDate(nextPlanned.date)}`}</h2>
+              <h2 className={styles.title}>{bookedToday ? 'You’re in today' : `Next in ${fmtDate(nextPlanned.date)}`}</h2>
               <p className={styles.meta}>
                 {nextPlanned.length === 'Half'
                   ? `Half day${nextPlanned.period ? ` · ${nextPlanned.period === 'am' ? 'morning' : 'afternoon'}` : ''}`
                   : 'Full day'}
                 {nextPlanned.kind === 'pass' ? ' · day pass' : ''}
+                {bookedToday ? ' · booked in — no need to check in when you arrive' : ''}
               </p>
             </>
           ) : (
@@ -184,12 +188,12 @@ export function CheckInCard({ className }: { className?: string }) {
 
           {!status?.checkedIn ? (
             <div className={styles.actions}>
-              {openToday ? (
+              {openToday && !bookedToday ? (
                 <Button variant="primary" size="sm" onClick={doCheckIn} disabled={busy}>
                   I&rsquo;m in today
                 </Button>
               ) : null}
-              <Button variant={openToday ? 'secondary' : 'primary'} size="sm" onClick={() => doReserveDate(nextOpen)} disabled={busy}>
+              <Button variant={openToday && !bookedToday ? 'secondary' : 'primary'} size="sm" onClick={() => doReserveDate(nextOpen)} disabled={busy}>
                 I&rsquo;ll be in {nextLabel}
               </Button>
             </div>

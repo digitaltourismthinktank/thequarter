@@ -490,6 +490,29 @@ function MembersPane() {
     return `${m.name || ''} ${m.email || ''} ${m.company || ''}`.toLowerCase().includes(q.toLowerCase());
   });
 
+  // A–Z: sort the filtered list by name and index it by first letter so the rail can jump to a
+  // letter and each letter's first card carries an anchor id.
+  const letterOf = (m: AdminMember) => {
+    const c = (m.name || m.email || '#').trim()[0]?.toUpperCase() || '#';
+    return c >= 'A' && c <= 'Z' ? c : '#';
+  };
+  const sorted = [...filtered].sort((a, b) =>
+    (a.name || a.email || '').trim().toLowerCase().localeCompare((b.name || b.email || '').trim().toLowerCase()),
+  );
+  const ALPHA = ['#', ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')];
+  const presentLetters = new Set(sorted.map(letterOf));
+  const firstIds = new Set<string>();
+  {
+    const seen = new Set<string>();
+    for (const m of sorted) {
+      const L = letterOf(m);
+      if (!seen.has(L)) {
+        seen.add(L);
+        firstIds.add(m.id);
+      }
+    }
+  }
+
   // Members needing a look: card issue, VAT request pending, or a birthday within a week.
   const attention = members
     .flatMap((m) => {
@@ -573,96 +596,78 @@ function MembersPane() {
           </button>
         )}
       </div>
-      <div className={styles.tableWrap}>
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th>Member</th>
-              <th>Plan</th>
-              <th>Days</th>
-              <th>Passes</th>
-              <th>Room hrs</th>
-              <th>Points</th>
-              <th>Renewal</th>
-              <th aria-label="actions" />
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((m) => (
-              <tr key={m.id}>
-                <td>
-                  <div className={styles.mName}>{m.name || '—'}</div>
-                  <div className={styles.mEmail}>{m.email}</div>
-                  {m.phone ? <div className={styles.mEmail}>{m.phone}</div> : null}
-                  {m.company ? (
-                    <div className={styles.mCompany}>
-                      <Icon name="building" size={12} color="var(--text-muted)" /> {m.company}
-                      {companyCount(m.company) > 1 ? <span className={styles.teamBadge}>+{companyCount(m.company) - 1} here</span> : null}
-                    </div>
-                  ) : null}
-                </td>
-                <td data-label="Plan">
-                  {m.plan || '—'}
+      {/* A–Z card list. One compact card per member; the A–Z rail on the left jumps to a letter.
+          All editing (days, passes, room hours, renewal) lives in the Profile pop-over now — the
+          inline table inputs were the thing that made this unusable on a phone. */}
+      <div className={styles.memWrap}>
+        {sorted.length >= 10 ? (
+          <div className={styles.azRail} aria-label="Jump to a letter">
+            {ALPHA.map((L) => (
+              <button
+                key={L}
+                type="button"
+                className={styles.azBtn}
+                disabled={!presentLetters.has(L)}
+                onClick={() => document.getElementById(`mem-${L}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+              >
+                {L}
+              </button>
+            ))}
+          </div>
+        ) : null}
+        <div className={styles.memList}>
+          {sorted.length === 0 ? <p className={styles.muted}>No members match.</p> : null}
+          {sorted.map((m) => (
+            <div key={m.id} id={firstIds.has(m.id) ? `mem-${letterOf(m)}` : undefined} className={styles.memCard}>
+              <div className={styles.memCardMain}>
+                <div className={styles.memCardHead}>
+                  <span className={styles.mName}>{m.name || '—'}</span>
+                  {m.plan ? <span className={styles.memPlanTag}>{m.plan}</span> : null}
                   {m.paused ? <span className={styles.pausedTag}>Paused</span> : null}
                   {m.paymentIssue ? <span className={styles.issueTag}>Card issue</span> : null}
-                </td>
-                <td data-label="Days">
-                  <input
-                    className={styles.dayInput}
-                    value={edits[m.id] ?? m.days ?? ''}
-                    onChange={(e) => setEdits({ ...edits, [m.id]: e.target.value })}
-                    aria-label={`Days for ${m.name || m.email}`}
-                  />
-                  <button type="button" className={styles.smallBtn} onClick={() => saveDays(m)} disabled={busyId === m.id}>
-                    Save
-                  </button>
-                </td>
-                <td data-label="Passes">
-                  <input
-                    className={styles.dayInput}
-                    value={passEdits[m.id] ?? (m.carnet ? String(m.carnet) : '')}
-                    onChange={(e) => setPassEdits({ ...passEdits, [m.id]: e.target.value })}
-                    aria-label={`Day passes for ${m.name || m.email}`}
-                  />
-                  <button type="button" className={styles.smallBtn} onClick={() => savePasses(m)} disabled={busyId === m.id}>
-                    Save
-                  </button>
-                </td>
-                <td data-label="Room hrs">
-                  <input
-                    className={styles.dayInput}
-                    value={hoursEdits[m.id] ?? String(m.roomHoursCap)}
-                    onChange={(e) => setHoursEdits({ ...hoursEdits, [m.id]: e.target.value })}
-                    aria-label={`Monthly meeting-room hours for ${m.name || m.email}`}
-                    title="Monthly free meeting-room hours. Blank = plan standard; 0 = none."
-                  />
-                  <button type="button" className={styles.smallBtn} onClick={() => saveHours(m)} disabled={busyId === m.id}>
-                    Save
-                  </button>
-                </td>
-                <td className={styles.muted} data-label="Points">{m.points.toLocaleString('en-GB')}</td>
-                <td className={styles.muted} data-label="Renewal">{m.renewal || '—'}</td>
-                <td>
-                  <button type="button" className={styles.smallBtn} onClick={() => setProfileId(m.id)}>
-                    Profile
-                  </button>{' '}
-                  {checkedInIds.has(m.id) ? (
-                    <span className={styles.checkedTag}>✓ Checked in</span>
-                  ) : (
-                    <span className={styles.seg}>
-                      <button type="button" className={styles.segBtn} onClick={() => checkIn(m, 'Full')} disabled={busyId === m.id}>
-                        {busyId === m.id ? '…' : 'Check in'}
-                      </button>
-                      <button type="button" className={styles.segBtn} onClick={() => checkIn(m, 'Half')} disabled={busyId === m.id} title="Half day (½ day cost)">
-                        ½
-                      </button>
+                </div>
+                <div className={styles.mEmail}>{m.email}</div>
+                {m.company ? (
+                  <div className={styles.mCompany}>
+                    <Icon name="building" size={12} color="var(--text-muted)" /> {m.company}
+                    {companyCount(m.company) > 1 ? <span className={styles.teamBadge}>+{companyCount(m.company) - 1} here</span> : null}
+                  </div>
+                ) : null}
+                <div className={styles.memStats}>
+                  <span>
+                    <strong>{m.days ?? '—'}</strong> days
+                  </span>
+                  {m.carnet ? (
+                    <span>
+                      <strong>{m.carnet}</strong> {m.carnet === 1 ? 'pass' : 'passes'}
                     </span>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                  ) : null}
+                  <span>
+                    <strong>{m.points.toLocaleString('en-GB')}</strong> pts
+                  </span>
+                  {m.renewal ? <span>renews {m.renewal}</span> : null}
+                </div>
+              </div>
+              <div className={styles.memCardActions}>
+                <button type="button" className={styles.smallBtn} onClick={() => setProfileId(m.id)}>
+                  Profile
+                </button>
+                {checkedInIds.has(m.id) ? (
+                  <span className={styles.checkedTag}>✓ In</span>
+                ) : (
+                  <span className={styles.seg}>
+                    <button type="button" className={styles.segBtn} onClick={() => checkIn(m, 'Full')} disabled={busyId === m.id}>
+                      {busyId === m.id ? '…' : 'Check in'}
+                    </button>
+                    <button type="button" className={styles.segBtn} onClick={() => checkIn(m, 'Half')} disabled={busyId === m.id} title="Half day (½ day cost)">
+                      ½
+                    </button>
+                  </span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
       {msg ? <p className={styles.msg}>{msg}</p> : null}
       <MemberProfileModal
