@@ -444,14 +444,15 @@ function MembersPane() {
     await refresh();
     setBusyId(null);
   }
+  const [confirmReset, setConfirmReset] = useState(false);
   async function resetAllHours() {
-    if (!window.confirm('Reset every member to their plan’s standard meeting-room hours? This clears all per-member overrides.')) return;
     setBusyId('reset-hours');
     setMsg(null);
     const r = await adminResetRoomHours();
     setMsg(r.ok ? `Reset ${r.data.cleared} override${r.data.cleared === 1 ? '' : 's'} to standard.` : 'Reset failed');
     await refresh();
     setBusyId(null);
+    setConfirmReset(false);
   }
   async function checkIn(m: AdminMember, length: 'Full' | 'Half') {
     setBusyId(m.id);
@@ -554,9 +555,23 @@ function MembersPane() {
         <p className={styles.count} style={{ margin: 0 }}>
           {filtered.length} {planFilter === 'All' ? 'members' : planFilter}
         </p>
-        <button type="button" className={styles.smallBtn} onClick={resetAllHours} disabled={busyId === 'reset-hours'} title="Clear all per-member room-hour overrides so everyone reverts to their plan's standard">
-          {busyId === 'reset-hours' ? 'Resetting…' : 'Reset room hours to standard'}
-        </button>
+        {confirmReset ? (
+          <span style={{ display: 'inline-flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, justifyContent: 'flex-end' }}>
+            <span className={styles.caution}>
+              Reset room hours for <strong>ALL {members.length} members</strong> — not just the {filtered.length} shown here? This clears every per-member override; any custom grants must be re-added by hand.
+            </span>
+            <button type="button" className={styles.smallBtn} onClick={resetAllHours} disabled={busyId === 'reset-hours'}>
+              {busyId === 'reset-hours' ? 'Resetting…' : 'Yes, reset all'}
+            </button>
+            <button type="button" className={styles.smallBtn} onClick={() => setConfirmReset(false)} disabled={busyId === 'reset-hours'}>
+              Cancel
+            </button>
+          </span>
+        ) : (
+          <button type="button" className={styles.smallBtn} onClick={() => setConfirmReset(true)} title="Clear all per-member room-hour overrides so everyone reverts to their plan's standard">
+            Reset room hours to standard
+          </button>
+        )}
       </div>
       <div className={styles.tableWrap}>
         <table className={styles.table}>
@@ -1957,30 +1972,48 @@ function DaySchedule({ spaces, bookings }: { spaces: AdminSpace[]; bookings: Adm
             <div key={g.label} className={styles.schedGroup}>
               <div className={styles.schedGroupLabel}>{g.label}</div>
               {g.list.map((s) => {
-                const bs = bookings.filter((x) => x.space === s.id);
+                const bs = bookings.filter((x) => x.space === s.id).sort((a, b) => (a.allDay ? -1 : b.allDay ? 1 : a.startMin - b.startMin));
                 return (
                   <div key={s.id} className={styles.schedLane}>
                     <div className={styles.schedRoom}>{s.name}</div>
-                    <div className={styles.schedTrack}>
+                    <div className={styles.schedBody}>
+                      {/* Timeline bar — the shape of the day at a glance (wide screens). */}
+                      <div className={styles.schedTrack}>
+                        {bs.length === 0 ? (
+                          <span className={styles.schedFree}>Free all day</span>
+                        ) : (
+                          bs.map((b, i) => {
+                            const start = b.allDay ? DAY_START_MIN : Math.max(DAY_START_MIN, b.startMin);
+                            const end = b.allDay ? DAY_END_MIN : Math.min(DAY_END_MIN, b.endMin);
+                            const left = ((start - DAY_START_MIN) / DAY_SPAN_MIN) * 100;
+                            const width = Math.min(Math.max(3, ((end - start) / DAY_SPAN_MIN) * 100), 100 - left);
+                            return (
+                              <span
+                                key={i}
+                                className={`${styles.schedSeg} ${segClass(b)}`}
+                                style={{ left: `${left}%`, width: `${width}%` }}
+                                title={`${segLabel(b)} · ${b.allDay ? 'all day' : `${minToHHMM(b.startMin)}–${minToHHMM(b.endMin)}`}`}
+                              >
+                                {width > 14 ? segLabel(b) : ''}
+                              </span>
+                            );
+                          })
+                        )}
+                      </div>
+                      {/* Explicit who + when — the timeline shows the shape, this shows exactly who has
+                          the room and until when. It's the clear read on mobile (the bar is hidden there). */}
                       {bs.length === 0 ? (
-                        <span className={styles.schedFree}>Free all day</span>
+                        <span className={styles.schedFreeText}>Free all day</span>
                       ) : (
-                        bs.map((b, i) => {
-                          const start = b.allDay ? DAY_START_MIN : Math.max(DAY_START_MIN, b.startMin);
-                          const end = b.allDay ? DAY_END_MIN : Math.min(DAY_END_MIN, b.endMin);
-                          const left = ((start - DAY_START_MIN) / DAY_SPAN_MIN) * 100;
-                          const width = Math.min(Math.max(3, ((end - start) / DAY_SPAN_MIN) * 100), 100 - left);
-                          return (
-                            <span
-                              key={i}
-                              className={`${styles.schedSeg} ${segClass(b)}`}
-                              style={{ left: `${left}%`, width: `${width}%` }}
-                              title={`${segLabel(b)} · ${b.allDay ? 'all day' : `${minToHHMM(b.startMin)}–${minToHHMM(b.endMin)}`}`}
-                            >
-                              {width > 14 ? segLabel(b) : ''}
-                            </span>
-                          );
-                        })
+                        <ul className={styles.schedWhoList}>
+                          {bs.map((b, i) => (
+                            <li key={i} className={styles.schedWhoItem}>
+                              <span className={`${styles.schedWhoDot} ${segClass(b)}`} aria-hidden />
+                              <span className={styles.schedWhoTime}>{b.allDay ? 'All day' : `${minToHHMM(b.startMin)}–${minToHHMM(b.endMin)}`}</span>
+                              <span className={styles.schedWhoName}>{segLabel(b)}</span>
+                            </li>
+                          ))}
+                        </ul>
                       )}
                     </div>
                   </div>
@@ -2305,7 +2338,10 @@ function AdminTodayPane({ onAllBirthdays }: { onAllBirthdays: () => void }) {
       {view === 'day' && loading ? (
         <p className={styles.state}>Loading…</p>
       ) : view === 'day' ? (
-        <div className={styles.todayGrid}>
+        <div className={styles.todayStack}>
+          {/* Order the team asked for: who's in, then the day's rooms, then birthdays, then the next
+              event's RSVPs — the two things you most need at a glance sit together up top, and the
+              date selector above drives BOTH who's-in and the schedule directly below it. */}
           {/* Who's in usually holds a lot of people and guests are rare — so who's-in gets a
               half-width panel to breathe, with guests as a quieter section beneath a divider
               rather than an equal-sized card of its own. */}
@@ -2388,7 +2424,8 @@ function AdminTodayPane({ onAllBirthdays }: { onAllBirthdays: () => void }) {
               </div>
             ) : null}
           </div>
-          <NextEventCard />
+          {/* Day schedule sits right under who's-in — the two key at-a-glance things. */}
+          {!closed ? <DaySchedule spaces={spaces} bookings={bookings} /> : null}
           <div className={styles.todayCard}>
             <span className={styles.todayCardLabel}>Birthdays in the next 30 days</span>
             {birthdaysThisWeek.length ? (
@@ -2408,10 +2445,10 @@ function AdminTodayPane({ onAllBirthdays }: { onAllBirthdays: () => void }) {
               All birthdays ›
             </button>
           </div>
+          {/* Next event + its live RSVP headcount — last, once the day's essentials are covered. */}
+          <NextEventCard />
         </div>
       ) : null}
-
-      {view === 'day' && !closed ? <DaySchedule spaces={spaces} bookings={bookings} /> : null}
 
       {members.filter((m) => m.vatRequested).length ? (
         <div className={styles.panel} style={{ marginTop: 18, borderColor: 'var(--gold-400)' }}>
@@ -2463,37 +2500,27 @@ function ScreensPane({ onWhatsNew }: { onWhatsNew: () => void }) {
 
   return (
     <div>
-      {/* Wall displays — the always-on screens. Open on the device, then Full screen. */}
+      {/* Displays — ONE app for every screen. Open on the device, add to the home screen, pick which
+          display it should be (Entrance / a floor / Reception). Replaces the old per-screen links. */}
       <div className={styles.panel}>
-        <span className={styles.panelTitle}>Wall displays</span>
-        <p className={styles.muted}>Always-on screens. Open on the device and tap Full screen.</p>
+        <span className={styles.panelTitle}>Displays</span>
+        <p className={styles.muted}>
+          One app for every screen. Open it on the iPad, add it to the home screen (that drops the browser
+          bar), then pick which display this device is — Entrance, a floor, or Reception. Tap the ⋯ in the
+          corner to switch it later.
+        </p>
         <div className={styles.shortcuts}>
-          <a className={styles.shortcut} href="/screen" target="_blank" rel="noreferrer">
-            <Icon name="monitor" size={16} color="var(--gold-700)" /> Entrance screen
-          </a>
-          <a className={styles.shortcut} href="/screen?floor=1" target="_blank" rel="noreferrer">
-            <Icon name="monitor" size={16} color="var(--gold-700)" /> First-floor screen
-          </a>
-          <a className={styles.shortcut} href="/screen?floor=2" target="_blank" rel="noreferrer">
-            <Icon name="monitor" size={16} color="var(--gold-700)" /> Second-floor screen
+          <a className={`${styles.shortcut} ${styles.shortcutPrimary}`} href="/screen" target="_blank" rel="noreferrer">
+            <Icon name="monitor" size={16} color="var(--gold-700)" /> Open the display picker
           </a>
         </div>
       </div>
 
-      {/* Check-in & sign-in — the shared iPads by the door and the per-room door kiosks. */}
+      {/* Per-room door screens — the little screen on each room/pod door. */}
       <div className={styles.panel}>
-        <span className={styles.panelTitle}>Check-in &amp; sign-in</span>
-        <p className={styles.muted}>Shared iPads — no login. Reception is the one that checks anyone in.</p>
+        <span className={styles.panelTitle}>Door screens</span>
+        <p className={styles.muted}>The small screen on each room and pod door.</p>
         <div className={styles.shortcuts}>
-          <a className={styles.shortcut} href="/reception" target="_blank" rel="noreferrer">
-            <Icon name="users" size={16} color="var(--gold-700)" /> Reception — check members &amp; guests in
-          </a>
-          <a className={styles.shortcut} href="/arrive" target="_blank" rel="noreferrer">
-            <Icon name="check" size={16} color="var(--gold-700)" /> Arrival check-in (member phones)
-          </a>
-          <a className={styles.shortcut} href="/guest" target="_blank" rel="noreferrer">
-            <Icon name="users" size={16} color="var(--gold-700)" /> Guest sign-in
-          </a>
           {spaces
             .filter((s) => s.bookable)
             .map((s) => (
@@ -2502,6 +2529,27 @@ function ScreensPane({ onWhatsNew }: { onWhatsNew: () => void }) {
               </a>
             ))}
         </div>
+        <details className={styles.archived}>
+          <summary>Older direct links</summary>
+          <p className={styles.muted}>The display picker above covers these now — kept only for reference.</p>
+          <div className={styles.shortcuts}>
+            <a className={styles.shortcut} href="/screen?floor=1" target="_blank" rel="noreferrer">
+              <Icon name="monitor" size={16} color="var(--gold-700)" /> First-floor screen (direct)
+            </a>
+            <a className={styles.shortcut} href="/screen?floor=2" target="_blank" rel="noreferrer">
+              <Icon name="monitor" size={16} color="var(--gold-700)" /> Second-floor screen (direct)
+            </a>
+            <a className={styles.shortcut} href="/reception" target="_blank" rel="noreferrer">
+              <Icon name="users" size={16} color="var(--gold-700)" /> Reception (direct)
+            </a>
+            <a className={styles.shortcut} href="/arrive" target="_blank" rel="noreferrer">
+              <Icon name="check" size={16} color="var(--gold-700)" /> Arrival check-in (member phones)
+            </a>
+            <a className={styles.shortcut} href="/guest" target="_blank" rel="noreferrer">
+              <Icon name="users" size={16} color="var(--gold-700)" /> Guest sign-in
+            </a>
+          </div>
+        </details>
       </div>
 
       {/* Sign-up & sharing — bringing new members on board. */}

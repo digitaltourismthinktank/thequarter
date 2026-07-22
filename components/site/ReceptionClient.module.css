@@ -15,6 +15,31 @@
   font-family: var(--font-sans);
   -webkit-text-size-adjust: 100%;
 }
+/* Landing + day-pass QR have no keyboard, so they centre for a calmer, less top-heavy screen. */
+.screenCentered {
+  align-items: center;
+  padding-top: clamp(20px, 4vh, 48px);
+  padding-bottom: clamp(20px, 4vh, 48px);
+}
+
+/* Ambient date · time · weather on the resting screen */
+.ambient {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 12px;
+  color: var(--text-muted, #8a7f72);
+}
+.ambientTime {
+  font-weight: var(--fw-bold);
+  color: var(--ink-900);
+  font-size: clamp(1.1rem, 2vw, 1.55rem);
+  font-variant-numeric: tabular-nums;
+}
+.ambientDate { font-size: clamp(0.95rem, 1.4vw, 1.15rem); }
+.ambientDot { opacity: 0.5; }
+.ambientWeather { font-size: clamp(0.95rem, 1.4vw, 1.15rem); }
 
 .card {
   width: 100%;

@@ -680,9 +680,55 @@ select.input {
 .segPriv {
   background: #7c5cbf;
 }
-/* On a phone the 08:00–18:00 timeline was wider than the screen and scrolled sideways, which read
-   as broken and unclear. Stack instead: each room's name on its own line with its full-width track
-   directly below, so the whole working day is visible at once with no horizontal scroll. */
+/* Room lane = name + a body holding the timeline bar (wide screens) AND an explicit who + when
+   list. The bar shows the SHAPE of the day; the list shows exactly who has the room and until
+   when — which is the clear, correct read on a phone (where the bar is hidden). */
+.schedBody {
+  flex: 1;
+  min-width: 0;
+}
+.schedWhoList,
+.schedFreeText {
+  display: none; /* desktop uses the timeline bar; these are the phone view */
+}
+.schedWhoList {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+.schedWhoItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--text-sm);
+}
+.schedWhoDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex: none;
+}
+.schedWhoTime {
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--fw-semibold);
+  color: var(--ink-900);
+  white-space: nowrap;
+}
+.schedWhoName {
+  color: var(--text-body);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.schedFreeText {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+/* On a phone the 08:00–18:00 timeline scrolled sideways and read as broken; hide the bar + its
+   scale there and show the clear who + when list instead, each room stacked. */
 @media (max-width: 700px) {
   .schedScroll {
     overflow-x: visible;
@@ -691,18 +737,25 @@ select.input {
     min-width: 0;
     padding-right: 0;
   }
-  .schedScaleRow {
-    margin-left: 0;
+  .schedScaleRow,
+  .schedTrack {
+    display: none;
   }
   .schedLane {
     flex-direction: column;
     align-items: stretch;
-    gap: 4px;
-    margin-bottom: 12px;
+    gap: 2px;
+    margin-bottom: 14px;
   }
   .schedRoom {
     width: auto;
     white-space: normal;
+  }
+  .schedWhoList {
+    display: flex;
+  }
+  .schedFreeText {
+    display: block;
   }
 }
 .kindBlock {
@@ -1545,6 +1598,13 @@ select.input {
     grid-template-columns: 1fr;
   }
 }
+/* The day view now stacks in the order the team reads it: who's-in, the day's rooms, birthdays,
+   next-event RSVPs — the date selector above drives who's-in + the schedule together. */
+.todayStack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
 /* The wide who's-in + guests panel. */
 .todayCardWide {
   grid-column: 1;
@@ -1902,6 +1962,33 @@ select.input {
 .shortcut:hover {
   border-color: var(--gold-500);
   background: var(--sand-100);
+}
+/* The one link that matters now — the display picker. */
+.shortcutPrimary {
+  background: var(--gold-100);
+  border-color: var(--gold-300);
+  font-weight: var(--fw-bold);
+  padding: 12px 18px;
+}
+.shortcutPrimary:hover {
+  background: var(--gold-100);
+  border-color: var(--gold-600);
+}
+/* Archived/older links tucked behind a disclosure. */
+.archived {
+  margin-top: 12px;
+}
+.archived summary {
+  cursor: pointer;
+  font-size: var(--text-xs);
+  font-weight: var(--fw-semibold);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  list-style: revert;
+}
+.archived[open] summary {
+  margin-bottom: 8px;
 }
 
 /* "How it works" callout at the top of the Partners pane */

@@ -51,6 +51,56 @@ function memberCheckinError(code?: string): string {
   }
 }
 
+/** WMO weather code → a simple emoji (mirrors the entrance screen). */
+function weatherEmoji(code: number): string {
+  if (code === 0) return '☀️';
+  if (code <= 3) return '⛅';
+  if (code === 45 || code === 48) return '🌫️';
+  if (code >= 51 && code <= 67) return '🌧️';
+  if (code >= 71 && code <= 77) return '❄️';
+  if (code >= 80 && code <= 82) return '🌦️';
+  if (code >= 95) return '⛈️';
+  return '☁️';
+}
+
+/** Date · live clock · Canterbury weather on the resting reception screen — so an always-on
+ *  entrance iPad earns its keep between visitors, like the lobby display does. */
+function ReceptionAmbient() {
+  const [now, setNow] = useState(() => new Date());
+  const [weather, setWeather] = useState<{ temp: number; emoji: string } | null>(null);
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 20000);
+    return () => clearInterval(t);
+  }, []);
+  useEffect(() => {
+    let live = true;
+    const load = async () => {
+      try {
+        const r = await fetch('https://api.open-meteo.com/v1/forecast?latitude=51.28&longitude=1.08&current=temperature_2m,weather_code&timezone=Europe%2FLondon');
+        const j = await r.json();
+        const tmp = j?.current?.temperature_2m;
+        const c = j?.current?.weather_code;
+        if (live && typeof tmp === 'number' && typeof c === 'number') setWeather({ temp: tmp, emoji: weatherEmoji(c) });
+      } catch {
+        /* no weather — just the clock */
+      }
+    };
+    load();
+    const id = setInterval(load, 30 * 60 * 1000);
+    return () => { live = false; clearInterval(id); };
+  }, []);
+  const dateLabel = now.toLocaleDateString('en-GB', { timeZone: 'Europe/London', weekday: 'long', day: 'numeric', month: 'long' });
+  const timeLabel = now.toLocaleTimeString('en-GB', { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit', hour12: false });
+  return (
+    <div className={styles.ambient}>
+      <span className={styles.ambientTime}>{timeLabel}</span>
+      <span className={styles.ambientDot} aria-hidden>·</span>
+      <span className={styles.ambientDate}>{dateLabel}</span>
+      {weather ? <span className={styles.ambientWeather}>{weather.emoji} {Math.round(weather.temp)}°</span> : null}
+    </div>
+  );
+}
+
 export function ReceptionClient() {
   const [mode, setMode] = useState<Mode>('landing');
 
@@ -143,14 +193,19 @@ export function ReceptionClient() {
     setBusy(false);
   }
 
+  // The landing + the day-pass QR have no text entry, so centre them (calmer, less top-heavy).
+  // The member/guest steps DO take typing, so they stay top-aligned to clear the keyboard.
+  const centered = mode === 'landing' || mode === 'daypass';
+
   return (
-    <div className={styles.screen}>
+    <div className={`${styles.screen} ${centered ? styles.screenCentered : ''}`}>
       <div className={styles.card}>
         <img className={styles.logo} src="/brand/logo-wordmark-black.png" alt="The Quarter" />
 
         {/* ---------------------------------------------------------------- landing -- */}
         {mode === 'landing' ? (
           <>
+            <ReceptionAmbient />
             <span className={styles.eyebrow}>Welcome to The Quarter</span>
             <h1 className={styles.h1}>Checking in?</h1>
             <p className={styles.lead}>Tap whichever is you — no phone or password needed.</p>
