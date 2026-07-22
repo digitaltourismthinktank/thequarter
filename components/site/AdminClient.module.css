@@ -1895,7 +1895,7 @@ select.input {
   z-index: 1000;
   display: grid;
   place-items: center;
-  padding: 20px;
+  padding: 16px;
   background: rgba(20, 17, 13, 0.6);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
@@ -1905,10 +1905,28 @@ select.input {
   max-width: 560px;
   max-height: 92vh;
   overflow-y: auto;
+  /* Contain the width — the tab row used to force the card wider than a phone, cutting the name
+     and stat tiles off both edges. */
+  overflow-x: hidden;
+  box-sizing: border-box;
   background: var(--surface-card);
   border-radius: var(--radius-lg);
   padding: 24px;
   animation: profIn var(--duration-base) var(--ease-out);
+}
+/* On a phone the profile is a bottom sheet: full-width, tall, rounded top — easy to reach and
+   scroll, and it never overflows the viewport. */
+@media (max-width: 560px) {
+  .profOverlay {
+    padding: 0;
+    align-items: end;
+  }
+  .profCard {
+    max-width: 100%;
+    max-height: 94vh;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    padding: 18px 16px calc(18px + env(safe-area-inset-bottom, 0px));
+  }
 }
 @keyframes profIn {
   from {
@@ -1926,6 +1944,17 @@ select.input {
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 16px;
+  /* Sticky so the name + close stay reachable while scrolling a tall profile. */
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--surface-card);
+  padding-bottom: 10px;
+  margin-top: -4px;
+  padding-top: 4px;
+}
+.profName {
+  overflow-wrap: anywhere;
 }
 .profName {
   font-size: var(--text-lg);
@@ -1976,11 +2005,12 @@ select.input {
    summary so the modal reads as three tidy panels rather than one long scroll. */
 .profTabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
   margin-top: 18px;
   padding: 4px;
   background: var(--surface-sunken);
-  border-radius: var(--radius-full, 999px);
+  border-radius: var(--radius-lg);
 }
 .profTab {
   flex: 1;
@@ -2026,8 +2056,24 @@ select.input {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
   font-size: var(--text-sm);
   color: var(--text-body);
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.profHistRow:last-child {
+  border-bottom: none;
+}
+.histWhat {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.histWhen {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
 }
 .histNeg {
   color: var(--danger);

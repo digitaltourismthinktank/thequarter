@@ -197,7 +197,7 @@ async function memberProfile(id) {
       cost: Number(x.fields[F.redemptions.cost]) || 0,
       at: x.fields[F.redemptions.at] || null,
     })),
-    recentLedger: ledger.slice(0, 8).map((x) => ({
+    recentLedger: ledger.slice(0, 20).map((x) => ({
       delta: Number(x.fields[F.pointsLedger.delta]) || 0,
       reason: x.fields[F.pointsLedger.reason] || '',
       at: x.fields[F.pointsLedger.at] || null,

@@ -688,6 +688,32 @@ function MembersPane() {
   );
 }
 
+/** Points-ledger reason code → a readable line for the activity feed. */
+function ledgerLabel(reason: string): string {
+  const map: Record<string, string> = {
+    checkin: 'Checked in',
+    'checkin-quiet': 'Checked in · quiet-day bonus',
+    welcome: 'Welcome bonus',
+    'welcome-bonus': 'Welcome bonus',
+    birthday: 'Birthday treat',
+    referral: 'Referral credit',
+    'referral-credit': 'Referral credit',
+    redeem: 'Reward redeemed',
+    redemption: 'Reward redeemed',
+    'admin adjust': 'Admin adjustment',
+    'admin-adjust': 'Admin adjustment',
+    spend: 'Room-hire points',
+  };
+  return map[reason] || reason.replace(/[-_]/g, ' ').replace(/^\w/, (c) => c.toUpperCase());
+}
+/** A ledger timestamp → e.g. "Wed 22 Jul, 14:30". */
+function ledgerWhen(at: string | null): string {
+  if (!at) return '';
+  const d = new Date(at);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
 function MemberProfileModal({
   id,
   bday,
@@ -1004,7 +1030,10 @@ function MemberProfileModal({
                     <Icon name="calendar" size={15} color="var(--gold-700)" />
                     {p.renewal ? `Renews ${p.renewal}` : 'Set renewal date'}
                   </button>
-                  <span className={styles.muted}>Resets their days on this date (manual members).</span>
+                  <span className={styles.muted}>
+                    The date this member&rsquo;s day allowance resets each month. Only needed for manual/comp members — Stripe members
+                    reset automatically on their billing date.
+                  </span>
                 </div>
 
                 {/* Custom monthly days (overrides the plan) */}
@@ -1041,7 +1070,28 @@ function MemberProfileModal({
                   <button type="button" className={styles.smallBtn} onClick={saveDaysBalance} disabled={busy}>
                     Save balance
                   </button>
-                  <span className={styles.muted}>Days remaining this cycle.</span>
+                  <span className={styles.muted}>Day-visits left in the current cycle. Resets on the renewal date above.</span>
+                </div>
+
+                {/* Free meeting-room hours per month — grouped here with the other balances (was buried
+                    under Details & access, where nobody could find it to grant a member room time). */}
+                <div className={styles.formRow} style={{ marginTop: 12 }}>
+                  <input
+                    className={styles.dayInput}
+                    type="number"
+                    min={0}
+                    placeholder="4"
+                    value={capOverride}
+                    onChange={(e) => setCapOverride(e.target.value)}
+                    aria-label="Free meeting-room hours per month"
+                  />
+                  <button type="button" className={styles.smallBtn} onClick={saveDetails} disabled={busy}>
+                    Save room hrs
+                  </button>
+                  <span className={styles.muted}>
+                    Free meeting-room hours a month. Blank = plan standard (4). Set this to let a member (e.g. a day-pass member) book
+                    rooms when they&rsquo;re in.
+                  </span>
                 </div>
 
                 {/* Renew now */}
@@ -1119,43 +1169,40 @@ function MemberProfileModal({
 
                 {p.recentLedger.length ? (
                   <div className={styles.profSection}>
-                    <span className={styles.profSectionTitle}>Recent points</span>
+                    <span className={styles.profSectionTitle}>Recent activity</span>
                     <div className={styles.profHist}>
                       {p.recentLedger.map((l, i) => (
                         <div key={i} className={styles.profHistRow}>
-                          <span>{l.reason}</span>
+                          <span className={styles.histWhat}>
+                            {ledgerLabel(l.reason)}
+                            {ledgerWhen(l.at) ? <span className={styles.histWhen}>{ledgerWhen(l.at)}</span> : null}
+                          </span>
                           <span className={l.delta < 0 ? styles.histNeg : styles.histPos}>
                             {l.delta > 0 ? '+' : ''}
-                            {l.delta}
+                            {l.delta} pts
                           </span>
                         </div>
                       ))}
                     </div>
+                    <span className={styles.muted}>
+                      Points events with when they happened — check-ins (quiet days earn more), redemptions and admin adjustments. Something
+                      look wrong? Use “Adjust points” above to correct it.
+                    </span>
                   </div>
                 ) : null}
               </>
             ) : (
               <>
                 <div className={styles.profSection}>
-                  <span className={styles.profSectionTitle}>Edit details</span>
+                  <span className={styles.profSectionTitle}>Name</span>
                   <div className={styles.formRow}>
                     <input className={styles.label} placeholder="First name" value={firstName} onChange={(e) => setFirstName(e.target.value)} aria-label="First name" />
                     <input className={styles.label} placeholder="Last name" value={lastName} onChange={(e) => setLastName(e.target.value)} aria-label="Last name" />
-                    <input
-                      className={styles.dayInput}
-                      type="number"
-                      min={0}
-                      placeholder="4h"
-                      value={capOverride}
-                      onChange={(e) => setCapOverride(e.target.value)}
-                      aria-label="Free meeting-room hours per month"
-                      title="Free meeting-room hours per month (blank = default 4)"
-                    />
                     <button type="button" className={styles.smallBtn} onClick={saveDetails} disabled={busy}>
                       Save
                     </button>
                   </div>
-                  <span className={styles.muted}>Fixes a wrong name; the number is their free meeting-room hours/month (blank = 4).</span>
+                  <span className={styles.muted}>Fixes a wrong name. (Meeting-room hours moved to “Membership &amp; days”, with the day balance.)</span>
                 </div>
 
                 <div className={styles.profSection}>
