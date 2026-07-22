@@ -112,9 +112,11 @@ export async function consumePlannedDay(me, { dateStr, length, row }) {
   const passesLeft = Math.max(0, Number(carnet.remaining) || 0);
   const carnetLive = passesLeft > 0 && !(carnet.expires && carnet.expires < dateStr);
   const outOfDays = !unlimited && current !== null && current < cost;
-  // Plan days first, carnet as the fallback — out of days, or no plan at all (a carnet-only
-  // member who reserved a day). A future paid Day Pass is its own 'Paid' row, never a Planned.
-  const useCarnet = (outOfDays || !hasPlan) && carnetLive;
+  const hasDays = current !== null && current >= cost;
+  // Plan days (or a paused member's standing/rollover balance) first, carnet as the fallback —
+  // out of days, or no plan AND no standing days at all (a carnet-only member who reserved a
+  // day). A future paid Day Pass is its own 'Paid' row, never a Planned.
+  const useCarnet = (outOfDays || (!hasPlan && !hasDays)) && carnetLive;
 
   // Decide the funding as PURE values first — what to spend, what to mark, what to write to
   // Memberstack — WITHOUT touching Memberstack yet.
@@ -326,6 +328,22 @@ export default async function handler(req) {
   const carnetPasses = Math.max(0, Number(carnetState.remaining) || 0);
   const carnetLiveOn = (d) => carnetPasses > 0 && !(carnetState.expires && carnetState.expires < d);
 
+  // A standing day balance is ITSELF a right to be here — even with no allowance-bearing plan.
+  // That covers a PAUSED member (their days are frozen on the Paused tag, which carries no
+  // allowance, so `hasPlan` is false), a member whose days were left on file, and an
+  // admin-granted balance. Without this, pausing a plan — or holding day-pass days but no plan
+  // tag — was refused at the gate with "needs a plan or pass", which is exactly what blocked
+  // check-in for Tina (paused) and for a no-plan member with days on account. A properly lapsed
+  // member is zeroed to '0' days, so this never re-opens access they shouldn't have. Seed a
+  // metered plan member's balance from their allowance if the field was never written, so the
+  // deduction isn't a silent free day.
+  let standingDays = parseDays(me.customFields?.['days-remaining']);
+  if (standingDays === null && !unlimited && hasPlan) {
+    const a = allowanceForMember(me);
+    if (typeof a === 'number') standingDays = a;
+  }
+  const hasStandingDays = standingDays !== null && standingDays > 0;
+
   // Check in for TODAY (deducts unless unlimited). Idempotent per day.
   if (body.action === 'checkin') {
     const today = londonNow().dateStr;
@@ -356,7 +374,9 @@ export default async function handler(req) {
     // above). Without one of these, checking in was silently free.
     const paidPassToday = recs.some((r) => r.fields[F.checkins.status] === 'Paid');
     const approvedToday = recs.some((r) => r.fields[F.checkins.status] === 'Planned');
-    if (!hasPlan && !carnetLiveOn(today) && !paidPassToday && !approvedToday) {
+    // A standing day balance (paused member, days on file) is a valid right to attend — see
+    // hasStandingDays above. It's spent below just like a plan member's days.
+    if (!hasPlan && !carnetLiveOn(today) && !paidPassToday && !approvedToday && !hasStandingDays) {
       return json({ error: 'needs-plan-or-pass' }, 400);
     }
 
@@ -369,24 +389,21 @@ export default async function handler(req) {
     // a different card to use one. Being refused entry while holding passes you bought is
     // the worst version of this, so the fallback is automatic and the response says which
     // was spent.
-    let current = parseDays(me.customFields?.['days-remaining']);
-    // A metered plan member whose balance was never seeded (field absent) would check in FREE:
-    // parseDays returns null and the deduction below no-ops. Fall back to their monthly allowance
-    // so the day is actually spent. This is the most likely cause of "I checked in but my days
-    // didn't go down" for a plan member (the other being an unlimited plan, or a day-pass/carnet).
-    if (current === null && !unlimited && hasPlan) {
-      const a = allowanceForMember(me);
-      if (typeof a === 'number') current = a;
-    }
+    // Balance already resolved (and seeded for a metered plan member whose field was never
+    // written) as standingDays above — reuse it so plan members, paused members and day-balance
+    // members all spend the same way.
+    const current = standingDays;
     const outOfDays = !unlimited && current !== null && current < cost;
 
     const carnet = me.metaData?.carnet || {};
     const passesLeft = Math.max(0, Number(carnet.remaining) || 0);
     const carnetLive = passesLeft > 0 && !(carnet.expires && carnet.expires < today);
-    // Spend a carnet pass when a plan member has run out of days, AND when a member with no
-    // plan and no paid pass is here on a carnet — otherwise the gate above would let them in
-    // but nothing would be spent, which is the free check-in all over again.
-    const useCarnet = (outOfDays || (!hasPlan && !paidPassToday)) && carnetLive;
+    // Spend a carnet pass when a plan member has run out of days, AND when a member with no plan,
+    // no standing day balance and no paid pass is here on a carnet — otherwise the gate above
+    // would let them in but nothing would be spent, which is the free check-in all over again.
+    // A standing day balance is spent BEFORE a carnet (a paused/rollover day expires; a carnet
+    // pass is theirs to keep).
+    const useCarnet = (outOfDays || (!hasPlan && !hasStandingDays && !paidPassToday)) && carnetLive;
 
     if (outOfDays && !useCarnet) {
       return json({ error: 'no-allowance' }, 400);
@@ -465,10 +482,10 @@ export default async function handler(req) {
       return json({ ok: true, alreadyReserved: true });
     }
     // Same gate as a live check-in: reserving is only meaningful if you could actually
-    // attend. A no-plan account with no carnet would otherwise plan days it can never use
-    // and show up in the admin who's-in list as expected. A future paid day pass already
-    // exists as a row, so it short-circuits above and never reaches here.
-    if (!hasPlan && !carnetLiveOn(date)) {
+    // attend. A no-plan account with no carnet and no standing days would otherwise plan days
+    // it can never use and show up in the admin who's-in list as expected. A future paid day
+    // pass already exists as a row, so it short-circuits above and never reaches here.
+    if (!hasPlan && !carnetLiveOn(date) && !hasStandingDays) {
       return json({ error: 'needs-plan-or-pass' }, 400);
     }
     // Weekends are by request (not a given): create a 'Requested' record + notify staff.

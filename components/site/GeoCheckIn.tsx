@@ -43,6 +43,13 @@ function friendly(code?: string): string {
     case 'closed-weekend':
     case 'closed-day':
       return 'The Quarter is closed today.';
+    case 'needs-plan-or-pass':
+      return 'Checking in needs a plan, a day pass, or days on your account.';
+    case 'no-allowance':
+      return 'You’ve used your days for now — grab a day pass or have a word with the team.';
+    case 'weekend-request':
+    case 'weekend-pending':
+      return 'Weekends are by request — we’ll confirm your day by email.';
     case 'no-token':
     case 'invalid-token':
     case 'verify-failed':

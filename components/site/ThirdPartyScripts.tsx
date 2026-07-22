@@ -3,26 +3,17 @@
 import Script from 'next/script';
 import { usePathname } from 'next/navigation';
 import { useEffect } from 'react';
+import { APP_ROUTES, DISPLAY_ROUTES, matchesRoute } from '@/lib/appRoutes';
 
-/* The cookie-consent banner (CookieScript) + Crisp chat bubble load site-wide — EXCEPT
-   on the wall-display / kiosk routes, where they'd overlay the full-screen design. A
-   dedicated kiosk loads one of these routes directly (fresh, standalone), so the scripts
-   never inject there. Everywhere else they load exactly as before. */
-const DISPLAY_ROUTES = ['/screen', '/kiosk', '/arrive', '/guest', '/reception', '/signage', '/invite', '/unsubscribe'];
-
-/* The member app AND admin get NO Crisp: the widget isn't loaded here at all, and a launcher that
-   persisted across a client-side navigation from the public site is hidden. Chat is opened
-   deliberately from a "Talk to us" control instead; admin staff don't need it. The public
-   marketing site keeps its launcher. */
-const APP_ROUTES = ['/dashboard', '/book', '/rewards', '/perks', '/whats-on', '/plan', '/account', '/admin', '/admin-guide'];
-
-const matches = (pathname: string, routes: string[]) =>
-  routes.some((p) => pathname === p || pathname.startsWith(`${p}/`));
-
+/* The cookie-consent banner (CookieScript) + Crisp chat bubble load site-wide — EXCEPT on the
+   wall-display / kiosk routes (DISPLAY_ROUTES), where they'd overlay the full-screen design, and
+   the member app + admin (APP_ROUTES), which get NO Crisp at all. A dedicated kiosk loads one of
+   those routes directly (fresh, standalone), so the scripts never inject there. Route groups live
+   in lib/appRoutes so they can't drift from the PWA update banner's copy of the same lists. */
 export function ThirdPartyScripts() {
   const pathname = usePathname() || '';
-  const isDisplay = matches(pathname, DISPLAY_ROUTES);
-  const inApp = matches(pathname, APP_ROUTES);
+  const isDisplay = matchesRoute(pathname, DISPLAY_ROUTES);
+  const inApp = matchesRoute(pathname, APP_ROUTES);
 
   /* Crisp visibility is owned here rather than in the member shell. This component creates
      the $crisp queue itself, so there's no load-order race, and it lives in the root layout

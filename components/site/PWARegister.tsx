@@ -1,17 +1,23 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
+import { APP_ROUTES, matchesRoute } from '@/lib/appRoutes';
 
 /**
  * Registers the service worker (production only) and keeps updates seamless:
  *  - If a code-split chunk fails to load after a deploy (the old build asking for a file the new
  *    deploy removed), reload ONCE to pull the fresh build — instead of an obscure error with no
- *    way forward. Guarded against reload loops.
- *  - When a new version has installed, show a small "updated — reload" banner so the person
- *    refreshes at a good moment rather than being surprised mid-task.
+ *    way forward. Guarded against reload loops. Runs everywhere (self-healing a left-open wall
+ *    screen or a public page is silent and desirable).
+ *  - When a new version has installed, show a small "updated — reload" banner — but ONLY inside
+ *    the member app + admin (APP_ROUTES). It used to appear on public marketing pages and the
+ *    always-on wall/kiosk screens too, where a "reload" prompt is noise, not help.
  */
 export function PWARegister() {
   const [updateReady, setUpdateReady] = useState(false);
+  const pathname = usePathname() || '';
+  const inApp = matchesRoute(pathname, APP_ROUTES);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -84,7 +90,8 @@ export function PWARegister() {
     };
   }, []);
 
-  if (!updateReady) return null;
+  // Only surface the banner inside the app/admin — never on public pages or wall screens.
+  if (!updateReady || !inApp) return null;
 
   return (
     <div

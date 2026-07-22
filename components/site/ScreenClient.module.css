@@ -146,26 +146,29 @@
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  gap: clamp(10px, 2vw, 24px);
-  height: clamp(58px, 9vh, 104px);
-  margin: 6px auto 0;
-  max-width: 420px;
+  /* Generous, even spacing between the five columns so the bars read as a clean chart, never a
+     scrunched-together block — the gap and the strip width both scale up with the wall display. */
+  gap: clamp(18px, 3vw, 40px);
+  height: clamp(64px, 10vh, 116px);
+  margin: 10px auto 0;
+  max-width: min(620px, 78%);
 }
 .weekCol {
   flex: 1;
-  max-width: 64px;
+  max-width: 84px;
   display: flex;
   flex-direction: column;
   align-items: center;
   height: 100%;
-  gap: 8px;
+  gap: 10px;
 }
 /* Bars: a FIXED width (centred in each column) so only the HEIGHT varies day to day — the
-   earlier full-width bars read as different widths as well as heights, which looked wrong. */
+   earlier full-width bars read as different widths as well as heights, which looked wrong. The
+   bar is comfortably narrower than its column, so the inter-column gap always shows through. */
 .weekBarWrap { flex: 1; width: 100%; display: flex; align-items: flex-end; justify-content: center; }
 .weekBar {
-  width: clamp(20px, 2.6vw, 32px);
-  border-radius: 8px 8px 3px 3px;
+  width: clamp(24px, 3vw, 40px);
+  border-radius: 9px 9px 3px 3px;
   background: currentColor;
   opacity: 0.4;
   min-height: 8px;
@@ -786,14 +789,19 @@
   }
 }
 
-/* The event icon sat tight against the title and description at TV scale — give the tile
-   real breathing room and let the text block keep its own rhythm. */
+/* The event icon sat tight against the title and description at TV scale — give the tile real
+   breathing room (a clear gap between the icon tile and the text) and let the text block keep its
+   own rhythm (title, when/where, description each clearly separated). */
 .eventFeature {
-  gap: clamp(32px, 3vw, 56px);
-  padding: clamp(24px, 1.8vw, 34px) clamp(28px, 2.2vw, 40px);
+  gap: clamp(36px, 3.4vw, 60px);
+  padding: clamp(26px, 1.9vw, 36px) clamp(30px, 2.3vw, 44px);
+  align-items: center;
 }
 .evBody {
-  gap: 6px;
+  gap: clamp(8px, 0.7vw, 12px);
+}
+.evDesc {
+  margin-top: clamp(4px, 0.5vw, 8px);
 }
 
 /* Scheduled announcement — a warm banner across the top when the team has set a note for the
