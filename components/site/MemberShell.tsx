@@ -99,12 +99,12 @@ export function MemberShell({ children, wide = false }: { children: ReactNode; w
             {onAdmin ? (
               <Link href="/dashboard" className={styles.switch}>
                 <Icon name="user" size={15} />
-                <span>Member view</span>
+                <span>Switch to member</span>
               </Link>
             ) : admin ? (
               <Link href="/admin" className={styles.switch}>
                 <Icon name="key" size={16} />
-                <span>Admin</span>
+                <span>Switch to hosting</span>
               </Link>
             ) : null}
 

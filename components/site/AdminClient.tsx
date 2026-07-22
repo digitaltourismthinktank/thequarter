@@ -220,6 +220,8 @@ export function AdminClient() {
     return () => clearTimeout(t);
   }, [loading, member]);
 
+  // Phone bottom-nav "More" sheet (the secondary admin areas live behind it).
+  const [moreOpen, setMoreOpen] = useState(false);
   // "What's new" — open once per admin after a new update lands, remembered by the newest id.
   const [whatsNewOpen, setWhatsNewOpen] = useState(false);
   useEffect(() => {
@@ -249,7 +251,7 @@ export function AdminClient() {
   }
 
   return (
-    <div>
+    <div className={styles.adminRoot}>
       <WhatsNew open={whatsNewOpen} onClose={closeWhatsNew} />
       <div className={styles.head}>
         <div>
@@ -307,6 +309,63 @@ export function AdminClient() {
       ) : (
         <BirthdaysPane />
       )}
+
+      {/* Phone-first bottom navigation — mirrors the member app: five primary areas along the
+          bottom, the rest behind "More". The desktop keeps the top tab strip above (CSS-hidden here). */}
+      <nav className={styles.adminBar} aria-label="Admin sections">
+        {([
+          { id: 'today', label: 'Today', icon: 'home' },
+          { id: 'members', label: 'Members', icon: 'users' },
+          { id: 'rooms', label: 'Rooms', icon: 'calendar' },
+          { id: 'comms', label: 'Comms', icon: 'message-circle' },
+        ] as { id: AdminTab; label: string; icon: IconName }[]).map((t) => (
+          <button key={t.id} type="button" className={`${styles.abTab} ${tab === t.id ? styles.abOn : ''}`} onClick={() => setTab(t.id)} aria-current={tab === t.id ? 'page' : undefined}>
+            <Icon name={t.icon} size={21} />
+            {t.label}
+          </button>
+        ))}
+        <button
+          type="button"
+          className={`${styles.abTab} ${(['events', 'content', 'partners', 'birthdays', 'screens'] as AdminTab[]).includes(tab) ? styles.abOn : ''}`}
+          onClick={() => setMoreOpen(true)}
+          aria-haspopup="dialog"
+        >
+          <Icon name="grid" size={21} />
+          More
+        </button>
+      </nav>
+
+      {moreOpen ? (
+        <div className={styles.moreOverlay} role="dialog" aria-modal="true" aria-label="More admin sections" onClick={() => setMoreOpen(false)}>
+          <div className={styles.moreSheet} onClick={(e) => e.stopPropagation()}>
+            <span className={styles.moreTitle}>More tools</span>
+            {([
+              { id: 'events', label: 'Events', icon: 'party-popper' },
+              { id: 'content', label: 'Perks & Rewards', icon: 'gift' },
+              { id: 'partners', label: 'Partners & float', icon: 'pound-sterling' },
+              { id: 'birthdays', label: 'Birthdays', icon: 'cake' },
+              { id: 'screens', label: 'Screens & resources', icon: 'monitor' },
+            ] as { id: AdminTab; label: string; icon: IconName }[]).map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                className={`${styles.moreItem} ${tab === t.id ? styles.moreItemOn : ''}`}
+                onClick={() => {
+                  setTab(t.id);
+                  setMoreOpen(false);
+                }}
+              >
+                <Icon name={t.icon} size={20} color="var(--gold-700)" />
+                <span>{t.label}</span>
+                <Icon name="chevron-right" size={16} />
+              </button>
+            ))}
+            <button type="button" className={styles.moreClose} onClick={() => setMoreOpen(false)}>
+              Close
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

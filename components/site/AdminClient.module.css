@@ -61,6 +61,119 @@
   font-weight: var(--fw-semibold);
 }
 
+/* --- Phone-first admin navigation --------------------------------------------------------- */
+/* A bottom bar mirroring the member app takes over on phones; the dense top strip is desktop-only. */
+.adminBar {
+  display: none;
+}
+@media (max-width: 860px) {
+  .tabs {
+    display: none;
+  }
+  .adminRoot {
+    padding-bottom: calc(66px + var(--tabbar-inset, 8px));
+  }
+  .adminBar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 60;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    align-items: end;
+    background: var(--surface-card);
+    border-top: 1px solid var(--border-subtle);
+    padding: 8px 6px var(--tabbar-inset, 8px);
+    box-shadow: 0 -6px 20px rgba(30, 26, 21, 0.06);
+  }
+  .abTab {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 6px 0;
+    border: none;
+    background: none;
+    font: inherit;
+    font-size: 10px;
+    font-weight: var(--fw-semibold);
+    line-height: 1;
+    color: var(--stone-400, #a89f92);
+    cursor: pointer;
+  }
+  .abOn {
+    color: var(--ink-900);
+  }
+  .abOn svg {
+    color: var(--gold-700);
+  }
+}
+
+/* "More" bottom sheet — the secondary admin areas (Events, Perks & Rewards, Partners, etc.). */
+.moreOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  background: rgba(30, 26, 21, 0.5);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.moreSheet {
+  width: 100%;
+  max-width: 520px;
+  background: var(--surface-card, #fffdf8);
+  border-radius: 20px 20px 0 0;
+  padding: 20px 16px calc(20px + var(--tabbar-inset, 8px));
+  box-shadow: 0 -12px 40px rgba(30, 26, 21, 0.25);
+}
+.moreTitle {
+  display: block;
+  font-size: var(--text-2xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  color: var(--text-muted);
+  font-weight: var(--fw-semibold);
+  margin-bottom: 10px;
+}
+.moreItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 12px;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: var(--text-base);
+  font-weight: var(--fw-semibold);
+  color: var(--ink-900);
+  cursor: pointer;
+  border-radius: var(--radius-md);
+  text-align: left;
+}
+.moreItem span {
+  flex: 1;
+}
+.moreItemOn {
+  background: var(--gold-100, #f4ecd8);
+}
+.moreItem svg:last-child {
+  color: var(--text-muted);
+}
+.moreClose {
+  width: 100%;
+  margin-top: 8px;
+  padding: 13px;
+  border: none;
+  border-radius: var(--radius-full, 999px);
+  background: var(--ink-900);
+  color: var(--sand-50, #faf7f0);
+  font-weight: var(--fw-bold);
+  cursor: pointer;
+}
+
 .count {
   font-size: var(--text-sm);
   color: var(--text-muted);
