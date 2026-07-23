@@ -10,8 +10,6 @@
   overflow: hidden;
   overscroll-behavior: none;
   background: var(--surface-page);
-  display: grid;
-  place-items: center;
 }
 .screen {
   /* Sized + scaled inline from the measured viewport. The fallbacks below are what renders before
@@ -21,7 +19,15 @@
   /* NO max-height here: the canvas is deliberately TALLER than the window (a 1512x800 window draws
      a 1920x1016 canvas that is then scaled down), and a max-height of 100dvh would clamp it
      straight back to the window and undo the scaling. The stage clips instead. */
-  transform-origin: center center;
+  /* Anchored top-left, and scaled from the same corner. Centring does NOT work here: the canvas is
+     WIDER than the viewport before scaling, and CSS grid/flex refuse to give an overflowing item a
+     negative offset — it stays at the start and overflows the end. Scaling about the centre then
+     left the whole screen pushed in by half the overflow (204px at 1512 wide). From the top-left
+     corner the maths is unconditional: scaled size == viewport size, at 0,0. */
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: top left;
   overflow: hidden;
   overscroll-behavior: none;
   background: var(--surface-page);
