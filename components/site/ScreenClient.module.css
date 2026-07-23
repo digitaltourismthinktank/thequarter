@@ -898,7 +898,12 @@
   /* Four rooms as a 2x2 block rather than four thin columns. Kept compact (not stretched to fill)
      so the rooms, the pods and the workspaces all sit above the bottom transport band. */
   .roomGrid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    /* One row, not a 2x2. Two rows of cards plus the Workspaces block needed ~745px in a column
+       that is only ~593px tall even on the 1080p wall display, so the phone pods were clipped in
+       half — the "boxes get cut off" everyone kept seeing. Across the full width of the column each
+       card still has ~250px, which reads fine at wall distance, and the whole column now fits with
+       room to spare. auto-fit rather than a fixed 4 so adding a room doesn't break it. */
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   }
   .roomGrid .spaceCard {
     min-height: clamp(96px, 12vh, 164px);
