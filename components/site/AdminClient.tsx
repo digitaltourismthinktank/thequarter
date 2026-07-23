@@ -20,6 +20,7 @@ import {
   adminPostQueue,
   adminLogPost,
   adminSettlePost,
+  adminUploadPostFile,
   type AdminPostItem,
   adminGetSpaces,
   adminGetCalendar,
@@ -3532,6 +3533,16 @@ function EventAdminRow({ e, onEdit, onDelete, busy }: { e: QuarterEvent; onEdit:
 const POST_TYPES = ['Letter', 'Large letter', 'Parcel'];
 const POST_TAGS = ['Looks official', 'Signed-for', 'Recorded/tracked', 'Time-sensitive'];
 
+/** Read a File as base64 (no data: prefix) for the Post attachment upload. */
+function fileToBase64(file: File): Promise<{ data: string; contentType: string; filename: string }> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve({ data: String(reader.result || '').split(',')[1] || '', contentType: file.type || 'application/octet-stream', filename: file.name });
+    reader.onerror = () => reject(new Error('read-failed'));
+    reader.readAsDataURL(file);
+  });
+}
+
 function AdminPostPane() {
   const [items, setItems] = useState<AdminPostItem[] | null>(null);
   const [members, setMembers] = useState<{ id: string; name: string | null; email: string | null; company: string | null }[]>([]);
@@ -3582,6 +3593,21 @@ function AdminPostPane() {
     setBusy(false);
     if (r.ok) await load();
   }
+  async function upload(id: string, kind: 'scan' | 'photo', file: File | null | undefined) {
+    if (!file) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      const f = await fileToBase64(file);
+      const r = await adminUploadPostFile(id, kind, f);
+      if (r.ok) await load();
+      else setMsg(r.data?.error === 'too-large' ? 'That file is too big (max ~5MB).' : 'Upload failed — you can attach it in Airtable instead.');
+    } catch {
+      setMsg('Couldn’t read that file.');
+    }
+    setBusy(false);
+  }
+  const uploadStyle: React.CSSProperties = { cursor: 'pointer', display: 'inline-flex' };
 
   const waiting = (items ?? []).filter((i) => i.status === 'Waiting');
   const toAction = (items ?? []).filter((i) => ['To scan', 'To forward', 'To collect'].includes(i.status));
@@ -3692,6 +3718,10 @@ function AdminPostPane() {
                   {t}
                 </span>
               ))}
+              <label className={styles.smallBtn} style={uploadStyle}>
+                📷 Photo
+                <input type="file" accept="image/*" hidden onChange={(e) => upload(it.id, 'photo', e.target.files?.[0])} disabled={busy} />
+              </label>
             </span>
           </div>
         ))}
@@ -3721,9 +3751,15 @@ function AdminPostPane() {
                   Mark posted
                 </button>
               ) : it.status === 'To scan' ? (
-                <button type="button" className={styles.smallBtn} onClick={() => settle(it.id, 'scanned')} disabled={busy}>
-                  Mark scanned
-                </button>
+                <>
+                  <label className={styles.smallBtn} style={uploadStyle}>
+                    Upload scan
+                    <input type="file" accept="application/pdf,image/*" hidden onChange={(e) => upload(it.id, 'scan', e.target.files?.[0])} disabled={busy} />
+                  </label>
+                  <button type="button" className={styles.smallBtn} onClick={() => settle(it.id, 'scanned')} disabled={busy}>
+                    Mark scanned
+                  </button>
+                </>
               ) : (
                 <button type="button" className={styles.smallBtn} onClick={() => settle(it.id, 'collected')} disabled={busy}>
                   Mark collected

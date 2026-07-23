@@ -23,7 +23,7 @@ import { NotificationToggle } from './NotificationToggle';
 import { getMemberstack, memberName, memberDaysRemaining, memberRenewalDate, memberDoorCode, memberHasPaymentIssue } from '@/lib/memberstack';
 import { PLANS, PLAN_DAY_ALLOWANCE } from '@/lib/plans';
 import { STRIPE_BILLING_PORTAL_URL } from '@/lib/commerce';
-import { getRewards } from '@/lib/booking';
+import { getRewards, getCheckinToday } from '@/lib/booking';
 import { levelForPoints, type LevelSlug } from '@/lib/rewards';
 import styles from './DashboardClient.module.css';
 
@@ -40,6 +40,14 @@ export function DashboardClient() {
   const [billingError, setBillingError] = useState<string | null>(null);
   const [allPlans, setAllPlans] = useState<unknown>(null);
   const [today, setToday] = useState<ReturnType<typeof busyness> | null>(null);
+  // Rolled-over days come from the SERVER (works even when the Memberstack rollover fields are
+  // admin-restricted from the client), so the plan/rolled-over split always shows.
+  const [srvRoll, setSrvRoll] = useState<{ rollover: number; rolloverExpiry: string | null } | null>(null);
+  useEffect(() => {
+    getCheckinToday().then((r) => {
+      if (r.ok) setSrvRoll({ rollover: r.data.rollover ?? 0, rolloverExpiry: r.data.rolloverExpiry ?? null });
+    });
+  }, []);
   // Seed the loyalty card from the last-known values (instant render, works offline).
   const [points, setPoints] = useState<number | null>(() => {
     if (typeof window === 'undefined') return null;
@@ -188,10 +196,13 @@ export function DashboardClient() {
 
   // Two-bucket day balance: this cycle's plan days (days-remaining) PLUS the rollover bucket
   // (days-rollover, live only until rollover-expiry). Read straight from the member's custom fields.
-  const rollRaw = member.customFields?.['days-rollover'];
-  const rollExp = String(member.customFields?.['rollover-expiry'] || '').trim();
   const nowISO = new Date().toISOString().slice(0, 10);
-  const rollNum = rollExp && rollExp < nowISO ? 0 : Math.max(0, Number(rollRaw) || 0);
+  // Prefer the server's live rollover (already expiry-adjusted, and readable even when the fields
+  // are admin-restricted); fall back to the client custom field.
+  const clientRollExp = String(member.customFields?.['rollover-expiry'] || '').trim();
+  const clientRoll = clientRollExp && clientRollExp < nowISO ? 0 : Math.max(0, Number(member.customFields?.['days-rollover']) || 0);
+  const rollNum = srvRoll ? Math.max(0, srvRoll.rollover) : clientRoll;
+  const rollExp = (srvRoll?.rolloverExpiry || clientRollExp || '').trim();
   const planNum = Number.isFinite(daysNum) ? daysNum : 0;
   const totalDays = planNum + rollNum;
   const rollExpLabel = rollExp ? new Date(`${rollExp}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '';
@@ -276,7 +287,7 @@ export function DashboardClient() {
       <div className={styles.layout}>
         <div className={styles.mainCol}>
           {/* Hybrid Office leads on their post, then the registered address they pay for. */}
-          {isHybrid ? <PostCard variant="hero" greetingName={first || undefined} /> : null}
+          {isHybrid ? <PostCard variant="hero" /> : null}
           {isHybrid ? <RegisteredAddressCard company={(member.metaData?.company as string) || null} /> : null}
           {hasPlan ? (
             <div className={styles.statRow}>
@@ -293,6 +304,10 @@ export function DashboardClient() {
           ) : (
             <DayPassCard />
           )}
+
+          {/* Non-Hybrid members see their post here, right under the tiles — a proper card (not the
+              easy-to-miss rail strip), but only when something's actually waiting. */}
+          {!isHybrid ? <PostCard variant="card" /> : null}
 
           {band ? (
             <div className={styles.busy}>
@@ -322,8 +337,6 @@ export function DashboardClient() {
         </div>
 
         <aside className={styles.rail}>
-          {/* Everyone else: a quiet "you've got post" strip (renders nothing when there's no mail). */}
-          {!isHybrid ? <PostCard variant="strip" /> : null}
           {/* Phones only: a tight one-card summary that stands in for the big membership card AND
               the days/plan/door tiles, so the top of the screen isn't three stacked blocks. */}
           <button type="button" className={styles.mSum} onClick={() => setCardOpen(true)} aria-label="Show your membership card">

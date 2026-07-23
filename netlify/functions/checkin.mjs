@@ -286,6 +286,11 @@ export default async function handler(req) {
       length: active ? active.fields[F.checkins.length] : null,
       period: active && active.fields[F.checkins.length] === 'Half' ? periodFromNotes(active.fields[F.checkins.notes]) : null,
       balance: vm.member.customFields?.['days-remaining'] ?? null,
+      // Rollover comes from the SERVER (the admin SDK sees these fields even when they're
+      // admin-restricted from the client), so the dashboard can always show the plan/rolled-over
+      // split regardless of the Memberstack field visibility.
+      rollover: liveRollover(vm.member),
+      rolloverExpiry: vm.member.customFields?.['rollover-expiry'] || null,
       planned: upcoming,
       requested: requested.map((r) => ({
         id: r.id,

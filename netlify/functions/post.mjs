@@ -16,16 +16,21 @@
 
 import memberstackAdmin from '@memberstack/admin';
 import { verifyMember, memberEmail, memberName, isAdmin, tokenFromRequest } from './_member.mjs';
-import { listRecords, createRecord, updateRecord, esc, airtableReady } from './_airtable.mjs';
+import { listRecords, createRecord, updateRecord, esc, airtableReady, BASE } from './_airtable.mjs';
 import { londonNow } from './_time.mjs';
 import { pushToEmail, pushToAdmins } from './_push.mjs';
 import { sendEmail, emailShell, escapeHtml, notifyAdmins } from './_email.mjs';
 
 const MS_SECRET = process.env.MEMBERSTACK_SECRET_KEY;
 const STRIPE_SECRET = process.env.STRIPE_SECRET_KEY;
+const AIRTABLE_TOKEN = process.env.AIRTABLE_API_KEY; // for the attachment content-upload API
 const FORWARD_FEE_PENCE = 750; // £7.50 to forward by 1st class post
+// Attachment field IDs on the Post table (for direct dashboard uploads via Airtable's content API).
+const POST_FIELD_ID = { scan: 'fldCO27cMvPh3wppP', photo: 'fld5tY0i3z2Za7YVh' };
 
-const POST = 'Post'; // Airtable table, addressed by name
+// The mail table in the Ops base. Addressed by its stable table ID (its display name is free to
+// change); `byName: true` on reads just means "return fields keyed by NAME" (we read PF.* names).
+const POST = 'tblpYalqRYkaGnLXp';
 // Field NAMES in the Post table (create these columns exactly).
 const PF = {
   item: 'Item', // primary — a human label, e.g. "Letter · Riva Savant"
@@ -350,6 +355,39 @@ export default async function handler(req) {
         /* best-effort */
       }
       return json({ ok: true, status: fields[PF.status] });
+    }
+
+    // ---- Admin: upload a scan (PDF) or envelope photo straight from the dashboard ----
+    if (body.action === 'uploadFile') {
+      if (!isAdmin(me)) return json({ error: 'forbidden' }, 403);
+      const fieldId = POST_FIELD_ID[body.kind];
+      if (!body.id || !fieldId || !body.data) return json({ error: 'bad-upload' }, 400);
+      // Airtable's content-upload API wants base64 (no data: prefix); it caps attachments ~5MB.
+      if (String(body.data).length > 7_000_000) return json({ error: 'too-large' }, 413);
+      const res = await fetch(`https://content.airtable.com/v0/${BASE}/${body.id}/${fieldId}/uploadAttachment`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${AIRTABLE_TOKEN}`, 'content-type': 'application/json' },
+        body: JSON.stringify({
+          contentType: String(body.contentType || 'application/octet-stream'),
+          filename: String(body.filename || (body.kind === 'photo' ? 'envelope' : 'scan')),
+          file: String(body.data),
+        }),
+      });
+      if (!res.ok) {
+        const detail = await res.text().catch(() => '');
+        return json({ error: 'upload-failed', detail: detail.slice(0, 300) }, 502);
+      }
+      // A scan means it's ready to read — flip to Scanned and let the member know.
+      if (body.kind === 'scan') {
+        const row = await getRow(body.id);
+        await updateRecord(POST, body.id, { [PF.status]: 'Scanned' }, { typecast: true });
+        try {
+          if (row) await pushToEmail(String(row.fields[PF.email] || ''), { title: 'Your post', body: 'Your item has been scanned — read it in the app.', url: '/dashboard/' });
+        } catch {
+          /* best-effort */
+        }
+      }
+      return json({ ok: true });
     }
 
     return json({ error: 'unknown-action' }, 400);

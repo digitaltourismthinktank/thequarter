@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Icon } from '@/components/ds/Icon';
 import { cn } from '@/lib/cn';
-import { getCheckinToday, checkInToday, type CheckinStatus } from '@/lib/booking';
+import { getCheckinToday, checkInToday, changeCheckinLength, type CheckinStatus } from '@/lib/booking';
 import { haptic, playChime } from '@/lib/feedback';
 import styles from './CheckInSheet.module.css';
 
@@ -58,11 +58,13 @@ export function CheckInSheet({ open, onClose }: { open: boolean; onClose: () => 
   const [period, setPeriod] = useState<'am' | 'pm'>('am');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [changeNote, setChangeNote] = useState<string | null>(null);
   const [done, setDone] = useState<{ points: number; usedCarnet?: boolean; passesLeft?: number | null } | null>(null);
 
   useEffect(() => {
     if (!open) return;
     setError(null);
+    setChangeNote(null);
     setDone(null);
     setLoading(true);
     getCheckinToday().then((r) => {
@@ -99,6 +101,27 @@ export function CheckInSheet({ open, onClose }: { open: boolean; onClose: () => 
       setDone({ points: r.data?.pointsAwarded ?? 0, usedCarnet: r.data?.usedCarnet, passesLeft: r.data?.carnetRemaining ?? null });
       haptic(18);
       playChime('success');
+    }
+    setBusy(false);
+  }
+
+  // Change today's length once already in — moves only the day difference (points don't change),
+  // and re-reads status so the sheet reflects it immediately.
+  async function changeLength(length: 'Full' | 'Half', p?: 'am' | 'pm') {
+    setBusy(true);
+    setError(null);
+    setChangeNote(null);
+    const r = await changeCheckinLength(length, length === 'Half' ? p ?? 'am' : null);
+    if (!r.ok || r.data?.error) {
+      const code = r.data?.error;
+      setError(code === 'no-allowance' ? 'Not enough days left to make it a full day.' : code === 'change-unsupported' ? 'To change this day, cancel it and book again.' : friendly(code));
+      haptic([8, 40, 8]);
+    } else {
+      const d = r.data?.dayDelta ?? 0;
+      setChangeNote(d > 0 ? 'Changed to a full day — half a day used.' : d < 0 ? 'Changed to a half day — half a day credited back.' : 'Updated.');
+      haptic(12);
+      const s = await getCheckinToday();
+      if (s.ok) setStatus(s.data);
     }
     setBusy(false);
   }
@@ -143,6 +166,33 @@ export function CheckInSheet({ open, onClose }: { open: boolean; onClose: () => 
                     : 'You’re here for a full day.'}{' '}
                   Enjoy The Quarter.
                 </p>
+
+                {/* Change your mind — switch half↔full (and morning↔afternoon). Only the day
+                    difference moves; points don't change. */}
+                <div className={styles.seg} role="group" aria-label="Change today">
+                  {status?.length === 'Half' ? (
+                    <>
+                      <button type="button" className={styles.segBtn} onClick={() => changeLength('Full')} disabled={busy}>
+                        Make it a full day
+                      </button>
+                      <button type="button" className={styles.segBtn} onClick={() => changeLength('Half', status.period === 'am' ? 'pm' : 'am')} disabled={busy}>
+                        Move to {status.period === 'am' ? 'afternoon' : 'morning'}
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button type="button" className={styles.segBtn} onClick={() => changeLength('Half', 'am')} disabled={busy}>
+                        Half day · morning
+                      </button>
+                      <button type="button" className={styles.segBtn} onClick={() => changeLength('Half', 'pm')} disabled={busy}>
+                        Half day · afternoon
+                      </button>
+                    </>
+                  )}
+                </div>
+                {changeNote ? <p className={styles.fine}>{changeNote}</p> : null}
+                {error ? <p className={styles.error}>{error}</p> : null}
+
                 <button type="button" className={styles.cta} onClick={onClose}>
                   Close
                 </button>

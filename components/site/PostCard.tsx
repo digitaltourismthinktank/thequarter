@@ -1,8 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { getMyPost, choosePost, requestEnvelopePhoto, saveProfile, type PostItem } from '@/lib/booking';
+import { getMyPost, choosePost, requestEnvelopePhoto, type PostItem } from '@/lib/booking';
 import { SITE } from '@/lib/site';
+import { CardUpdate } from './CardUpdate';
 import { cn } from '@/lib/cn';
 import styles from './PostCard.module.css';
 
@@ -57,10 +58,10 @@ function arrivedLabel(iso: string | null): string {
 
 const STATUS_TEXT: Record<string, string> = {
   'To scan': 'We’re scanning it',
-  Scanned: 'Scanned — read it below',
+  Scanned: 'Scanned — read it below · original in your pigeon hole to collect any time',
   'To forward': 'Getting it ready to post',
   Posted: 'On its way to you',
-  'To collect': 'Held for you — just check in at reception',
+  'To collect': 'You can collect it from your pigeon hole any time',
   Collected: 'Collected',
 };
 
@@ -69,24 +70,19 @@ const STATUS_TEXT: Record<string, string> = {
  * bought the address) and `strip` (a compact rail entry for everyone else). It's driven entirely
  * by the member's own post records — no post on file and the strip renders nothing.
  */
-export function PostCard({ variant = 'hero', greetingName, className }: { variant?: 'hero' | 'strip'; greetingName?: string; className?: string }) {
+export function PostCard({ variant = 'hero', className }: { variant?: 'hero' | 'strip' | 'card'; className?: string }) {
   const [items, setItems] = useState<PostItem[] | null>(null);
-  const [forwardAddress, setForwardAddress] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [scanFor, setScanFor] = useState<string | null>(null); // item awaiting explicit open-permission
-  const [addrFor, setAddrFor] = useState<string | null>(null); // item awaiting a forwarding address
-  const [addrDraft, setAddrDraft] = useState('');
+  const [needAddr, setNeedAddr] = useState(false); // forward blocked: no forwarding address on profile
+  const [cardFor, setCardFor] = useState<string | null>(null); // forward blocked: add a card inline first
   const [expanded, setExpanded] = useState(false); // strip → reveal the actions
 
   const refresh = useCallback(async () => {
     const r = await getMyPost();
-    if (r.ok) {
-      setItems(r.data.items);
-      setForwardAddress(r.data.forwardAddress || '');
-      setAddrDraft((prev) => prev || r.data.forwardAddress || '');
-    }
+    if (r.ok) setItems(r.data.items);
   }, []);
   useEffect(() => {
     refresh();
@@ -107,37 +103,31 @@ export function PostCard({ variant = 'hero', greetingName, className }: { varian
 
   async function doScan(id: string) {
     setBusyId(id);
-    await act(() => choosePost(id, 'scan', { permission: true }), 'Thanks — we’ll scan it and email you. We’ll keep the original for you to collect.');
+    await act(() => choosePost(id, 'scan', { permission: true }), 'Thanks — we’ll scan it and email you. The original stays in your pigeon hole to collect any time.');
     setScanFor(null);
     setBusyId(null);
   }
   async function doForward(id: string) {
     setBusyId(id);
+    setErr(null);
+    setNeedAddr(false);
     const r = await choosePost(id, 'forward');
     if (r.ok && !r.data?.error) {
       setNote('Sorted — £7.50 charged, and we’ll post it 1st class to your forwarding address.');
-      setErr(null);
       await refresh();
     } else if (r.data?.error === 'no-forward-address') {
-      setAddrFor(id); // ask for an address, then forward
+      setNeedAddr(true); // must add a forwarding address on their profile first
+    } else if (r.data?.error === 'no-card') {
+      setCardFor(id); // no saved card → collect one inline, then retry
     } else {
       setErr(postError(r.data?.error));
     }
     setBusyId(null);
   }
-  async function saveAddressThenForward(id: string) {
-    const addr = addrDraft.trim();
-    if (!addr) return;
-    setBusyId(id);
-    const s = await saveProfile({ forwardAddress: addr });
-    if (s.ok) {
-      setForwardAddress(addr);
-      setAddrFor(null);
-      await doForward(id);
-    } else {
-      setErr('Couldn’t save your address — please try again.');
-      setBusyId(null);
-    }
+  // After a card is added inline, retry the forward — now the saved-card charge path runs.
+  async function cardAddedThenForward(id: string) {
+    setCardFor(null);
+    await doForward(id);
   }
   async function doCollect(id: string) {
     setBusyId(id);
@@ -170,12 +160,16 @@ export function PostCard({ variant = 'hero', greetingName, className }: { varian
     }
   }
 
+  // The 'card' variant (non-Hybrid, under the stat tiles) mirrors the hero but only appears when
+  // there's actually post — no permanent "nothing waiting" block on the dashboard.
+  if (variant === 'card' && (items === null || active === 0)) return null;
+
   const showCalm = variant === 'hero' && active === 0;
 
   return (
-    <div className={cn(variant === 'hero' ? styles.hero : styles.stripCard, waiting.length > 0 && variant === 'hero' && styles.heroActive, className)}>
+    <div className={cn(variant === 'strip' ? styles.stripCard : styles.hero, waiting.length > 0 && variant !== 'strip' && styles.heroActive, className)}>
       <div className={styles.head}>
-        <span className={styles.eyebrow}>{greetingName ? `${greetingName} — your post` : 'Your post'}</span>
+        <span className={styles.eyebrow}>Post &amp; Parcels</span>
         <span className={styles.pin} aria-hidden="true">
           📮
         </span>
@@ -229,7 +223,7 @@ export function PostCard({ variant = 'hero', greetingName, className }: { varian
               {scanFor === it.id ? (
                 <div className={styles.confirm}>
                   <p className={styles.confirmText}>
-                    Scanning means we <strong>open your envelope</strong> — you’re OK’ing that. We’ll email you the scan and{' '}
+                    Scanning means we <strong>open your envelope</strong> — by confirming you give your consent. We’ll email you the scan and{' '}
                     <strong>keep the original</strong> for you to collect.
                   </p>
                   <div className={styles.btnRow}>
@@ -241,25 +235,13 @@ export function PostCard({ variant = 'hero', greetingName, className }: { varian
                     </button>
                   </div>
                 </div>
-              ) : addrFor === it.id ? (
+              ) : cardFor === it.id ? (
                 <div className={styles.confirm}>
-                  <p className={styles.confirmText}>Where should we post it? (£7.50, 1st class.)</p>
-                  <textarea
-                    className={styles.addr}
-                    rows={3}
-                    value={addrDraft}
-                    onChange={(e) => setAddrDraft(e.target.value)}
-                    placeholder={'12 Orchard Way\nWhitstable\nCT5 1AB'}
-                    aria-label="Forwarding address"
-                  />
-                  <div className={styles.btnRow}>
-                    <button type="button" className={styles.btn} onClick={() => saveAddressThenForward(it.id)} disabled={busyId === it.id || !addrDraft.trim()}>
-                      Save &amp; forward · £7.50
-                    </button>
-                    <button type="button" className={cn(styles.btn, styles.btnGhost)} onClick={() => setAddrFor(null)} disabled={busyId === it.id}>
-                      Cancel
-                    </button>
-                  </div>
+                  <p className={styles.confirmText}>Add a card to forward by post — £7.50, 1st class. We’ll save it for next time.</p>
+                  <CardUpdate triggerLabel="Add a card" onDone={() => cardAddedThenForward(it.id)} />
+                  <button type="button" className={cn(styles.btn, styles.btnGhost)} onClick={() => setCardFor(null)} disabled={busyId === it.id}>
+                    Cancel
+                  </button>
                 </div>
               ) : (
                 <div className={styles.btnRow}>
@@ -274,7 +256,7 @@ export function PostCard({ variant = 'hero', greetingName, className }: { varian
                   </button>
                   {!it.photoUrl && !it.photoRequested ? (
                     <button type="button" className={cn(styles.btn, styles.btnGhost)} onClick={() => doPhoto(it.id)} disabled={busyId === it.id}>
-                      Photo of envelope
+                      Request photo of the envelope
                     </button>
                   ) : null}
                 </div>
@@ -296,16 +278,32 @@ export function PostCard({ variant = 'hero', greetingName, className }: { varian
                 </span>
                 <span className={cn(styles.statusPill, it.status === 'To collect' && styles.pillGo, it.status === 'Posted' && styles.pillOk)}>{it.status}</span>
               </div>
-              {it.scanUrl ? (
-                <a className={styles.readScan} href={it.scanUrl} target="_blank" rel="noreferrer">
-                  Read the scan →
-                </a>
-              ) : null}
+              <div className={styles.viewLinks}>
+                {it.scanUrl ? (
+                  <a className={styles.readScan} href={it.scanUrl} target="_blank" rel="noreferrer">
+                    View / download the scan →
+                  </a>
+                ) : null}
+                {it.photoUrl ? (
+                  <a className={styles.readScan} href={it.photoUrl} target="_blank" rel="noreferrer">
+                    View the envelope photo →
+                  </a>
+                ) : null}
+              </div>
             </div>
           ))}
         </>
       )}
 
+      {needAddr ? (
+        <p className={styles.err}>
+          Add a forwarding address on your{' '}
+          <a href="/account" className={styles.readScan}>
+            profile
+          </a>
+          , then tap Forward again.
+        </p>
+      ) : null}
       {note ? (
         <p className={styles.note} role="status">
           {note}

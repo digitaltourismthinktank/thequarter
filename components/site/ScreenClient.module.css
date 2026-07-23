@@ -665,7 +665,10 @@
     display: grid;
     align-items: stretch;
     grid-template-columns: minmax(0, 4fr) minmax(0, 6fr);
-    grid-template-rows: auto minmax(0, 1fr) auto;
+    /* Left column stacks: week hero (flex) · what's-on · transport. The transport band MUST have
+       its own explicit row — without it the band auto-flowed into an implicit 4th row, stealing
+       height from the 1fr hero row so the week strip overflowed onto the What's-on heading. */
+    grid-template-rows: auto minmax(0, 1fr) auto auto;
     column-gap: clamp(24px, 2.5vw, 56px);
     row-gap: clamp(12px, 1.6vh, 26px);
   }
@@ -688,9 +691,16 @@
     align-self: end;
     max-width: none;
   }
+  /* Live departures sit at the foot of the left column, under What's-on, in their own row. */
+  .transport {
+    grid-column: 1;
+    grid-row: 4;
+    align-self: end;
+    margin-top: 0;
+  }
   .entranceMain {
     grid-column: 2;
-    grid-row: 2 / 4;
+    grid-row: 2 / 5;
     min-height: 0;
   }
   /* 10vw is portrait maths — in a half-width column it dwarfs the room status, which is

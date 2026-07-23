@@ -44,7 +44,7 @@ async function waitForNode(ref: { current: HTMLDivElement | null }): Promise<HTM
  * only into Stripe's own iframe (Stripe Elements) — this app never sees it. We
  * create a SetupIntent server-side, confirm it here, then set the new card default.
  */
-export function CardUpdate({ onDone }: { onDone?: () => void }) {
+export function CardUpdate({ onDone, triggerLabel = 'Update card' }: { onDone?: () => void; triggerLabel?: string }) {
   const [open, setOpen] = useState(false);
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -124,7 +124,7 @@ export function CardUpdate({ onDone }: { onDone?: () => void }) {
     return (
       <div className={styles.wrap}>
         <button type="button" className={styles.trigger} onClick={() => setOpen(true)}>
-          Update card
+          {triggerLabel}
         </button>
         {msg ? <span className={styles.msg}>{msg}</span> : null}
       </div>

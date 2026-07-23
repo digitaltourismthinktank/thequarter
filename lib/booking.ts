@@ -70,6 +70,10 @@ export interface CheckinStatus {
   length: 'Full' | 'Half' | null;
   period?: DayPeriod | null;
   balance: string | null;
+  /** Live rolled-over days + expiry, provided by the server (works even when the Memberstack
+   *  fields are admin-restricted from the client). */
+  rollover?: number;
+  rolloverExpiry?: string | null;
   planned: { id: string; date: string; length: 'Full' | 'Half'; kind?: 'pass' | 'reserved'; period?: DayPeriod | null }[];
   requested?: { id: string; date: string; length: 'Full' | 'Half'; period?: DayPeriod | null }[];
 }
@@ -379,6 +383,9 @@ export const adminLogPost = (b: { memberId: string; type: string; sender?: strin
   call<{ ok: boolean }>('post', { method: 'POST', body: { action: 'log', ...b } });
 export const adminSettlePost = (id: string, to: 'posted' | 'collected' | 'scanned', note?: string) =>
   call<{ ok: boolean; status?: string }>('post', { method: 'POST', body: { action: 'settle', id, to, ...(note ? { note } : {}) } });
+/** Upload a scan (PDF) or envelope photo to an item's attachment field. `data` is base64 (no data: prefix). */
+export const adminUploadPostFile = (id: string, kind: 'scan' | 'photo', file: { filename: string; contentType: string; data: string }) =>
+  call<{ ok: boolean; error?: string; detail?: string }>('post', { method: 'POST', body: { action: 'uploadFile', id, kind, ...file } });
 
 // ---- Admin (staff only; the function also enforces the @thinkdigital.travel gate) ----
 export interface AdminMember {
