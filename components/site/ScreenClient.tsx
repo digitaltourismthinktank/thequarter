@@ -5,10 +5,13 @@ import {
   getTodayScreen,
   getUpcomingEvents,
   getAnnouncements,
+  getTransport,
   type ScreenSpace,
   type ScreenBooking,
   type QuarterEvent,
   type ScreenAnnouncement,
+  type TrainDeparture,
+  type BusDeparture,
 } from '@/lib/booking';
 import { busyness, expectedPeople, type Band } from '@/lib/busyness';
 import { Icon } from '@/components/ds/Icon';
@@ -149,6 +152,122 @@ function eventWhen(start: string): string {
     minute: '2-digit',
     hour12: false,
   });
+}
+
+// ---- Transport band (Canterbury West / East trains + Bus Station) --------------------------
+// A compact "Quarter panel" departures board for the entrance display. On-time reads quiet;
+// anything off-schedule pops (amber late / red cancelled) so it's legible across the lobby. Both
+// stations are a ~10-min walk, so each column shows a full hour (~7 departures).
+
+type TransportData = Awaited<ReturnType<typeof getTransport>>['data'];
+
+/** One Darwin departure's status as a compact chip. */
+function TrainStatus({ t }: { t: TrainDeparture }) {
+  if (t.state === 'cancelled') return <span className={`${styles.trStatus} ${styles.trCancelled}`}>Cancelled</span>;
+  if (t.state === 'delayed') return <span className={`${styles.trStatus} ${styles.trLate}`}>Delayed</span>;
+  if (t.state === 'late' && t.expected) return <span className={`${styles.trStatus} ${styles.trLate}`}>Exp {t.expected}</span>;
+  return <span className={`${styles.trStatus} ${styles.trOnTime}`}>On time</span>;
+}
+
+function TrainColumn({ title, sub, rows, live }: { title: string; sub: string; rows: TrainDeparture[]; live: boolean }) {
+  return (
+    <div className={styles.trCol}>
+      <div className={styles.trColHead}>
+        <span className={styles.trStation}>{title}</span>
+        <span className={styles.trDir}>{sub}</span>
+      </div>
+      {rows.length ? (
+        <ul className={styles.trList}>
+          {rows.map((t, i) => (
+            <li key={`${t.time}-${i}`} className={t.state === 'cancelled' ? styles.trRowCx : undefined}>
+              <span className={styles.trTime}>{t.time}</span>
+              <span className={styles.trDest}>{t.to}</span>
+              <span className={styles.trPlat}>{t.platform ? `Pl ${t.platform}` : ''}</span>
+              <TrainStatus t={t} />
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className={styles.trEmpty}>{live ? 'Nothing in the next hour' : 'Live train times switching on soon'}</p>
+      )}
+    </div>
+  );
+}
+
+function BusColumn({ rows }: { rows: BusDeparture[] }) {
+  return (
+    <div className={styles.trCol}>
+      <div className={styles.trColHead}>
+        <span className={styles.trStation}>Buses</span>
+        <span className={styles.trDir}>Canterbury Bus Station</span>
+      </div>
+      {rows.length ? (
+        <ul className={styles.trList}>
+          {rows.map((bd, i) => (
+            <li key={`${bd.time}-${bd.line}-${i}`}>
+              <span className={styles.trTime}>{bd.time}</span>
+              <span className={styles.busLine}>{bd.line}</span>
+              <span className={styles.trDest}>{bd.to}</span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className={styles.trEmpty}>Nothing in the next hour</p>
+      )}
+    </div>
+  );
+}
+
+function TransportBand() {
+  const [t, setT] = useState<TransportData | null>(null);
+  const [updated, setUpdated] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    const r = await getTransport();
+    if (r.ok) {
+      setT(r.data);
+      setUpdated(
+        new Date().toLocaleTimeString('en-GB', {
+          timeZone: 'Europe/London',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false,
+        }),
+      );
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+    const id = setInterval(load, 60000);
+    return () => clearInterval(id);
+  }, [load]);
+
+  if (!t || !t.configured) return null;
+  const { trains, buses, trainsLive } = t;
+  // Nothing to show at all (trains not live yet + no buses now) — hide rather than show a shell.
+  if (!trainsLive && !buses.length && !trains.west.length && !trains.east.length) return null;
+
+  return (
+    <section className={styles.transport} aria-label="Live departures">
+      <div className={styles.trGrid}>
+        <TrainColumn title="Canterbury West" sub="London St Pancras · Ramsgate" rows={trains.west} live={!!trainsLive} />
+        <TrainColumn title="Canterbury East" sub="London Victoria · Dover" rows={trains.east} live={!!trainsLive} />
+        <BusColumn rows={buses} />
+      </div>
+      <div className={styles.trFoot}>
+        <span className={styles.trWalk}>≈ 10-min walk to either station</span>
+        {trainsLive && updated ? (
+          <span className={styles.trLive}>
+            <span className={styles.trDot} aria-hidden="true" /> Live · updated {updated}
+          </span>
+        ) : (
+          <span className={styles.trLive}>Bus times from timetable</span>
+        )}
+      </div>
+    </section>
+  );
 }
 
 /** One installed /screen app can BE any of these displays — persisted so a reopen returns to it. */
@@ -489,6 +608,9 @@ function EntranceScreen() {
           ) : null}
         </div>
       </header>
+
+      {/* Live departures sit high up — the first thing a member sees when heading out. */}
+      {!closed ? <TransportBand /> : null}
 
       {closed ? (
         <section className={`${styles.hero} ${styles.bandClosed}`}>

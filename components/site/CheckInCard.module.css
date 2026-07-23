@@ -321,3 +321,42 @@
     margin-top: 4px;
   }
 }
+
+/* Change today's length (half↔full / move a half AM↔PM) — a quiet secondary control shown once
+   the day is committed, so it reads as "adjust" not "check in again". */
+.changeToday {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-top: 12px;
+}
+.changeLabel {
+  font-size: var(--text-2xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  font-weight: var(--fw-semibold);
+  color: var(--text-muted);
+}
+.changeBtns {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.changeBtn {
+  padding: 7px 13px;
+  border: 1px solid var(--sand-300);
+  border-radius: var(--radius-pill);
+  background: var(--sand-50);
+  color: var(--ink-900);
+  font-size: var(--text-xs);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+}
+.changeBtn:hover:not(:disabled) {
+  border-color: var(--gold-500);
+  background: var(--gold-100);
+}
+.changeBtn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}

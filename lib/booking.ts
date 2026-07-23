@@ -286,7 +286,15 @@ export interface TourSlot {
   available: boolean;
 }
 // ---- Live Canterbury transport for the lobby display (public) ----
-export interface TrainDeparture { time: string; to: string; expected: string | null; onTime: boolean; cancelled: boolean }
+export type DepartureState = 'on-time' | 'late' | 'delayed' | 'cancelled';
+export interface TrainDeparture {
+  time: string; // scheduled "HH:MM"
+  to: string;
+  platform: string | null;
+  operator: string;
+  state: DepartureState;
+  expected?: string; // present only when state === 'late' (a real re-timed departure)
+}
 export interface BusDeparture { time: string; line: string; to: string }
 export const getTransport = () =>
   call<{
@@ -306,14 +314,22 @@ export const bookTour = (b: { date: string; time: string; name: string; email: s
 // Check-in
 export const getCheckinToday = () => call<CheckinStatus>('checkin?action=today');
 export const checkInToday = (length: 'Full' | 'Half', period?: DayPeriod | null) =>
-  call<{ ok: boolean; balance: string | null; pointsAwarded?: number; alreadyCheckedIn?: boolean; usedCarnet?: boolean; carnetRemaining?: number | null }>('checkin', {
+  call<{ ok: boolean; balance: string | null; pointsAwarded?: number; alreadyCheckedIn?: boolean; alreadyBooked?: boolean; length?: 'Full' | 'Half'; usedCarnet?: boolean; carnetRemaining?: number | null }>('checkin', {
     method: 'POST',
     body: { action: 'checkin', length, ...(length === 'Half' && period ? { period } : {}) },
+  });
+/** Change TODAY's booked/checked-in day between Half and Full. Adjusts ONLY the day difference
+ *  (points are per-attendance and never change). `change-unsupported` = an over-allowance day the
+ *  member should cancel & rebook instead. */
+export const changeCheckinLength = (length: 'Full' | 'Half', period?: DayPeriod | null) =>
+  call<{ ok: boolean; length?: 'Full' | 'Half'; dayDelta?: number; balance?: string | null; pending?: boolean; unchanged?: boolean; error?: string }>('checkin', {
+    method: 'POST',
+    body: { action: 'changeLength', length, ...(length === 'Half' && period ? { period } : {}) },
   });
 /** Shared-kiosk check-in: no login — the member is identified by the id from the privacy-safe
  *  name search. Runs the same server-side check-in as checkInToday (Source is recorded 'Kiosk'). */
 export const kioskCheckIn = (memberId: string, length: 'Full' | 'Half', period?: DayPeriod | null) =>
-  call<{ ok: boolean; balance?: string | null; pointsAwarded?: number; alreadyCheckedIn?: boolean; alreadyCounted?: boolean; usedCarnet?: boolean; error?: string }>('checkin', {
+  call<{ ok: boolean; balance?: string | null; pointsAwarded?: number; alreadyCheckedIn?: boolean; alreadyCounted?: boolean; alreadyBooked?: boolean; usedCarnet?: boolean; error?: string }>('checkin', {
     method: 'POST',
     auth: false,
     body: { action: 'kioskCheckin', memberId, length, ...(length === 'Half' && period ? { period } : {}) },
@@ -323,6 +339,47 @@ export const reserveDay = (date: string, length: 'Full' | 'Half', period?: DayPe
 export const cancelReservation = (id: string) =>
   call<{ ok: boolean; refunded?: boolean }>('checkin', { method: 'POST', body: { action: 'cancel', id } });
 
+// ---- Post / mail (members' physical post; see netlify/functions/post.mjs) ----
+export type PostStatus = 'Waiting' | 'To scan' | 'Scanned' | 'To forward' | 'Posted' | 'To collect' | 'Collected';
+export type PostHandling = 'Scan' | 'Forward' | 'Collect';
+export interface PostItem {
+  id: string;
+  type: string; // Letter / Large letter / Parcel
+  tags: string[]; // Looks official / Signed-for / Recorded/tracked / Time-sensitive
+  sender: string;
+  arrived: string | null;
+  status: PostStatus;
+  handling: PostHandling | null;
+  photoUrl: string | null;
+  scanUrl: string | null;
+  photoRequested: boolean;
+  postedOn: string | null;
+  collectedOn: string | null;
+}
+export interface AdminPostItem extends PostItem {
+  memberName: string;
+  memberEmail: string;
+  company: string;
+  forwardAddress: string;
+  forwardPaid: boolean;
+  notes: string;
+}
+export const getMyPost = () => call<{ items: PostItem[]; forwardAddress: string }>('post?action=mine');
+/** Choose what happens to an item. `scan` needs { permission: true } (opening the envelope);
+ *  `forward` charges £7.50 to the saved card and needs a forwarding address on file (set via
+ *  saveProfile → forwardAddress). */
+export const choosePost = (id: string, handling: 'scan' | 'forward' | 'collect', opts?: { permission?: boolean }) =>
+  call<{ ok: boolean; status?: string; paid?: boolean; requiresAction?: boolean; clientSecret?: string; error?: string; detail?: string }>('post', {
+    method: 'POST',
+    body: { action: 'choose', id, handling, ...(opts?.permission ? { permission: true } : {}) },
+  });
+export const requestEnvelopePhoto = (id: string) => call<{ ok: boolean }>('post', { method: 'POST', body: { action: 'requestPhoto', id } });
+export const adminPostQueue = () => call<{ items: AdminPostItem[] }>('post?action=queue');
+export const adminLogPost = (b: { memberId: string; type: string; sender?: string; tags?: string[] }) =>
+  call<{ ok: boolean }>('post', { method: 'POST', body: { action: 'log', ...b } });
+export const adminSettlePost = (id: string, to: 'posted' | 'collected' | 'scanned', note?: string) =>
+  call<{ ok: boolean; status?: string }>('post', { method: 'POST', body: { action: 'settle', id, to, ...(note ? { note } : {}) } });
+
 // ---- Admin (staff only; the function also enforces the @thinkdigital.travel gate) ----
 export interface AdminMember {
   id: string;
@@ -330,6 +387,8 @@ export interface AdminMember {
   name: string | null;
   plan: string | null;
   days: string | null;
+  /** Live rolled-over days (respects expiry); 0 if none. */
+  rollover?: number;
   renewal: string | null;
   /** Per-member numeric allowance override (customFields['allowance-override']); null = none. */
   allowanceOverride: string | null;
@@ -466,6 +525,9 @@ export const adminApproveWeekend = (id: string) => call<{ ok: boolean }>('admin'
 export const adminDeclineWeekend = (id: string) => call<{ ok: boolean }>('admin', { method: 'POST', body: { action: 'declineWeekend', id } });
 export const adminAdjustDays = (memberId: string, days: string) =>
   call<{ ok: boolean }>('admin', { method: 'POST', body: { action: 'adjustDays', memberId, days } });
+
+export const adminAdjustRollover = (memberId: string, days: string) =>
+  call<{ ok: boolean }>('admin', { method: 'POST', body: { action: 'adjustRollover', memberId, days } });
 export const adminGrantPasses = (memberId: string, passes: number) =>
   call<{ ok: boolean; carnet: { remaining: number; total: number; expires: string } }>('admin', {
     method: 'POST',
@@ -583,6 +645,10 @@ export interface MemberProfile {
   paused: boolean;
   since: string | null;
   days: string | null;
+  /** Live rolled-over days (respects expiry); 0 if none. */
+  rollover?: number;
+  /** When the rollover expires (YYYY-MM-DD), or null. */
+  rolloverExpiry?: string | null;
   renewal: string | null;
   /** Per-member numeric allowance override (customFields['allowance-override']); null = none. */
   allowanceOverride: string | null;
@@ -594,6 +660,7 @@ export interface MemberProfile {
   unassigned: boolean;
   company: string | null;
   phone: string | null;
+  forwardAddress: string | null;
   bday: string | null;
   roomHoursCap: number | null;
   points: number;
@@ -612,7 +679,7 @@ export const adminRedeemForMember = (memberId: string, rewardId: string) =>
   call<{ ok: boolean; balance: number; reward: string }>('admin', { method: 'POST', body: { action: 'redeemForMember', memberId, rewardId } });
 export const adminUpdateMember = (
   memberId: string,
-  fields: { firstName?: string; lastName?: string; company?: string; phone?: string; meetingRoomHoursCap?: number | null },
+  fields: { firstName?: string; lastName?: string; company?: string; phone?: string; forwardAddress?: string; meetingRoomHoursCap?: number | null },
 ) => call<{ ok: boolean }>('admin', { method: 'POST', body: { action: 'updateMember', memberId, ...fields } });
 /** Clear every per-member meeting-room-hours override, so all members revert to their plan's standard allocation. */
 export const adminResetRoomHours = () =>
@@ -827,6 +894,8 @@ export interface ProfileFields {
   phone?: string;
   role?: string;
   dietary?: string;
+  /** Postal forwarding address for the mail service, or '' to clear. */
+  forwardAddress?: string;
   /** Chosen Quarter Character id (see lib/characters.ts), or '' to clear. */
   character?: string;
   /** Notification preferences — both opt-OUTs (true = don't send). Essential mail always sends. */

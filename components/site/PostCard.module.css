@@ -1,0 +1,282 @@
+/* Members' post card. Hero (Hybrid) leads on warm gold when something's waiting; the calm and
+   in-progress states stay quiet. The rail strip is a one-liner for everyone else. */
+
+.hero,
+.stripCard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px;
+  border-radius: var(--radius-lg);
+  background: var(--surface-card);
+  border: 1px solid var(--sand-200);
+}
+.heroActive {
+  background: linear-gradient(160deg, var(--gold-100), var(--gold-200));
+  border-color: var(--gold-300);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.eyebrow {
+  font-size: var(--text-2xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  font-weight: var(--fw-bold);
+  color: var(--gold-700);
+}
+.pin {
+  font-size: 18px;
+}
+.title {
+  font-size: var(--text-xl);
+  font-weight: var(--fw-bold);
+  color: var(--ink-900);
+  margin: 0;
+  line-height: 1.15;
+}
+.sub {
+  font-size: var(--text-sm);
+  color: var(--text-body, var(--stone-700));
+  margin: 0;
+}
+
+/* An item */
+.item {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  background: var(--surface-card);
+  border: 1px solid var(--sand-200);
+  border-radius: var(--radius-md);
+}
+.heroActive .item {
+  border-color: var(--gold-300);
+}
+.itemQuiet {
+  opacity: 0.92;
+}
+.itemHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.itemIcon {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  border-radius: 9px;
+  background: var(--ink-900);
+  color: #f4c430;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+}
+.itemText {
+  font-size: var(--text-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--ink-900);
+  line-height: 1.3;
+  min-width: 0;
+}
+.itemText small {
+  display: block;
+  font-weight: var(--fw-regular, 400);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+.tags {
+  margin-left: auto;
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.tag {
+  font-size: 10px;
+  font-weight: var(--fw-semibold);
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--sand-100);
+  color: var(--stone-600);
+  white-space: nowrap;
+}
+.tagOfficial {
+  background: #f7e7c3;
+  color: #8a5a12;
+  border: 1px solid #e6c98a;
+}
+
+.envelope {
+  max-width: 100%;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--sand-200);
+}
+
+.btnRow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.btn {
+  flex: 1 1 auto;
+  min-width: max-content;
+  text-align: center;
+  font-size: var(--text-xs);
+  font-weight: var(--fw-bold);
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--ink-900);
+  background: var(--ink-900);
+  color: var(--pure-white, #fff);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btnSec {
+  background: var(--surface-card);
+  color: var(--ink-900);
+  border-color: var(--sand-300);
+}
+.btnGhost {
+  background: transparent;
+  color: var(--gold-700);
+  border-color: transparent;
+  flex: 0 1 auto;
+}
+.btn:hover:not(:disabled) {
+  filter: brightness(0.97);
+}
+.btnSec:hover:not(:disabled) {
+  border-color: var(--gold-500);
+  background: var(--gold-100);
+}
+.btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* Scan-permission + address confirm */
+.confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.confirmText {
+  font-size: var(--text-xs);
+  color: var(--text-body, var(--stone-700));
+  margin: 0;
+  line-height: 1.45;
+}
+.addr {
+  width: 100%;
+  border: 1px solid var(--sand-300);
+  border-radius: var(--radius-md);
+  padding: 9px 11px;
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--ink-900);
+  resize: vertical;
+  background: var(--surface-card);
+}
+.addr:focus {
+  outline: 2px solid var(--gold-500);
+  outline-offset: 1px;
+}
+
+.statusPill {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: var(--fw-bold);
+  padding: 2px 9px;
+  border-radius: var(--radius-pill);
+  background: var(--sand-100);
+  color: var(--stone-600);
+  white-space: nowrap;
+}
+.pillGo {
+  background: rgba(214, 158, 46, 0.18);
+  color: #9a5b00;
+}
+.pillOk {
+  background: rgba(75, 122, 82, 0.16);
+  color: #3c6343;
+}
+.readScan {
+  font-size: var(--text-xs);
+  font-weight: var(--fw-semibold);
+  color: var(--gold-700);
+  text-decoration: none;
+}
+.readScan:hover {
+  text-decoration: underline;
+}
+
+.addrBlock {
+  font-size: var(--text-md, 1rem);
+  line-height: 1.5;
+  color: var(--ink-900);
+  font-weight: var(--fw-semibold);
+  margin: 0;
+}
+.help {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  margin: 4px 0 0;
+  line-height: 1.45;
+}
+
+.note {
+  font-size: var(--text-xs);
+  color: var(--success, #4b7a52);
+  font-weight: var(--fw-semibold);
+  margin: 0;
+}
+.err {
+  font-size: var(--text-xs);
+  color: var(--danger, #a9442f);
+  margin: 0;
+}
+
+/* Rail strip — the compact "you've got post" entry for non-Hybrid members. */
+.strip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 11px 13px;
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+  border: 1px solid var(--gold-300);
+  cursor: pointer;
+  text-align: left;
+}
+.strip:hover {
+  background: var(--gold-100);
+}
+.stripIcon {
+  width: 26px;
+  height: 26px;
+  flex: 0 0 auto;
+  border-radius: 7px;
+  background: var(--ink-900);
+  color: #f4c430;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+}
+.stripText {
+  font-size: var(--text-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--ink-900);
+}
+.stripArrow {
+  margin-left: auto;
+  color: var(--gold-700);
+  font-weight: var(--fw-bold);
+}

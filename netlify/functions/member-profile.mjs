@@ -40,6 +40,7 @@ export default async function handler(req) {
   if (typeof body.phone === 'string') meta.phone = body.phone.trim() || null;
   if (typeof body.role === 'string') meta.role = body.role.trim() || null; // "what you do" — for intros/events
   if (typeof body.dietary === 'string') meta.dietary = body.dietary.trim() || null; // for catered events
+  if (typeof body.forwardAddress === 'string') meta.forwardAddress = body.forwardAddress.trim() || null; // where to post mail on
   // Quarter Character — validated against the fixed set rather than stored free-form, so a
   // bad value can never reach the avatar renderer and blank someone's identity everywhere.
   if (typeof body.character === 'string') {

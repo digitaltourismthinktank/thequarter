@@ -147,7 +147,7 @@ export function ReceptionClient() {
     const r = await kioskCheckIn(picked.id, half ? 'Half' : 'Full');
     setBusy(false);
     if (r.ok && r.data?.ok !== false) {
-      setMemberDone({ name: picked.name, already: !!(r.data?.alreadyCheckedIn || r.data?.alreadyCounted) });
+      setMemberDone({ name: picked.name, already: !!(r.data?.alreadyCheckedIn || r.data?.alreadyCounted || r.data?.alreadyBooked) });
       scheduleReset();
     } else {
       setMemberErr(memberCheckinError(r.data?.error));

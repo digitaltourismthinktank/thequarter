@@ -14,8 +14,9 @@ import memberstackAdmin from '@memberstack/admin';
 import { verifyMember, isAdmin, tokenFromRequest } from './_member.mjs';
 import { listRecords, listAllRecords, createRecord, updateRecord, deleteRecord, T, F, airtableReady, esc } from './_airtable.mjs';
 import { londonWallClockToISO, isoToLondonMin, isoToLondonDate, hhmmToMin, londonNow, holdReleased, addDays } from './_time.mjs';
-import { PLAN_NAMES, allowanceForMember, setMemberPlan, clearMemberPlan, renewMember, formatDate } from './_quarter-sync.mjs';
+import { PLAN_NAMES, allowanceForMember, setMemberPlan, clearMemberPlan, renewMember, formatDate, liveRollover, MS_ROLLOVER, MS_ROLLOVER_EXP, addMonthsISO, todayISO } from './_quarter-sync.mjs';
 import { listRewards, listPerks, listFloats, floatStatus, awardPoints, redeemReward, partnerPayouts, markPartnerPaid, partnerStatement } from './_rewards.mjs';
+import { plannedConsumed } from './checkin.mjs';
 import { sendEmail, emailShell, escapeHtml, OPS_EMAIL, fmtDateLong } from './_email.mjs';
 import { pushToEmail } from './_push.mjs';
 import { roomHoursCap } from './_entitlement.mjs';
@@ -123,6 +124,7 @@ async function listAllMembers() {
         name: [cf['first-name'], cf['last-name']].filter(Boolean).join(' ').trim() || null,
         plan: planId ? PLAN_NAMES[planId] || planId : null,
         days: cf['days-remaining'] ?? null,
+        rollover: liveRollover(m),
         renewal: cf['renewal-date'] ?? null,
         allowanceOverride: cf['allowance-override'] || null,
         allowance: allowanceForMember(m), // effective allowance (override-aware); null = unlimited
@@ -130,7 +132,7 @@ async function listAllMembers() {
         doorCode: cf['door-code'] ?? null,
         paused: planId === PAUSED,
         manualBilling: !!md.manualBilling, // admin-managed (renewal cron owns them, not Stripe)
-        unassigned: !managedPlanId, // holds no managed plan tag
+        unassigned: !managedPlanId && !md.noPlanOk, // no managed plan AND not a deliberate no-plan member
         bday: md.bday || null,
         bdayClaimed: md.bdayClaimed || null,
         points: Math.max(0, Math.round(Number(md.points) || 0)),
@@ -178,13 +180,16 @@ async function memberProfile(id) {
     paused: planId === PAUSED,
     since: m.createdAt || null,
     days: cf['days-remaining'] ?? null,
+    rollover: liveRollover(m),
+    rolloverExpiry: cf['rollover-expiry'] || null,
     renewal: cf['renewal-date'] ?? null,
     allowanceOverride: cf['allowance-override'] || null,
     allowance: allowanceForMember(m), // effective allowance (override-aware); null = unlimited
     manualBilling: !!md.manualBilling,
-    unassigned: !managedPlanId,
+    unassigned: !managedPlanId && !md.noPlanOk,
     company: md.company || null,
     phone: md.phone || null,
+    forwardAddress: md.forwardAddress || null,
     bday: md.bday || null,
     roomHoursCap: md.meetingRoomHoursCap ?? null,
     points: Math.max(0, Math.round(Number(md.points) || 0)),
@@ -615,6 +620,24 @@ export default async function handler(req) {
     return json({ ok: true });
   }
 
+  // Correct a member's ROLLED-OVER days directly. A positive value keeps (or gives) a 12-month
+  // life; zeroing it clears the expiry. Spent BEFORE plan days at check-in.
+  if (action === 'adjustRollover') {
+    if (!body.memberId) return json({ error: 'missing-member' }, 400);
+    const admin = memberstackAdmin.init(MS_SECRET);
+    const n = Math.max(0, Number(body.days) || 0);
+    const cf = { [MS_ROLLOVER]: String(n) };
+    if (n > 0) {
+      const r = await admin.members.retrieve({ id: body.memberId });
+      const existing = String(r?.data?.customFields?.[MS_ROLLOVER_EXP] || '').trim();
+      cf[MS_ROLLOVER_EXP] = existing && existing >= todayISO() ? existing : addMonthsISO(todayISO(), 12);
+    } else {
+      cf[MS_ROLLOVER_EXP] = '';
+    }
+    await admin.members.update({ id: body.memberId, data: { customFields: cf } });
+    return json({ ok: true });
+  }
+
   // Grant (or correct) a member's day passes — for comping and for testing the
   // carnet without a real purchase. Tops up the carnet balance + resets the expiry.
   if (action === 'grantPasses') {
@@ -666,7 +689,7 @@ export default async function handler(req) {
     if (typeof body.lastName === 'string') cf['last-name'] = body.lastName.trim();
     const data = {};
     if (Object.keys(cf).length) data.customFields = cf;
-    if (typeof body.company === 'string' || typeof body.phone === 'string' || body.meetingRoomHoursCap !== undefined) {
+    if (typeof body.company === 'string' || typeof body.phone === 'string' || typeof body.forwardAddress === 'string' || body.meetingRoomHoursCap !== undefined) {
       const r = await admin.members.retrieve({ id: body.memberId });
       const md = { ...(r?.data?.metaData || {}) };
       // Memberstack merges metaData by key, so clearing a field means NULLing it, not
@@ -678,6 +701,11 @@ export default async function handler(req) {
       if (typeof body.phone === 'string') {
         const p = body.phone.trim();
         md.phone = p || null;
+      }
+      // Postal forwarding address for the mail service (same metaData key the member edits).
+      if (typeof body.forwardAddress === 'string') {
+        const fa = body.forwardAddress.trim();
+        md.forwardAddress = fa || null;
       }
       // Per-member override for free meeting-room hours/month. Distinguish CLEARING the override
       // (null / '' → revert to the plan default) from a real value of ZERO — 0 is a valid cap
@@ -804,8 +832,8 @@ export default async function handler(req) {
     const name = [cf['first-name'], cf['last-name']].filter(Boolean).join(' ').trim() || email || 'Member';
     const length = body.length === 'Half' ? 'Half' : 'Full';
     const cost = length === 'Half' ? 0.5 : 1;
-    // Did staff explicitly pick a half? If not, we must not clobber a member's own AM/PM choice.
-    const adminChosePeriod = body.period === 'am' || body.period === 'pm';
+    // Period note only matters for a FRESH admin check-in (no booking) — a booking's own AM/PM is
+    // preserved when we settle it below.
     const chosenPeriodNote = length === 'Half' ? (String(body.period).toLowerCase() === 'pm' ? 'PM' : 'AM') : '';
     const unlimited = allowanceForMember(m) === null;
     const today = londonNow().dateStr;
@@ -819,44 +847,56 @@ export default async function handler(req) {
 
     const raw = cf['days-remaining'];
     const cur = String(raw).toLowerCase() === 'unlimited' ? null : Math.max(0, parseFloat(String(raw)) || 0);
-    // Block a check-in when the allowance is exhausted (metered member with < cost left).
+
+    // A booking for today ALREADY counts as attendance — so an admin tap must settle THAT booking,
+    // never open a fresh full-day charge. This is where a plain re-check-in used to (a) deduct a
+    // day a SECOND time if the overnight sweep had already spent it, and (b) silently swap the
+    // member's booked half for the admin button's full. Both are fixed here.
+    const plannedToday = todaysRecs.find((rr) => (rr.fields[F.checkins.status] || '') === 'Planned');
+    if (plannedToday) {
+      const bookedLen = plannedToday.fields[F.checkins.length] === 'Half' ? 'Half' : 'Full';
+      if (plannedConsumed(plannedToday)) {
+        // Already settled — just record arrival. Preserve the row's length/notes/dayCost exactly
+        // (its notes may carry a Carnet/Unlimited marker that must survive) — no second deduction.
+        await updateRecord(T.checkins, plannedToday.id, { [F.checkins.status]: 'Checked-in', [F.checkins.source]: 'Admin' });
+        return json({ ok: true, alreadyBooked: true });
+      }
+      // Not yet settled — spend the BOOKED length now (never the admin's default), then flip.
+      const bookedCost = bookedLen === 'Half' ? 0.5 : 1;
+      if (!unlimited && cur !== null) {
+        if (cur < bookedCost) return json({ error: 'no-allowance' }, 400);
+        await admin.members.update({ id: body.memberId, data: { customFields: { 'days-remaining': String(Math.max(0, cur - bookedCost)) } } });
+      }
+      const bookedPeriod = bookedLen === 'Half' ? (periodFromNotes(plannedToday.fields[F.checkins.notes]) || 'am').toUpperCase() : '';
+      await updateRecord(T.checkins, plannedToday.id, {
+        [F.checkins.status]: 'Checked-in',
+        [F.checkins.length]: bookedLen,
+        [F.checkins.notes]: bookedPeriod,
+        [F.checkins.dayCost]: unlimited ? 0 : bookedCost,
+        [F.checkins.source]: 'Admin',
+      });
+      return json({ ok: true, alreadyBooked: true });
+    }
+
+    // No booking today — a fresh admin check-in at the length staff chose. Block when the
+    // allowance is exhausted (metered member with < cost left).
     if (!unlimited && cur !== null && cur < cost) {
       return json({ error: 'no-allowance' }, 400);
     }
-
-    if (!unlimited) {
-      if (cur !== null) {
-        await admin.members.update({ id: body.memberId, data: { customFields: { 'days-remaining': String(Math.max(0, cur - cost)) } } });
-      }
+    if (!unlimited && cur !== null) {
+      await admin.members.update({ id: body.memberId, data: { customFields: { 'days-remaining': String(Math.max(0, cur - cost)) } } });
     }
-    // If the member already has a Planned reservation for today (they reserved the day, or an
-    // approved weekend), FLIP it to Checked-in rather than adding a second row — otherwise the
-    // person is duplicated in the Today "Who's in" view. Only create fresh when none exists.
-    const plannedToday = todaysRecs.find((rr) => (rr.fields[F.checkins.status] || '') === 'Planned');
-    if (plannedToday) {
-      // Keep the member's own half-day AM/PM (stored in Notes) unless staff explicitly chose one.
-      const existingPeriod = periodFromNotes(plannedToday.fields[F.checkins.notes]);
-      const flipNotes = length !== 'Half' ? '' : adminChosePeriod ? chosenPeriodNote : existingPeriod ? existingPeriod.toUpperCase() : 'AM';
-      await updateRecord(T.checkins, plannedToday.id, {
-        [F.checkins.status]: 'Checked-in',
-        [F.checkins.length]: length,
-        [F.checkins.notes]: flipNotes,
-        [F.checkins.dayCost]: unlimited ? 0 : cost,
-        [F.checkins.source]: 'Admin',
-      });
-    } else {
-      await createRecord(T.checkins, {
-        [F.checkins.ref]: `${name} · ${today}`,
-        [F.checkins.email]: email,
-        [F.checkins.name]: name,
-        [F.checkins.date]: today,
-        [F.checkins.length]: length,
-        [F.checkins.notes]: chosenPeriodNote,
-        [F.checkins.dayCost]: unlimited ? 0 : cost,
-        [F.checkins.status]: 'Checked-in',
-        [F.checkins.source]: 'Admin',
-      });
-    }
+    await createRecord(T.checkins, {
+      [F.checkins.ref]: `${name} · ${today}`,
+      [F.checkins.email]: email,
+      [F.checkins.name]: name,
+      [F.checkins.date]: today,
+      [F.checkins.length]: length,
+      [F.checkins.notes]: chosenPeriodNote,
+      [F.checkins.dayCost]: unlimited ? 0 : cost,
+      [F.checkins.status]: 'Checked-in',
+      [F.checkins.source]: 'Admin',
+    });
     return json({ ok: true });
   }
 
@@ -1034,6 +1074,10 @@ export default async function handler(req) {
 
     // Merge manualBilling=true into metaData (this member is now admin-managed).
     const md = { ...(m.metaData || {}), manualBilling: true };
+    // Record a DELIBERATE no-plan choice (day-pass / carnet only) so the member stops
+    // flagging as "needs a plan"; assigning a real plan clears the flag.
+    if (body.planId === 'none') md.noPlanOk = true;
+    else if (body.planId) md.noPlanOk = false;
     const data = { metaData: md };
     if (Object.keys(cf).length) data.customFields = cf;
     await admin.members.update({ id: body.memberId, data });

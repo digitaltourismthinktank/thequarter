@@ -15,6 +15,7 @@ import { CheckInCard } from './CheckInCard';
 import { MyBookingsCard } from './MyBookingsCard';
 import { EventsCard } from './EventsCard';
 import { CarnetMini } from './CarnetMini';
+import { PostCard, RegisteredAddressCard } from './PostCard';
 import { BirthdayCard } from './BirthdayCard';
 import { InstallPrompt } from './InstallPrompt';
 import { GeoCheckIn } from './GeoCheckIn';
@@ -164,6 +165,9 @@ export function DashboardClient() {
   const display = memberName(member);
   const first = display ? display.split(' ')[0] : null;
   const isUnlimited = matched?.id === 'citizen' || (planName?.toLowerCase().includes('citizen') ?? false);
+  // Hybrid Office is really a registered address + mail service, so their post leads the dashboard;
+  // every other plan gets a compact "you've got post" strip in the rail (invisible with no mail).
+  const isHybrid = matched?.id === 'hybrid-office' || (planName?.toLowerCase().includes('hybrid') ?? false);
   const days = memberDaysRemaining(member);
   const renewal = memberRenewalDate(member);
   const doorCode = memberDoorCode(member);
@@ -182,21 +186,32 @@ export function DashboardClient() {
   const debug = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === '1';
   const band = today && !today.closed ? today.band ?? null : null;
 
-  // "Your days" StatTile content (paused / unlimited / metered / unset).
+  // Two-bucket day balance: this cycle's plan days (days-remaining) PLUS the rollover bucket
+  // (days-rollover, live only until rollover-expiry). Read straight from the member's custom fields.
+  const rollRaw = member.customFields?.['days-rollover'];
+  const rollExp = String(member.customFields?.['rollover-expiry'] || '').trim();
+  const nowISO = new Date().toISOString().slice(0, 10);
+  const rollNum = rollExp && rollExp < nowISO ? 0 : Math.max(0, Number(rollRaw) || 0);
+  const planNum = Number.isFinite(daysNum) ? daysNum : 0;
+  const totalDays = planNum + rollNum;
+  const rollExpLabel = rollExp ? new Date(`${rollExp}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '';
+
+  // "Your days" StatTile content (paused / unlimited / metered / unset). Shows the TOTAL spendable,
+  // with the plan-vs-rolled-over split in the hint.
   let daysValue: string = '—';
   let daysUnit: string | undefined;
   let daysHint: string | undefined;
   let daysProg: number | undefined;
   if (isPaused) {
-    daysValue = days ?? '0';
-    daysHint = 'Held while paused';
+    daysValue = String(rollNum || planNum || 0);
+    daysHint = rollNum > 0 ? `Rolled over — yours to use${rollExpLabel ? ` · expire ${rollExpLabel}` : ''}` : 'Held while paused';
   } else if (isUnlimited) {
     daysValue = 'Unlimited';
     daysHint = 'Citizen access';
   } else if (days !== null) {
-    daysValue = days;
+    daysValue = String(totalDays);
     daysUnit = 'days left';
-    daysHint = renewal ? `Resets ${renewal}` : undefined;
+    daysHint = rollNum > 0 ? `${planNum} in plan + ${rollNum} rolled over${rollExpLabel ? ` (expire ${rollExpLabel})` : ''}` : renewal ? `Resets ${renewal}` : undefined;
     daysProg = daysProgress;
   } else {
     daysHint = 'Set up soon';
@@ -260,6 +275,9 @@ export function DashboardClient() {
 
       <div className={styles.layout}>
         <div className={styles.mainCol}>
+          {/* Hybrid Office leads on their post, then the registered address they pay for. */}
+          {isHybrid ? <PostCard variant="hero" greetingName={first || undefined} /> : null}
+          {isHybrid ? <RegisteredAddressCard company={(member.metaData?.company as string) || null} /> : null}
           {hasPlan ? (
             <div className={styles.statRow}>
               <StatTile label="Your days" tone="ink" icon="calendar" value={daysValue} unit={daysUnit} hint={daysHint} progress={daysProg} valueSize="var(--text-2xl)" />
@@ -304,6 +322,8 @@ export function DashboardClient() {
         </div>
 
         <aside className={styles.rail}>
+          {/* Everyone else: a quiet "you've got post" strip (renders nothing when there's no mail). */}
+          {!isHybrid ? <PostCard variant="strip" /> : null}
           {/* Phones only: a tight one-card summary that stands in for the big membership card AND
               the days/plan/door tiles, so the top of the screen isn't three stacked blocks. */}
           <button type="button" className={styles.mSum} onClick={() => setCardOpen(true)} aria-label="Show your membership card">

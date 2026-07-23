@@ -17,6 +17,10 @@ import { PLANS, PLAN_MEMBERSTACK_ID, PLAN_DAY_ALLOWANCE } from '@/lib/plans';
 import { POINTS_PER_POUND_VALUE, POINTS_PER_GBP, LEVELS } from '@/lib/rewards';
 import {
   adminGetMembers,
+  adminPostQueue,
+  adminLogPost,
+  adminSettlePost,
+  type AdminPostItem,
   adminGetSpaces,
   adminGetCalendar,
   adminBlock,
@@ -32,6 +36,7 @@ import {
   adminDeclineWeekend,
   type WeekendRequest,
   adminAdjustDays,
+  adminAdjustRollover,
   adminGrantPasses,
   adminSetDoorCode,
   adminClearVat,
@@ -177,7 +182,7 @@ function daysToBirthday(bday: string | null): number | null {
   return Math.round((next.getTime() - today.getTime()) / 86400000);
 }
 
-const ADMIN_TABS = ['today', 'members', 'comms', 'rooms', 'events', 'content', 'partners', 'birthdays', 'screens'] as const;
+const ADMIN_TABS = ['today', 'members', 'comms', 'rooms', 'post', 'events', 'content', 'partners', 'birthdays', 'screens'] as const;
 type AdminTab = (typeof ADMIN_TABS)[number];
 const tabFromHash = (): AdminTab => {
   if (typeof window === 'undefined') return 'today';
@@ -285,6 +290,9 @@ export function AdminClient() {
         <button type="button" className={`${styles.tab} ${tab === 'birthdays' ? styles.tabOn : ''}`} onClick={() => setTab('birthdays')}>
           Birthdays
         </button>
+        <button type="button" className={`${styles.tab} ${tab === 'post' ? styles.tabOn : ''}`} onClick={() => setTab('post')}>
+          Post
+        </button>
         <button type="button" className={`${styles.tab} ${tab === 'screens' ? styles.tabOn : ''}`} onClick={() => setTab('screens')}>
           Screens &amp; resources
         </button>
@@ -298,6 +306,8 @@ export function AdminClient() {
         <CommsPane />
       ) : tab === 'rooms' ? (
         <RoomsPane />
+      ) : tab === 'post' ? (
+        <AdminPostPane />
       ) : tab === 'events' ? (
         <EventsPane />
       ) : tab === 'content' ? (
@@ -326,7 +336,7 @@ export function AdminClient() {
         ))}
         <button
           type="button"
-          className={`${styles.abTab} ${(['events', 'content', 'partners', 'birthdays', 'screens'] as AdminTab[]).includes(tab) ? styles.abOn : ''}`}
+          className={`${styles.abTab} ${(['post', 'events', 'content', 'partners', 'birthdays', 'screens'] as AdminTab[]).includes(tab) ? styles.abOn : ''}`}
           onClick={() => setMoreOpen(true)}
           aria-haspopup="dialog"
         >
@@ -340,6 +350,7 @@ export function AdminClient() {
           <div className={styles.moreSheet} onClick={(e) => e.stopPropagation()}>
             <span className={styles.moreTitle}>More tools</span>
             {([
+              { id: 'post', label: 'Post', icon: 'mail' },
               { id: 'events', label: 'Events', icon: 'party-popper' },
               { id: 'content', label: 'Perks & Rewards', icon: 'gift' },
               { id: 'partners', label: 'Partners & float', icon: 'pound-sterling' },
@@ -641,6 +652,11 @@ function MembersPane() {
                   <span>
                     <strong>{m.days ?? '—'}</strong> days
                   </span>
+                  {m.rollover ? (
+                    <span>
+                      <strong>{m.rollover}</strong> rolled over
+                    </span>
+                  ) : null}
                   <span>
                     <strong>{m.roomHoursCap}</strong>h room
                   </span>
@@ -735,12 +751,14 @@ function MemberProfileModal({
   const [planSel, setPlanSel] = useState('');
   const [allowanceEdit, setAllowanceEdit] = useState('');
   const [daysEdit, setDaysEdit] = useState('');
+  const [rolloverEdit, setRolloverEdit] = useState('');
   const [renewalPickerOpen, setRenewalPickerOpen] = useState(false);
   const [confirmRenew, setConfirmRenew] = useState(false);
   const [passes, setPasses] = useState('');
   const [door, setDoor] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [forwardAddr, setForwardAddr] = useState('');
   const [capOverride, setCapOverride] = useState('');
   const [confirmAdjust, setConfirmAdjust] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -755,12 +773,14 @@ function MemberProfileModal({
     const parts = (p?.name || '').trim().split(/\s+/).filter(Boolean);
     setFirstName(parts[0] || '');
     setLastName(parts.slice(1).join(' '));
+    setForwardAddr(p?.forwardAddress || '');
     setCapOverride(p?.roomHoursCap != null ? String(p.roomHoursCap) : '');
     // Membership section — seed from the loaded profile.
     const curPlan = PLANS.find((x) => x.name.toLowerCase() === (p?.plan || '').toLowerCase());
     setPlanSel(curPlan ? PLAN_MEMBERSTACK_ID[curPlan.id] : '');
     setAllowanceEdit(p?.allowanceOverride != null ? String(p.allowanceOverride) : '');
     setDaysEdit(p?.days != null ? String(p.days) : '');
+    setRolloverEdit(p?.rollover != null ? String(p.rollover) : '');
     setConfirmRenew(false);
   }, [p]);
 
@@ -830,7 +850,7 @@ function MemberProfileModal({
     setBusy(true);
     setMsg(null);
     const cap = capOverride.trim() === '' ? null : Math.max(0, Number(capOverride) || 0);
-    const r = await adminUpdateMember(id, { firstName: firstName.trim(), lastName: lastName.trim(), meetingRoomHoursCap: cap });
+    const r = await adminUpdateMember(id, { firstName: firstName.trim(), lastName: lastName.trim(), forwardAddress: forwardAddr.trim(), meetingRoomHoursCap: cap });
     setBusy(false);
     if (r.ok) {
       setMsg('Details updated.');
@@ -908,6 +928,18 @@ function MemberProfileModal({
       onChanged();
     } else setMsg('Could not update days remaining.');
   }
+  async function saveRollover() {
+    if (!id) return;
+    setBusy(true);
+    setMsg(null);
+    const r = await adminAdjustRollover(id, rolloverEdit.trim());
+    setBusy(false);
+    if (r.ok) {
+      setMsg('Rolled-over days updated.');
+      await load();
+      onChanged();
+    } else setMsg('Could not update rolled-over days.');
+  }
   async function renewNow() {
     if (!id) return;
     setBusy(true);
@@ -946,7 +978,8 @@ function MemberProfileModal({
               {p?.email}
               {p?.phone ? ` · ${p.phone}` : ''}
               {p?.company ? ` · ${p.company}` : ''}
-              {p?.plan ? ` · ${p.plan}` : ''}
+              {/* When paused the plan IS "Paused", so show it once — don't print the plan name too. */}
+              {p?.plan && !p?.paused ? ` · ${p.plan}` : ''}
               {bdayLabel ? ` · Birthday ${bdayLabel}` : ''}
               {p?.paused ? ' · Paused' : ''}
             </span>
@@ -1094,6 +1127,38 @@ function MemberProfileModal({
                   </span>
                 </div>
 
+                {/* Rolled-over days — carried from prior cycles / a pause, spent BEFORE plan days,
+                    expiring 12 months out. Normally system-managed, but editable here so an admin can
+                    correct it. Saving a positive value (re)starts a 12-month life; 0 clears it. */}
+                <div className={styles.formRow} style={{ marginTop: 12 }}>
+                  <input
+                    className={styles.dayInput}
+                    type="number"
+                    min={0}
+                    placeholder="0"
+                    value={rolloverEdit}
+                    onChange={(e) => setRolloverEdit(e.target.value)}
+                    aria-label="Rolled-over days"
+                  />
+                  <button type="button" className={styles.smallBtn} onClick={saveRollover} disabled={busy}>
+                    Save rolled-over
+                  </button>
+                  <span className={styles.muted}>
+                    Days carried from earlier cycles or a pause. Spent before plan days.{' '}
+                    {p.rollover != null && p.rollover > 0 ? (
+                      <>
+                        Currently <strong>{p.rollover}</strong>
+                        {p.rolloverExpiry
+                          ? `, expiring ${new Date(`${p.rolloverExpiry}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`
+                          : ''}
+                        . Total available now: <strong>{(Number(p.days) || 0) + p.rollover}</strong>.
+                      </>
+                    ) : (
+                      'None right now. Saving a value gives it a 12-month life.'
+                    )}
+                  </span>
+                </div>
+
                 {/* Renew now */}
                 <div className={styles.formRow} style={{ marginTop: 12 }}>
                   {confirmRenew ? (
@@ -1203,6 +1268,25 @@ function MemberProfileModal({
                     </button>
                   </div>
                   <span className={styles.muted}>Fixes a wrong name. (Meeting-room hours moved to “Membership &amp; days”, with the day balance.)</span>
+                </div>
+
+                <div className={styles.profSection}>
+                  <span className={styles.profSectionTitle}>Postal forwarding address</span>
+                  <div className={styles.formRow}>
+                    <textarea
+                      className={styles.label}
+                      rows={3}
+                      style={{ resize: 'vertical', minHeight: 64 }}
+                      placeholder={'Where to post their mail when they choose “forward”'}
+                      value={forwardAddr}
+                      onChange={(e) => setForwardAddr(e.target.value)}
+                      aria-label="Postal forwarding address"
+                    />
+                    <button type="button" className={styles.smallBtn} onClick={saveDetails} disabled={busy}>
+                      Save address
+                    </button>
+                  </div>
+                  <span className={styles.muted}>Used by the mail service’s “Forward by post” (£7.50). The member can also set this themselves.</span>
                 </div>
 
                 <div className={styles.profSection}>
@@ -3440,6 +3524,237 @@ function EventAdminRow({ e, onEdit, onDelete, busy }: { e: QuarterEvent; onEdit:
         </div>
       ) : null}
     </div>
+  );
+}
+
+// The Post tab — staff log incoming mail, see the two working queues, and settle items. Members
+// make the scan/forward/collect choice themselves (post.mjs); this is the physical side.
+const POST_TYPES = ['Letter', 'Large letter', 'Parcel'];
+const POST_TAGS = ['Looks official', 'Signed-for', 'Recorded/tracked', 'Time-sensitive'];
+
+function AdminPostPane() {
+  const [items, setItems] = useState<AdminPostItem[] | null>(null);
+  const [members, setMembers] = useState<{ id: string; name: string | null; email: string | null; company: string | null }[]>([]);
+  const [q, setQ] = useState('');
+  const [picked, setPicked] = useState<{ id: string; name: string } | null>(null);
+  const [type, setType] = useState('Letter');
+  const [sender, setSender] = useState('');
+  const [tags, setTags] = useState<string[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    const [pq, mm] = await Promise.all([adminPostQueue(), adminGetMembers()]);
+    if (pq.ok) setItems(pq.data.items);
+    if (mm.ok) setMembers(mm.data.members.map((m) => ({ id: m.id, name: m.name, email: m.email, company: m.company })));
+  }, []);
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const toggleTag = (t: string) => setTags((s) => (s.includes(t) ? s.filter((x) => x !== t) : [...s, t]));
+  const matches =
+    q.trim().length >= 2 && !picked
+      ? members
+          .filter((m) => `${m.name || ''} ${m.email || ''} ${m.company || ''}`.toLowerCase().includes(q.trim().toLowerCase()))
+          .slice(0, 6)
+      : [];
+
+  async function logItem() {
+    if (!picked) return;
+    setBusy(true);
+    setMsg(null);
+    const r = await adminLogPost({ memberId: picked.id, type, sender: sender.trim() || undefined, tags: tags.length ? tags : undefined });
+    setBusy(false);
+    if (r.ok) {
+      setMsg(`Logged & notified ${picked.name}.`);
+      setPicked(null);
+      setQ('');
+      setSender('');
+      setTags([]);
+      setType('Letter');
+      await load();
+    } else setMsg('Could not log that — please try again.');
+  }
+  async function settle(id: string, to: 'posted' | 'collected' | 'scanned') {
+    setBusy(true);
+    const r = await adminSettlePost(id, to);
+    setBusy(false);
+    if (r.ok) await load();
+  }
+
+  const waiting = (items ?? []).filter((i) => i.status === 'Waiting');
+  const toAction = (items ?? []).filter((i) => ['To scan', 'To forward', 'To collect'].includes(i.status));
+  const recent = (items ?? []).filter((i) => ['Posted', 'Scanned'].includes(i.status));
+
+  const inp: React.CSSProperties = { padding: '9px 11px', border: '1px solid var(--sand-300)', borderRadius: 9, font: 'inherit', fontSize: 14, color: 'var(--ink-900)', background: 'var(--surface-card)', width: '100%' };
+  const seg = (on: boolean): React.CSSProperties => ({ padding: '6px 11px', borderRadius: 8, border: `1px solid ${on ? 'var(--ink-900)' : 'var(--sand-300)'}`, background: on ? 'var(--ink-900)' : 'var(--surface-card)', color: on ? '#fff' : 'var(--ink-900)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' });
+  const row: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 11, padding: '10px 12px', background: 'var(--surface-sunken)', border: '1px solid var(--sand-200)', borderRadius: 11, marginBottom: 8 };
+
+  return (
+    <section style={{ display: 'flex', flexDirection: 'column', gap: 18, maxWidth: 760 }}>
+      <div>
+        <h2 style={{ margin: '0 0 3px' }}>Post</h2>
+        <p className={styles.muted}>Log incoming mail against a member — they’re notified and choose scan, forward or collect.</p>
+      </div>
+
+      {/* Log an item */}
+      <div style={{ background: 'var(--surface-card)', border: '1px solid var(--sand-200)', borderRadius: 14, padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <h3 style={{ margin: 0, fontSize: 16 }}>Log an item</h3>
+
+        <div>
+          <label className={styles.muted} style={{ display: 'block', marginBottom: 4, fontSize: 12 }}>Member</label>
+          {picked ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontWeight: 650 }}>{picked.name}</span>
+              <button type="button" className={styles.smallBtn} onClick={() => setPicked(null)}>
+                Change
+              </button>
+            </div>
+          ) : (
+            <>
+              <input style={inp} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Start typing a name, email or company…" aria-label="Find member" />
+              {matches.length ? (
+                <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {matches.map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => setPicked({ id: m.id, name: m.name || m.email || 'Member' })}
+                      style={{ textAlign: 'left', padding: '8px 10px', border: '1px solid var(--sand-200)', borderRadius: 9, background: 'var(--surface-card)', cursor: 'pointer' }}
+                    >
+                      <strong style={{ fontSize: 13.5 }}>{m.name || m.email}</strong>
+                      {m.company ? <span className={styles.muted}> · {m.company}</span> : null}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </>
+          )}
+        </div>
+
+        <div>
+          <label className={styles.muted} style={{ display: 'block', marginBottom: 4, fontSize: 12 }}>Type</label>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {POST_TYPES.map((t) => (
+              <button key={t} type="button" style={seg(type === t)} onClick={() => setType(t)}>
+                {t}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label className={styles.muted} style={{ display: 'block', marginBottom: 4, fontSize: 12 }}>Sender — optional</label>
+          <input style={inp} value={sender} onChange={(e) => setSender(e.target.value)} placeholder="If it says on the envelope…" />
+        </div>
+
+        <div>
+          <label className={styles.muted} style={{ display: 'block', marginBottom: 4, fontSize: 12 }}>Tags</label>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {POST_TAGS.map((t) => (
+              <button key={t} type="button" style={seg(tags.includes(t))} onClick={() => toggleTag(t)}>
+                {t}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button type="button" className={styles.smallBtn} onClick={logItem} disabled={busy || !picked}>
+            Log &amp; notify
+          </button>
+          {msg ? <span className={styles.muted}>{msg}</span> : null}
+        </div>
+        <p className={styles.muted} style={{ margin: 0, fontSize: 11.5 }}>
+          Snap the envelope and attach it (Photo) directly in Airtable if useful. Sending fires a push + email to the member.
+        </p>
+      </div>
+
+      {/* Needs member choice */}
+      <div>
+        <h4 style={{ margin: '0 0 9px', textTransform: 'uppercase', letterSpacing: '0.1em', fontSize: 12, color: 'var(--text-muted)' }}>
+          Needs member choice · {waiting.length}
+        </h4>
+        {items === null ? <p className={styles.muted}>Loading…</p> : waiting.length === 0 ? <p className={styles.muted}>Nothing waiting.</p> : null}
+        {waiting.map((it) => (
+          <div key={it.id} style={row}>
+            <span style={{ fontSize: 13, fontWeight: 650, color: 'var(--ink-900)' }}>
+              {it.memberName || it.memberEmail}
+              <span className={styles.muted} style={{ display: 'block', fontWeight: 400, fontSize: 11.5 }}>
+                {it.type}
+                {it.sender ? ` · ${it.sender}` : ''} · {it.arrived || ''}
+              </span>
+            </span>
+            <span style={{ marginLeft: 'auto', display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+              {it.tags.map((t) => (
+                <span key={t} style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: /official/i.test(t) ? '#f7e7c3' : 'var(--sand-100)', color: /official/i.test(t) ? '#8a5a12' : 'var(--stone-600)' }}>
+                  {t}
+                </span>
+              ))}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {/* To action */}
+      <div>
+        <h4 style={{ margin: '0 0 9px', textTransform: 'uppercase', letterSpacing: '0.1em', fontSize: 12, color: 'var(--gold-700)' }}>
+          To action · {toAction.length}
+        </h4>
+        {toAction.length === 0 ? <p className={styles.muted}>Nothing to do right now.</p> : null}
+        {toAction.map((it) => (
+          <div key={it.id} style={row}>
+            <span style={{ fontSize: 13, fontWeight: 650, color: 'var(--ink-900)' }}>
+              {it.memberName || it.memberEmail}
+              <span className={styles.muted} style={{ display: 'block', fontWeight: 400, fontSize: 11.5 }}>
+                {it.status === 'To forward'
+                  ? `Forward £7.50 ${it.forwardPaid ? '· paid ✓' : ''} → ${(it.forwardAddress || '').split('\n')[0]}`
+                  : it.status === 'To scan'
+                    ? 'Scan · opened with permission'
+                    : 'Ready to collect'}
+              </span>
+            </span>
+            <span style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+              {it.status === 'To forward' ? (
+                <button type="button" className={styles.smallBtn} onClick={() => settle(it.id, 'posted')} disabled={busy}>
+                  Mark posted
+                </button>
+              ) : it.status === 'To scan' ? (
+                <button type="button" className={styles.smallBtn} onClick={() => settle(it.id, 'scanned')} disabled={busy}>
+                  Mark scanned
+                </button>
+              ) : (
+                <button type="button" className={styles.smallBtn} onClick={() => settle(it.id, 'collected')} disabled={busy}>
+                  Mark collected
+                </button>
+              )}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {recent.length ? (
+        <div>
+          <h4 style={{ margin: '0 0 9px', textTransform: 'uppercase', letterSpacing: '0.1em', fontSize: 12, color: 'var(--text-muted)' }}>Recently settled</h4>
+          {recent.map((it) => (
+            <div key={it.id} style={{ ...row, opacity: 0.75 }}>
+              <span style={{ fontSize: 13, color: 'var(--ink-900)' }}>
+                {it.memberName || it.memberEmail}
+                <span className={styles.muted} style={{ display: 'block', fontSize: 11.5 }}>
+                  {it.type} · {it.status}
+                </span>
+              </span>
+              {it.status === 'Scanned' ? (
+                <button type="button" className={styles.smallBtn} style={{ marginLeft: 'auto' }} onClick={() => settle(it.id, 'collected')} disabled={busy}>
+                  Mark collected
+                </button>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </section>
   );
 }
 

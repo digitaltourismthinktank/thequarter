@@ -140,11 +140,86 @@ export function daysUsedThisCycle(member) {
   return Math.max(0, allowance - remaining);
 }
 
+/* ---------------------------------------------------------------------------------------------
+ * TWO-BUCKET DAY BALANCE (rollover)
+ *
+ * A member's spendable days now live in TWO Memberstack custom fields:
+ *   days-remaining  — this cycle's PLAN days (resets to the allowance each renewal).
+ *   days-rollover   — unused days carried from prior cycles / a pause, CAPPED at one allowance,
+ *                     and EXPIRING on `rollover-expiry` (YYYY-MM-DD, 12 months from when last added).
+ * Total spendable = days-remaining + LIVE days-rollover (0 once expired). Check-in spends the
+ * rollover FIRST (it expires; plan days are this month's anyway). Pausing moves the plan days into
+ * rollover so they're not lost. A full cancellation (lapse) forfeits both. Hybrid never rolls over.
+ * ------------------------------------------------------------------------------------------- */
+export const MS_ROLLOVER = 'days-rollover';
+export const MS_ROLLOVER_EXP = 'rollover-expiry';
+export const ROLLOVER_MONTHS = 12;
+
+/** Non-negative float from a raw field ('unlimited' → 0). */
+export function dayNum(raw) {
+  if (raw == null || String(raw).toLowerCase() === 'unlimited') return 0;
+  const n = parseFloat(String(raw));
+  return Number.isFinite(n) ? Math.max(0, n) : 0;
+}
+
+/** Today as YYYY-MM-DD (UTC — a day either side is immaterial for a 12-month expiry). */
+export function todayISO() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+/** Add n whole months to a YYYY-MM-DD, clamping the day-of-month. */
+export function addMonthsISO(iso, n) {
+  const [y, m, d] = String(iso).split('-').map(Number);
+  const base = new Date(Date.UTC(y, m - 1 + n, 1));
+  const dim = new Date(Date.UTC(base.getUTCFullYear(), base.getUTCMonth() + 1, 0)).getUTCDate();
+  base.setUTCDate(Math.min(d, dim));
+  return base.toISOString().slice(0, 10);
+}
+
+/** The member's LIVE rollover days — 0 if none, or if the rollover expiry has passed. */
+export function liveRollover(member, today = todayISO()) {
+  const cf = member?.customFields || {};
+  const exp = String(cf[MS_ROLLOVER_EXP] || '').trim();
+  if (exp && exp < today) return 0;
+  return dayNum(cf[MS_ROLLOVER]);
+}
+
+/**
+ * The rollover bucket at a genuine renewal: last cycle's unused PLAN days fold into the live
+ * rollover, capped at one allowance. Returns { rollover, expiry } (expiry '' when empty). Pure.
+ */
+export function nextRollover(prevRemaining, liveRoll, allowance, today = todayISO()) {
+  const roll = Math.min(dayNum(prevRemaining) + Math.max(0, liveRoll), allowance);
+  return { rollover: roll, expiry: roll > 0 ? addMonthsISO(today, ROLLOVER_MONTHS) : '' };
+}
+
+/**
+ * The custom-field writes when a member PAUSES: fold this cycle's plan days into the rollover (so
+ * they're kept, usable while paused, up to 12 months) and zero the plan days. Uses the plan they're
+ * pausing FROM for the cap, so read this BEFORE re-tagging them to Paused. Returns {} for an
+ * unlimited/no-plan member (nothing metered to preserve).
+ */
+export function pauseFields(member, today = todayISO()) {
+  const allowance = allowanceForMember(member);
+  if (allowance === null || allowance === undefined) return {};
+  const { rollover, expiry } = nextRollover(member?.customFields?.['days-remaining'], liveRollover(member, today), allowance, today);
+  return { 'days-remaining': '0', [MS_ROLLOVER]: String(rollover), [MS_ROLLOVER_EXP]: expiry };
+}
+
+/** Apply the pause day-fields to an ALREADY-RETRIEVED member (call BEFORE re-tagging to Paused so
+ *  the pre-pause plan sets the rollover cap). No-op for unlimited/no-plan members. */
+export async function pauseMemberDays(secret, member) {
+  const pf = pauseFields(member);
+  if (!secret || !member?.id || !Object.keys(pf).length) return { ok: true, fields: {} };
+  const admin = memberstackAdmin.init(secret);
+  await admin.members.update({ id: member.id, data: { customFields: pf } });
+  return { ok: true, fields: pf };
+}
+
 /**
  * The new day balance at a renewal, given the previous balance + allowance.
- * Rollover rule: a fresh allowance PLUS at most one month's unused days, with
- * the total hard-capped at 2x the allowance — so days can never accumulate
- * beyond two months' worth. Pure function (easy to reason about / test).
+ * LEGACY single-bucket helper (kept for callers/tests that still use it). The live path uses the
+ * two-bucket model in renewMember. Fresh allowance + at most one month's unused, capped at 2x.
  */
 export function nextBalance(prevRaw, allowance) {
   if (allowance === null) return 'Unlimited';
@@ -175,22 +250,37 @@ export async function renewMember(secret, email, { renewalDate, resetDays = true
   if (renewalDate !== undefined) fields['renewal-date'] = renewalDate;
 
   if (lapse) {
+    // Full cancellation forfeits everything — plan days AND the rollover.
     fields['days-remaining'] = '0';
+    fields[MS_ROLLOVER] = '0';
+    fields[MS_ROLLOVER_EXP] = '';
   } else if (explicitDays !== undefined && explicitDays !== null) {
     fields['days-remaining'] = explicitDays;
   } else if (resetDays) {
     const allowance = allowanceForMember(member);
-    if (allowance !== undefined) {
-      // Hybrid Office never rolls over — its allowance is monthly and auto-burns, so any
-      // reset (annual Stripe renewal, plan switch) is FLAT to the allowance, not rollover.
-      const forceFlat = flat || isHybridMember(member);
-      // flat = set to the plan's base allowance (used on a plan switch);
-      // otherwise apply the 1-month rollover (used on a genuine renewal).
-      fields['days-remaining'] = forceFlat
-        ? allowance === null
-          ? 'Unlimited'
-          : String(allowance)
-        : nextBalance(member?.customFields?.['days-remaining'], allowance);
+    if (allowance === null) {
+      // Unlimited (Citizen) — no metered balance, no rollover.
+      fields['days-remaining'] = 'Unlimited';
+      fields[MS_ROLLOVER] = '0';
+      fields[MS_ROLLOVER_EXP] = '';
+    } else if (allowance !== undefined) {
+      const today = todayISO();
+      if (flat || isHybridMember(member)) {
+        // Plan switch, or Hybrid (which never rolls over): set this cycle flat to the allowance.
+        // A plain plan switch leaves any existing rollover untouched; Hybrid clears it.
+        fields['days-remaining'] = String(allowance);
+        if (isHybridMember(member)) {
+          fields[MS_ROLLOVER] = '0';
+          fields[MS_ROLLOVER_EXP] = '';
+        }
+      } else {
+        // Genuine renewal: last cycle's unused PLAN days fold into the rollover (capped at one
+        // allowance, 12-month expiry), and this cycle's plan days reset to the allowance.
+        const { rollover, expiry } = nextRollover(member?.customFields?.['days-remaining'], liveRollover(member, today), allowance, today);
+        fields['days-remaining'] = String(allowance);
+        fields[MS_ROLLOVER] = String(rollover);
+        fields[MS_ROLLOVER_EXP] = expiry;
+      }
     }
   }
 

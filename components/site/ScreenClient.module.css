@@ -177,54 +177,117 @@
 .weekDay { font-size: clamp(11px, 1.3vw, 15px); font-weight: var(--fw-semibold); opacity: 0.65; }
 .weekToday .weekDay { opacity: 1; font-weight: var(--fw-bold); }
 
-/* Live transport — a proper departure board: West / East trains + the bus station, each row
-   a time, a destination, and a status (green on time, red for a slip). Green/red is the
-   universal transport convention, so it's used HERE only — the busyness scale stays gold. */
-.board {
-  margin: clamp(14px, 2vh, 24px) auto 0;
+/* Live departures — the "Quarter panel" board (Direction B): a warm, on-brand full-width band
+   holding three columns (Canterbury West / East trains + the bus station). Each column shows a
+   full hour of departures because the stations are a ~10-min walk. On-time reads quiet; anything
+   off-schedule pops amber (late) or red (cancelled) so it's legible across the lobby. */
+.transport {
+  margin: clamp(12px, 1.8vh, 22px) 0 0;
+  padding: clamp(12px, 1.6vh, 20px) clamp(14px, 1.8vw, 22px);
+  background: var(--gold-100, #f4ecd8);
+  border: 1px solid var(--gold-300, #e6d3a3);
+  border-radius: 16px;
+}
+.trGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: clamp(10px, 1.4vw, 18px);
+}
+.trCol {
   display: flex;
   flex-direction: column;
-  gap: clamp(9px, 1.5vh, 16px);
-  text-align: left;
-  max-width: 520px;
+  background: var(--surface-card, #fff);
+  border-radius: 12px;
+  padding: clamp(9px, 1.2vh, 14px) clamp(11px, 1.2vw, 15px);
 }
-.boardSection { display: flex; flex-direction: column; }
-.boardHead {
-  font-size: clamp(11px, 1.25vw, 15px);
-  text-transform: uppercase;
-  letter-spacing: var(--tracking-caps);
+.trColHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 6px;
+  margin-bottom: 4px;
+  border-bottom: 2px solid var(--gold-300, #e6d3a3);
+}
+.trStation {
+  font-size: clamp(15px, 1.7vw, 21px);
   font-weight: var(--fw-bold);
-  opacity: 0.7;
-  margin-bottom: 3px;
+  color: var(--ink-900);
+  white-space: nowrap;
 }
-.depRow {
+.trDir {
+  font-size: clamp(10px, 1.05vw, 13px);
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.trList { list-style: none; margin: 0; padding: 0; }
+.trList li {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto 1fr auto auto;
   align-items: center;
-  gap: 12px;
-  font-size: clamp(14px, 1.5vw, 19px);
+  gap: clamp(6px, 0.8vw, 12px);
+  padding: clamp(3px, 0.5vh, 6px) 0;
+  font-size: clamp(13px, 1.45vw, 18px);
   font-variant-numeric: tabular-nums;
-  padding: 3px 0;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.09);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.07);
 }
-.depTime { font-weight: var(--fw-bold); }
-.depTo { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.depGood { color: #2f7d4e; font-weight: var(--fw-semibold); white-space: nowrap; }
-.depBad { color: #b4231d; font-weight: var(--fw-bold); white-space: nowrap; }
-.depNone { font-size: clamp(13px, 1.3vw, 16px); opacity: 0.55; padding: 3px 0; }
-/* Bus route number as a destination blind — amber on black, like the front of the bus. */
-.busBlind {
+.trList li:last-child { border-bottom: 0; }
+.trRowCx { opacity: 0.6; }
+.trRowCx .trTime, .trRowCx .trDest { text-decoration: line-through; }
+.trTime { font-weight: var(--fw-bold); color: var(--ink-900); }
+.trDest { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-900); }
+.trPlat {
+  font-size: 0.82em;
+  color: var(--text-muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.trStatus {
+  font-size: 0.82em;
+  font-weight: var(--fw-semibold);
+  white-space: nowrap;
+  padding: 1px 7px;
+  border-radius: 999px;
+}
+.trOnTime { color: #2f7d4e; background: rgba(47, 125, 78, 0.1); }
+.trLate { color: #9a5b00; background: rgba(214, 158, 46, 0.18); font-weight: var(--fw-bold); }
+.trCancelled { color: #b4231d; background: rgba(180, 35, 29, 0.12); font-weight: var(--fw-bold); }
+/* Bus route number as a destination blind — amber on ink, like the front of the bus. */
+.busLine {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   min-width: 2.1em;
-  padding: 2px 8px;
+  padding: 1px 7px;
   background: var(--ink-900, #1e1a15);
   color: #f4c430;
   border-radius: 6px;
   font-weight: var(--fw-bold);
-  font-size: 0.86em;
+  font-size: 0.82em;
 }
+.trEmpty { font-size: clamp(12px, 1.2vw, 15px); color: var(--text-muted); padding: 6px 0; margin: 0; }
+.trFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: clamp(8px, 1.1vh, 13px);
+  font-size: clamp(11px, 1.1vw, 14px);
+  color: var(--ink-900);
+  opacity: 0.72;
+}
+.trLive { display: inline-flex; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; }
+.trDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #2f7d4e;
+  animation: trPulse 2s ease-in-out infinite;
+}
+@keyframes trPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .trDot { animation: none; } }
 
 .band_quiet {
   background: var(--sand-100);

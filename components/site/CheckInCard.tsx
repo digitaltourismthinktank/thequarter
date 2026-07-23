@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ds/Button';
-import { getCheckinToday, checkInToday, reserveDay, cancelReservation, type CheckinStatus } from '@/lib/booking';
+import { getCheckinToday, checkInToday, changeCheckinLength, reserveDay, cancelReservation, type CheckinStatus } from '@/lib/booking';
 import { cn } from '@/lib/cn';
 import { WeekStrip } from './WeekStrip';
 import { DatePickerModal } from './DatePickerModal';
@@ -68,7 +68,7 @@ export function CheckInCard({ className }: { className?: string }) {
     else {
       // Members told us they couldn't tell whether checking in had worked — there was no
       // acknowledgement at all. Show an explicit confirmation, with the points just earned.
-      setConfirmed({ points: r.data?.pointsAwarded ?? 0, already: !!r.data?.alreadyCheckedIn });
+      setConfirmed({ points: r.data?.pointsAwarded ?? 0, already: !!(r.data?.alreadyCheckedIn || r.data?.alreadyBooked) });
     }
     await refresh();
     setBusy(false);
@@ -97,6 +97,36 @@ export function CheckInCard({ className }: { className?: string }) {
     setBusy(false);
   }
 
+  // Change today's length half↔full (or move a half AM↔PM). The day already counts — this only
+  // adjusts the day difference; points don't change. Booked-but-not-yet-settled days just relabel.
+  async function doChangeToday(length: 'Full' | 'Half', p?: 'am' | 'pm') {
+    setBusy(true);
+    setError(null);
+    setNote(null);
+    const r = await changeCheckinLength(length, length === 'Half' ? p ?? 'am' : null);
+    if (!r.ok || r.data?.error) {
+      const code = r.data?.error;
+      setError(
+        code === 'change-unsupported'
+          ? 'To change this day, please cancel it and book again.'
+          : code === 'no-allowance'
+            ? 'Not enough days left to extend to a full day.'
+            : friendly(code),
+      );
+    } else {
+      const d = r.data?.dayDelta ?? 0;
+      setNote(
+        d > 0
+          ? 'Updated to a full day — half a day used.'
+          : d < 0
+            ? 'Updated to a half day — half a day credited back.'
+            : 'Updated.',
+      );
+    }
+    await refresh();
+    setBusy(false);
+  }
+
   const todayIso = status?.date ?? new Date().toISOString().slice(0, 10);
   const openToday = dowOf(todayIso) >= 1 && dowOf(todayIso) <= 5;
   const nextOpen = nextOpenDay(todayIso);
@@ -110,6 +140,16 @@ export function CheckInCard({ className }: { className?: string }) {
   // Booked for TODAY = already counted as in (the overnight sweep spends the day), so there's no
   // need to tap "I'm in today" — we say so and drop the redundant button.
   const bookedToday = !!nextPlanned && nextPlanned.date === todayIso;
+  // Today's committed day (checked in OR booked) and its length/period — drives the half↔full switch.
+  const todayActive = !!(status?.checkedIn || bookedToday);
+  const todayLen: 'Full' | 'Half' = status?.checkedIn
+    ? status.length === 'Half'
+      ? 'Half'
+      : 'Full'
+    : nextPlanned?.length === 'Half'
+      ? 'Half'
+      : 'Full';
+  const todayPeriod: 'am' | 'pm' | null = status?.checkedIn ? status.period ?? null : nextPlanned?.period ?? null;
 
   const plannedDates = status?.planned?.map((p) => p.date) ?? [];
   const pendingOnly = pending.filter((d) => !plannedDates.includes(d));
@@ -163,6 +203,35 @@ export function CheckInCard({ className }: { className?: string }) {
               <p className={cn(styles.meta, styles.metaPhone)}>Tap the check-in button below when you arrive, or plan a day.</p>
             </>
           )}
+
+          {/* Already in today (checked in OR booked) → offer to change the length. The booking
+              already counts, so this just moves the half-day difference; points don't change. */}
+          {todayActive ? (
+            <div className={styles.changeToday}>
+              <span className={styles.changeLabel}>Change today</span>
+              <div className={styles.changeBtns}>
+                {todayLen === 'Full' ? (
+                  <button type="button" className={styles.changeBtn} onClick={() => doChangeToday('Half', 'am')} disabled={busy}>
+                    Make it a half day
+                  </button>
+                ) : (
+                  <>
+                    <button type="button" className={styles.changeBtn} onClick={() => doChangeToday('Full')} disabled={busy}>
+                      Make it a full day
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.changeBtn}
+                      onClick={() => doChangeToday('Half', todayPeriod === 'am' ? 'pm' : 'am')}
+                      disabled={busy}
+                    >
+                      Move to {todayPeriod === 'am' ? 'afternoon' : 'morning'}
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          ) : null}
 
           {/* Full / Half — applies to checking in today and to any days you plan. */}
           <div className={styles.seg} role="tablist" aria-label="Day length">

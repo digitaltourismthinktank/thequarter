@@ -149,9 +149,11 @@ function findCustomField(member: Member | null, test: (key: string) => boolean):
   return null;
 }
 
-/** The member's remaining day balance (Memberstack custom field), or null. */
+/** The member's remaining day balance (Memberstack custom field), or null.
+ *  NB: the rollover work added `days-rollover` (also contains "day"), so the match must exclude
+ *  it — otherwise this could return the rollover bucket instead of the plan-days bucket. */
 export function memberDaysRemaining(member: Member | null): string | null {
-  return findCustomField(member, (k) => k.includes('day'));
+  return findCustomField(member, (k) => k.includes('day') && !k.includes('rollover'));
 }
 
 /** The member's plan renewal / reset date (custom field), or null. */

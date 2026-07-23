@@ -28,6 +28,7 @@ export function ProfileEditor({ member, onClose, onSaved }: { member: any; onClo
   const [phone, setPhone] = useState<string>(meta.phone || '');
   const [role, setRole] = useState<string>(meta.role || '');
   const [dietary, setDietary] = useState<string>(meta.dietary || '');
+  const [forwardAddress, setForwardAddress] = useState<string>(meta.forwardAddress || '');
   const bday: string = typeof meta.bday === 'string' && /^\d{2}-\d{2}$/.test(meta.bday) ? meta.bday : '';
   const [month, setMonth] = useState<string>(bday ? String(Number(bday.slice(0, 2))) : '');
   const [day, setDay] = useState<string>(bday ? String(Number(bday.slice(3, 5))) : '');
@@ -43,6 +44,7 @@ export function ProfileEditor({ member, onClose, onSaved }: { member: any; onClo
       phone,
       role,
       dietary,
+      forwardAddress,
       ...(bdayVal !== undefined ? { bday: bdayVal } : {}),
     });
     setBusy(false);
@@ -105,6 +107,17 @@ export function ProfileEditor({ member, onClose, onSaved }: { member: any; onClo
         <label className={styles.field}>
           <span className={styles.label}>Dietary needs</span>
           <input className={styles.input} value={dietary} onChange={(e) => setDietary(e.target.value)} placeholder="Allergies / preferences for events" />
+        </label>
+
+        <label className={styles.field}>
+          <span className={styles.label}>Postal forwarding address</span>
+          <textarea
+            className={styles.input}
+            rows={3}
+            value={forwardAddress}
+            onChange={(e) => setForwardAddress(e.target.value)}
+            placeholder={'Where we post your mail when you choose "forward"\n(optional)'}
+          />
         </label>
 
         <div className={styles.actions}>

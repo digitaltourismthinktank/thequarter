@@ -18,7 +18,22 @@ import { londonNow } from './_time.mjs';
 import { DEPARTURES, DESTS, GENERATED, COVERAGE } from './_bus-timetable.mjs';
 
 const WINDOW_MIN = 60; // only show departures within the next hour
-const NRE_TOKEN = process.env.NATIONAL_RAIL_TOKEN; // National Rail Darwin (LDBWS) — pending approval
+const MAX_TRAINS = 7; // a full hour is ~7 departures per station (10-min walk, so show plenty)
+
+// National Rail Darwin via the Rail Data Marketplace "Live Departure Board" (LDBWS) REST product.
+// Key-only: the consumer key goes in an `x-apikey` header — no OAuth, no secret. `RAIL_DATA_KEY`
+// is that consumer key (set in Netlify). The board switches on the moment that var is present.
+//
+// The exact base path differs by product version (e.g. `...-dep` vs `...-dep1_2`) and is shown on
+// the product's Specification/API tab in RDM. So it's overridable via `RAIL_DATA_URL` — set that to
+// the example request URL from RDM and we normalise it — meaning a path correction needs NO code
+// redeploy. If unset we fall back to the current best-known "Live Departure Board" base.
+const RAIL_KEY = process.env.RAIL_DATA_KEY;
+const LDBWS_DEFAULT = 'https://api1.raildata.org.uk/1010-live-departure-board-dep1_2/LDBWS/api/20220120';
+// Accept either a bare base (…/20220120) or a full sample URL (…/GetDepartureBoard/XXX); trim to base.
+const LDBWS_BASE = (process.env.RAIL_DATA_URL || LDBWS_DEFAULT)
+  .replace(/\/GetDep(artureBoard|BoardWithDetails)\b.*$/i, '')
+  .replace(/\/+$/, '');
 
 // Everything is either static (buses) or cheaply cached, so a short CDN cache keeps the board
 // fresh without hammering anything. The client also polls every few minutes.
@@ -61,15 +76,49 @@ function busDepartures() {
 }
 
 /**
- * Canterbury West / East live departures via National Rail Darwin.
- * Returns [] until NATIONAL_RAIL_TOKEN is set (token pending approval) — the Darwin call is wired
- * and tested the moment the credential lands. Always fails soft.
+ * Normalise Darwin's `etd` (estimated time of departure) into a compact status the board renders:
+ *   { state: 'on-time' | 'late' | 'delayed' | 'cancelled', expected?: 'HH:MM' }
+ * `etd` is one of "On time", "Cancelled", "Delayed", or an actual time like "14:35" (running late).
  */
-async function trainDepartures(/* crs */) {
-  if (!NRE_TOKEN) return [];
+function departureStatus(etd) {
+  const v = String(etd || '').trim();
+  if (/^cancelled$/i.test(v)) return { state: 'cancelled' };
+  if (/^delayed$/i.test(v)) return { state: 'delayed' };
+  if (/^on time$/i.test(v) || v === '') return { state: 'on-time' };
+  if (/^\d{1,2}:\d{2}$/.test(v)) return { state: 'late', expected: v }; // a real re-timed departure
+  return { state: 'on-time' };
+}
+
+/**
+ * Canterbury West (CBW) / East (CBE) live departures via the RDM LDBWS Public REST API.
+ * Returns [] until RAIL_DATA_KEY is set. Always fails soft — a bad feed empties the column
+ * rather than erroring the whole board.
+ */
+async function trainDepartures(crs) {
+  if (!RAIL_KEY) return [];
   try {
-    // TODO(darwin): wire LDBWS GetDepartureBoard for `crs` once the RDM token is approved.
-    return [];
+    const url = `${LDBWS_BASE}/GetDepartureBoard/${crs}?numRows=12`;
+    const res = await fetch(url, { headers: { 'x-apikey': RAIL_KEY, accept: 'application/json' } });
+    if (!res.ok) return [];
+    const data = await res.json();
+    const services = Array.isArray(data?.trainServices) ? data.trainServices : [];
+    return services
+      .map((s) => {
+        // Destination shape varies across the LDBWS JSON wrappers — an array, or { location: [...] }.
+        // Handle both. A splitting service lists more than one destination, so join their names.
+        const dnode = s?.destination;
+        const dests = Array.isArray(dnode) ? dnode : Array.isArray(dnode?.location) ? dnode.location : [];
+        const to = dests.map((d) => d?.locationName).filter(Boolean).join(' & ');
+        return {
+          time: String(s?.std || '').trim(), // scheduled departure "HH:MM"
+          to,
+          platform: s?.platform ? String(s.platform) : null,
+          operator: s?.operator || '',
+          ...departureStatus(s?.etd),
+        };
+      })
+      .filter((t) => /^\d{1,2}:\d{2}$/.test(t.time) && t.to)
+      .slice(0, MAX_TRAINS);
   } catch {
     return [];
   }
@@ -81,7 +130,7 @@ export default async function handler() {
     const [west, east] = await Promise.all([trainDepartures('CBW'), trainDepartures('CBE')]);
     const data = {
       configured: true,
-      trainsLive: !!NRE_TOKEN,
+      trainsLive: !!RAIL_KEY,
       trains: { west, east },
       buses,
       busInfo: { generated: GENERATED, coverage: COVERAGE },

@@ -20,6 +20,7 @@ import {
   PAUSED_PLAN_ID,
   PLAN_ALLOWANCE,
   daysUsedThisCycle,
+  pauseMemberDays,
   getMemberSync,
   stampSync,
 } from './_quarter-sync.mjs';
@@ -668,7 +669,10 @@ async function handleEvent(event) {
     const nativePaused = !!obj.pause_collection;
     const target = nativePaused ? PAUSED_PLAN_ID : targetPlanForPrice(price?.id, price?.unit_amount);
     if (target === PAUSED_PLAN_ID) {
-      await setMemberPlan(MS_SECRET, email, PAUSED_PLAN_ID); // pause: freeze days
+      // Pause: fold this cycle's plan days into the rollover bucket (kept + usable while paused, up
+      // to 12 months) BEFORE re-tagging — `member` still has the real plan + balance here.
+      await pauseMemberDays(MS_SECRET, member);
+      await setMemberPlan(MS_SECRET, email, PAUSED_PLAN_ID);
       applied = { target, paused: true };
     } else {
       // Usage-aware switch: new days = new plan's allowance − days already used this

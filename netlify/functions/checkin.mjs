@@ -14,7 +14,7 @@ import memberstackAdmin from '@memberstack/admin';
 import { verifyMember, memberEmail, memberName, tokenFromRequest } from './_member.mjs';
 import { listRecords, createRecord, updateRecord, T, F, airtableReady, esc } from './_airtable.mjs';
 import { londonNow, addDays, isoToLondonDate } from './_time.mjs';
-import { allowanceForMember } from './_quarter-sync.mjs';
+import { allowanceForMember, liveRollover, MS_ROLLOVER, MS_ROLLOVER_EXP } from './_quarter-sync.mjs';
 import { awardPoints, checkinBonusesThisMonth, earnBoostForMember, CHECKIN_BONUS, CHECKIN_QUIET_BONUS, CHECKIN_BONUS_CAP } from './_rewards.mjs';
 import { isQuietDay } from './_busyness.mjs';
 import { isClosedDay } from './_holidays.mjs';
@@ -69,6 +69,28 @@ async function setDays(memberId, value) {
   await admin.members.update({ id: memberId, data: { customFields: { 'days-remaining': value } } });
 }
 
+/** Write whichever day-bucket fields are provided in one Memberstack update. */
+async function setDayBuckets(memberId, fields) {
+  const admin = memberstackAdmin.init(MS_SECRET);
+  await admin.members.update({ id: memberId, data: { customFields: fields } });
+}
+
+/** Split a day `cost` across the ROLLOVER bucket first (it expires), then plan days. Pure. */
+function splitSpend(planDays, rollDays, cost) {
+  const p = Math.max(0, planDays);
+  const r = Math.max(0, rollDays);
+  const fromRoll = Math.min(r, cost);
+  const fromPlan = Math.min(p, cost - fromRoll);
+  return { fromRoll, fromPlan, covered: fromRoll + fromPlan, newPlan: p - fromPlan, newRoll: r - fromRoll };
+}
+
+/** The day-bucket writes for a spend (rollover cleared of its expiry when it hits zero). */
+function spendFields(s) {
+  const f = { 'days-remaining': String(s.newPlan), [MS_ROLLOVER]: String(s.newRoll) };
+  if (s.newRoll <= 0) f[MS_ROLLOVER_EXP] = '';
+  return f;
+}
+
 /** A member's check-in records for a given date (any status). */
 async function checkinsFor(email, dateStr) {
   return listRecords(T.checkins, {
@@ -108,51 +130,44 @@ export async function consumePlannedDay(me, { dateStr, length, row }) {
   // otherwise be treated as 'over allowance' and spend nothing — a silent free day. Fall back to
   // their monthly allowance so the day actually deducts and the field gets written.
   if (current === null && !unlimited && hasPlan) current = allowance;
+  const planNum = current === null ? 0 : current;
+  const roll = liveRollover(me, dateStr); // spendable rollover days (respects expiry)
+  const available = planNum + roll; // total spendable plan+rollover days (metered members)
   const carnet = me.metaData?.carnet || {};
   const passesLeft = Math.max(0, Number(carnet.remaining) || 0);
   const carnetLive = passesLeft > 0 && !(carnet.expires && carnet.expires < dateStr);
-  const outOfDays = !unlimited && current !== null && current < cost;
-  const hasDays = current !== null && current >= cost;
-  // Plan days (or a paused member's standing/rollover balance) first, carnet as the fallback —
-  // out of days, or no plan AND no standing days at all (a carnet-only member who reserved a
-  // day). A future paid Day Pass is its own 'Paid' row, never a Planned.
-  const useCarnet = (outOfDays || (!hasPlan && !hasDays)) && carnetLive;
+  // Days (rollover + plan) cover the cost? If not, and a carnet is live, spend a carnet pass and
+  // keep the days — a future paid Day Pass is its own 'Paid' row, never a Planned.
+  const canCover = !unlimited && available + 1e-9 >= cost;
+  const useCarnet = !unlimited && !canCover && carnetLive;
 
-  // Decide the funding as PURE values first — what to spend, what to mark, what to write to
-  // Memberstack — WITHOUT touching Memberstack yet.
+  // Decide the funding as PURE values first — WITHOUT touching Memberstack yet.
   let newBalance = me.customFields?.['days-remaining'] ?? null;
   let carnetRemaining = null;
   let dayCost = 0;
   let mark = '';
-  let spend = null; // null | { kind: 'carnet' } | { kind: 'days', value }
+  let dayFields = null; // day-bucket writes, or null to leave the balance alone
 
   if (unlimited) {
     mark = 'Unlimited';
   } else if (useCarnet) {
     carnetRemaining = passesLeft - 1;
     mark = 'Carnet pass';
-    spend = { kind: 'carnet' };
-  } else if (current !== null && !outOfDays) {
-    newBalance = String(Math.max(0, current - cost));
-    dayCost = cost;
-    spend = { kind: 'days', value: newBalance };
   } else {
-    // A plan member who over-committed — reserved more days than they hold, with no carnet to
-    // fall back on. Let them in (they pay for the month), spend whatever's left, and flag the
-    // shortfall so the office can see it rather than a silent free day.
-    if (current !== null && current > 0) {
-      dayCost = current;
-      newBalance = '0';
-      spend = { kind: 'days', value: '0' };
-    }
-    mark = 'Over allowance';
+    // Spend rollover FIRST (it expires), then plan days. If they over-committed (available < cost)
+    // with no carnet, let them in and spend whatever's there, flagged, rather than a silent free day.
+    const s = splitSpend(planNum, roll, cost);
+    dayCost = s.covered;
+    dayFields = spendFields(s);
+    newBalance = String(s.newPlan + s.newRoll);
+    if (!canCover) mark = 'Over allowance';
   }
 
   // Stamp the row FIRST — this is the ONLY idempotency marker (plannedConsumed reads dayCost +
   // the note). Writing it BEFORE the irreversible Memberstack decrement means the worst a
   // failure between the two can do is leave an UN-charged (free) day, which a re-run simply
   // skips — never a double-charge or a lost carnet pass, which is the harm that actually costs a
-  // member. dayCost carries the plan-day spend; the machine note carries the rest. Keep any AM/PM.
+  // member. dayCost carries the total days spent; the machine note carries the rest. Keep any AM/PM.
   const period = length === 'Half' ? String(periodFromNotes(row?.fields?.[F.checkins.notes]) || '').toUpperCase() : '';
   const notes = [period, mark].filter(Boolean).join(' · ');
   await updateRecord(T.checkins, row.id, {
@@ -161,11 +176,11 @@ export async function consumePlannedDay(me, { dateStr, length, row }) {
   });
 
   // Only now the irreversible external decrement, with the row already marked spent.
-  if (spend?.kind === 'carnet') {
+  if (useCarnet) {
     const admin = memberstackAdmin.init(MS_SECRET);
     await admin.members.update({ id: me.id, data: { metaData: { ...(me.metaData || {}), carnet: { ...carnet, remaining: carnetRemaining } } } });
-  } else if (spend?.kind === 'days') {
-    await setDays(me.id, spend.value);
+  } else if (dayFields) {
+    await setDayBuckets(me.id, dayFields);
   }
 
   // Points for being in — quiet days earn double, capped monthly. Best-effort, never blocks.
@@ -342,7 +357,10 @@ export default async function handler(req) {
     const a = allowanceForMember(me);
     if (typeof a === 'number') standingDays = a;
   }
-  const hasStandingDays = standingDays !== null && standingDays > 0;
+  // Rollover days are a standing balance too — a paused member's KEPT days live in the rollover
+  // bucket, so a paused member with rollover can still check in and spend it.
+  const standingRoll = liveRollover(me, londonNow().dateStr);
+  const hasStandingDays = (standingDays !== null && standingDays > 0) || standingRoll > 0;
 
   // Check in for TODAY (deducts unless unlimited). Idempotent per day.
   if (body.action === 'checkin') {
@@ -361,12 +379,23 @@ export default async function handler(req) {
       return json({ ok: true, alreadyCheckedIn: true, balance: me.customFields?.['days-remaining'] ?? null });
     }
 
-    // A planned day already spent for real (auto-attended by the morning sweep, or reserved
-    // for today). This tap is just physical arrival — record it, don't charge the day again.
+    // A booking for today ALREADY means you're in — a booked day is attendance (same day spent,
+    // same points). So tapping check-in must never open a second, fresh check-in that could charge
+    // again or silently swap your booked length. Settle the booking at the LENGTH YOU BOOKED and
+    // record arrival — nothing more. Changing half↔full is a separate, explicit action.
     const plannedRec = recs.find((r) => r.fields[F.checkins.status] === 'Planned');
-    if (plannedRec && plannedConsumed(plannedRec)) {
+    if (plannedRec) {
+      const bookedLen = plannedRec.fields[F.checkins.length] === 'Half' ? 'Half' : 'Full';
+      if (plannedConsumed(plannedRec)) {
+        // Already settled (the overnight sweep, or reserved-for-today) — just record physical arrival.
+        await updateRecord(T.checkins, plannedRec.id, { [F.checkins.status]: 'Checked-in', [F.checkins.source]: source });
+        return json({ ok: true, alreadyBooked: true, length: bookedLen, balance: me.customFields?.['days-remaining'] ?? null });
+      }
+      // Booked but not yet settled — spend the day now at the BOOKED length (never the button's
+      // default), then mark arrived. consumePlannedDay is idempotent via its dayCost stamp.
+      const c = await consumePlannedDay(me, { dateStr: today, length: bookedLen, row: plannedRec });
       await updateRecord(T.checkins, plannedRec.id, { [F.checkins.status]: 'Checked-in', [F.checkins.source]: source });
-      return json({ ok: true, alreadyCounted: true, balance: me.customFields?.['days-remaining'] ?? null });
+      return json({ ok: true, alreadyBooked: true, length: bookedLen, balance: c.newBalance, pointsAwarded: c.pointsAwarded, usedCarnet: c.usedCarnet, carnetRemaining: c.carnetRemaining });
     }
 
     // Entitlement. You may check in only if you have a plan, a paid day pass for today, or a
@@ -389,34 +418,32 @@ export default async function handler(req) {
     // a different card to use one. Being refused entry while holding passes you bought is
     // the worst version of this, so the fallback is automatic and the response says which
     // was spent.
-    // Balance already resolved (and seeded for a metered plan member whose field was never
-    // written) as standingDays above — reuse it so plan members, paused members and day-balance
-    // members all spend the same way.
-    const current = standingDays;
-    const outOfDays = !unlimited && current !== null && current < cost;
+    // Balance = this cycle's plan days (seeded above as standingDays) PLUS the live rollover bucket.
+    const planNum = standingDays === null ? 0 : standingDays;
+    const roll = standingRoll; // liveRollover for today, computed above
+    const available = planNum + roll;
+    const canCover = !unlimited && available + 1e-9 >= cost;
 
     const carnet = me.metaData?.carnet || {};
     const passesLeft = Math.max(0, Number(carnet.remaining) || 0);
     const carnetLive = passesLeft > 0 && !(carnet.expires && carnet.expires < today);
-    // Spend a carnet pass when a plan member has run out of days, AND when a member with no plan,
-    // no standing day balance and no paid pass is here on a carnet — otherwise the gate above
-    // would let them in but nothing would be spent, which is the free check-in all over again.
-    // A standing day balance is spent BEFORE a carnet (a paused/rollover day expires; a carnet
-    // pass is theirs to keep).
-    const useCarnet = (outOfDays || (!hasPlan && !hasStandingDays && !paidPassToday)) && carnetLive;
+    // Days (rollover + plan) cover the day? Otherwise fall back to a carnet pass (theirs to keep),
+    // else refuse. A standing/rollover balance is always spent BEFORE a carnet, and rollover before
+    // plan days (the rollover expires; this cycle's plan days are for this cycle).
+    const useCarnet = !unlimited && !canCover && carnetLive;
 
-    if (outOfDays && !useCarnet) {
+    if (!unlimited && !canCover && !useCarnet) {
       return json({ error: 'no-allowance' }, 400);
     }
 
-    // Deduct from the Memberstack balance (unless unlimited, or paying with a pass).
+    // Deduct — rollover FIRST, then plan days (unless unlimited, or paying with a carnet pass).
     let newBalance = me.customFields?.['days-remaining'] ?? null;
+    let dayCost = 0;
     if (!unlimited && !useCarnet) {
-      const next = current === null ? null : Math.max(0, current - cost);
-      if (next !== null) {
-        newBalance = String(next);
-        await setDays(me.id, newBalance);
-      }
+      const s = splitSpend(planNum, roll, cost);
+      dayCost = s.covered;
+      newBalance = String(s.newPlan + s.newRoll);
+      await setDayBuckets(me.id, spendFields(s));
     }
     // A carnet pass covers a whole day, so a half day still costs one — there is no half
     // pass. Worth surfacing to the member rather than quietly charging a full one.
@@ -437,7 +464,7 @@ export default async function handler(req) {
         [F.checkins.status]: 'Checked-in',
         [F.checkins.length]: length,
         [F.checkins.notes]: periodNote,
-        [F.checkins.dayCost]: unlimited || useCarnet ? 0 : cost,
+        [F.checkins.dayCost]: dayCost,
         [F.checkins.source]: source,
         ...(useCarnet ? { [F.checkins.notes]: `${periodNote ? periodNote + ' · ' : ''}Carnet pass` } : {}),
       });
@@ -449,7 +476,7 @@ export default async function handler(req) {
         [F.checkins.date]: today,
         [F.checkins.length]: length,
         [F.checkins.notes]: periodNote,
-        [F.checkins.dayCost]: unlimited ? 0 : cost,
+        [F.checkins.dayCost]: dayCost,
         [F.checkins.status]: 'Checked-in',
         [F.checkins.source]: source,
       });
@@ -469,6 +496,81 @@ export default async function handler(req) {
       /* points are best-effort; never block a check-in */
     }
     return json({ ok: true, balance: newBalance, pointsAwarded, usedCarnet: useCarnet, carnetRemaining });
+  }
+
+  // Change TODAY's booked / checked-in length between Half and Full. A booking already counts as
+  // attendance, so this moves ONLY the day cost, by the difference — points are per-attendance and
+  // never change, so they're left exactly as they are (no re-award, no claw-back). Idempotent, and
+  // it refuses the one ambiguous case (an over-allowance day) rather than guess at the balance.
+  if (body.action === 'changeLength') {
+    const today = londonNow().dateStr;
+    const recs = await checkinsFor(email, today);
+    // Today's attendance row: a live check-in wins, else the booking.
+    const row =
+      recs.find((r) => r.fields[F.checkins.status] === 'Checked-in') ||
+      recs.find((r) => r.fields[F.checkins.status] === 'Planned');
+    if (!row) return json({ error: 'no-booking' }, 400);
+
+    const curLen = row.fields[F.checkins.length] === 'Half' ? 'Half' : 'Full';
+    const newLen = body.length === 'Half' ? 'Half' : 'Full';
+    const newPeriod = newLen === 'Half' ? (String(body.period).toLowerCase() === 'pm' ? 'PM' : 'AM') : '';
+    const notes = String(row.fields[F.checkins.notes] || '');
+    // Preserve the machine marker (Carnet pass / Unlimited / Over allowance) while re-setting the
+    // AM/PM period. Notes are stored as "[period · ]mark".
+    const markMatch = notes.match(/(Carnet pass|Unlimited|Over allowance)/i);
+    const mark = markMatch ? markMatch[1] : '';
+    const buildNotes = () => [newLen === 'Half' ? newPeriod : '', mark].filter(Boolean).join(' · ');
+
+    // Same length → allow a half-day AM/PM tweak, else a no-op.
+    if (curLen === newLen) {
+      if (newLen === 'Half') await updateRecord(T.checkins, row.id, { [F.checkins.notes]: buildNotes() });
+      return json({ ok: true, length: newLen, dayDelta: 0, unchanged: true });
+    }
+
+    // Not yet settled (a plain Planned row, no day spent): just relabel — the spend happens later
+    // (at check-in or the overnight sweep) at the new length, so there's no balance to move.
+    if (row.fields[F.checkins.status] === 'Planned' && !plannedConsumed(row)) {
+      await updateRecord(T.checkins, row.id, { [F.checkins.length]: newLen, [F.checkins.notes]: buildNotes() });
+      return json({ ok: true, length: newLen, dayDelta: 0, pending: true });
+    }
+
+    // Unlimited or carnet-funded: half and full cost the same (nothing / one whole pass) — relabel only.
+    const unlimited = allowanceForMember(me) === null || /unlimited/i.test(notes);
+    if (unlimited || /carnet/i.test(notes)) {
+      await updateRecord(T.checkins, row.id, { [F.checkins.length]: newLen, [F.checkins.notes]: buildNotes() });
+      return json({ ok: true, length: newLen, dayDelta: 0 });
+    }
+    // Over-allowance edge: the original spend didn't fully cover the nominal day, so a clean ±0.5
+    // isn't well-defined — ask them to cancel & rebook rather than risk a wrong balance.
+    if (/over allowance/i.test(notes)) return json({ error: 'change-unsupported' }, 409);
+
+    // Plain plan/rollover-funded day: move the balance by the difference only. Points untouched.
+    const oldCost = Number(row.fields[F.checkins.dayCost]) || 0;
+    const newCost = newLen === 'Half' ? 0.5 : 1;
+    const delta = newCost - oldCost; // +0.5 half→full, −0.5 full→half
+    let newBalance = me.customFields?.['days-remaining'] ?? null;
+    if (delta > 0) {
+      // Extend: spend the extra fraction — rollover first (it expires), then plan days.
+      const planNum = parseDays(me.customFields?.['days-remaining']) ?? 0;
+      const roll = liveRollover(me, today);
+      if (planNum + roll + 1e-9 < delta) return json({ error: 'no-allowance' }, 400);
+      const s = splitSpend(planNum, roll, delta);
+      await setDayBuckets(me.id, spendFields(s));
+      newBalance = String(s.newPlan + s.newRoll);
+    } else if (delta < 0) {
+      // Shorten: give the fraction back to the plan bucket (mirrors refundPlannedDay's convention).
+      const current = parseDays(me.customFields?.['days-remaining']);
+      if (current !== null) {
+        newBalance = String(current + -delta);
+        await setDays(me.id, newBalance);
+      }
+    }
+    await updateRecord(T.checkins, row.id, {
+      [F.checkins.length]: newLen,
+      [F.checkins.notes]: buildNotes(),
+      [F.checkins.dayCost]: newCost,
+    });
+    return json({ ok: true, length: newLen, dayDelta: delta, balance: newBalance });
   }
 
   // Reserve a future day. No deduction until they actually check in. Weekends are
