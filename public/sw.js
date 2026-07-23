@@ -9,7 +9,7 @@
  *             even after a new deploy. This is what stops the "ChunkLoadError / obscure update
  *             error" — previously the version bump deleted the old chunks out from under open tabs.
  *   PAGES   — visited HTML (so a page + the Quarter Card open offline). Versioned + purged on bump. */
-const VERSION = 'quarter-v60';
+const VERSION = 'quarter-v61';
 const STATIC = 'quarter-static';
 const PAGES = VERSION;
 

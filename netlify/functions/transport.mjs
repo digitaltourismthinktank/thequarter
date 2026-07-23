@@ -75,7 +75,7 @@ function busDepartures() {
     out.push({ time, line, to: dest, mins: wait });
   }
   out.sort((a, b) => a.mins - b.mins);
-  return out.slice(0, 8).map(({ mins, ...rest }) => rest); // eslint-disable-line no-unused-vars
+  return out.slice(0, 10).map(({ mins, ...rest }) => rest); // eslint-disable-line no-unused-vars
 }
 
 /**

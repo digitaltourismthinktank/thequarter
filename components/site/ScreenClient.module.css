@@ -679,49 +679,49 @@
     display: grid;
     align-items: stretch;
     grid-template-columns: minmax(0, 4fr) minmax(0, 6fr);
-    /* Rows, top to bottom: header (full width) · live departures (full width) · then the split
-       region — the week hero (row 3) and What's-on (row 4) stack down the LEFT while live room
-       status fills the RIGHT by spanning both. Giving the hero and What's-on their OWN explicit
-       rows is what stops the week strip painting over the What's-on heading; and lifting the
-       departures board to its own full-width row stops it collapsing into one tall narrow stack
-       inside the 4fr column. */
-    grid-template-rows: auto auto auto minmax(0, 1fr);
+    /* Rows, top to bottom: header (full) · the split content region (week hero + What's-on down the
+       LEFT, live room status filling the RIGHT) · live departures as a full-width band at the
+       BOTTOM — transport is what you glance at on the way OUT, so it reads last. The middle content
+       row is the 1fr that absorbs slack, so the whole screen fits without the room cards spilling
+       past the fold. */
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
     column-gap: clamp(24px, 2.5vw, 56px);
-    row-gap: clamp(12px, 1.6vh, 26px);
+    row-gap: clamp(10px, 1.3vh, 20px);
   }
   .top {
     grid-column: 1 / -1;
     grid-row: 1;
     max-width: none;
   }
-  /* Live departures span the full width, high up — a proper three-column board with room to
-     breathe, the first thing a member reads on the way out. */
-  .transport {
-    grid-column: 1 / -1;
-    grid-row: 2;
-    margin-top: 0;
-  }
-  .trGrid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
   .hero {
+    grid-column: 1;
+    grid-row: 2;
+    align-self: start;
+    max-width: none;
+  }
+  /* What's-on is a direct child of .screen; the room blocks nest inside .entranceMain, so this
+     targets only the footer block. Clip it so a long event description can't push the fold. */
+  .screen > .block {
     grid-column: 1;
     grid-row: 3;
     align-self: start;
     max-width: none;
-  }
-  /* The What's-on section is a direct child of .screen; the room blocks are nested inside
-     .entranceMain, so this targets only the footer block. */
-  .screen > .block {
-    grid-column: 1;
-    grid-row: 4;
-    align-self: start;
-    max-width: none;
+    min-height: 0;
+    overflow: hidden;
   }
   .entranceMain {
     grid-column: 2;
-    grid-row: 3 / 5;
+    grid-row: 2 / 4;
     min-height: 0;
+  }
+  /* Live departures: a full-width three-column board across the FOOT of the screen. */
+  .transport {
+    grid-column: 1 / -1;
+    grid-row: 4;
+    margin-top: 0;
+  }
+  .trGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
   /* 10vw is portrait maths — in a half-width column it dwarfs the room status, which is
      the part people actually walk up to read. */
@@ -805,17 +805,18 @@
     flex-direction: column;
     justify-content: center;
   }
+  /* Stack the room + workspace blocks from the top, content-sized — with transport now taking a
+     full-width band at the foot, the right column no longer stretches to fill and the cards stay
+     compact so all four rooms, the pods and the workspaces fit above the fold. */
   .entranceMain {
-    justify-content: space-between;
+    justify-content: flex-start;
   }
   .spaceCard {
-    min-height: clamp(150px, 17vh, 224px);
+    min-height: clamp(84px, 10.5vh, 140px);
   }
-  /* With taller cards the timeline can sit lower in the card, closer to where the eye
-     finishes reading the status. */
   .dayLine {
     margin-top: auto;
-    padding-top: 14px;
+    padding-top: clamp(6px, 0.8vh, 12px);
   }
 }
 
@@ -874,14 +875,13 @@
 }
 
 @media (orientation: landscape) and (min-width: 1000px) {
-  /* Four rooms as a 2x2 block rather than four thin columns: bigger cards that carry the
-     status, the schedule and the timeline comfortably, and they fill the height that was
-     sitting empty between the rooms and the workspaces. */
+  /* Four rooms as a 2x2 block rather than four thin columns. Kept compact (not stretched to fill)
+     so the rooms, the pods and the workspaces all sit above the bottom transport band. */
   .roomGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .roomGrid .spaceCard {
-    min-height: clamp(180px, 22vh, 280px);
+    min-height: clamp(96px, 12vh, 164px);
   }
 }
 
