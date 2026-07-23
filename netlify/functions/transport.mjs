@@ -28,7 +28,10 @@ const MAX_TRAINS = 7; // a full hour is ~7 departures per station (10-min walk, 
 // the product's Specification/API tab in RDM. So it's overridable via `RAIL_DATA_URL` — set that to
 // the example request URL from RDM and we normalise it — meaning a path correction needs NO code
 // redeploy. If unset we fall back to the current best-known "Live Departure Board" base.
-const RAIL_KEY = process.env.RAIL_DATA_KEY;
+// Accept the consumer key under either the current name or the legacy one, so the board switches
+// on whichever slot the key was pasted into in Netlify (a name mismatch was silently keeping
+// trainsLive false even after the key was set).
+const RAIL_KEY = process.env.RAIL_DATA_KEY || process.env.NATIONAL_RAIL_TOKEN;
 const LDBWS_DEFAULT = 'https://api1.raildata.org.uk/1010-live-departure-board-dep1_2/LDBWS/api/20220120';
 // Accept either a bare base (…/20220120) or a full sample URL (…/GetDepartureBoard/XXX); trim to base.
 const LDBWS_BASE = (process.env.RAIL_DATA_URL || LDBWS_DEFAULT)
@@ -94,14 +97,31 @@ function departureStatus(etd) {
  * Returns [] until RAIL_DATA_KEY is set. Always fails soft — a bad feed empties the column
  * rather than erroring the whole board.
  */
-async function trainDepartures(crs) {
+async function trainDepartures(crs, diag) {
   if (!RAIL_KEY) return [];
   try {
     const url = `${LDBWS_BASE}/GetDepartureBoard/${crs}?numRows=12`;
     const res = await fetch(url, { headers: { 'x-apikey': RAIL_KEY, accept: 'application/json' } });
-    if (!res.ok) return [];
+    if (diag) diag.status = res.status;
+    if (!res.ok) {
+      // Capture a short, key-free snippet of the upstream body so ?debug=1 can show WHY (bad path,
+      // rejected key, wrong product) instead of just an empty column.
+      if (diag) diag.body = (await res.text().catch(() => '')).slice(0, 200);
+      return [];
+    }
     const data = await res.json();
-    const services = Array.isArray(data?.trainServices) ? data.trainServices : [];
+    // Darwin-via-RDM JSON nests services differently across the LDBWS wrappers: a bare array, a
+    // { service: [...] } object, or the SOAP-shaped GetStationBoardResult.trainServices.service.
+    // Accept all three — the { service: [...] } shape was silently yielding an empty board.
+    const raw = data?.trainServices;
+    const services = Array.isArray(raw)
+      ? raw
+      : Array.isArray(raw?.service)
+        ? raw.service
+        : Array.isArray(data?.GetStationBoardResult?.trainServices?.service)
+          ? data.GetStationBoardResult.trainServices.service
+          : [];
+    if (diag) diag.parsed = { topKeys: Object.keys(data || {}).slice(0, 8), count: services.length };
     return services
       .map((s) => {
         // Destination shape varies across the LDBWS JSON wrappers — an array, or { location: [...] }.
@@ -124,19 +144,42 @@ async function trainDepartures(crs) {
   }
 }
 
-export default async function handler() {
+export default async function handler(req) {
+  // ?debug=1 → a key-free diagnostic of the LDBWS calls (which env slot the key came from, the base
+  // URL used, the HTTP status per station, and how the response parsed). Lets us tell a name
+  // mismatch from a bad path from a rejected key without exposing the key itself.
+  let debug = false;
+  try {
+    debug = new URL(req.url).searchParams.get('debug') === '1';
+  } catch {
+    /* no URL (unexpected) — just skip debug */
+  }
+  const wDiag = debug ? {} : null;
+  const eDiag = debug ? {} : null;
   try {
     const buses = busDepartures();
-    const [west, east] = await Promise.all([trainDepartures('CBW'), trainDepartures('CBE')]);
+    const [west, east] = await Promise.all([trainDepartures('CBW', wDiag), trainDepartures('CBE', eDiag)]);
     const data = {
       configured: true,
       trainsLive: !!RAIL_KEY,
       trains: { west, east },
       buses,
       busInfo: { generated: GENERATED, coverage: COVERAGE },
+      ...(debug
+        ? {
+            trainDebug: {
+              keyPresent: !!RAIL_KEY,
+              keySource: process.env.RAIL_DATA_KEY ? 'RAIL_DATA_KEY' : process.env.NATIONAL_RAIL_TOKEN ? 'NATIONAL_RAIL_TOKEN' : null,
+              base: LDBWS_BASE,
+              urlOverride: !!process.env.RAIL_DATA_URL,
+              west: wDiag,
+              east: eDiag,
+            },
+          }
+        : {}),
     };
-    return json(data, 200, true);
-  } catch {
-    return json({ configured: true, trainsLive: false, trains: { west: [], east: [] }, buses: [] });
+    return json(data, 200, !debug);
+  } catch (e) {
+    return json({ configured: true, trainsLive: false, trains: { west: [], east: [] }, buses: [], ...(debug ? { trainDebug: { error: String(e?.message || e) } } : {}) });
   }
 }

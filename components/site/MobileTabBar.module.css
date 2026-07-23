@@ -19,6 +19,14 @@
     border-top: 1px solid var(--border-subtle);
     padding: 8px 6px var(--tabbar-inset);
     box-shadow: 0 -6px 20px rgba(30, 26, 21, 0.06);
+    /* iOS Safari lags fixed elements against the *layout* viewport during momentum scroll, so a
+       bar pinned to bottom:0 appears to drift upward mid-scroll. Promoting it to its own
+       compositing layer makes it track the visual viewport, so it stays welded to the edge. */
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+    will-change: transform;
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
   }
 
   .tab,

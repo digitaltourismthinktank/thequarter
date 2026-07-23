@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Icon } from '@/components/ds/Icon';
 import { cn } from '@/lib/cn';
-import { getCheckinToday, checkInToday, changeCheckinLength, type CheckinStatus } from '@/lib/booking';
+import { getCheckinToday, checkInToday, changeCheckinLength, announceBalancesChanged, type CheckinStatus } from '@/lib/booking';
 import { haptic, playChime } from '@/lib/feedback';
 import styles from './CheckInSheet.module.css';
 
@@ -59,7 +59,7 @@ export function CheckInSheet({ open, onClose }: { open: boolean; onClose: () => 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [changeNote, setChangeNote] = useState<string | null>(null);
-  const [done, setDone] = useState<{ points: number; usedCarnet?: boolean; passesLeft?: number | null } | null>(null);
+  const [done, setDone] = useState<{ points: number; usedCarnet?: boolean; passesLeft?: number | null; balance?: string | null } | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -98,7 +98,14 @@ export function CheckInSheet({ open, onClose }: { open: boolean; onClose: () => 
       setError(friendly(r.data?.error));
       haptic([8, 40, 8]); // a stutter, so a failure doesn't feel like a success
     } else {
-      setDone({ points: r.data?.pointsAwarded ?? 0, usedCarnet: r.data?.usedCarnet, passesLeft: r.data?.carnetRemaining ?? null });
+      setDone({
+        points: r.data?.pointsAwarded ?? 0,
+        usedCarnet: r.data?.usedCarnet,
+        passesLeft: r.data?.carnetRemaining ?? null,
+        balance: r.data?.balance ?? null,
+      });
+      // Refresh the dashboard's days / pass counts the instant this spend lands.
+      announceBalancesChanged({ balance: r.data?.balance ?? null, carnetRemaining: r.data?.carnetRemaining ?? null });
       haptic(18);
       playChime('success');
     }
@@ -122,6 +129,8 @@ export function CheckInSheet({ open, onClose }: { open: boolean; onClose: () => 
       haptic(12);
       const s = await getCheckinToday();
       if (s.ok) setStatus(s.data);
+      // The length change moved a half-day of balance — refresh the dashboard counts.
+      announceBalancesChanged();
     }
     setBusy(false);
   }
@@ -141,6 +150,12 @@ export function CheckInSheet({ open, onClose }: { open: boolean; onClose: () => 
               {half ? `Half day · ${period === 'am' ? 'morning' : 'afternoon'}` : 'Full day'}
               {done.points > 0 ? ` · +${done.points} points` : ''}
             </p>
+            {/* Say plainly what this cost — a day off the plan, so it never feels like a day vanished. */}
+            {!done.usedCarnet && done.balance != null && String(done.balance).toLowerCase() !== 'unlimited' && Number.isFinite(Number(done.balance)) ? (
+              <p className={styles.note}>
+                Used {half ? 'half a day' : '1 day'} from your plan — {Number(done.balance)} {Number(done.balance) === 1 ? 'day' : 'days'} left.
+              </p>
+            ) : null}
             {/* Spending a pass without saying so would look like a pass going missing. */}
             {done.usedCarnet ? (
               <p className={styles.note}>

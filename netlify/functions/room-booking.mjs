@@ -30,6 +30,7 @@ import { sendEmail, emailShell, escapeHtml, OPS_EMAIL, fmtDateTime } from './_em
 import { pushToEmail } from './_push.mjs';
 import { isRecurringBlockRule, recurringBlockOccurrences } from './_privatisation.mjs';
 import { roomHoursCap, memberRoomDiscount, planSlugForMember } from './_entitlement.mjs';
+import { ensureDayForDate } from './checkin.mjs';
 
 /* Free meeting-room hours are per plan and live in _entitlement.mjs, which both this path
    and the dashboard's bookings.mjs now share. Pods are free and never counted. */
@@ -499,6 +500,11 @@ export default async function handler(req) {
         return json({ error: 'cap-exceeded', capHours: cap, usedHours: round2(used), remaining: round2(Math.max(0, cap - used)) });
       }
     }
+    // A free member room/pod booking IS being in the office that day, so it books a co-working day
+    // too (idempotent). A member with no days/passes is refused (needsDay) → the client sends them to
+    // upgrade or buy a pass. Rooms are Mon–Fri, so the weekday day-spend always applies.
+    const day = await ensureDayForDate(me, date, { source: 'Web', length: 'Full', block: true });
+    if (day.blocked) return json({ error: day.reason || 'no-allowance', needsDay: true }, 402);
     const rec = await createRecord(
       T.bookings,
       {

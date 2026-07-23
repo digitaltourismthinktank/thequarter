@@ -235,6 +235,50 @@
   line-height: 1.45;
 }
 
+/* Hybrid's included co-working day — a tappable row that both states the allowance and routes
+   to booking. Warm-gold so it reads as a benefit, not an alert. */
+.allowance {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin-top: 4px;
+  padding: 11px 13px;
+  border-radius: var(--radius-md);
+  background: var(--gold-100);
+  border: 1px solid var(--gold-300);
+  text-decoration: none;
+}
+.allowance:hover {
+  border-color: var(--gold-500);
+}
+.allowanceIcon {
+  font-size: 18px;
+  line-height: 1;
+}
+.allowanceText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.allowanceText strong {
+  font-size: var(--text-sm);
+  font-weight: var(--fw-bold);
+  color: var(--ink-900);
+  line-height: 1.25;
+}
+.allowanceSub {
+  font-size: var(--text-2xs);
+  color: var(--gold-700);
+  line-height: 1.35;
+}
+.allowanceArrow {
+  color: var(--gold-600);
+  font-size: var(--text-md);
+  flex: 0 0 auto;
+}
+
 .note {
   font-size: var(--text-xs);
   color: var(--success, #4b7a52);

@@ -146,6 +146,10 @@ export function AccountClient() {
             <dt>Dietary needs</dt>
             <dd>{detail('dietary') || '—'}</dd>
           </div>
+          <div>
+            <dt>Postal forwarding address</dt>
+            <dd style={{ whiteSpace: 'pre-line' }}>{detail('forwardAddress') || '—'}</dd>
+          </div>
         </dl>
         <button type="button" className={styles.btn} onClick={() => setEditing(true)}>
           Edit your details

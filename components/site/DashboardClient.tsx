@@ -23,7 +23,7 @@ import { NotificationToggle } from './NotificationToggle';
 import { getMemberstack, memberName, memberDaysRemaining, memberRenewalDate, memberDoorCode, memberHasPaymentIssue } from '@/lib/memberstack';
 import { PLANS, PLAN_DAY_ALLOWANCE } from '@/lib/plans';
 import { STRIPE_BILLING_PORTAL_URL } from '@/lib/commerce';
-import { getRewards, getCheckinToday } from '@/lib/booking';
+import { getRewards, getCheckinToday, BALANCES_EVENT } from '@/lib/booking';
 import { levelForPoints, type LevelSlug } from '@/lib/rewards';
 import styles from './DashboardClient.module.css';
 
@@ -40,13 +40,19 @@ export function DashboardClient() {
   const [billingError, setBillingError] = useState<string | null>(null);
   const [allPlans, setAllPlans] = useState<unknown>(null);
   const [today, setToday] = useState<ReturnType<typeof busyness> | null>(null);
-  // Rolled-over days come from the SERVER (works even when the Memberstack rollover fields are
-  // admin-restricted from the client), so the plan/rolled-over split always shows.
-  const [srvRoll, setSrvRoll] = useState<{ rollover: number; rolloverExpiry: string | null } | null>(null);
+  // Plan days + rollover come from the SERVER (fresh after any spend, and readable even when the
+  // rollover fields are admin-restricted from the client). Re-fetched on the balances-changed event
+  // so checking in / booking updates the day tile instantly, not on reload.
+  const [srv, setSrv] = useState<{ balance: string | null; rollover: number; rolloverExpiry: string | null } | null>(null);
   useEffect(() => {
-    getCheckinToday().then((r) => {
-      if (r.ok) setSrvRoll({ rollover: r.data.rollover ?? 0, rolloverExpiry: r.data.rolloverExpiry ?? null });
-    });
+    const load = () =>
+      getCheckinToday().then((r) => {
+        if (r.ok) setSrv({ balance: r.data.balance ?? null, rollover: r.data.rollover ?? 0, rolloverExpiry: r.data.rolloverExpiry ?? null });
+      });
+    load();
+    const onChange = () => load();
+    window.addEventListener(BALANCES_EVENT, onChange);
+    return () => window.removeEventListener(BALANCES_EVENT, onChange);
   }, []);
   // Seed the loyalty card from the last-known values (instant render, works offline).
   const [points, setPoints] = useState<number | null>(() => {
@@ -201,9 +207,11 @@ export function DashboardClient() {
   // are admin-restricted); fall back to the client custom field.
   const clientRollExp = String(member.customFields?.['rollover-expiry'] || '').trim();
   const clientRoll = clientRollExp && clientRollExp < nowISO ? 0 : Math.max(0, Number(member.customFields?.['days-rollover']) || 0);
-  const rollNum = srvRoll ? Math.max(0, srvRoll.rollover) : clientRoll;
-  const rollExp = (srvRoll?.rolloverExpiry || clientRollExp || '').trim();
-  const planNum = Number.isFinite(daysNum) ? daysNum : 0;
+  const rollNum = srv ? Math.max(0, srv.rollover) : clientRoll;
+  const rollExp = (srv?.rolloverExpiry || clientRollExp || '').trim();
+  // Prefer the server's plan-day balance (fresh after a spend) over the possibly-stale client field.
+  const serverDays = srv && srv.balance != null && String(srv.balance).toLowerCase() !== 'unlimited' ? parseInt(String(srv.balance), 10) : NaN;
+  const planNum = Number.isFinite(serverDays) ? serverDays : Number.isFinite(daysNum) ? daysNum : 0;
   const totalDays = planNum + rollNum;
   const rollExpLabel = rollExp ? new Date(`${rollExp}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '';
 
@@ -288,7 +296,13 @@ export function DashboardClient() {
         <div className={styles.mainCol}>
           {/* Hybrid Office leads on their post, then the registered address they pay for. */}
           {isHybrid ? <PostCard variant="hero" /> : null}
-          {isHybrid ? <RegisteredAddressCard company={(member.metaData?.company as string) || null} /> : null}
+          {isHybrid ? (
+            <RegisteredAddressCard
+              company={(member.metaData?.company as string) || null}
+              daysLeft={isUnlimited ? null : planNum}
+              renewal={renewal}
+            />
+          ) : null}
           {hasPlan ? (
             <div className={styles.statRow}>
               <StatTile label="Your days" tone="ink" icon="calendar" value={daysValue} unit={daysUnit} hint={daysHint} progress={daysProg} valueSize="var(--text-2xl)" />

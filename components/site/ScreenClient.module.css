@@ -254,18 +254,32 @@
 .trOnTime { color: #2f7d4e; background: rgba(47, 125, 78, 0.1); }
 .trLate { color: #9a5b00; background: rgba(214, 158, 46, 0.18); font-weight: var(--fw-bold); }
 .trCancelled { color: #b4231d; background: rgba(180, 35, 29, 0.12); font-weight: var(--fw-bold); }
-/* Bus route number as a destination blind — amber on ink, like the front of the bus. */
+/* Bus rows carry NO platform/status, so they get their own three-track template — time, the
+   route blind, then the destination taking the slack. (The shared .trList li grid is four-column,
+   which dropped the blind into the flexible 1fr cell and stretched it to a different width on every
+   row — the uneven badges seen on the wall.) */
+.busRow {
+  grid-template-columns: auto auto minmax(0, 1fr);
+}
+/* Bus route number as a destination blind — amber on ink, like the front of the bus. A FIXED
+   width (not just min-width) so every badge is the same size however many digits the route has;
+   a rare long name is centre-clipped rather than widening the badge. */
 .busLine {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 2.1em;
-  padding: 1px 7px;
+  width: 2.6em;
+  min-width: 2.6em;
+  max-width: 2.6em;
+  justify-self: start;
+  overflow: hidden;
+  padding: 2px 4px;
   background: var(--ink-900, #1e1a15);
   color: #f4c430;
   border-radius: 6px;
   font-weight: var(--fw-bold);
   font-size: 0.82em;
+  white-space: nowrap;
 }
 .trEmpty { font-size: clamp(12px, 1.2vw, 15px); color: var(--text-muted); padding: 6px 0; margin: 0; }
 .trFoot {
@@ -665,10 +679,13 @@
     display: grid;
     align-items: stretch;
     grid-template-columns: minmax(0, 4fr) minmax(0, 6fr);
-    /* Left column stacks: week hero (flex) · what's-on · transport. The transport band MUST have
-       its own explicit row — without it the band auto-flowed into an implicit 4th row, stealing
-       height from the 1fr hero row so the week strip overflowed onto the What's-on heading. */
-    grid-template-rows: auto minmax(0, 1fr) auto auto;
+    /* Rows, top to bottom: header (full width) · live departures (full width) · then the split
+       region — the week hero (row 3) and What's-on (row 4) stack down the LEFT while live room
+       status fills the RIGHT by spanning both. Giving the hero and What's-on their OWN explicit
+       rows is what stops the week strip painting over the What's-on heading; and lifting the
+       departures board to its own full-width row stops it collapsing into one tall narrow stack
+       inside the 4fr column. */
+    grid-template-rows: auto auto auto minmax(0, 1fr);
     column-gap: clamp(24px, 2.5vw, 56px);
     row-gap: clamp(12px, 1.6vh, 26px);
   }
@@ -677,9 +694,19 @@
     grid-row: 1;
     max-width: none;
   }
+  /* Live departures span the full width, high up — a proper three-column board with room to
+     breathe, the first thing a member reads on the way out. */
+  .transport {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    margin-top: 0;
+  }
+  .trGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
   .hero {
     grid-column: 1;
-    grid-row: 2;
+    grid-row: 3;
     align-self: start;
     max-width: none;
   }
@@ -687,20 +714,13 @@
      .entranceMain, so this targets only the footer block. */
   .screen > .block {
     grid-column: 1;
-    grid-row: 3;
-    align-self: end;
-    max-width: none;
-  }
-  /* Live departures sit at the foot of the left column, under What's-on, in their own row. */
-  .transport {
-    grid-column: 1;
     grid-row: 4;
-    align-self: end;
-    margin-top: 0;
+    align-self: start;
+    max-width: none;
   }
   .entranceMain {
     grid-column: 2;
-    grid-row: 2 / 5;
+    grid-row: 3 / 5;
     min-height: 0;
   }
   /* 10vw is portrait maths — in a half-width column it dwarfs the room status, which is

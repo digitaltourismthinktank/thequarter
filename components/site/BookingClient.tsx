@@ -924,6 +924,13 @@ function friendly(code?: string): string {
       return 'Phone pods are two hours at a time, so everyone gets a turn. Longer than that is possible — just ask the team.';
     case 'cap-exceeded':
       return 'That would use more meeting-room hours than your plan includes this month. Ask the team, or book and pay for the extra time.';
+    // Booking a room/pod uses a co-working day for that date; this member has none left.
+    case 'no-allowance':
+    case 'needs-plan-or-pass':
+      return 'Booking a room or pod uses one of your co-working days for that day, and you’ve none left. Add day passes or upgrade your plan on the Plan page, then book.';
+    // A booking holds a co-working day for its date — move it by cancelling + re-booking.
+    case 'date-move-unsupported':
+      return 'To move a booking to another day, cancel it and book the new day — that keeps your co-working days right.';
     case 'network':
       return 'Network problem — please try again.';
     default:

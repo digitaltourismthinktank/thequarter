@@ -204,7 +204,7 @@ function BusColumn({ rows }: { rows: BusDeparture[] }) {
       {rows.length ? (
         <ul className={styles.trList}>
           {rows.map((bd, i) => (
-            <li key={`${bd.time}-${bd.line}-${i}`}>
+            <li key={`${bd.time}-${bd.line}-${i}`} className={styles.busRow}>
               <span className={styles.trTime}>{bd.time}</span>
               <span className={styles.busLine}>{bd.line}</span>
               <span className={styles.trDest}>{bd.to}</span>

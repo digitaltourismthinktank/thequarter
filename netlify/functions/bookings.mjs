@@ -17,6 +17,7 @@ import { isClosedDay } from './_holidays.mjs';
 import { isRecurringBlockRule, recurringBlockOccurrences, parsePrivatisationSlots, isPrivatisedOn } from './_privatisation.mjs';
 import { notifyAdmins, fmtDateTime, dayBar } from './_email.mjs';
 import { canBook } from './_entitlement.mjs';
+import { ensureDayForDate, releaseDayForDate } from './checkin.mjs';
 
 /** A released company hold no longer blocks the room. */
 const isReleased = (r, dateStr, nowMin, todayStr) =>
@@ -368,6 +369,14 @@ export default async function handler(req) {
     });
     if (selfClash) return json({ error: 'double-book' }, 409);
 
+    // A member room/pod booking IS being in the office that day, so it also books a co-working day
+    // for the date — otherwise a free pod/room is a loophole to come in without spending a day.
+    // Idempotent (no second day if already in that day); a member with no days/passes is refused
+    // here (needsDay) so the client can send them to upgrade or buy a pass. This endpoint is member-
+    // token only, so a guest never reaches it.
+    const day = await ensureDayForDate(me, date, { source: 'Web', length: 'Full', block: true });
+    if (day.blocked) return json({ error: day.reason || 'no-allowance', needsDay: true }, 402);
+
     const rec = await createRecord(T.bookings, {
       [F.bookings.title]: `${start}–${end} · ${memberName(me)}`,
       [F.bookings.space]: [spaceId],
@@ -394,7 +403,14 @@ export default async function handler(req) {
       ],
       extraHtml: dayBar(s, e),
     });
-    return json({ ok: true, id: rec.id });
+    return json({
+      ok: true,
+      id: rec.id,
+      // What the booking cost in co-working days, so the client can say "uses 1 day · N left".
+      day: day.already
+        ? { already: true }
+        : { dayCost: day.dayCost, balance: day.balance, usedCarnet: day.usedCarnet, carnetRemaining: day.carnetRemaining, deferred: day.deferred },
+    });
   }
 
   // Amend a booking's date/time IN PLACE (same room) — so a member can move a booking
@@ -455,6 +471,17 @@ export default async function handler(req) {
     });
     if (selfClash) return json({ error: 'double-book' }, 409);
 
+    // A booking holds a co-working day for its date. Moving it to ANOTHER day would have to release
+    // the old day and spend a new one — and doing that within a single request against one in-memory
+    // member risks a stale-balance free day. So a member moves a booking across days by cancelling
+    // (which hands the day back) and re-booking (which spends the new day) — each its own request
+    // with a fresh balance. Refuse a member's own date-move here; a same-day TIME change is fine.
+    // Admins amend freely (an override; their manual action doesn't touch the member's day economy).
+    const oldDate = isoToLondonDate(r.fields[F.bookings.date]);
+    if (date !== oldDate && !admin && r.fields[F.bookings.kind] === 'Member') {
+      return json({ error: 'date-move-unsupported' }, 400);
+    }
+
     const nm = r.fields[F.bookings.name] || memberName(me);
     await updateRecord(T.bookings, bookingId, {
       [F.bookings.date]: date,
@@ -487,7 +514,18 @@ export default async function handler(req) {
     // Paid changes go through ops/refund, not the member dashboard.
     if (r.fields[F.bookings.kind] === 'Company') return json({ error: 'paid-booking' }, 403);
     await updateRecord(T.bookings, bookingId, { [F.bookings.status]: 'Cancelled' });
-    return json({ ok: true });
+    // Cancelling the booking hands back the co-working day it booked — unless another booking that
+    // day or a physical check-in still needs it. Only when the OWNER cancels their own (we have their
+    // member object to credit); an admin cancelling on someone's behalf leaves the day to ops.
+    let released;
+    if (String(r.fields[F.bookings.email] || '').toLowerCase() === String(email || '').toLowerCase()) {
+      try {
+        released = await releaseDayForDate(me, isoToLondonDate(r.fields[F.bookings.date]), { exceptBookingId: bookingId });
+      } catch (e) {
+        console.error('[bookings] release-day after cancel failed', bookingId, e);
+      }
+    }
+    return json({ ok: true, dayRefunded: !!released?.refunded });
   }
 
   return json({ error: 'unknown-action' }, 400);

@@ -14,7 +14,7 @@ import memberstackAdmin from '@memberstack/admin';
 import { verifyMember, memberEmail, memberName, tokenFromRequest } from './_member.mjs';
 import { listRecords, createRecord, updateRecord, T, F, airtableReady, esc } from './_airtable.mjs';
 import { londonNow, addDays, isoToLondonDate } from './_time.mjs';
-import { allowanceForMember, liveRollover, MS_ROLLOVER, MS_ROLLOVER_EXP } from './_quarter-sync.mjs';
+import { allowanceForMember, liveRollover, addMonthsISO, MS_ROLLOVER, MS_ROLLOVER_EXP } from './_quarter-sync.mjs';
 import { awardPoints, checkinBonusesThisMonth, earnBoostForMember, CHECKIN_BONUS, CHECKIN_QUIET_BONUS, CHECKIN_BONUS_CAP } from './_rewards.mjs';
 import { isQuietDay } from './_busyness.mjs';
 import { isClosedDay } from './_holidays.mjs';
@@ -131,7 +131,11 @@ export async function consumePlannedDay(me, { dateStr, length, row }) {
   // their monthly allowance so the day actually deducts and the field gets written.
   if (current === null && !unlimited && hasPlan) current = allowance;
   const planNum = current === null ? 0 : current;
-  const roll = liveRollover(me, dateStr); // spendable rollover days (respects expiry)
+  // Evaluate rollover as of NOW, not the reservation date — the spend happens now (or, for the
+  // sweep, on the day, when now == dateStr), and it must match ensureDayForDate's affordability gate
+  // which also reads rollover at today. Reading it at a future dateStr could show 0 (expired by then)
+  // even though the gate approved on today's live rollover, silently granting a free day.
+  const roll = liveRollover(me, londonNow().dateStr); // spendable rollover days (respects expiry)
   const available = planNum + roll; // total spendable plan+rollover days (metered members)
   const carnet = me.metaData?.carnet || {};
   const passesLeft = Math.max(0, Number(carnet.remaining) || 0);
@@ -184,11 +188,15 @@ export async function consumePlannedDay(me, { dateStr, length, row }) {
   }
 
   // Points for being in — quiet days earn double, capped monthly. Best-effort, never blocks.
+  // Only a day that actually COST something (a plan/rollover day, a carnet pass) or an unlimited
+  // member earns points — an over-allowance day that spent nothing (0 days, 0 passes) is a courtesy
+  // entry and must NOT mint free points.
   let pointsAwarded = 0;
+  const earnsPoints = unlimited || useCarnet || dayCost > 0;
   try {
     const email = (memberEmail(me) || '').toLowerCase();
     const used = await checkinBonusesThisMonth(email, dateStr.slice(0, 7));
-    if (used < CHECKIN_BONUS_CAP) {
+    if (earnsPoints && used < CHECKIN_BONUS_CAP) {
       const quiet = isQuietDay(dateStr);
       const mult = earnBoostForMember(me);
       pointsAwarded = Math.round((quiet ? CHECKIN_QUIET_BONUS : CHECKIN_BONUS) * mult);
@@ -199,6 +207,171 @@ export async function consumePlannedDay(me, { dateStr, length, row }) {
   }
 
   return { dayCost, newBalance, usedCarnet: useCarnet, carnetRemaining, pointsAwarded };
+}
+
+/** The member's next renewal date (the cycle boundary) as YYYY-MM-DD, or null. Stored DD/MM/YYYY
+ *  by renewMember for both Stripe and manual members. */
+function renewalDateISO(me) {
+  const s = String(me?.customFields?.['renewal-date'] || '').trim();
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(s);
+  if (!m) return null;
+  return `${m[3]}-${m[2]}-${m[1]}`;
+}
+
+/** The [start, end) billing cycle (YYYY-MM-DD) that contains `dateStr`, walking the renewal
+ *  boundary forward one month at a time. Only meaningful for a future-cycle date. */
+function cycleWindowFor(renewalISO, dateStr) {
+  let start = renewalISO;
+  let end = addMonthsISO(renewalISO, 1);
+  let guard = 0;
+  while (dateStr >= end && guard < 60) {
+    start = end;
+    end = addMonthsISO(end, 1);
+    guard += 1;
+  }
+  return { start, end };
+}
+
+/**
+ * Ensure a member has a co-working day booked for `dateStr` — the ONE place that turns "I'll be in
+ * on D" into a spent day. Shared by the check-in `reserve` action AND every member room/pod booking
+ * path, so being in the office always costs a day however the member got there.
+ *
+ * Rules:
+ *  - Idempotent: if they already have a live check-in / booking / paid pass for D, no second day
+ *    is taken (returns { already:true }).
+ *  - Weekends carry no co-working day (rooms are Mon–Fri; weekend attendance is the separate
+ *    request flow) — returns { skipped:'weekend' }.
+ *  - Current cycle: spend the day NOW (rollover → plan → carnet), via consumePlannedDay.
+ *  - Future cycle (D on/after the next renewal): DON'T spend now — leave a Planned row for the
+ *    overnight sweep to spend on the day from that cycle's fresh allowance, gated so the member
+ *    can't over-book a future cycle beyond its plan allowance (a carnet pass covers overflow).
+ *  - No entitlement / can't afford: with block=true (free bookings, check-in reserve) it REFUSES
+ *    ({ blocked, reason }); with block=false (a PAID room booking — they've paid, never block) it
+ *    lets them in flagged over-allowance and spends nothing.
+ */
+export async function ensureDayForDate(me, dateStr, { source = 'Web', length = 'Full', block = true, period = '' } = {}) {
+  const email = (memberEmail(me) || '').toLowerCase();
+  const name = memberName(me);
+  const cost = length === 'Half' ? 0.5 : 1;
+
+  if (isWeekend(dateStr)) return { ok: true, dayCost: 0, skipped: 'weekend' };
+
+  // Already attending that date? No second day.
+  const existing = await checkinsFor(email, dateStr);
+  if (existing.some((r) => r.fields[F.checkins.status] !== 'Cancelled')) return { ok: true, already: true, dayCost: 0 };
+
+  const allowance = allowanceForMember(me);
+  const unlimited = allowance === null;
+  const hasPlan = allowance !== undefined;
+  const carnet = me.metaData?.carnet || {};
+  const passes = Math.max(0, Number(carnet.remaining) || 0);
+  const carnetLive = passes > 0 && !(carnet.expires && carnet.expires < dateStr);
+  let standingDays = parseDays(me.customFields?.['days-remaining']);
+  if (standingDays === null && !unlimited && hasPlan) standingDays = allowance;
+  const standingRoll = liveRollover(me, londonNow().dateStr);
+  const hasStanding = (standingDays !== null && standingDays > 0) || standingRoll > 0;
+
+  // No plan, no live pass, no standing days → not entitled to attend at all.
+  if (!unlimited && !hasPlan && !carnetLive && !hasStanding) {
+    return block ? { ok: false, blocked: true, reason: 'needs-plan-or-pass', dayCost: 0 } : { ok: true, overAllowance: true, dayCost: 0 };
+  }
+
+  const newRow = (status, dayCost) =>
+    createRecord(
+      T.checkins,
+      {
+        [F.checkins.ref]: `${name} · ${dateStr}`,
+        [F.checkins.email]: email,
+        [F.checkins.name]: name,
+        [F.checkins.date]: dateStr,
+        [F.checkins.length]: length,
+        [F.checkins.notes]: length === 'Half' && period ? String(period).toUpperCase() : '',
+        [F.checkins.dayCost]: dayCost,
+        [F.checkins.status]: status,
+        [F.checkins.source]: source,
+      },
+      { typecast: true },
+    );
+
+  const today = londonNow().dateStr;
+  const renewal = renewalDateISO(me);
+  const futureCycle = !unlimited && !!renewal && renewal > today && dateStr >= renewal;
+
+  if (futureCycle) {
+    // Gate: the member's already-committed Planned days in D's cycle + this one must fit that
+    // cycle's plan allowance, unless a carnet pass covers the overflow.
+    const win = cycleWindowFor(renewal, dateStr);
+    const plannedInCycle = await listRecords(T.checkins, {
+      filterByFormula: `AND(LOWER({Member email})='${esc(email)}', {Status}='Planned', DATETIME_FORMAT({Date},'YYYY-MM-DD')>='${esc(win.start)}', DATETIME_FORMAT({Date},'YYYY-MM-DD')<'${esc(win.end)}')`,
+    });
+    const committed = plannedInCycle.reduce((a, r) => a + (r.fields[F.checkins.length] === 'Half' ? 0.5 : 1), 0);
+    // A carnet pass is a COUNTED cover (passes carry over), never an unlimited waiver, so the cycle
+    // can fund at most its plan allowance PLUS the passes on hand — otherwise one pass would let a
+    // member over-book a future cycle without bound. A member with no managed plan (allowance not a
+    // number) has an effective plan cap of 0, so only passes can cover their future-cycle days.
+    const coverPasses = carnetLive ? passes : 0;
+    const planCap = typeof allowance === 'number' ? allowance : 0;
+    const fits = committed + cost <= planCap + coverPasses + 1e-9;
+    if (!fits) {
+      if (block) return { ok: false, blocked: true, reason: 'no-allowance', dayCost: 0 };
+      // Paid booking over the future cycle's cover: never blocked, but leave a SETTLED marker so the
+      // day-of check-in sees the date as already covered and never charges a fresh co-working day.
+      const over = await newRow('Planned', 0);
+      await updateRecord(T.checkins, over.id, { [F.checkins.notes]: 'Over allowance' });
+      return { ok: true, overAllowance: true, deferred: true, dayCost: 0, id: over?.id || null };
+    }
+    const rec = await newRow('Planned', 0);
+    return { ok: true, deferred: true, dayCost: 0, id: rec?.id || null, balance: me.customFields?.['days-remaining'] ?? null };
+  }
+
+  // Current cycle (or unlimited): affordability gate for the blocking (free) path.
+  const availNow = (standingDays === null ? 0 : standingDays) + standingRoll;
+  const affordable = unlimited || availNow + 1e-9 >= cost || carnetLive;
+  if (!affordable && block) return { ok: false, blocked: true, reason: 'no-allowance', dayCost: 0 };
+
+  const rec = await newRow('Planned', 0);
+  const c = await consumePlannedDay(me, { dateStr, length, row: rec });
+  return {
+    ok: true,
+    id: rec?.id || null,
+    dayCost: c.dayCost,
+    balance: c.newBalance,
+    pointsAwarded: c.pointsAwarded,
+    usedCarnet: c.usedCarnet,
+    carnetRemaining: c.carnetRemaining,
+    overAllowance: !unlimited && !c.usedCarnet && c.dayCost + 1e-9 < cost,
+  };
+}
+
+/**
+ * Release the co-working day a room/pod booking booked, when that booking is cancelled — the
+ * inverse of ensureDayForDate. Only releases (and refunds) when NOTHING else still needs the day:
+ * no OTHER live booking that date, and the member hasn't physically checked in. So cancelling a pod
+ * gives the day back, but cancelling one of two rooms booked the same day keeps the day held.
+ */
+export async function releaseDayForDate(me, dateStr, { exceptBookingId } = {}) {
+  const email = (memberEmail(me) || '').toLowerCase();
+  const others = await listRecords(T.bookings, {
+    filterByFormula: `AND(DATETIME_FORMAT({Date},'YYYY-MM-DD')='${esc(dateStr)}', LOWER({Member email})='${esc(email)}', {Status}='Confirmed')`,
+  });
+  if (others.some((r) => r.id !== exceptBookingId)) return { released: false, reason: 'other-booking' };
+  const rows = await checkinsFor(email, dateStr);
+  if (rows.some((r) => r.fields[F.checkins.status] === 'Checked-in')) return { released: false, reason: 'checked-in' };
+  const planned = rows.find((r) => r.fields[F.checkins.status] === 'Planned');
+  if (!planned) return { released: false, reason: 'no-day' };
+  const wasConsumed = plannedConsumed(planned);
+  await updateRecord(T.checkins, planned.id, { [F.checkins.status]: 'Cancelled' });
+  let refunded = false;
+  if (wasConsumed) {
+    try {
+      await refundPlannedDay(me, planned);
+      refunded = true;
+    } catch (e) {
+      console.error('[checkin] release-day refund failed', planned.id, e);
+    }
+  }
+  return { released: true, refunded };
 }
 
 /**
@@ -278,6 +451,21 @@ export default async function handler(req) {
       const kind = r.fields[F.checkins.status] === 'Paid' ? 'pass' : 'reserved';
       // Period only for a member's own half-day reservation (a paid pass's Notes hold pass metadata).
       upcoming.push({ id: r.id, date: d, length: len, kind, period: len === 'Half' && kind !== 'pass' ? periodFromNotes(r.fields[F.checkins.notes]) : null });
+    }
+    // A walk-in / geo check-in creates a Checked-in row (not a Planned one), so today wouldn't
+    // otherwise appear in the list — surface it too, flagged `in:true`, so "Your Visits" shows today
+    // with the checked-in tick. `in` also tells the client to drop the cancel × (you can't un-attend a
+    // walked-in day), whereas a still-Planned booked-today stays cancellable.
+    if (active && !seenDates.has(today)) {
+      const len = active.fields[F.checkins.length];
+      upcoming.push({
+        id: active.id,
+        date: today,
+        length: len,
+        kind: 'reserved',
+        period: len === 'Half' ? periodFromNotes(active.fields[F.checkins.notes]) : null,
+        in: true,
+      });
     }
     upcoming.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
     return json({
@@ -401,6 +589,17 @@ export default async function handler(req) {
       const c = await consumePlannedDay(me, { dateStr: today, length: bookedLen, row: plannedRec });
       await updateRecord(T.checkins, plannedRec.id, { [F.checkins.status]: 'Checked-in', [F.checkins.source]: source });
       return json({ ok: true, alreadyBooked: true, length: bookedLen, balance: c.newBalance, pointsAwarded: c.pointsAwarded, usedCarnet: c.usedCarnet, carnetRemaining: c.carnetRemaining });
+    }
+
+    // A PAID Day Pass (a 'Paid' row, £21.60 already taken) covers today outright — record arrival and
+    // spend NOTHING. Without this, a member who both holds a plan/carnet AND a paid pass for today was
+    // charged a plan day (or a carnet pass) ON TOP of the pass, because the paths below only saw the
+    // pass as an entitlement signal. ensureDayForDate already treats any live row (incl. Paid) as
+    // already-covered; this brings the direct check-in into line.
+    const paidRec = recs.find((r) => r.fields[F.checkins.status] === 'Paid');
+    if (paidRec) {
+      await updateRecord(T.checkins, paidRec.id, { [F.checkins.status]: 'Checked-in', [F.checkins.source]: source });
+      return json({ ok: true, alreadyBooked: true, usedPass: true, balance: me.customFields?.['days-remaining'] ?? null });
     }
 
     // Entitlement. You may check in only if you have a plan, a paid day pass for today, or a
@@ -554,11 +753,16 @@ export default async function handler(req) {
     const newCost = newLen === 'Half' ? 0.5 : 1;
     const delta = newCost - oldCost; // +0.5 half→full, −0.5 full→half
     let newBalance = me.customFields?.['days-remaining'] ?? null;
+    const planNum = parseDays(me.customFields?.['days-remaining']) ?? 0;
+    const roll = liveRollover(me, today);
+    if (delta > 0 && planNum + roll + 1e-9 < delta) return json({ error: 'no-allowance' }, 400);
+    // Stamp the row's new cost FIRST, THEN move the balance — so a failure between the two leaves an
+    // UN-charged change (a re-tap reads the new dayCost, computes delta 0, and no-ops), never a
+    // double-charge. This matches consumePlannedDay's stamp-first discipline. (Previously the order
+    // was reversed, so a mid-write failure could double-charge on re-tap.)
+    await updateRecord(T.checkins, row.id, { [F.checkins.length]: newLen, [F.checkins.notes]: buildNotes(), [F.checkins.dayCost]: newCost });
     if (delta > 0) {
       // Extend: spend the extra fraction — rollover first (it expires), then plan days.
-      const planNum = parseDays(me.customFields?.['days-remaining']) ?? 0;
-      const roll = liveRollover(me, today);
-      if (planNum + roll + 1e-9 < delta) return json({ error: 'no-allowance' }, 400);
       const s = splitSpend(planNum, roll, delta);
       await setDayBuckets(me.id, spendFields(s));
       newBalance = String(s.newPlan + s.newRoll);
@@ -570,61 +774,55 @@ export default async function handler(req) {
         await setDays(me.id, newBalance);
       }
     }
-    await updateRecord(T.checkins, row.id, {
-      [F.checkins.length]: newLen,
-      [F.checkins.notes]: buildNotes(),
-      [F.checkins.dayCost]: newCost,
-    });
     return json({ ok: true, length: newLen, dayDelta: delta, balance: newBalance });
   }
 
-  // Reserve a future day. No deduction until they actually check in. Weekends are
-  // allowed for members (the app asks them to confirm); bank holidays are not.
+  // Reserve a future day. A weekday reservation IS attendance: the shared ensureDayForDate spends
+  // the day NOW if it falls in the current cycle, or leaves it Planned for the overnight sweep if
+  // it's in a FUTURE cycle (so next month's days come from next month's allowance) — gated either
+  // way so a member on 0 days can't over-book. Weekends stay a staff-approved request (not spent
+  // until confirmed); bank holidays are refused.
   if (body.action === 'reserve') {
     const date = body.date || addDays(londonNow().dateStr, 1);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return json({ error: 'bad-date' }, 400);
     if (await isClosedDay(date)) return json({ error: 'closed-day' }, 400);
-    const existing = await checkinsFor(email, date);
-    if (existing.some((r) => r.fields[F.checkins.status] !== 'Cancelled')) {
-      return json({ ok: true, alreadyReserved: true });
-    }
-    // Same gate as a live check-in: reserving is only meaningful if you could actually
-    // attend. A no-plan account with no carnet and no standing days would otherwise plan days
-    // it can never use and show up in the admin who's-in list as expected. A future paid day
-    // pass already exists as a row, so it short-circuits above and never reaches here.
-    if (!hasPlan && !carnetLiveOn(date) && !hasStandingDays) {
-      return json({ error: 'needs-plan-or-pass' }, 400);
-    }
-    // Weekends are by request (not a given): create a 'Requested' record + notify staff.
-    // Weekdays reserve straight to 'Planned'.
-    const weekend = isWeekend(date);
-    const rec = await createRecord(
-      T.checkins,
-      {
-        [F.checkins.ref]: `${name} · ${date}`,
-        [F.checkins.email]: email,
-        [F.checkins.name]: name,
-        [F.checkins.date]: date,
-        [F.checkins.length]: length,
-        [F.checkins.notes]: periodNote,
-        [F.checkins.dayCost]: 0,
-        [F.checkins.status]: weekend ? 'Requested' : 'Planned',
-        [F.checkins.source]: source,
-      },
-      { typecast: true },
-    );
-    if (weekend) {
+
+    if (isWeekend(date)) {
+      const existing = await checkinsFor(email, date);
+      if (existing.some((r) => r.fields[F.checkins.status] !== 'Cancelled')) return json({ ok: true, alreadyReserved: true });
+      if (!hasPlan && !carnetLiveOn(date) && !hasStandingDays) return json({ error: 'needs-plan-or-pass' }, 400);
+      const rec = await createRecord(
+        T.checkins,
+        {
+          [F.checkins.ref]: `${name} · ${date}`,
+          [F.checkins.email]: email,
+          [F.checkins.name]: name,
+          [F.checkins.date]: date,
+          [F.checkins.length]: length,
+          [F.checkins.notes]: periodNote,
+          [F.checkins.dayCost]: 0,
+          [F.checkins.status]: 'Requested',
+          [F.checkins.source]: source,
+        },
+        { typecast: true },
+      );
       await sendWeekendRequestEmails({ email, name, date });
       return json({ ok: true, id: rec.id, requested: true });
     }
-    // A weekday reservation now IS attendance — the day gets spent. Future days are swept
-    // overnight (renew-cron), so a reservation for TODAY has to be spent here and now: the
-    // sweep for today already ran this morning and won't run again.
-    if (date === londonNow().dateStr) {
-      const c = await consumePlannedDay(me, { dateStr: date, length, row: rec });
-      return json({ ok: true, id: rec.id, balance: c.newBalance, pointsAwarded: c.pointsAwarded, usedCarnet: c.usedCarnet, carnetRemaining: c.carnetRemaining });
-    }
-    return json({ ok: true, id: rec.id });
+
+    const r = await ensureDayForDate(me, date, { source, length, block: true, period: periodNote });
+    if (r.already) return json({ ok: true, alreadyReserved: true });
+    if (r.blocked) return json({ error: r.reason === 'needs-plan-or-pass' ? 'needs-plan-or-pass' : 'no-allowance' }, 400);
+    return json({
+      ok: true,
+      id: r.id,
+      dayCost: r.dayCost,
+      balance: r.balance,
+      pointsAwarded: r.pointsAwarded,
+      usedCarnet: r.usedCarnet,
+      carnetRemaining: r.carnetRemaining,
+      deferred: r.deferred,
+    });
   }
 
   // Cancel an own Planned reservation.
@@ -636,8 +834,19 @@ export default async function handler(req) {
     if (String(r.fields[F.checkins.email] || '').toLowerCase() !== email) return json({ error: 'forbidden' }, 403);
     const st = r.fields[F.checkins.status];
     if (st !== 'Planned' && st !== 'Requested') return json({ error: 'only-planned-cancellable' }, 400);
-    // Their chosen policy: a future day was never charged, but a day already spent (a same-day
-    // cancel, or one the overnight sweep has reached) is given back.
+    // This co-working day may be HELD by a room/pod booking on the same date (a booking books the
+    // day). Refunding it here while the booking stays live would be a free room — so refuse, and
+    // send them to cancel the booking instead (which releases the day). A plain reserve with no
+    // booking on that date cancels normally.
+    const rDate = isoToLondonDate(r.fields[F.checkins.date]);
+    const heldBy = await listRecords(T.bookings, {
+      filterByFormula: `AND(DATETIME_FORMAT({Date},'YYYY-MM-DD')='${esc(rDate)}', LOWER({Member email})='${esc(email)}', {Status}='Confirmed')`,
+      maxRecords: 1,
+    });
+    if (heldBy.length) return json({ error: 'held-by-booking' }, 409);
+    // Their chosen policy: cancelling gives the day (or pass) back. A booked weekday is now spent
+    // at booking time, so plannedConsumed(r) is true and refundPlannedDay credits it back; a weekend
+    // 'Requested' row was never spent, so plannedConsumed is false and nothing is refunded.
     //
     // Mark it Cancelled BEFORE crediting the refund. The cancellable-status guard above then
     // rejects any retry, so a transient failure of the refund write becomes a rare, logged,

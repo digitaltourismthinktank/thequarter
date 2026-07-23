@@ -120,6 +120,9 @@ const ERRORS: Record<string, string> = {
   'missing-company': 'Please add the company or organisation name.',
   'no-space': 'This room isn’t bookable online just now — please enquire below.',
   'not-configured': 'Online booking is being set up — please enquire below for now.',
+  // Booking a room uses a co-working day for that date, and this member has none left.
+  'no-allowance': 'Booking a room uses one of your co-working days, and you’ve none left. Add day passes or upgrade your plan on the Plan page, then book.',
+  'needs-plan-or-pass': 'Booking a room uses one of your co-working days, and you’ve none left. Add day passes or upgrade your plan on the Plan page, then book.',
 };
 
 export function RoomBooking({ roomName, price }: { roomName: string; price: { half: number; full: number } }) {

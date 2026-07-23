@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Icon } from '@/components/ds/Icon';
-import { getCarnet, type CarnetState } from '@/lib/booking';
+import { getCarnet, BALANCES_EVENT, type CarnetState } from '@/lib/booking';
 import styles from './CarnetMini.module.css';
 
 /**
@@ -13,11 +13,22 @@ import styles from './CarnetMini.module.css';
 export function CarnetMini() {
   const [carnet, setCarnet] = useState<CarnetState | null>(null);
 
-  useEffect(() => {
-    getCarnet().then((r) => {
-      if (r.ok) setCarnet(r.data.carnet);
-    });
+  const load = useCallback(async () => {
+    const r = await getCarnet();
+    if (r.ok) setCarnet(r.data.carnet);
   }, []);
+  useEffect(() => {
+    load();
+    // Refresh the moment a check-in / booking spends a pass — optimistically from the event detail
+    // if it carried a fresh count, then re-fetch for the source of truth.
+    const onChange = (e: Event) => {
+      const n = (e as CustomEvent).detail?.carnetRemaining;
+      if (typeof n === 'number') setCarnet((c) => (c ? { ...c, remaining: Math.max(0, n) } : c));
+      load();
+    };
+    window.addEventListener(BALANCES_EVENT, onChange);
+    return () => window.removeEventListener(BALANCES_EVENT, onChange);
+  }, [load]);
 
   if (!carnet || carnet.remaining <= 0) return null;
   const validUntil = carnet.expires

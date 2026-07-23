@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ds/Button';
 import { Icon } from '@/components/ds/Icon';
-import { getCheckinToday, checkInToday, type CheckinStatus } from '@/lib/booking';
+import { getCheckinToday, checkInToday, announceBalancesChanged, type CheckinStatus } from '@/lib/booking';
 import { PREVIEW } from '@/lib/devMock';
 import styles from './GeoCheckIn.module.css';
 
@@ -225,8 +225,11 @@ export function GeoCheckIn({ doorCode, busyBand }: GeoCheckInProps) {
     const r = await checkInToday('Full');
     if (!alive.current) return;
     setBusy(false);
-    if (r.ok) setJustChecked(true);
-    else setError(friendly(r.data?.error));
+    if (r.ok) {
+      setJustChecked(true);
+      // Refresh the day tile / carnet + the "Your Visits" checked-in chip across the dashboard.
+      announceBalancesChanged({ balance: r.data?.balance ?? null, carnetRemaining: r.data?.carnetRemaining ?? null });
+    } else setError(friendly(r.data?.error));
   }
 
   if (phase === 'hidden') return null;

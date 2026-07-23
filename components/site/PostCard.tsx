@@ -7,8 +7,20 @@ import { CardUpdate } from './CardUpdate';
 import { cn } from '@/lib/cn';
 import styles from './PostCard.module.css';
 
-/** The Canterbury business address the Hybrid plan confers — copyable for Companies House / HMRC. */
-export function RegisteredAddressCard({ company, className }: { company?: string | null; className?: string }) {
+/** The Canterbury business address the Hybrid plan confers — copyable for Companies House / HMRC.
+ *  Hybrid also includes a co-working day a month; surface that allowance here so it's never a
+ *  benefit the member forgot they had. `daysLeft`/`renewal` come from the dashboard's live balance. */
+export function RegisteredAddressCard({
+  company,
+  className,
+  daysLeft,
+  renewal,
+}: {
+  company?: string | null;
+  className?: string;
+  daysLeft?: number | null;
+  renewal?: string | null;
+}) {
   const [copied, setCopied] = useState(false);
   const lines = [company || null, 'The Quarter', ...SITE.address.split(', ')].filter(Boolean) as string[];
   async function copy() {
@@ -20,6 +32,7 @@ export function RegisteredAddressCard({ company, className }: { company?: string
       /* clipboard can be blocked — the address is on screen to copy by hand */
     }
   }
+  const hasDays = typeof daysLeft === 'number';
   return (
     <div className={cn(styles.hero, className)}>
       <div className={styles.head}>
@@ -39,6 +52,28 @@ export function RegisteredAddressCard({ company, className }: { company?: string
         </button>
       </div>
       <p className={styles.help}>Use this as your official business and mailing address — the one to give Companies House, HMRC and your bank.</p>
+
+      {/* The co-working day that comes with Hybrid — one a month, so members can plan a day in. */}
+      <a className={styles.allowance} href="/book">
+        <span className={styles.allowanceIcon} aria-hidden="true">
+          ☕
+        </span>
+        <span className={styles.allowanceText}>
+          <strong>
+            {hasDays ? (
+              daysLeft && daysLeft > 0 ? `${daysLeft} co-working ${daysLeft === 1 ? 'day' : 'days'} to use` : 'This month’s co-working day is used'
+            ) : (
+              'A co-working day a month'
+            )}
+          </strong>
+          <span className={styles.allowanceSub}>
+            Included with Hybrid — a day a month to work in{renewal ? ` · resets ${renewal}` : ''}. Tap to book yours.
+          </span>
+        </span>
+        <span className={styles.allowanceArrow} aria-hidden="true">
+          →
+        </span>
+      </a>
     </div>
   );
 }
@@ -86,6 +121,18 @@ export function PostCard({ variant = 'hero', className }: { variant?: 'hero' | '
   }, []);
   useEffect(() => {
     refresh();
+    // Post is logged by staff while the member's dashboard may already be open — re-fetch when the
+    // tab regains focus / becomes visible (and the push lands them back here) so newly-arrived post
+    // shows without a manual reload.
+    const onWake = () => {
+      if (document.visibilityState === 'visible') refresh();
+    };
+    document.addEventListener('visibilitychange', onWake);
+    window.addEventListener('focus', onWake);
+    return () => {
+      document.removeEventListener('visibilitychange', onWake);
+      window.removeEventListener('focus', onWake);
+    };
   }, [refresh]);
 
   const waiting = (items ?? []).filter((i) => i.status === 'Waiting');
@@ -278,18 +325,18 @@ export function PostCard({ variant = 'hero', className }: { variant?: 'hero' | '
                 </span>
                 <span className={cn(styles.statusPill, it.status === 'To collect' && styles.pillGo, it.status === 'Posted' && styles.pillOk)}>{it.status}</span>
               </div>
-              <div className={styles.viewLinks}>
-                {it.scanUrl ? (
+              {/* An envelope photo shows inline; a scan (often a PDF) is a view/download link. */}
+              {it.photoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img className={styles.envelope} src={it.photoUrl} alt="Envelope" />
+              ) : null}
+              {it.scanUrl ? (
+                <div className={styles.viewLinks}>
                   <a className={styles.readScan} href={it.scanUrl} target="_blank" rel="noreferrer">
                     View / download the scan →
                   </a>
-                ) : null}
-                {it.photoUrl ? (
-                  <a className={styles.readScan} href={it.photoUrl} target="_blank" rel="noreferrer">
-                    View the envelope photo →
-                  </a>
-                ) : null}
-              </div>
+                </div>
+              ) : null}
             </div>
           ))}
         </>

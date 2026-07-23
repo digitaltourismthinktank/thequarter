@@ -74,7 +74,7 @@ export interface CheckinStatus {
    *  fields are admin-restricted from the client). */
   rollover?: number;
   rolloverExpiry?: string | null;
-  planned: { id: string; date: string; length: 'Full' | 'Half'; kind?: 'pass' | 'reserved'; period?: DayPeriod | null }[];
+  planned: { id: string; date: string; length: 'Full' | 'Half'; kind?: 'pass' | 'reserved'; period?: DayPeriod | null; in?: boolean }[];
   requested?: { id: string; date: string; length: 'Full' | 'Half'; period?: DayPeriod | null }[];
 }
 
@@ -339,9 +339,28 @@ export const kioskCheckIn = (memberId: string, length: 'Full' | 'Half', period?:
     body: { action: 'kioskCheckin', memberId, length, ...(length === 'Half' && period ? { period } : {}) },
   });
 export const reserveDay = (date: string, length: 'Full' | 'Half', period?: DayPeriod | null) =>
-  call<{ ok: boolean; requested?: boolean }>('checkin', { method: 'POST', body: { action: 'reserve', date, length, ...(length === 'Half' && period ? { period } : {}) } });
+  call<{
+    ok: boolean;
+    id?: string;
+    requested?: boolean;
+    alreadyReserved?: boolean;
+    /** Booking now spends the day immediately — these report what it cost. */
+    dayCost?: number;
+    balance?: string | null;
+    pointsAwarded?: number;
+    usedCarnet?: boolean;
+    carnetRemaining?: number | null;
+    error?: string;
+  }>('checkin', { method: 'POST', body: { action: 'reserve', date, length, ...(length === 'Half' && period ? { period } : {}) } });
 export const cancelReservation = (id: string) =>
   call<{ ok: boolean; refunded?: boolean }>('checkin', { method: 'POST', body: { action: 'cancel', id } });
+
+/** Fired after any action that moves the member's day balance or carnet passes, so the dashboard
+ *  day tile + the carnet pane can refresh instantly instead of waiting for a reload. */
+export const BALANCES_EVENT = 'quarter:balances-changed';
+export function announceBalancesChanged(detail?: { balance?: string | null; carnetRemaining?: number | null }): void {
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(BALANCES_EVENT, { detail: detail || {} }));
+}
 
 // ---- Post / mail (members' physical post; see netlify/functions/post.mjs) ----
 export type PostStatus = 'Waiting' | 'To scan' | 'Scanned' | 'To forward' | 'Posted' | 'To collect' | 'Collected';

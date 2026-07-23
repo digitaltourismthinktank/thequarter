@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ds/Button';
-import { getCheckinToday, checkInToday, reserveDay, cancelReservation, type CheckinStatus } from '@/lib/booking';
+import { getCheckinToday, checkInToday, reserveDay, cancelReservation, announceBalancesChanged, BALANCES_EVENT, type CheckinStatus } from '@/lib/booking';
 import { cn } from '@/lib/cn';
 import { WeekStrip } from './WeekStrip';
 import { DatePickerModal } from './DatePickerModal';
@@ -58,6 +58,11 @@ export function CheckInCard({ className }: { className?: string }) {
 
   useEffect(() => {
     refresh();
+    // Another surface (the geo card, the check-in sheet) spent/booked a day — re-read so
+    // "Your Visits" reflects it (e.g. today's checked-in chip) without a manual reload.
+    const onChange = () => refresh();
+    window.addEventListener(BALANCES_EVENT, onChange);
+    return () => window.removeEventListener(BALANCES_EVENT, onChange);
   }, []);
 
   async function doCheckIn() {
@@ -69,6 +74,7 @@ export function CheckInCard({ className }: { className?: string }) {
       // Members told us they couldn't tell whether checking in had worked — there was no
       // acknowledgement at all. Show an explicit confirmation, with the points just earned.
       setConfirmed({ points: r.data?.pointsAwarded ?? 0, already: !!(r.data?.alreadyCheckedIn || r.data?.alreadyBooked) });
+      announceBalancesChanged({ balance: r.data?.balance ?? null, carnetRemaining: r.data?.carnetRemaining ?? null });
     }
     await refresh();
     setBusy(false);
@@ -83,6 +89,11 @@ export function CheckInCard({ className }: { className?: string }) {
     const r = await reserveDay(v, half ? 'Half' : 'Full', half ? period : null);
     if (!r.ok) setError(friendly(r.data?.error));
     else if (r.data.requested) setNote('Weekend access requested — we’ll confirm by email.');
+    else {
+      // Booking now spends the day immediately — tell them what it cost + stars earned.
+      setNote(spendNote(r.data, 'Booked'));
+      announceBalancesChanged({ balance: r.data.balance ?? null, carnetRemaining: r.data.carnetRemaining ?? null });
+    }
     await refresh();
     setPending((p) => p.filter((x) => x !== v));
     setBusy(false);
@@ -92,7 +103,10 @@ export function CheckInCard({ className }: { className?: string }) {
     setBusy(true);
     const r = await cancelReservation(id);
     // Never call it a "refund" — cancelling returns the day (or pass) to their balance.
-    if (r.ok) setNote(r.data?.refunded ? 'Cancelled — that day’s been credited back to your balance.' : 'Cancelled.');
+    if (r.ok) {
+      setNote(r.data?.refunded ? 'Cancelled — that day’s been credited back to your balance.' : 'Cancelled.');
+      announceBalancesChanged();
+    }
     await refresh();
     setBusy(false);
   }
@@ -217,16 +231,31 @@ export function CheckInCard({ className }: { className?: string }) {
           <span className={styles.plannedLabel}>Your upcoming check-ins</span>
           {/* Copy before sorting: sort() mutates, and this array is held in React state.
               Check-ins carry no start time, so date is the whole key. */}
-          {[...(status?.planned ?? [])].sort((a, b) => a.date.localeCompare(b.date)).map((p) => (
-            <span key={p.id} className={styles.chip}>
-              {fmtDate(p.date)}
-              {p.length === 'Half' ? (p.period ? ` · ½ ${p.period.toUpperCase()}` : ' · ½') : ''}
-              {p.kind === 'pass' ? <span className={styles.passTag}>Day Pass</span> : null}
-              <button className={styles.chipX} onClick={() => doCancel(p.id)} aria-label="Cancel reservation" disabled={busy}>
-                ×
-              </button>
-            </span>
-          ))}
+          {[...(status?.planned ?? [])].sort((a, b) => a.date.localeCompare(b.date)).map((p) => {
+            // A day booked for today counts as in already (the sweep spends it) — mark it with a
+            // tick and a pill so it reads as done, while keeping the same × to release it.
+            const isToday = p.date === todayIso;
+            return (
+              <span key={p.id} className={cn(styles.chip, isToday && styles.chipIn)}>
+                {isToday ? (
+                  <span className={styles.chipTick} aria-hidden="true">
+                    ✓
+                  </span>
+                ) : null}
+                {fmtDate(p.date)}
+                {p.length === 'Half' ? (p.period ? ` · ½ ${p.period.toUpperCase()}` : ' · ½') : ''}
+                {isToday ? <span className={styles.chipInTag}>In today</span> : null}
+                {p.kind === 'pass' ? <span className={styles.passTag}>Day Pass</span> : null}
+                {/* A walked-in day (p.in) can't be un-attended, so no cancel ×; a still-booked day
+                    (today or future) keeps the × to release it. */}
+                {p.in ? null : (
+                  <button className={styles.chipX} onClick={() => doCancel(p.id)} aria-label={isToday ? 'Cancel today’s visit' : 'Cancel reservation'} disabled={busy}>
+                    ×
+                  </button>
+                )}
+              </span>
+            );
+          })}
           {pendingOnly.map((d) => (
             <span key={`pend-${d}`} className={cn(styles.chip, styles.chipPending)} aria-live="polite">
               {fmtDate(d)} · adding…
@@ -261,6 +290,19 @@ export function CheckInCard({ className }: { className?: string }) {
       />
     </div>
   );
+}
+
+/** "Booked — uses 1 day pass · 1 left · +25 points." / "Booked — uses half a day · 3.5 left." */
+function spendNote(
+  d: { dayCost?: number; balance?: string | null; usedCarnet?: boolean; carnetRemaining?: number | null; pointsAwarded?: number },
+  verb: string,
+): string {
+  const bits: string[] = [];
+  if (d.usedCarnet) bits.push(`uses 1 day pass${typeof d.carnetRemaining === 'number' ? ` · ${d.carnetRemaining} left` : ''}`);
+  else if (typeof d.dayCost === 'number' && d.dayCost > 0)
+    bits.push(`uses ${d.dayCost === 0.5 ? 'half a day' : `${d.dayCost} day${d.dayCost === 1 ? '' : 's'}`}${d.balance != null ? ` · ${d.balance} left` : ''}`);
+  const pts = d.pointsAwarded ? ` · +${d.pointsAwarded} points` : '';
+  return `${verb}${bits.length ? ' — ' + bits.join(', ') : ''}${pts}.`;
 }
 
 function friendly(code?: string): string {

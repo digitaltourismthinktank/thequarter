@@ -29,6 +29,7 @@ import { listRecords, createRecord, T, F, airtableReady, esc } from './_airtable
 import { londonWallClockToISO, hhmmToMin } from './_time.mjs';
 import { sendEmail, emailShell, escapeHtml, OPS_EMAIL, fmtDateLong, fmtDateTime, dayBar, SITE_URL } from './_email.mjs';
 import { pushToEmail, pushToAdmins } from './_push.mjs';
+import { ensureDayForDate } from './checkin.mjs';
 
 const MS_SECRET = process.env.MEMBERSTACK_SECRET_KEY;
 const STRIPE_SECRET = process.env.STRIPE_SECRET_KEY;
@@ -176,6 +177,19 @@ async function finaliseRoomBooking(pi) {
       }
     } catch {
       /* rewards are best-effort — never block the booking */
+    }
+  }
+
+  // A member who PAID for room time is still in the office that day — so the paid booking also
+  // books a co-working day. block:false → a paid booking is NEVER refused; if they've no days left
+  // it's flagged over-allowance (they've paid), not blocked. Idempotent: this runs once per booking
+  // (duplicate-PI guard above) and ensureDayForDate no-ops if they already have a day for the date.
+  if (m.memberEmail) {
+    try {
+      const { member } = await getMemberSync(MS_SECRET, m.memberEmail);
+      if (member) await ensureDayForDate(member, m.date, { source: 'Web', length: 'Full', block: false });
+    } catch {
+      /* day-coupling is best-effort — never block or 500 a paid booking */
     }
   }
 

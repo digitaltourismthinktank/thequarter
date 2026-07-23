@@ -3693,7 +3693,7 @@ function AdminPostPane() {
           {msg ? <span className={styles.muted}>{msg}</span> : null}
         </div>
         <p className={styles.muted} style={{ margin: 0, fontSize: 11.5 }}>
-          Snap the envelope and attach it (Photo) directly in Airtable if useful. Sending fires a push + email to the member.
+          After logging, tap <strong>📷 Photo</strong> on the item to snap &amp; attach the envelope — the member sees it on their dashboard. Sending fires a push + email.
         </p>
       </div>
 
@@ -3745,7 +3745,11 @@ function AdminPostPane() {
                     : 'Ready to collect'}
               </span>
             </span>
-            <span style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+            <span style={{ marginLeft: 'auto', display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+              <label className={styles.smallBtn} style={uploadStyle}>
+                📷
+                <input type="file" accept="image/*" hidden onChange={(e) => upload(it.id, 'photo', e.target.files?.[0])} disabled={busy} />
+              </label>
               {it.status === 'To forward' ? (
                 <button type="button" className={styles.smallBtn} onClick={() => settle(it.id, 'posted')} disabled={busy}>
                   Mark posted

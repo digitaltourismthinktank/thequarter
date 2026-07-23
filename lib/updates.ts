@@ -18,6 +18,22 @@ export interface Update {
 
 export const UPDATES: Update[] = [
   {
+    id: '2026-07-23-booking-post-hybrid',
+    date: '2026-07-23',
+    title: 'Clearer day-spending, post in the dashboard & the lobby board back',
+    items: [
+      'Booking a day ahead now spends the day (or a day pass) straight away, exactly like checking in — no more days quietly not coming off, and no booking past your allowance. Members see what each one costs and the points it earns, both on check-in and when they book ahead.',
+      'Booking a meeting room or pod now also uses a co-working day for that date — being in for a meeting is being in the office — so a room or pod can’t be used to come in without a day. A day booked into next month draws from next month’s allowance.',
+      'Fixed: a paid day pass now covers the whole day on its own — checking in no longer also takes a plan day on top of it.',
+      'Your visits shows today’s booked day with a tick, and it can still be removed with the cross beside it (a day held by a room booking is released when you cancel the booking).',
+      'Tapping check-in when you’re already booked in now says you’re already in — and lets you switch that day between a half and a full day right there, with the balance adjusted correctly.',
+      'Post & Parcels lives in the dashboard: forward to the address on your profile and pay by card in-app, see an envelope photo or read a scan inline, and request a photo of any item.',
+      'Hybrid Office members now see their included co-working day (one a month) on their dashboard, with a tap to book it.',
+      'The lobby entrance screen’s transport board is back, rebuilt for the wide lobby display — bus departures now, with Canterbury West/East trains switching on once the rail key is confirmed.',
+      'The phone app’s bottom bar now stays put while you scroll.',
+    ],
+  },
+  {
     id: '2026-07-22-rooms-admin-tiered',
     date: '2026-07-22',
     title: 'Pay-as-you-go room top-ups + a tidier admin',
@@ -59,35 +75,6 @@ export const UPDATES: Update[] = [
       'Physical check-in is now just for walk-ins. Cancelling a day credits it straight back to their balance (never called a “refund”).',
       'A space-wide message now reaches everyone expected that day, not only those already at a desk.',
       'Fixed a hole where a plan member with an un-set balance could check in for free.',
-    ],
-  },
-  {
-    id: '2026-07-21-notifications-prefs',
-    date: '2026-07-21',
-    title: 'Notification preferences',
-    items: [
-      'Members choose their channels in the account area — friendly email updates and space-wide announcements, independently.',
-      'The essentials (receipts, bookings, plan changes) always send.',
-    ],
-  },
-  {
-    id: '2026-07-21-admin-comms',
-    date: '2026-07-21',
-    title: 'Admin: comms & members tidy-up',
-    items: [
-      'To-Do emails now show a preview before they send — no more sending on the first click — and there’s a one-tap “mark all as welcomed” to clear the backlog.',
-      'The To-Do shows people’s names again (it was showing the plan), and “everyone on a plan” counts real plans plus anyone holding day passes.',
-      'Meeting-room hours are editable on the member list, can be set to zero, and there’s a “reset all to standard”.',
-      'The old Access-check tool has been retired now entry is gated.',
-    ],
-  },
-  {
-    id: '2026-07-21-emails-plans',
-    date: '2026-07-21',
-    title: 'Emails & plans polish',
-    items: [
-      'Thank-you and welcome emails refreshed: a smart “on Friday / recently” date, the correct Google review link, a friendlier sign-off, and the Arke water note.',
-      'Every public plan now shows a comparable per-day cost (Citizen included).',
     ],
   },
 ];

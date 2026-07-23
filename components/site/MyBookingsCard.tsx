@@ -38,6 +38,10 @@ function amendError(code?: string): string {
       return 'Please choose a valid date.';
     case 'paid-booking':
       return 'Paid bookings are changed by the team — just give us a shout.';
+    // A booking holds a co-working day for its date, so moving it to another day means cancelling
+    // and re-booking (which hands back the old day and books the new). Same-day time changes are fine.
+    case 'date-move-unsupported':
+      return 'To move a booking to a different day, cancel it and book the new day — that keeps your co-working days right.';
     default:
       return 'We couldn’t change that booking — please try again.';
   }
