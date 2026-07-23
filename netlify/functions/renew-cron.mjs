@@ -23,8 +23,8 @@
 import memberstackAdmin from '@memberstack/admin';
 import { renewMember, formatDate, HYBRID_PLAN_ID, isHybridMember, PLAN_ALLOWANCE } from './_quarter-sync.mjs';
 import { londonNow } from './_time.mjs';
-import { listRecords, T, F, esc } from './_airtable.mjs';
-import { consumePlannedDay, plannedConsumed } from './checkin.mjs';
+import { listAllRecords, T, F, esc } from './_airtable.mjs';
+import { consumePlannedDay, plannedConsumed, renewalDateISO } from './checkin.mjs';
 
 const MS_SECRET = process.env.MEMBERSTACK_SECRET_KEY;
 
@@ -59,6 +59,7 @@ export default async function handler() {
   let failed = 0;
   let hybridReset = 0;
   let attended = 0;
+  let deferredSkipped = 0;
 
   let after;
   for (let i = 0; i < 50; i += 1) {
@@ -149,7 +150,9 @@ export default async function handler() {
   // Idempotent: consumePlannedDay stamps each row before it touches Memberstack, and
   // plannedConsumed skips a row already spent — so a manual re-run is a no-op.
   try {
-    const plannedToday = await listRecords(T.checkins, {
+    // listAllRecords (not listRecords): a single page caps at 100 rows, so once more than
+    // 100 people were booked for one day the surplus was silently never charged.
+    const plannedToday = await listAllRecords(T.checkins, {
       filterByFormula: `AND({Status}='Planned', DATETIME_FORMAT({Date}, 'YYYY-MM-DD')='${esc(today)}')`,
     });
     for (const row of plannedToday) {
@@ -162,6 +165,18 @@ export default async function handler() {
         const r = await admin.members.retrieve({ email });
         const m = r?.data;
         if (!m) continue;
+        // Only settle against a cycle that has ACTUALLY rolled. A deferred (future-cycle) row was
+        // booked on the promise of next month's allowance, but this cron only RENEWS manualBilling
+        // members — a Stripe member's reset arrives with their invoice, which may not have landed
+        // yet. renewMember always pushes renewal-date strictly into the future, so a date still on
+        // or before today proves the reset for this cycle hasn't happened. Leave the row Planned and
+        // unstamped (still chargeable) rather than spending a carnet pass or handing out a free
+        // 'over allowance' day against a stale, empty balance.
+        const renewalISO = renewalDateISO(m);
+        if (renewalISO && renewalISO <= today) {
+          deferredSkipped += 1;
+          continue;
+        }
         const length = row.fields[F.checkins.length] === 'Half' ? 'Half' : 'Full';
         await consumePlannedDay(m, { dateStr: today, length, row });
         attended += 1;
@@ -174,7 +189,7 @@ export default async function handler() {
     console.error('[renew-cron] planned scan failed', e);
   }
 
-  const summary = { scanned, renewed, failed, hybridReset, attended, date: today };
+  const summary = { scanned, renewed, failed, hybridReset, attended, deferredSkipped, planned: 0, date: today };
   console.log('[renew-cron]', JSON.stringify(summary));
   return new Response(JSON.stringify(summary), { status: 200, headers: { 'content-type': 'application/json' } });
 }

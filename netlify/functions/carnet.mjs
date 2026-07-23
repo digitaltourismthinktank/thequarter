@@ -130,8 +130,11 @@ export default async function handler(req) {
     if (c.expires && c.expires < today) return json({ error: 'expired' }, 400);
     if (await isClosedDay(today)) return json({ error: 'closed-day' }, 400);
 
+    // Any LIVE row for today already covers the day — a booking (Planned), a paid Day Pass (Paid)
+    // or an existing check-in. Looking only for 'Checked-in' meant a member who had already BOOKED
+    // today could spend a second pass on the same day, for nothing.
     const todays = await listRecords(T.checkins, {
-      filterByFormula: `AND({Member email}='${esc(email)}', DATETIME_FORMAT({Date}, 'YYYY-MM-DD')='${esc(today)}', {Status}='Checked-in')`,
+      filterByFormula: `AND({Member email}='${esc(email)}', DATETIME_FORMAT({Date}, 'YYYY-MM-DD')='${esc(today)}', NOT({Status}='Cancelled'))`,
       maxRecords: 1,
     });
     if (todays[0]) return json({ error: 'already-in' }, 400);

@@ -1,16 +1,20 @@
 {
+  "id": "/screen/",
   "name": "The Quarter — Screens",
   "short_name": "Quarter Screens",
   "description": "Live room-availability displays for The Quarter — set each iPad to its floor URL and Add to Home Screen.",
-  "start_url": "/screen",
-  "scope": "/screen",
-  "display": "standalone",
+  "start_url": "/screen/",
+  "scope": "/screen/",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
   "orientation": "any",
   "background_color": "#14110c",
   "theme_color": "#1e1a15",
   "lang": "en-GB",
+  "prefer_related_applications": false,
   "icons": [
     { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }

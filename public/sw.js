@@ -9,12 +9,20 @@
  *             even after a new deploy. This is what stops the "ChunkLoadError / obscure update
  *             error" — previously the version bump deleted the old chunks out from under open tabs.
  *   PAGES   — visited HTML (so a page + the Quarter Card open offline). Versioned + purged on bump. */
-const VERSION = 'quarter-v62';
+const VERSION = 'quarter-v63';
 const STATIC = 'quarter-static';
 const PAGES = VERSION;
 
 self.addEventListener('install', () => {
   self.skipWaiting();
+});
+
+/* The "updated — reload" banner asks us to take over NOW. skipWaiting() already runs on install,
+   but a worker can still be sitting in `waiting` when the page asks (installation and activation
+   are not instantaneous), and reloading while the OLD worker is still in charge just re-serves the
+   old page — which is why that button used to need pressing several times. */
+self.addEventListener('message', (event) => {
+  if (event?.data?.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {

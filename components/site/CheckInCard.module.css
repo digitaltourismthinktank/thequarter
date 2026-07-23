@@ -183,6 +183,32 @@
 .chipX:hover {
   color: var(--danger);
 }
+/* The chip is the control: tapping a booked day opens it to change the length or release it.
+   Needs the button reset (chips used to be plain spans with a × inside). */
+.chipBtn {
+  border: 1px solid transparent;
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+  padding: 4px 8px 4px 12px;
+  transition: border-color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard);
+}
+.chipBtn:hover {
+  border-color: var(--gold-500);
+}
+.chipBtn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.chipEdit {
+  color: var(--text-muted);
+  font-size: var(--text-md);
+  line-height: 1;
+  padding-left: 2px;
+}
+.chipIn .chipEdit {
+  color: var(--gold-700);
+}
 /* Today's booked day = already in. Gold-tinted chip with a leading tick and an "In today" pill,
    so it stands apart from the plain upcoming chips while keeping the same shape and × to release. */
 .chipIn {

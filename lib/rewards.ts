@@ -189,4 +189,9 @@ export const CARNET_BUNDLES: CarnetBundle[] = [
   { passes: 30, price: 550.8, bestValue: true },
 ];
 
+/** One pass, at the full single-day rate — sold alongside the books for "I just need one day".
+ *  Deliberately NOT in CARNET_BUNDLES: it isn't a bundle, carries no discount, and shouldn't
+ *  appear in the marketing bundle grid. */
+export const SINGLE_PASS: CarnetBundle = { passes: 1, price: DAY_PASS_PRICE };
+
 export const carnetPerPass = (b: CarnetBundle) => b.price / b.passes;

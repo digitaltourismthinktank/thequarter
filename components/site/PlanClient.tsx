@@ -289,7 +289,9 @@ export function PlanClient() {
         <p className={styles.note}>Switches take effect at your next renewal, with no mid-cycle charge.</p>
       </section>
 
-      <div style={{ marginTop: 18 }}>
+      {/* #passes — the anchor the out-of-days prompt sends people to, so "Buy a day pass" lands on
+          the passes pane rather than the top of the plan page. */}
+      <div id="passes" style={{ marginTop: 18, scrollMarginTop: '90px' }}>
         <CarnetCard />
       </div>
 

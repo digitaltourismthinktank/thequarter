@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ds/Button';
-import { getCheckinToday, checkInToday, reserveDay, cancelReservation, announceBalancesChanged, BALANCES_EVENT, type CheckinStatus } from '@/lib/booking';
+import { getCheckinToday, cancelReservation, announceBalancesChanged, BALANCES_EVENT, type CheckinStatus } from '@/lib/booking';
 import { cn } from '@/lib/cn';
 import { WeekStrip } from './WeekStrip';
 import { DatePickerModal } from './DatePickerModal';
+import { DaySheet, type DaySheetDay } from './DaySheet';
 import styles from './CheckInCard.module.css';
 
 /** Format a YYYY-MM-DD as e.g. "Mon 29 Jun" (treat as a calendar date, UTC). */
@@ -37,14 +38,14 @@ function nextOpenDay(iso: string): string {
 export function CheckInCard({ className }: { className?: string }) {
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<CheckinStatus | null>(null);
-  const [half, setHalf] = useState(false);
-  const [period, setPeriod] = useState<'am' | 'pm'>('am');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [pending, setPending] = useState<string[]>([]); // optimistic reservations in flight
   const [note, setNote] = useState<string | null>(null);
-  const [confirmed, setConfirmed] = useState<{ points: number; already: boolean } | null>(null);
+  // The one place a day is booked, changed or released. Every route in — the week strip, the
+  // calendar, "I'm in today", tapping a day you've already booked — opens this, so the full/half
+  // question is always asked out loud and the answer always comes back with what it cost.
+  const [sheet, setSheet] = useState<{ date: string; existing?: DaySheetDay | null; checkinNow?: boolean } | null>(null);
   // Planning a future day is useful but secondary — on a phone the tab bar's check-in
   // sheet handles today, so this folds away behind a toggle rather than filling Home.
   const [planOpen, setPlanOpen] = useState(false);
@@ -65,46 +66,12 @@ export function CheckInCard({ className }: { className?: string }) {
     return () => window.removeEventListener(BALANCES_EVENT, onChange);
   }, []);
 
-  async function doCheckIn() {
-    setBusy(true);
-    setError(null);
-    const r = await checkInToday(half ? 'Half' : 'Full', half ? period : null);
-    if (!r.ok) setError(friendly(r.data?.error));
-    else {
-      // Members told us they couldn't tell whether checking in had worked — there was no
-      // acknowledgement at all. Show an explicit confirmation, with the points just earned.
-      setConfirmed({ points: r.data?.pointsAwarded ?? 0, already: !!(r.data?.alreadyCheckedIn || r.data?.alreadyBooked) });
-      announceBalancesChanged({ balance: r.data?.balance ?? null, carnetRemaining: r.data?.carnetRemaining ?? null });
-    }
-    await refresh();
-    setBusy(false);
-  }
-
-  async function doReserveDate(v: string) {
-    if (!v) return;
-    setBusy(true);
-    setError(null);
-    setNote(null);
-    setPending((p) => (p.includes(v) ? p : [...p, v])); // instant feedback
-    const r = await reserveDay(v, half ? 'Half' : 'Full', half ? period : null);
-    if (!r.ok) setError(friendly(r.data?.error));
-    else if (r.data.requested) setNote('Weekend access requested — we’ll confirm by email.');
-    else {
-      // Booking now spends the day immediately — tell them what it cost + stars earned.
-      setNote(spendNote(r.data, 'Booked'));
-      announceBalancesChanged({ balance: r.data.balance ?? null, carnetRemaining: r.data.carnetRemaining ?? null });
-    }
-    await refresh();
-    setPending((p) => p.filter((x) => x !== v));
-    setBusy(false);
-  }
-
+  // Weekend requests only — a booked DAY is released from the day sheet, which asks first.
   async function doCancel(id: string) {
     setBusy(true);
     const r = await cancelReservation(id);
-    // Never call it a "refund" — cancelling returns the day (or pass) to their balance.
     if (r.ok) {
-      setNote(r.data?.refunded ? 'Cancelled — that day’s been credited back to your balance.' : 'Cancelled.');
+      setNote('Request withdrawn.');
       announceBalancesChanged();
     }
     await refresh();
@@ -126,28 +93,11 @@ export function CheckInCard({ className }: { className?: string }) {
   const bookedToday = !!nextPlanned && nextPlanned.date === todayIso;
 
   const plannedDates = status?.planned?.map((p) => p.date) ?? [];
-  const pendingOnly = pending.filter((d) => !plannedDates.includes(d));
-  const showPlanned = plannedDates.length > 0 || pendingOnly.length > 0;
+  const showPlanned = plannedDates.length > 0;
 
   return (
     <div className={cn(styles.card, className)}>
       <span className={styles.eyebrow}>Your visits</span>
-
-      {/* Unmissable acknowledgement that the check-in landed, and what it earned. */}
-      {confirmed ? (
-        <div className={styles.confirm} role="status" aria-live="polite">
-          <span className={styles.confirmTick} aria-hidden="true">
-            ✓
-          </span>
-          <span className={styles.confirmText}>
-            <strong>{confirmed.already ? 'You were already checked in' : "You're checked in"}</strong>
-            {confirmed.points > 0 ? <span className={styles.confirmPoints}>+{confirmed.points} points</span> : null}
-          </span>
-          <button type="button" className={styles.confirmX} onClick={() => setConfirmed(null)} aria-label="Dismiss">
-            ×
-          </button>
-        </div>
-      ) : null}
 
       {loading ? (
         <p className={styles.meta}>Loading…</p>
@@ -178,36 +128,14 @@ export function CheckInCard({ className }: { className?: string }) {
             </>
           )}
 
-          {/* Full / Half — applies to checking in today and to any days you plan. */}
-          <div className={styles.seg} role="tablist" aria-label="Day length">
-            <button type="button" role="tab" aria-selected={!half} className={cn(styles.segBtn, !half && styles.segOn)} onClick={() => setHalf(false)}>
-              Full day
-            </button>
-            <button type="button" role="tab" aria-selected={half} className={cn(styles.segBtn, half && styles.segOn)} onClick={() => setHalf(true)}>
-              Half day
-            </button>
-          </div>
-
-          {/* Which half — only for a half day, so the team knows when to expect you. */}
-          {half ? (
-            <div className={cn(styles.seg, styles.periodSeg)} role="tablist" aria-label="Which half of the day">
-              <button type="button" role="tab" aria-selected={period === 'am'} className={cn(styles.segBtn, period === 'am' && styles.segOn)} onClick={() => setPeriod('am')}>
-                Morning
-              </button>
-              <button type="button" role="tab" aria-selected={period === 'pm'} className={cn(styles.segBtn, period === 'pm' && styles.segOn)} onClick={() => setPeriod('pm')}>
-                Afternoon
-              </button>
-            </div>
-          ) : null}
-
           {!status?.checkedIn ? (
             <div className={styles.actions}>
               {openToday && !bookedToday ? (
-                <Button variant="primary" size="sm" onClick={doCheckIn} disabled={busy}>
+                <Button variant="primary" size="sm" onClick={() => setSheet({ date: todayIso, checkinNow: true })} disabled={busy}>
                   I&rsquo;m in today
                 </Button>
               ) : null}
-              <Button variant={openToday && !bookedToday ? 'secondary' : 'primary'} size="sm" onClick={() => doReserveDate(nextOpen)} disabled={busy}>
+              <Button variant={openToday && !bookedToday ? 'secondary' : 'primary'} size="sm" onClick={() => setSheet({ date: nextOpen })} disabled={busy}>
                 I&rsquo;ll be in {nextLabel}
               </Button>
             </div>
@@ -218,7 +146,15 @@ export function CheckInCard({ className }: { className?: string }) {
             {planOpen ? 'Hide other days' : 'Book another day'}
           </button>
           <div className={cn(styles.planAhead, planOpen && styles.planAheadOpen)}>
-            <WeekStrip label={status?.checkedIn ? 'Book another day' : 'Book for the coming week'} onSelect={doReserveDate} booked={[...plannedDates, ...pending]} />
+            <WeekStrip
+              label={status?.checkedIn ? 'Book another day' : 'Book for the coming week'}
+              onSelect={(d) => {
+                // Tapping a day you already have opens it for changing, not double-booking.
+                const owned = (status?.planned ?? []).find((p) => p.date === d);
+                setSheet({ date: d, existing: owned ?? null });
+              }}
+              booked={plannedDates}
+            />
             <button type="button" className={styles.dateBtn} onClick={() => setPickerOpen(true)}>
               + Pick a date
             </button>
@@ -233,10 +169,20 @@ export function CheckInCard({ className }: { className?: string }) {
               Check-ins carry no start time, so date is the whole key. */}
           {[...(status?.planned ?? [])].sort((a, b) => a.date.localeCompare(b.date)).map((p) => {
             // A day booked for today counts as in already (the sweep spends it) — mark it with a
-            // tick and a pill so it reads as done, while keeping the same × to release it.
+            // tick and a pill so it reads as done.
             const isToday = p.date === todayIso;
+            // The whole chip is the control now. The bare × was the only thing you could do to a
+            // booked day, and it released it (and its money) on a single tap; tapping the day now
+            // opens it, where the length can be changed and cancelling asks first.
             return (
-              <span key={p.id} className={cn(styles.chip, isToday && styles.chipIn)}>
+              <button
+                type="button"
+                key={p.id}
+                className={cn(styles.chip, styles.chipBtn, isToday && styles.chipIn)}
+                onClick={() => setSheet({ date: p.date, existing: p })}
+                disabled={busy}
+                aria-label={`${fmtDate(p.date)} — ${p.length === 'Half' ? 'half day' : 'full day'}. Change or cancel.`}
+              >
                 {isToday ? (
                   <span className={styles.chipTick} aria-hidden="true">
                     ✓
@@ -246,21 +192,15 @@ export function CheckInCard({ className }: { className?: string }) {
                 {p.length === 'Half' ? (p.period ? ` · ½ ${p.period.toUpperCase()}` : ' · ½') : ''}
                 {isToday ? <span className={styles.chipInTag}>In today</span> : null}
                 {p.kind === 'pass' ? <span className={styles.passTag}>Day Pass</span> : null}
-                {/* A walked-in day (p.in) can't be un-attended, so no cancel ×; a still-booked day
-                    (today or future) keeps the × to release it. */}
+                {/* A walked-in day is attendance — it can still be opened to read, not to release. */}
                 {p.in ? null : (
-                  <button className={styles.chipX} onClick={() => doCancel(p.id)} aria-label={isToday ? 'Cancel today’s visit' : 'Cancel reservation'} disabled={busy}>
-                    ×
-                  </button>
+                  <span className={styles.chipEdit} aria-hidden="true">
+                    ›
+                  </span>
                 )}
-              </span>
+              </button>
             );
           })}
-          {pendingOnly.map((d) => (
-            <span key={`pend-${d}`} className={cn(styles.chip, styles.chipPending)} aria-live="polite">
-              {fmtDate(d)} · adding…
-            </span>
-          ))}
         </div>
       ) : null}
 
@@ -284,25 +224,24 @@ export function CheckInCard({ className }: { className?: string }) {
       <DatePickerModal
         open={pickerOpen}
         onClose={() => setPickerOpen(false)}
-        onPick={doReserveDate}
+        onPick={(d) => {
+          const owned = (status?.planned ?? []).find((p) => p.date === d);
+          setSheet({ date: d, existing: owned ?? null });
+        }}
         allowWeekend
-        planned={[...plannedDates, ...pending]}
+        planned={plannedDates}
+      />
+
+      <DaySheet
+        open={!!sheet}
+        date={sheet?.date ?? null}
+        existing={sheet?.existing ?? null}
+        checkinNow={sheet?.checkinNow}
+        onClose={() => setSheet(null)}
+        onChanged={refresh}
       />
     </div>
   );
-}
-
-/** "Booked — uses 1 day pass · 1 left · +25 points." / "Booked — uses half a day · 3.5 left." */
-function spendNote(
-  d: { dayCost?: number; balance?: string | null; usedCarnet?: boolean; carnetRemaining?: number | null; pointsAwarded?: number },
-  verb: string,
-): string {
-  const bits: string[] = [];
-  if (d.usedCarnet) bits.push(`uses 1 day pass${typeof d.carnetRemaining === 'number' ? ` · ${d.carnetRemaining} left` : ''}`);
-  else if (typeof d.dayCost === 'number' && d.dayCost > 0)
-    bits.push(`uses ${d.dayCost === 0.5 ? 'half a day' : `${d.dayCost} day${d.dayCost === 1 ? '' : 's'}`}${d.balance != null ? ` · ${d.balance} left` : ''}`);
-  const pts = d.pointsAwarded ? ` · +${d.pointsAwarded} points` : '';
-  return `${verb}${bits.length ? ' — ' + bits.join(', ') : ''}${pts}.`;
 }
 
 function friendly(code?: string): string {

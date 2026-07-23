@@ -1,13 +1,27 @@
 /* Entrance lobby display — portrait, full-bleed, auto-refreshing. Black/white/gold,
    no green, no traffic lights. Busyness shown as a tonal gold scale. */
-.screen {
+/* The stage is what actually fills the display; .screen is a fixed-size canvas centred inside it
+   and scaled to fit (see useFitCanvas). Keeping the background here means the stage still paints
+   edge-to-edge on any aspect ratio. */
+.stage {
   position: fixed;
   inset: 0;
   z-index: 1000;
-  height: 100vh;
-  height: 100svh;
+  overflow: hidden;
+  overscroll-behavior: none;
+  background: var(--surface-page);
+  display: grid;
+  place-items: center;
+}
+.screen {
+  /* Sized + scaled inline from the measured viewport. The fallbacks below are what renders before
+     the first measurement, and on a narrow viewport where scaling is deliberately skipped. */
+  width: 100%;
   height: 100dvh;
-  max-height: 100dvh;
+  /* NO max-height here: the canvas is deliberately TALLER than the window (a 1512x800 window draws
+     a 1920x1016 canvas that is then scaled down), and a max-height of 100dvh would clamp it
+     straight back to the window and undo the scaling. The stage clips instead. */
+  transform-origin: center center;
   overflow: hidden;
   overscroll-behavior: none;
   background: var(--surface-page);
@@ -969,52 +983,54 @@
 /* ---- Shorter landscape screens (a laptop, a smaller TV) ---------------------------
    Below the 1080-tall display everything gives a little so all four sections still fit: tighter
    padding and gaps, smaller headings, content-sized cards, and denser departure rows. */
-@media (orientation: landscape) and (min-width: 1000px) and (max-height: 950px) {
-  .screen {
+/* Squat canvas (a short display, or a laptop window). Driven by a class rather than a media
+   query, because the canvas the layout is drawn on is NOT the browser window — a 1512x800
+   window renders a 1920x1016 canvas, and a window-height media query would compact a layout
+   that has plenty of room. A container query can't do it either: it would have to style its
+   own container, which CSS does not allow. So the measurement lives in useFitCanvas. */
+.screen.compact {
     padding: clamp(14px, 2vh, 30px) clamp(20px, 2.4vw, 44px);
     row-gap: clamp(6px, 0.9vh, 14px);
     column-gap: clamp(16px, 2vw, 36px);
   }
-  .h2 {
+.compact .h2 {
     font-size: clamp(15px, 2.1vh, 24px);
     margin-bottom: 8px;
   }
-  .weekStrip {
+.compact .weekStrip {
     height: clamp(40px, 7vh, 80px);
     margin-top: 6px;
   }
-  .hero {
+.compact .hero {
     padding: clamp(14px, 2.2vh, 30px);
   }
-  .spaceCard,
-  .roomGrid .spaceCard {
+.compact .spaceCard, .compact .roomGrid .spaceCard {
     min-height: 0;
     padding: 10px 13px;
   }
-  .spaceName {
+.compact .spaceName {
     font-size: clamp(14px, 2vh, 20px);
   }
-  .spaceStatus {
+.compact .spaceStatus {
     font-size: clamp(13px, 1.8vh, 18px);
   }
-  /* The per-room timeline is the first thing to go when height is scarce — the status line above
+/* The per-room timeline is the first thing to go when height is scarce — the status line above
      it already says whether the room is free. */
-  .dayLine {
+  .compact .dayLine {
     display: none;
   }
-  .transport {
+.compact .transport {
     padding: clamp(8px, 1.2vh, 16px) clamp(12px, 1.6vw, 20px);
   }
-  .trList li {
+.compact .trList li {
     padding: 2px 0;
     font-size: clamp(12px, 1.6vh, 17px);
   }
-  .eventFeature {
+.compact .eventFeature {
     padding: 12px 16px;
     gap: clamp(14px, 2vw, 26px);
   }
-  .evIcon {
+.compact .evIcon {
     width: 54px;
     height: 54px;
   }
-}

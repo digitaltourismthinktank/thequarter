@@ -25,7 +25,7 @@ import {
   stampSync,
 } from './_quarter-sync.mjs';
 import { pointsForGBP, appendLedger, WELCOME_BONUS, creditReferral, CARNET_AMOUNT_TO_PASSES } from './_rewards.mjs';
-import { listRecords, createRecord, T, F, airtableReady, esc } from './_airtable.mjs';
+import { listRecords, listAllRecords, createRecord, T, F, airtableReady, esc } from './_airtable.mjs';
 import { londonWallClockToISO, hhmmToMin } from './_time.mjs';
 import { sendEmail, emailShell, escapeHtml, OPS_EMAIL, fmtDateLong, fmtDateTime, dayBar, SITE_URL } from './_email.mjs';
 import { pushToEmail, pushToAdmins } from './_push.mjs';
@@ -135,6 +135,21 @@ async function finaliseRoomBooking(pi) {
     .filter(Boolean)
     .join(' · ');
 
+  // A member who PAID for room time is still in the office that day, so the paid booking books a
+  // co-working day too. block:false → a paid booking is NEVER refused; with no days left it's
+  // flagged over-allowance rather than blocked.
+  //
+  // This runs BEFORE the booking row is written, and is deliberately allowed to throw. Previously it
+  // sat after the row inside a swallowing try/catch, which made it unreachable on retry — the
+  // duplicate-PI guard returns before it — so one transient Memberstack blip permanently left a live
+  // room with no day, and the member was turned away on arrival. Failing here writes no booking, so
+  // Stripe redelivers and the whole thing replays cleanly (ensureDayForDate no-ops if the day
+  // already exists, and the dup guard correctly finds nothing).
+  if (m.memberEmail) {
+    const { member } = await getMemberSync(MS_SECRET, m.memberEmail);
+    if (member) await ensureDayForDate(member, m.date, { source: 'Web', length: 'Full', block: false });
+  }
+
   const rec = await createRecord(
     T.bookings,
     {
@@ -177,19 +192,6 @@ async function finaliseRoomBooking(pi) {
       }
     } catch {
       /* rewards are best-effort — never block the booking */
-    }
-  }
-
-  // A member who PAID for room time is still in the office that day — so the paid booking also
-  // books a co-working day. block:false → a paid booking is NEVER refused; if they've no days left
-  // it's flagged over-allowance (they've paid), not blocked. Idempotent: this runs once per booking
-  // (duplicate-PI guard above) and ensureDayForDate no-ops if they already have a day for the date.
-  if (m.memberEmail) {
-    try {
-      const { member } = await getMemberSync(MS_SECRET, m.memberEmail);
-      if (member) await ensureDayForDate(member, m.date, { source: 'Web', length: 'Full', block: false });
-    } catch {
-      /* day-coupling is best-effort — never block or 500 a paid booking */
     }
   }
 
@@ -353,7 +355,7 @@ async function spaceIdByName(name) {
  */
 async function finalisePrivatisation(m, refId, toEmail) {
   if (!airtableReady()) return { skipped: 'no-airtable' };
-  const existing = await listRecords(T.bookings, { filterByFormula: `AND({Status}='Confirmed', {Kind}='Privatisation')` });
+  const existing = await listAllRecords(T.bookings, { filterByFormula: `AND({Status}='Confirmed', {Kind}='Privatisation')` });
   if (existing.some((r) => String(r.fields[F.bookings.notes] || '').includes(refId))) return { skipped: 'duplicate' };
 
   const spaceId = await spaceIdByName(m.roomName || '');

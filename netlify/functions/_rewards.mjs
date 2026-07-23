@@ -67,7 +67,9 @@ export const earnBoostForMember = (m) => levelBoost(memberLifetimePoints(m));
 /** Carnet purchase: Stripe checkout amount (pence) → passes. Provisional — mirrors
  *  lib/rewards CARNET_BUNDLES (10 @ £194.40, 30 @ £550.80). Confirm + wire real Stripe
  *  products with Riva; update these amounts if the prices change. */
-export const CARNET_AMOUNT_TO_PASSES = { 19440: 10, 55080: 30 };
+// 2160 = ONE pass at the full single-day price. No discount: the books are the discount, and a
+// single pass has to stay dearer per day than them (and than a plan) or it undercuts both.
+export const CARNET_AMOUNT_TO_PASSES = { 2160: 1, 19440: 10, 55080: 30 };
 
 export const pointsForGBP = (gbp) => Math.round(POINTS_PER_GBP * Math.max(0, Number(gbp) || 0));
 export const poundsValue = (points) => Math.max(0, Number(points) || 0) / POINTS_PER_POUND_VALUE;
@@ -107,7 +109,22 @@ export async function awardPoints(member, delta, reason, ref = '') {
   const oldLife = memberLifetimePoints(member);
   const life = oldLife + (d > 0 ? d : 0);
   const admin = memberstackAdmin.init(MS_SECRET);
-  await admin.members.update({ id: member.id, data: { metaData: { ...(member.metaData || {}), points: next, lifetimePoints: life } } });
+  // Write ONLY the two keys this function owns. Memberstack merges metaData by TOP-LEVEL KEY, so
+  // spreading the caller's `member.metaData` here re-asserted a snapshot taken at the START of the
+  // request — silently reverting any other metaData key written since. That is exactly how a
+  // carnet pass spent moments earlier (checkin.mjs consumePlannedDay / the live check-in) was
+  // handed straight back: the pass was correctly decremented, then this write restored the stale
+  // `carnet` object. The row stayed stamped 'Carnet pass', so a later cancel refunded a pass that
+  // was never really taken — minting passes on book-then-cancel.
+  //
+  // Never spread a read-once metaData snapshot into an update. Write only what you own.
+  await admin.members.update({ id: member.id, data: { metaData: { points: next, lifetimePoints: life } } });
+  // Keep the caller's in-memory copy in step, so anything that reads `member.metaData` later in the
+  // same request (or writes it) sees the new values rather than the pre-award ones.
+  if (member.metaData) {
+    member.metaData.points = next;
+    member.metaData.lifetimePoints = life;
+  }
   // Level-up push (best-effort). Only on a genuine earn (d>0) that crosses a tier boundary.
   // Guarded end-to-end so the index math + push can never change awardPoints' return or throw.
   if (d > 0 && email) {

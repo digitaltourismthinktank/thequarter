@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ds/Button';
 import { Icon } from '@/components/ds/Icon';
-import { getCheckinToday, checkInToday, announceBalancesChanged, type CheckinStatus } from '@/lib/booking';
+import { getCheckinToday, type CheckinStatus } from '@/lib/booking';
 import { PREVIEW } from '@/lib/devMock';
+import { DaySheet } from './DaySheet';
 import styles from './GeoCheckIn.module.css';
 
 /**
@@ -37,32 +38,6 @@ function distanceM(lat1: number, lon1: number, lat2: number, lon2: number): numb
   return 2 * R * Math.asin(Math.sqrt(a));
 }
 
-/** A short, warm message if a check-in tap fails (mirrors CheckInCard's tone). */
-function friendly(code?: string): string {
-  switch (code) {
-    case 'closed-weekend':
-    case 'closed-day':
-      return 'The Quarter is closed today.';
-    case 'needs-plan-or-pass':
-      return 'Checking in needs a plan, a day pass, or days on your account.';
-    case 'no-allowance':
-      return 'You’ve used your days for now — grab a day pass or have a word with the team.';
-    case 'weekend-request':
-    case 'weekend-pending':
-      return 'Weekends are by request — we’ll confirm your day by email.';
-    case 'no-token':
-    case 'invalid-token':
-    case 'verify-failed':
-    case 'no-member':
-      return 'Please sign in again to check in.';
-    case 'network':
-    case 'server':
-      return 'Couldn’t reach check-in just now — please try again.';
-    default:
-      return 'Something went wrong — please try again.';
-  }
-}
-
 type Phase = 'hidden' | 'offer' | 'onsite';
 
 export interface GeoCheckInProps {
@@ -77,8 +52,7 @@ export function GeoCheckIn({ doorCode, busyBand }: GeoCheckInProps) {
   const [locating, setLocating] = useState(false);
   const [checkin, setCheckin] = useState<CheckinStatus | null>(null);
   const [justChecked, setJustChecked] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const alive = useRef(true);
 
   // A single position read. On success: near → reveal the hero (after reading today's
@@ -219,17 +193,11 @@ export function GeoCheckIn({ doorCode, busyBand }: GeoCheckInProps) {
     }
   }
 
-  async function doCheckIn() {
-    setBusy(true);
-    setError(null);
-    const r = await checkInToday('Full');
-    if (!alive.current) return;
-    setBusy(false);
-    if (r.ok) {
-      setJustChecked(true);
-      // Refresh the day tile / carnet + the "Your Visits" checked-in chip across the dashboard.
-      announceBalancesChanged({ balance: r.data?.balance ?? null, carnetRemaining: r.data?.carnetRemaining ?? null });
-    } else setError(friendly(r.data?.error));
+  // Checking in from here goes through the same sheet as everywhere else. It used to call
+  // checkInToday('Full') outright — no question asked — so anyone here for a half day was silently
+  // charged a whole one, and the tap that spent a day looked like a tap that dismissed a card.
+  function openCheckIn() {
+    setSheetOpen(true);
   }
 
   if (phase === 'hidden') return null;
@@ -307,12 +275,19 @@ export function GeoCheckIn({ doorCode, busyBand }: GeoCheckInProps) {
         </>
       ) : (
         <div className={styles.actions}>
-          <Button variant="accent" size="md" onClick={doCheckIn} disabled={busy} iconAfter="arrow-right">
-            {busy ? 'Checking in…' : 'Check in now'}
+          <Button variant="accent" size="md" onClick={openCheckIn} iconAfter="arrow-right">
+            Check in now
           </Button>
-          {error ? <span className={styles.error}>{error}</span> : null}
         </div>
       )}
+
+      <DaySheet
+        open={sheetOpen}
+        date={checkin?.date ?? new Date().toISOString().slice(0, 10)}
+        checkinNow
+        onClose={() => setSheetOpen(false)}
+        onChanged={() => setJustChecked(true)}
+      />
     </div>
   );
 }

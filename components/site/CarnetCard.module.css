@@ -151,3 +151,34 @@
 .balanceRow {
   flex-wrap: wrap;
 }
+
+/* Single pass — a quiet row under the books, not a third bundle competing with them. */
+.singleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-subtle);
+}
+.buyOne {
+  flex: none;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill);
+  background: var(--surface-card);
+  color: var(--ink-900);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: var(--fw-bold);
+  padding: 8px 16px;
+  cursor: pointer;
+}
+.buyOne:hover {
+  border-color: var(--gold-500);
+}
+.buyOne:disabled {
+  opacity: 0.6;
+  cursor: default;
+}

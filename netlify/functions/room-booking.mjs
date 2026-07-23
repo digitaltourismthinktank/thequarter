@@ -22,7 +22,7 @@
  *
  * Env: STRIPE_SECRET_KEY (PaymentIntents: Write), Airtable (via _airtable).
  */
-import { listRecords, createRecord, T, F, airtableReady, esc } from './_airtable.mjs';
+import { listRecords, listAllRecords, createRecord, T, F, airtableReady, esc } from './_airtable.mjs';
 import { BUSINESS, hhmmToMin, londonWallClockToISO, isoToLondonMin, londonNow } from './_time.mjs';
 import { isClosedDay } from './_holidays.mjs';
 import { verifyMember, memberEmail, memberName, tokenFromRequest } from './_member.mjs';
@@ -129,7 +129,7 @@ async function bookingsForSpaceDate(spaceId, dateStr) {
     const sp = r.fields[F.bookings.space];
     return Array.isArray(sp) && sp.includes(spaceId);
   });
-  const blockRecs = await listRecords(T.bookings, {
+  const blockRecs = await listAllRecords(T.bookings, {
     filterByFormula: `AND({Status}='Confirmed', OR({Kind}='Block', {Kind}='External'))`,
   });
   const occ = recurringBlockOccurrences(blockRecs, dateStr)

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ds/Button';
 import { STRIPE_PUBLISHABLE_KEY } from '@/lib/commerce';
 import { getCarnet, useCarnetPass, carnetIntent, type CarnetState } from '@/lib/booking';
-import { CARNET_BUNDLES, DAY_PASS_PRICE, carnetPerPass } from '@/lib/rewards';
+import { CARNET_BUNDLES, SINGLE_PASS, DAY_PASS_PRICE, carnetPerPass } from '@/lib/rewards';
 import { PREVIEW } from '@/lib/devMock';
 import styles from './CarnetCard.module.css';
 import pay from './RoomBooking.module.css';
@@ -196,7 +196,10 @@ export function CarnetCard() {
         </div>
       ) : (
         <div className={pay.payBox}>
-          <p className={styles.body}>Buying {buying} day passes · {gbp(CARNET_BUNDLES.find((b) => b.passes === buying)?.price ?? 0)}</p>
+          <p className={styles.body}>
+            Buying {buying} day {buying === 1 ? 'pass' : 'passes'} ·{' '}
+            {gbp(buying === 1 ? SINGLE_PASS.price : (CARNET_BUNDLES.find((b) => b.passes === buying)?.price ?? 0))}
+          </p>
           <div ref={mountRef} className={pay.payEl} />
           {payErr ? <p className={styles.msg}>{payErr}</p> : null}
           <Button variant="accent" size="sm" onClick={payNow} disabled={busy}>
@@ -209,7 +212,18 @@ export function CarnetCard() {
         </div>
       )}
 
-      <p className={styles.single}>A single day pass is {gbp(DAY_PASS_PRICE)} — the book works out cheaper per day.</p>
+      {/* Just one day. Sat under the books on purpose: the comparison is the point, so the
+          cheaper-per-day maths is right next to the button. */}
+      {buying === null ? (
+        <div className={styles.singleRow}>
+          <span className={styles.single}>
+            Just need one day? A single pass is {gbp(DAY_PASS_PRICE)} — the books work out cheaper per day.
+          </span>
+          <button type="button" className={styles.buyOne} onClick={() => startBuy(SINGLE_PASS.passes)} disabled={busy}>
+            Buy one pass
+          </button>
+        </div>
+      ) : null}
       {msg ? <p className={styles.msg}>{msg}</p> : null}
     </div>
   );

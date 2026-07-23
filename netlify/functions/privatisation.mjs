@@ -14,7 +14,7 @@
  *
  * Env: STRIPE_SECRET_KEY (Prices/Checkout/Subscriptions: Write), Airtable.
  */
-import { listRecords, T, F, airtableReady, esc } from './_airtable.mjs';
+import { listRecords, listAllRecords, T, F, airtableReady, esc } from './_airtable.mjs';
 import { parsePrivatisationSlots, normWeekdays } from './_privatisation.mjs';
 
 const STRIPE_SECRET = process.env.STRIPE_SECRET_KEY;
@@ -134,7 +134,7 @@ async function weekdayStatusForRoom(roomSlug) {
   // weekday is available now. Includes 'Company' because the long-standing tenants are
   // recorded that way (e.g. With You hold Tue+Thu as Kind='Company').
   const today = new Date().toISOString().slice(0, 10);
-  const recs = await listRecords(T.bookings, {
+  const recs = await listAllRecords(T.bookings, {
     filterByFormula: `AND({Status}='Confirmed', DATETIME_FORMAT({Date}, 'YYYY-MM-DD')>='${esc(today)}', OR({Kind}='Privatisation', {Kind}='Block', {Kind}='External', {Kind}='Company'))`,
   });
   // 'taken' always wins over 'partial', whichever order the records arrive in.
@@ -193,7 +193,7 @@ async function stripe(path, method, form) {
 
 /** Any confirmed privatisation currently on the books (the one-at-a-time lock). */
 async function activePrivatisation() {
-  const recs = await listRecords(T.bookings, { filterByFormula: `AND({Status}='Confirmed', {Kind}='Privatisation')` });
+  const recs = await listAllRecords(T.bookings, { filterByFormula: `AND({Status}='Confirmed', {Kind}='Privatisation')` });
   return recs[0] || null;
 }
 

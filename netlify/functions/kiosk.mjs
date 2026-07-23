@@ -15,6 +15,9 @@
 import memberstackAdmin from '@memberstack/admin';
 import { listRecords, createRecord, updateRecord, T, F, airtableReady, esc } from './_airtable.mjs';
 import { londonNow, isoToLondonMin, londonWallClockToISO, hhmmToMin, minToHHMM, BUSINESS, isWeekday, roomBookingReleased, ROOM_HOLD_GRACE_MIN } from './_time.mjs';
+import { isClosedDay } from './_holidays.mjs';
+import { canBook } from './_entitlement.mjs';
+import { ensureDayForDate } from './checkin.mjs';
 
 const MS_SECRET = process.env.MEMBERSTACK_SECRET_KEY;
 const json = (b, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { 'content-type': 'application/json' } });
@@ -195,6 +198,21 @@ export default async function handler(req) {
     const email = m.auth?.email || m.email || null;
     const cf = m.customFields || {};
     const name = [cf['first-name'], cf['last-name']].filter(Boolean).join(' ').trim() || email || 'Member';
+
+    // A kiosk booking is still a member booking and must clear the SAME gates as every other path.
+    // These actions used to create a Confirmed booking with no entitlement check, no closed-day
+    // check, no past-date bound and no co-working day — a free day in the building, bookable from a
+    // screen in the corridor, bypassing the plan, cap and allowance rules enforced everywhere else.
+    if (await isClosedDay(date)) return json({ error: 'closed-day' }, 400);
+    if (date < londonNow().dateStr) return json({ error: 'past-date' }, 400);
+    const spaceRecs = await listRecords(T.spaces, { filterByFormula: `RECORD_ID()='${esc(spaceId)}'`, maxRecords: 1 });
+    const spaceRec = spaceRecs[0];
+    if (!spaceRec) return json({ error: 'missing-space' }, 400);
+    const gate = await canBook({ member: m, email, spaceRec, dateStr: date, startMin: s, endMin: e });
+    if (!gate.ok) return json(gate, 403);
+    const day = await ensureDayForDate(m, date, { source: 'Kiosk', length: 'Full', block: true });
+    if (day.blocked) return json({ error: day.reason || 'no-allowance', needsDay: true }, 402);
+
     const rec = await createRecord(T.bookings, {
       [F.bookings.title]: `${start}–${end} · ${name}`,
       [F.bookings.space]: [spaceId],
@@ -238,6 +256,21 @@ export default async function handler(req) {
     const email = m.auth?.email || m.email || null;
     const cf = m.customFields || {};
     const name = [cf['first-name'], cf['last-name']].filter(Boolean).join(' ').trim() || email || 'Member';
+
+    // A kiosk booking is still a member booking and must clear the SAME gates as every other path.
+    // These actions used to create a Confirmed booking with no entitlement check, no closed-day
+    // check, no past-date bound and no co-working day — a free day in the building, bookable from a
+    // screen in the corridor, bypassing the plan, cap and allowance rules enforced everywhere else.
+    if (await isClosedDay(date)) return json({ error: 'closed-day' }, 400);
+    if (date < londonNow().dateStr) return json({ error: 'past-date' }, 400);
+    const spaceRecs = await listRecords(T.spaces, { filterByFormula: `RECORD_ID()='${esc(spaceId)}'`, maxRecords: 1 });
+    const spaceRec = spaceRecs[0];
+    if (!spaceRec) return json({ error: 'missing-space' }, 400);
+    const gate = await canBook({ member: m, email, spaceRec, dateStr: date, startMin: s, endMin: e });
+    if (!gate.ok) return json(gate, 403);
+    const day = await ensureDayForDate(m, date, { source: 'Kiosk', length: 'Full', block: true });
+    if (day.blocked) return json({ error: day.reason || 'no-allowance', needsDay: true }, 402);
+
     const rec = await createRecord(T.bookings, {
       [F.bookings.title]: `${start}–${end} · ${name}`,
       [F.bookings.space]: [spaceId],

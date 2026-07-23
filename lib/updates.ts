@@ -18,6 +18,24 @@ export interface Update {
 
 export const UPDATES: Update[] = [
   {
+    id: '2026-07-24-days-ux-screens',
+    date: '2026-07-24',
+    title: 'Full or half — asked properly, and a fix for days coming back that were never spent',
+    items: [
+      'Booking a day now ASKS whether it’s a full or a half day, with real buttons, and tells you what it cost and what’s left. Picking a date from the week strip or the calendar used to book it instantly at whatever the toggle happened to say — members were never actually asked.',
+      'Tap any day in “Your visits” to change it between a full and a half day (or morning to afternoon), or to cancel it — cancelling now asks first, instead of a single tap on a small cross.',
+      'Checked in for the morning and staying on? Change it to a full day from the same place and only the difference comes off.',
+      'Fixed a serious one: cancelling a booked day could hand back a day or a pass that had never actually been taken, so a member could gain days by booking and cancelling. Days and passes are now only ever returned when the ledger shows they were genuinely spent.',
+      'Fixed: checking in could quietly hand a carnet pass straight back, so passes looked like they were never being used. Worth a spot-check of anyone’s pass balance that looks higher than it should.',
+      'Staff check-in from the admin app now uses the same rules as the member app — it can see rolled-over days and carnet passes, so it no longer turns away a member who genuinely has days.',
+      'A member with no days left now gets a clear prompt with two ways forward — buy a day pass or move up a plan — instead of a flat refusal. The same prompt appears when a room or pod booking needs a day.',
+      'You can now buy a SINGLE day pass (£21.60) from the Plan tab, alongside the books of 10 and 30.',
+      'The lobby entrance screen now scales to any display or window — the whole layout is drawn at one size and fitted to the screen, so nothing overlaps or gets cut off on a laptop, a TV or a 4K panel.',
+      'Standing weekly room bookings (like With You’s) now show on every future week. They were dropping off once the bookings table grew past a certain size, which also meant those rooms could be double-booked.',
+      'The “The Quarter has been updated — reload” bar now works on the first press.',
+    ],
+  },
+  {
     id: '2026-07-23-booking-post-hybrid',
     date: '2026-07-23',
     title: 'Clearer day-spending, post in the dashboard & the lobby board back',

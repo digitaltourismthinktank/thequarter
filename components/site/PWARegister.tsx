@@ -14,8 +14,33 @@ import { APP_ROUTES, matchesRoute } from '@/lib/appRoutes';
  *    the member app + admin (APP_ROUTES). It used to appear on public marketing pages and the
  *    always-on wall/kiosk screens too, where a "reload" prompt is noise, not help.
  */
+/**
+ * Take the update NOW, in one press.
+ *
+ * The banner's button used to be a plain window.location.reload(), which often needed pressing
+ * four or five times: a reload is served by whichever worker is still in control, so if the new
+ * one hadn't finished activating you got the very page you were trying to replace, the banner came
+ * straight back, and the only thing that eventually fixed it was luck. So do the three things that
+ * actually make the next load fresh — hand over to the waiting worker, drop the cached HTML, and
+ * only then reload — and don't let a failure in any of them stop the reload.
+ */
+async function applyUpdate() {
+  try {
+    const reg = await navigator.serviceWorker?.getRegistration();
+    if (reg?.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+    if ('caches' in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((k) => caches.delete(k)));
+    }
+  } catch {
+    /* nothing here is required for the reload to be worth doing */
+  }
+  window.location.reload();
+}
+
 export function PWARegister() {
   const [updateReady, setUpdateReady] = useState(false);
+  const [applying, setApplying] = useState(false);
   const pathname = usePathname() || '';
   const inApp = matchesRoute(pathname, APP_ROUTES);
 
@@ -117,7 +142,11 @@ export function PWARegister() {
       <span>The Quarter has been updated.</span>
       <button
         type="button"
-        onClick={() => window.location.reload()}
+        disabled={applying}
+        onClick={() => {
+          setApplying(true);
+          applyUpdate();
+        }}
         style={{
           border: 'none',
           borderRadius: '999px',
@@ -126,10 +155,11 @@ export function PWARegister() {
           color: '#fff',
           fontWeight: 700,
           fontSize: '14px',
-          cursor: 'pointer',
+          cursor: applying ? 'default' : 'pointer',
+          opacity: applying ? 0.7 : 1,
         }}
       >
-        Reload
+        {applying ? 'Updating…' : 'Reload'}
       </button>
     </div>
   );

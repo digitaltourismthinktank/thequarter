@@ -11,7 +11,7 @@
  * Admin-created external bookings / blocks come later via the admin function.
  */
 import { verifyMember, memberEmail, memberName, isAdmin, tokenFromRequest } from './_member.mjs';
-import { listRecords, createRecord, updateRecord, T, F, airtableReady, esc } from './_airtable.mjs';
+import { listRecords, listAllRecords, createRecord, updateRecord, T, F, airtableReady, esc } from './_airtable.mjs';
 import { BUSINESS, hhmmToMin, isWeekday, londonWallClockToISO, isoToLondonMin, isoToLondonDate, londonNow, holdReleased, roomBookingReleased } from './_time.mjs';
 import { isClosedDay } from './_holidays.mjs';
 import { isRecurringBlockRule, recurringBlockOccurrences, parsePrivatisationSlots, isPrivatisedOn } from './_privatisation.mjs';
@@ -109,7 +109,7 @@ async function bookingsForSpaceDate(spaceId, dateStr) {
   // Confirmed blocks (mirrors admin's privatisation approach) is cheap. Each occurrence is the
   // rule's own record: isoToLondonMin(Start/End) gives the right window on any date, and it carries
   // no holdUntil so isReleased() treats it as firmly busy.
-  const blockRecs = await listRecords(T.bookings, {
+  const blockRecs = await listAllRecords(T.bookings, {
     filterByFormula: `AND({Status}='Confirmed', OR({Kind}='Block', {Kind}='External'))`,
   });
   const occ = recurringBlockOccurrences(blockRecs, dateStr)
@@ -181,7 +181,7 @@ export default async function handler(req) {
       // Expand indefinite recurring-Block rules so a block that started on an earlier date still
       // shows the room as occupied today. Rules live on their start date (so they're absent from
       // `recs` and excluded below); fetch all Confirmed blocks and re-add today's occurrences.
-      const blockRecs = await listRecords(T.bookings, {
+      const blockRecs = await listAllRecords(T.bookings, {
         filterByFormula: `AND({Status}='Confirmed', OR({Kind}='Block', {Kind}='External'))`,
       });
       const occRecs = recurringBlockOccurrences(blockRecs, today.dateStr).map((o) => o.record);
@@ -191,7 +191,7 @@ export default async function handler(req) {
       // "Available" on the entrance screen. A privatisation is one marker row on its START
       // date carrying a cadence in Notes — it's in neither `recs` (wrong date) nor
       // `blockRecs` (wrong Kind), so it has to be fetched and expanded for today separately.
-      const privRecs = await listRecords(T.bookings, {
+      const privRecs = await listAllRecords(T.bookings, {
         filterByFormula: `AND({Status}='Confirmed', {Kind}='Privatisation')`,
       });
       const privBookings = [];
@@ -246,7 +246,7 @@ export default async function handler(req) {
         filterByFormula: `AND(DATETIME_FORMAT({Date}, 'YYYY-MM-DD')='${today.dateStr}', {Status}='Confirmed')`,
         sort: [{ field: 'Start' }],
       });
-      const blockRecs = await listRecords(T.bookings, {
+      const blockRecs = await listAllRecords(T.bookings, {
         filterByFormula: `AND({Status}='Confirmed', OR({Kind}='Block', {Kind}='External'))`,
       });
       const occRecs = recurringBlockOccurrences(blockRecs, today.dateStr).map((o) => o.record);
@@ -266,7 +266,7 @@ export default async function handler(req) {
         }));
 
       // All-day workspace privatisations occupying a floor space today (carry the company/name).
-      const privRecs = await listRecords(T.bookings, {
+      const privRecs = await listAllRecords(T.bookings, {
         filterByFormula: `AND({Status}='Confirmed', {Kind}='Privatisation')`,
       });
       const privatisations = [];
@@ -513,6 +513,9 @@ export default async function handler(req) {
     // here only sets Status='Cancelled' with no Stripe refund, silently voiding money paid.
     // Paid changes go through ops/refund, not the member dashboard.
     if (r.fields[F.bookings.kind] === 'Company') return json({ error: 'paid-booking' }, 403);
+    // Idempotent: a replayed or double-tapped cancel must not run the day-release twice and credit
+    // the co-working day back more than once.
+    if (r.fields[F.bookings.status] === 'Cancelled') return json({ ok: true, alreadyCancelled: true });
     await updateRecord(T.bookings, bookingId, { [F.bookings.status]: 'Cancelled' });
     // Cancelling the booking hands back the co-working day it booked — unless another booking that
     // day or a physical check-in still needs it. Only when the OWNER cancels their own (we have their

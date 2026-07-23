@@ -109,7 +109,14 @@ export function isRecurringBlockRule(record) {
   const f = record?.fields || {};
   const kind = f[F.bookings.kind];
   if (kind !== 'Block' && kind !== 'External') return false;
-  return !!parsePrivatisationSlots(f[F.bookings.notes] || '');
+  // Require the EXPLICIT token, not parsePrivatisationSlots' full legacy grammar. That grammar has
+  // to be forgiving because it reads pre-token Privatisation markers, and part of it is prose-level
+  // loose: a bare "all" or a parenthesised digit list anywhere in Notes counts. Staff type free text
+  // into a booking's notes ("all day set-up", "cover (1,3) only"), and any of those phrases turned an
+  // ordinary one-off into a standing weekly rule that repeated on every future weekday forever.
+  // Blocks and company bookings are only ever made rules by the admin form, which always writes the
+  // token — so the token is the whole test here.
+  return /slots=(week|month):[\d-]+/.test(String(f[F.bookings.notes] || ''));
 }
 
 /**

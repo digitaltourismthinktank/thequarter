@@ -322,6 +322,49 @@ function Chooser({ current, onPick }: { current: ScreenChoice | null; onPick: (v
  *   reload → stays standalone/fullscreen). A discreet corner control reopens the Chooser.
  * Rendering `null` until ready avoids a hydration mismatch / entrance-view flash.
  */
+/**
+ * Fit-to-canvas scaling for the wall display.
+ *
+ * The layout was authored against a 1080p screen and, on anything shorter, sections ran into each
+ * other and cards were cut off — the breakpoints could only ever cover the resolutions we thought
+ * to write down. So the screen no longer lays itself out against the real viewport: it lays out at
+ * a FIXED design width (1920 landscape / 1080 portrait) in a box whose height matches the display's
+ * true aspect ratio, and the whole box is then scaled to fit. The proportions are identical at every
+ * resolution — a 1512×800 laptop shows exactly what the 1080p TV shows, just smaller — so nothing
+ * can overlap or be clipped by a size we never anticipated.
+ *
+ * Below 700px wide (a phone glancing at it) scaling is skipped: shrinking a 1920-wide layout onto a
+ * phone would be unreadable, and the plain responsive flow is the better answer there.
+ */
+function useFitCanvas() {
+  const [box, setBox] = useState<{ width: number; height: number; scale: number } | null>(null);
+
+  useEffect(() => {
+    const measure = () => {
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      if (!vw || !vh || vw < 700) {
+        setBox(null);
+        return;
+      }
+      const designW = vw >= vh ? 1920 : 1080;
+      const scale = vw / designW;
+      // Height follows the display's real aspect, so the canvas fills it exactly — no letterboxing,
+      // and no guessing at how tall the screen "should" be.
+      setBox({ width: designW, height: Math.round(vh / scale), scale });
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    window.addEventListener('orientationchange', measure);
+    return () => {
+      window.removeEventListener('resize', measure);
+      window.removeEventListener('orientationchange', measure);
+    };
+  }, []);
+
+  return box;
+}
+
 export function ScreenClient() {
   const [view, setView] = useState<ScreenView | null>(null);
   const [saved, setSaved] = useState<ScreenChoice | null>(null);
@@ -423,6 +466,7 @@ export function ScreenClient() {
 }
 
 function EntranceScreen() {
+  const fit = useFitCanvas();
   const [data, setData] = useState<ScreenData | null>(null);
   const [events, setEvents] = useState<QuarterEvent[]>([]);
   const [announcements, setAnnouncements] = useState<ScreenAnnouncement[]>([]);
@@ -580,7 +624,11 @@ function EntranceScreen() {
   const weekMax = Math.max(...weekDays.map((x) => x.val), 1);
 
   return (
-    <div className={styles.screen}>
+    <div className={styles.stage}>
+      <div
+        className={`${styles.screen}${fit && fit.height <= 950 ? ` ${styles.compact}` : ''}`}
+        style={fit ? { width: `${fit.width}px`, height: `${fit.height}px`, transform: `scale(${fit.scale})` } : undefined}
+      >
       {/* Wall displays often run on old machines where the browser's own full-screen is
           fiddly to reach — this puts it one tap away. Fades back once you're in. */}
       <button type="button" className={styles.fsBtn} onClick={toggleFullscreen} title={isFullscreen ? 'Exit full screen' : 'Full screen'}>
@@ -722,7 +770,8 @@ function EntranceScreen() {
         </section>
       ) : null}
 
-      {!loaded ? <p className={styles.loading}>Loading…</p> : null}
+        {!loaded ? <p className={styles.loading}>Loading…</p> : null}
+      </div>
     </div>
   );
 }

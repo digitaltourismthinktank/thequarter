@@ -16,7 +16,7 @@ import { listRecords, listAllRecords, createRecord, updateRecord, deleteRecord, 
 import { londonWallClockToISO, isoToLondonMin, isoToLondonDate, hhmmToMin, londonNow, holdReleased, addDays } from './_time.mjs';
 import { PLAN_NAMES, allowanceForMember, setMemberPlan, clearMemberPlan, renewMember, formatDate, liveRollover, MS_ROLLOVER, MS_ROLLOVER_EXP, addMonthsISO, todayISO } from './_quarter-sync.mjs';
 import { listRewards, listPerks, listFloats, floatStatus, awardPoints, redeemReward, partnerPayouts, markPartnerPaid, partnerStatement } from './_rewards.mjs';
-import { plannedConsumed } from './checkin.mjs';
+import { plannedConsumed, refundPlannedDay, consumePlannedDay } from './checkin.mjs';
 import { sendEmail, emailShell, escapeHtml, OPS_EMAIL, fmtDateLong } from './_email.mjs';
 import { pushToEmail } from './_push.mjs';
 import { roomHoursCap } from './_entitlement.mjs';
@@ -263,7 +263,7 @@ async function bookingsForDate(date) {
  * not-free. Marker rows are few, so loading them all is cheap.
  */
 async function privatisationsForDate(date) {
-  const recs = await listRecords(T.bookings, {
+  const recs = await listAllRecords(T.bookings, {
     filterByFormula: `AND({Status}='Confirmed', {Kind}='Privatisation')`,
   });
   const out = [];
@@ -303,7 +303,7 @@ async function privatisationsForDate(date) {
 async function recurringBlocksForDate(date) {
   // Block AND External rules recur indefinitely (company bookings store Kind='External'), so fetch
   // both kinds; recurringBlockOccurrences filters to genuine rule rows (token-bearing) among them.
-  const recs = await listRecords(T.bookings, {
+  const recs = await listAllRecords(T.bookings, {
     filterByFormula: `AND({Status}='Confirmed', OR({Kind}='Block', {Kind}='External'))`,
   });
   const now = londonNow();
@@ -862,42 +862,34 @@ export default async function handler(req) {
         return json({ ok: true, alreadyBooked: true });
       }
       // Not yet settled — spend the BOOKED length now (never the admin's default), then flip.
-      const bookedCost = bookedLen === 'Half' ? 0.5 : 1;
-      if (!unlimited && cur !== null) {
-        if (cur < bookedCost) return json({ error: 'no-allowance' }, 400);
-        await admin.members.update({ id: body.memberId, data: { customFields: { 'days-remaining': String(Math.max(0, cur - bookedCost)) } } });
-      }
-      const bookedPeriod = bookedLen === 'Half' ? (periodFromNotes(plannedToday.fields[F.checkins.notes]) || 'am').toUpperCase() : '';
-      await updateRecord(T.checkins, plannedToday.id, {
-        [F.checkins.status]: 'Checked-in',
-        [F.checkins.length]: bookedLen,
-        [F.checkins.notes]: bookedPeriod,
-        [F.checkins.dayCost]: unlimited ? 0 : bookedCost,
-        [F.checkins.source]: 'Admin',
-      });
+      // Routed through consumePlannedDay so staff check-in uses the SAME audited money path as the
+      // member app: it spends rollover before plan days, falls back to a carnet pass, stamps the
+      // funding marker + settlement, and withholds points on a zero-cost day. The old inline copy
+      // read only `days-remaining`, so it was blind to the rollover bucket and to carnet passes —
+      // refusing members who had days, and mis-recording those it did let through.
+      await consumePlannedDay(m, { dateStr: today, length: bookedLen, row: plannedToday });
+      await updateRecord(T.checkins, plannedToday.id, { [F.checkins.status]: 'Checked-in', [F.checkins.source]: 'Admin' });
       return json({ ok: true, alreadyBooked: true });
     }
 
     // No booking today — a fresh admin check-in at the length staff chose. Block when the
     // allowance is exhausted (metered member with < cost left).
-    if (!unlimited && cur !== null && cur < cost) {
-      return json({ error: 'no-allowance' }, 400);
-    }
-    if (!unlimited && cur !== null) {
-      await admin.members.update({ id: body.memberId, data: { customFields: { 'days-remaining': String(Math.max(0, cur - cost)) } } });
-    }
-    await createRecord(T.checkins, {
+    // Same audited path as a member walk-in: create the row, spend through consumePlannedDay
+    // (rollover → plan → carnet, with the funding marker + settlement stamped), then record arrival.
+    const fresh = await createRecord(T.checkins, {
       [F.checkins.ref]: `${name} · ${today}`,
       [F.checkins.email]: email,
       [F.checkins.name]: name,
       [F.checkins.date]: today,
       [F.checkins.length]: length,
       [F.checkins.notes]: chosenPeriodNote,
-      [F.checkins.dayCost]: unlimited ? 0 : cost,
-      [F.checkins.status]: 'Checked-in',
+      [F.checkins.dayCost]: 0,
+      [F.checkins.status]: 'Planned',
       [F.checkins.source]: 'Admin',
     });
-    return json({ ok: true });
+    const spent = await consumePlannedDay(m, { dateStr: today, length, row: fresh });
+    await updateRecord(T.checkins, fresh.id, { [F.checkins.status]: 'Checked-in', [F.checkins.source]: 'Admin' });
+    return json({ ok: true, balance: spent.newBalance, usedCarnet: spent.usedCarnet, carnetRemaining: spent.carnetRemaining });
   }
 
   // Undo a check-in from the Today pane: cancel the row, and (unless the member is
@@ -913,20 +905,17 @@ export default async function handler(req) {
     if (r.fields[F.checkins.status] === 'Cancelled') return json({ ok: true, alreadyCancelled: true });
     await updateRecord(T.checkins, body.id, { [F.checkins.status]: 'Cancelled' }, { typecast: true });
     try {
-      const dayCost = Number(r.fields[F.checkins.dayCost]) || 0;
       const email = r.fields[F.checkins.email];
-      if (dayCost > 0 && email) {
+      if (email) {
         const admin = memberstackAdmin.init(MS_SECRET);
         const mr = await admin.members.retrieve({ email });
         const m = mr?.data;
-        // allowanceForMember === null means unlimited — nothing to refund.
-        if (m && allowanceForMember(m) !== null) {
-          const raw = m.customFields?.['days-remaining'];
-          const cur = String(raw).toLowerCase() === 'unlimited' ? null : Math.max(0, parseFloat(String(raw)) || 0);
-          if (cur !== null) {
-            await admin.members.update({ id: m.id, data: { customFields: { 'days-remaining': String(cur + dayCost) } } });
-          }
-        }
+        // Use the ONE refund implementation (checkin.mjs) rather than a second copy. This path used
+        // to read only Day cost against days-remaining, so undoing a CARNET-funded check-in
+        // destroyed the member's pass outright (Day cost is 0 on those rows), and a rollover-funded
+        // day was repaid into the wrong bucket. refundPlannedDay handles carnet, the rollover/plan
+        // split and the settlement rule (it refuses to pay out on a debit that never landed).
+        if (m) await refundPlannedDay(m, r);
       }
     } catch {
       /* refund is best-effort — the cancel already succeeded */

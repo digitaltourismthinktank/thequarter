@@ -318,17 +318,17 @@ export const bookTour = (b: { date: string; time: string; name: string; email: s
 // Check-in
 export const getCheckinToday = () => call<CheckinStatus>('checkin?action=today');
 export const checkInToday = (length: 'Full' | 'Half', period?: DayPeriod | null) =>
-  call<{ ok: boolean; balance: string | null; pointsAwarded?: number; alreadyCheckedIn?: boolean; alreadyBooked?: boolean; length?: 'Full' | 'Half'; usedCarnet?: boolean; carnetRemaining?: number | null }>('checkin', {
+  call<{ ok: boolean; balance: string | null; dayCost?: number; pointsAwarded?: number; alreadyCheckedIn?: boolean; alreadyBooked?: boolean; length?: 'Full' | 'Half'; usedCarnet?: boolean; carnetRemaining?: number | null }>('checkin', {
     method: 'POST',
     body: { action: 'checkin', length, ...(length === 'Half' && period ? { period } : {}) },
   });
-/** Change TODAY's booked/checked-in day between Half and Full. Adjusts ONLY the day difference
- *  (points are per-attendance and never change). `change-unsupported` = an over-allowance day the
- *  member should cancel & rebook instead. */
-export const changeCheckinLength = (length: 'Full' | 'Half', period?: DayPeriod | null) =>
+/** Change a booked/checked-in day between Half and Full — today by default, or any upcoming day
+ *  via `date`. Adjusts ONLY the day difference (points are per-attendance and never change).
+ *  `change-unsupported` = an over-allowance day the member should cancel & rebook instead. */
+export const changeCheckinLength = (length: 'Full' | 'Half', period?: DayPeriod | null, date?: string) =>
   call<{ ok: boolean; length?: 'Full' | 'Half'; dayDelta?: number; balance?: string | null; pending?: boolean; unchanged?: boolean; error?: string }>('checkin', {
     method: 'POST',
-    body: { action: 'changeLength', length, ...(length === 'Half' && period ? { period } : {}) },
+    body: { action: 'changeLength', length, ...(length === 'Half' && period ? { period } : {}), ...(date ? { date } : {}) },
   });
 /** Shared-kiosk check-in: no login — the member is identified by the id from the privacy-safe
  *  name search. Runs the same server-side check-in as checkInToday (Source is recorded 'Kiosk'). */
@@ -350,6 +350,9 @@ export const reserveDay = (date: string, length: 'Full' | 'Half', period?: DayPe
     pointsAwarded?: number;
     usedCarnet?: boolean;
     carnetRemaining?: number | null;
+    /** The day falls in a LATER billing cycle, so it's held and paid for out of that cycle's
+     *  allowance on the morning itself — nothing has come off today's balance. */
+    deferred?: boolean;
     error?: string;
   }>('checkin', { method: 'POST', body: { action: 'reserve', date, length, ...(length === 'Half' && period ? { period } : {}) } });
 export const cancelReservation = (id: string) =>
