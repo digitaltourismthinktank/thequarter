@@ -8,6 +8,7 @@
  * web-push is imported lazily so a missing dep/keys never breaks module load.
  */
 import { getMemberSync } from './_quarter-sync.mjs';
+import { addNotification } from './_notifications.mjs';
 
 const PUB = process.env.VAPID_PUBLIC_KEY;
 const PRIV = process.env.VAPID_PRIVATE_KEY;
@@ -53,8 +54,25 @@ export async function pushToMember(member, payload) {
   return sendPush(Array.isArray(subs) ? subs : [], payload);
 }
 
-/** Look the member up by email (via the sync helper) and push to their devices. */
+/** Extract the inbox fields from a push payload (shape: { title, body, url, kind }). */
+function inboxFrom(payload) {
+  return {
+    title: payload?.title,
+    body: payload?.body,
+    url: payload?.url || payload?.data?.url || '',
+    kind: payload?.kind || '',
+  };
+}
+
+/**
+ * Look the member up by email (via the sync helper) and push to their devices.
+ * ALSO stores the notification in the inbox (bell) — independently of push config, so the row
+ * lands even when VAPID is off or the member has no subscription. Best-effort; never throws.
+ */
 export async function pushToEmail(email, payload) {
+  // Awaited (not fire-and-forget) so the row survives the function returning; addNotification
+  // swallows its own errors, so this never throws or blocks on a missing/renamed table.
+  if (email) await addNotification({ recipient: email, audience: 'member', ...inboxFrom(payload) });
   if (!pushConfigured()) return { skipped: true };
   const MS = process.env.MEMBERSTACK_SECRET_KEY;
   if (!MS || !email) return { skipped: true };
@@ -73,6 +91,9 @@ export async function pushToEmail(email, payload) {
  * email domain, so gather their subscriptions and push to all of them.
  */
 export async function pushToAdmins(payload) {
+  // One shared admin-feed row (recipient blank), independent of push config. Awaited so it
+  // persists before the function returns; best-effort inside, so it never throws.
+  await addNotification({ recipient: '', audience: 'admin', ...inboxFrom(payload) });
   if (!pushConfigured()) return { skipped: true };
   const MS = process.env.MEMBERSTACK_SECRET_KEY;
   if (!MS) return { skipped: true };

@@ -12,6 +12,7 @@ import { getMemberstack, memberName, memberInitials, memberDaysRemaining } from 
 import { MobileTabBar } from './MobileTabBar';
 import { QuarterCharacter } from './QuarterCharacter';
 import { CheckInSheet } from './CheckInSheet';
+import { NotificationsBell } from './NotificationsBell';
 import styles from './MemberShell.module.css';
 
 const TABS: { href: string; label: string; icon: IconName }[] = [
@@ -107,6 +108,9 @@ export function MemberShell({ children, wide = false }: { children: ReactNode; w
                 <span>Switch to admin</span>
               </Link>
             ) : null}
+
+            {/* The bell serves both apps: the admin view reads the shared staff feed. */}
+            <NotificationsBell scope={onAdmin ? 'admin' : 'member'} />
 
             <Link href="/account" className={styles.identity} title="Your account">
               <span className={styles.idText}>

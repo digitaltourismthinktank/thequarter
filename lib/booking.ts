@@ -548,6 +548,37 @@ export const adminActivity = (params: { member?: string; from?: string; to?: str
   if (params.to) q.set('to', params.to);
   return call<{ events: ActivityEvent[]; total: number; truncated?: boolean; activityLive?: boolean }>(`admin?${q.toString()}`);
 };
+/* ── Notifications inbox (the bell) ─────────────────────────────────────────
+   Every push the app sends is mirrored into a durable inbox. `scope` is 'member' (the
+   caller's own) or 'admin' (the shared staff feed — admin callers only). All calls degrade
+   to an empty inbox when the Notifications table isn't configured. */
+export interface Notification {
+  id: string;
+  at: string;
+  title: string;
+  body: string;
+  url: string;
+  kind: string;
+  read: boolean;
+}
+export type NotifyScope = 'member' | 'admin';
+interface NotifyResult {
+  ok: boolean;
+  configured: boolean;
+  notifications: Notification[];
+  unread: number;
+}
+export const listNotifications = (scope: NotifyScope = 'member') =>
+  call<NotifyResult>(`notifications?scope=${scope}`);
+export const markNotificationsRead = (ids: string[], scope: NotifyScope = 'member') =>
+  call<NotifyResult>('notifications', { method: 'POST', body: { action: 'read', ids, scope } });
+export const markAllNotificationsRead = (scope: NotifyScope = 'member') =>
+  call<NotifyResult>('notifications', { method: 'POST', body: { action: 'readAll', scope } });
+export const clearNotification = (id: string, scope: NotifyScope = 'member') =>
+  call<NotifyResult>('notifications', { method: 'POST', body: { action: 'clear', ids: [id], scope } });
+export const clearAllNotifications = (scope: NotifyScope = 'member') =>
+  call<NotifyResult>('notifications', { method: 'POST', body: { action: 'clearAll', scope } });
+
 export const adminBlock = (b: {
   spaceId: string;
   date: string;
