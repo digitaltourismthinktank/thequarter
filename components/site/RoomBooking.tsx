@@ -25,6 +25,7 @@ import { TalkToUs } from './TalkToUs';
 import { DatePickerModal } from './DatePickerModal';
 import { PREVIEW } from '@/lib/devMock';
 import { cn } from '@/lib/cn';
+import { BuyPassSheet } from './BuyPassSheet';
 import styles from './RoomBooking.module.css';
 
 /**
@@ -154,6 +155,7 @@ export function RoomBooking({ roomName, price }: { roomName: string; price: { ha
   const [error, setError] = useState<string | null>(null);
   // Out of co-working days: a decision point, not just an error line — show buy/change CTAs.
   const [blocked, setBlocked] = useState<'no-allowance' | 'needs-plan-or-pass' | null>(null);
+  const [buyPass, setBuyPass] = useState(false);
   const [serverLines, setServerLines] = useState<RoomQuoteLine[] | null>(null);
   // TEST COMP: a secret ?test=<code> routes to the server's env-gated comp path (skips Stripe).
   const [testCode, setTestCode] = useState('');
@@ -813,11 +815,12 @@ export function RoomBooking({ roomName, price }: { roomName: string; price: { ha
             <strong className={styles.blockedTitle}>{blocked === 'needs-plan-or-pass' ? 'You’ll need a plan or a day pass' : 'You’ve no co-working days left'}</strong>
             <p className={styles.blockedBody}>Booking a room or pod uses one of your co-working days for that date, and you’ve none left. Add a day pass for one-offs, or change plan if you’re here often.</p>
             <div className={styles.blockedActions}>
-              <a className={styles.blockedPrimary} href="/plan/#passes">Buy a day pass</a>
+              <button type="button" className={styles.blockedPrimary} onClick={() => setBuyPass(true)}>Buy a day pass</button>
               <a className={styles.blockedGhost} href="/plan/">{blocked === 'needs-plan-or-pass' ? 'Choose a plan' : 'Change plan'}</a>
             </div>
           </div>
         ) : null}
+        <BuyPassSheet open={buyPass} onClose={() => setBuyPass(false)} onPurchased={() => { setBuyPass(false); setBlocked(null); }} />
         {error ? <p className={styles.err}>{error}</p> : null}
         <p className={styles.note}>
           Questions about your booking? <a href="#enquire">Chat to us</a>.

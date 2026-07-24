@@ -6,6 +6,7 @@ import { Icon } from '@/components/ds/Icon';
 import { cn } from '@/lib/cn';
 import { reserveDay, checkInToday, cancelReservation, changeCheckinLength, announceBalancesChanged, type DayPeriod } from '@/lib/booking';
 import { haptic, playChime } from '@/lib/feedback';
+import { BuyPassSheet } from './BuyPassSheet';
 import styles from './DaySheet.module.css';
 
 /** The hour (0–23) right now in London — so a same-day check-in can assume the sensible length.
@@ -135,6 +136,7 @@ export function DaySheet({
   const [blocked, setBlocked] = useState<'no-allowance' | 'needs-plan-or-pass' | null>(null);
   const [done, setDone] = useState<{ title: string; detail: string | null } | null>(null);
   const [confirmCancel, setConfirmCancel] = useState(false);
+  const [buyPass, setBuyPass] = useState(false);
 
   // Open fresh every time.
   useEffect(() => {
@@ -455,9 +457,9 @@ export function DaySheet({
                     : 'Your plan’s days for this period are all used. Add a day pass for one-offs, or change plan if you’re here more often than it allows.'}
                 </p>
                 <div className={styles.blockedActions}>
-                  <a className={styles.blockedPrimary} href="/plan/#passes">
+                  <button type="button" className={styles.blockedPrimary} onClick={() => setBuyPass(true)}>
                     Buy a day pass
-                  </a>
+                  </button>
                   <a className={styles.blockedGhost} href="/plan/">
                     {blocked === 'needs-plan-or-pass' ? 'Choose a plan' : 'Change plan'}
                   </a>
@@ -501,6 +503,17 @@ export function DaySheet({
           </>
         )}
       </div>
+      <BuyPassSheet
+        open={buyPass}
+        onClose={() => setBuyPass(false)}
+        onPurchased={() => {
+          // Pass bought — clear the block and re-read, so they can carry straight on.
+          setBuyPass(false);
+          setBlocked(null);
+          announceBalancesChanged();
+          onChanged();
+        }}
+      />
     </div>
   );
 

@@ -504,6 +504,24 @@ export const adminGetMembers = () => call<{ members: AdminMember[] }>('admin?act
 export const adminGetSpaces = () => call<{ spaces: AdminSpace[] }>('admin?action=spaces');
 export const adminGetCalendar = (date: string) => call<{ date: string; bookings: AdminBooking[] }>(`admin?action=calendar&date=${date}`);
 
+/** Diagnostic: every active recurring rule / privatisation / company block and how the code parses
+ *  it — so "why isn't this weekly block showing?" can be answered from the data. */
+export interface ActiveRule {
+  id: string;
+  kind: string;
+  space: string;
+  who: string;
+  title: string;
+  start: string;
+  cadence: 'week' | 'month' | null;
+  weekdays: number[];
+  hasToken: boolean;
+  isRule: boolean;
+  isPrivatisation: boolean;
+  notes: string;
+}
+export const adminGetRules = () => call<{ rules: ActiveRule[] }>('admin?action=rules');
+
 /** One row of the admin audit ledger. Deltas (days/roll/passes/points) are signed movements where
  *  known; `base` names the Airtable table / system the underlying record lives in. */
 export interface ActivityEvent {

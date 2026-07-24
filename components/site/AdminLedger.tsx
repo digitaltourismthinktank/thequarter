@@ -1,8 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { adminActivity, type ActivityEvent } from '@/lib/booking';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { adminActivity, adminGetMembers, type ActivityEvent, type AdminMember } from '@/lib/booking';
 import styles from './AdminLedger.module.css';
+
+const iso = (d: Date) => d.toISOString().slice(0, 10);
+const daysAgo = (n: number) => iso(new Date(Date.now() - n * 86400000));
 
 /** Human label + tone for each event type. Tone drives the little type chip's colour. */
 const TYPE_META: Record<string, { label: string; tone: 'day' | 'money' | 'points' | 'admin' | 'post' | 'neutral' }> = {
@@ -76,12 +79,16 @@ function toCsv(events: ActivityEvent[]): string {
  * it lives in. Filter by member (email) and date window; export the current view to CSV.
  */
 export function AdminLedgerPane() {
-  const today = new Date().toISOString().slice(0, 10);
-  const monthAgo = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
-  const [member, setMember] = useState('');
-  const [from, setFrom] = useState(monthAgo);
+  const today = iso(new Date());
+  const [member, setMember] = useState(''); // the resolved email we query on
+  const [from, setFrom] = useState(daysAgo(30));
   const [to, setTo] = useState(today);
   const [filter, setFilter] = useState('all');
+  // Member typeahead — search by name (like the room-booking admin), resolve to their email.
+  const [members, setMembers] = useState<AdminMember[]>([]);
+  const [memberQuery, setMemberQuery] = useState('');
+  const [pickOpen, setPickOpen] = useState(false);
+  const pickWrap = useRef<HTMLDivElement | null>(null);
   const [events, setEvents] = useState<ActivityEvent[] | null>(null);
   const [meta, setMeta] = useState<{ total: number; truncated?: boolean; activityLive?: boolean } | null>(null);
   const [loading, setLoading] = useState(false);
@@ -100,6 +107,39 @@ export function AdminLedgerPane() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Members for the lookup — fetched once.
+  useEffect(() => {
+    adminGetMembers().then((r) => {
+      if (r.ok) setMembers(r.data.members);
+    });
+  }, []);
+  // Close the lookup dropdown on an outside click.
+  useEffect(() => {
+    const onDoc = (e: MouseEvent) => {
+      if (pickWrap.current && !pickWrap.current.contains(e.target as Node)) setPickOpen(false);
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, []);
+
+  const matches = useMemo(() => {
+    const q = memberQuery.trim().toLowerCase();
+    if (!q) return [];
+    return members
+      .filter((m) => `${m.name ?? ''} ${m.email ?? ''}`.toLowerCase().includes(q))
+      .slice(0, 8);
+  }, [members, memberQuery]);
+
+  function chooseMember(m: AdminMember) {
+    setMember((m.email ?? '').toLowerCase());
+    setMemberQuery(m.name || m.email || '');
+    setPickOpen(false);
+  }
+  function clearMember() {
+    setMember('');
+    setMemberQuery('');
+  }
 
   const shown = useMemo(() => {
     const types = FILTERS.find((f) => f.id === filter)?.types ?? [];
@@ -134,10 +174,39 @@ export function AdminLedgerPane() {
       </div>
 
       <div className={styles.controls}>
-        <label className={styles.field}>
-          <span>Member email</span>
-          <input type="text" inputMode="email" placeholder="Leave blank for everyone" value={member} onChange={(e) => setMember(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && load()} />
-        </label>
+        <div className={styles.field} ref={pickWrap}>
+          <span>Member</span>
+          <div className={styles.lookup}>
+            <input
+              type="text"
+              placeholder="Search by name — or leave blank for everyone"
+              value={memberQuery}
+              onChange={(e) => {
+                setMemberQuery(e.target.value);
+                setPickOpen(true);
+                if (!e.target.value.trim()) setMember('');
+              }}
+              onFocus={() => setPickOpen(true)}
+            />
+            {member || memberQuery ? (
+              <button type="button" className={styles.lookupClear} onClick={clearMember} aria-label="Clear member">
+                ×
+              </button>
+            ) : null}
+            {pickOpen && matches.length ? (
+              <ul className={styles.lookupMenu}>
+                {matches.map((m) => (
+                  <li key={m.id}>
+                    <button type="button" onClick={() => chooseMember(m)}>
+                      <span className={styles.lookupName}>{m.name || '—'}</span>
+                      <span className={styles.lookupEmail}>{m.email}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        </div>
         <label className={styles.field}>
           <span>From</span>
           <input type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} />
@@ -149,6 +218,27 @@ export function AdminLedgerPane() {
         <button type="button" className={styles.apply} onClick={load} disabled={loading}>
           {loading ? 'Loading…' : 'Apply'}
         </button>
+      </div>
+
+      <div className={styles.presets}>
+        {[
+          { label: 'Last 7 days', from: daysAgo(7) },
+          { label: 'Last 30 days', from: daysAgo(30) },
+          { label: 'Last 90 days', from: daysAgo(90) },
+          { label: 'This year', from: `${today.slice(0, 4)}-01-01` },
+        ].map((p) => (
+          <button
+            key={p.label}
+            type="button"
+            className={styles.preset}
+            onClick={() => {
+              setFrom(p.from);
+              setTo(today);
+            }}
+          >
+            {p.label}
+          </button>
+        ))}
       </div>
 
       <div className={styles.filterRow}>

@@ -17,25 +17,37 @@ import { APP_ROUTES, matchesRoute } from '@/lib/appRoutes';
 /**
  * Take the update NOW, in one press.
  *
- * The banner's button used to be a plain window.location.reload(), which often needed pressing
- * four or five times: a reload is served by whichever worker is still in control, so if the new
- * one hadn't finished activating you got the very page you were trying to replace, the banner came
- * straight back, and the only thing that eventually fixed it was luck. So do the three things that
- * actually make the next load fresh — hand over to the waiting worker, drop the cached HTML, and
- * only then reload — and don't let a failure in any of them stop the reload.
+ * The reason it used to need pressing several times: the old code reloaded IMMEDIATELY after asking
+ * the waiting worker to skip waiting — but skipWaiting→activate→claim is asynchronous, so the reload
+ * fired while the OLD worker was still in control and re-served the very page we were replacing. The
+ * fix is to reload only once the NEW worker has actually taken control: we listen for
+ * `controllerchange` (which fires after the new worker activates and claims the page) and reload
+ * then, with a short timeout as a backstop so a press never appears to do nothing.
  */
 async function applyUpdate() {
+  let reloaded = false;
+  const go = () => {
+    if (reloaded) return;
+    reloaded = true;
+    window.location.reload();
+  };
   try {
-    const reg = await navigator.serviceWorker?.getRegistration();
-    if (reg?.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
     if ('caches' in window) {
       const keys = await caches.keys();
       await Promise.all(keys.map((k) => caches.delete(k)));
     }
+    const reg = await navigator.serviceWorker?.getRegistration();
+    if (reg?.waiting && navigator.serviceWorker.controller) {
+      // Reload when the new worker takes over, not before.
+      navigator.serviceWorker.addEventListener('controllerchange', go, { once: true });
+      reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+      setTimeout(go, 2000); // backstop if controllerchange is missed
+      return;
+    }
   } catch {
-    /* nothing here is required for the reload to be worth doing */
+    /* fall through to a plain reload */
   }
-  window.location.reload();
+  go();
 }
 
 export function PWARegister() {

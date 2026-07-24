@@ -26,6 +26,7 @@ import { STRIPE_PUBLISHABLE_KEY } from '@/lib/commerce';
 import { WeekStrip } from './WeekStrip';
 import { DatePickerModal } from './DatePickerModal';
 import { PLAN_ROOM_HOURS, MEMBER_ROOM_DISCOUNT, planSlugFromMemberstackId } from '@/lib/plans';
+import { BuyPassSheet } from './BuyPassSheet';
 import styles from './BookingClient.module.css';
 
 const money = (n: number) => `£${n.toFixed(2)}`;
@@ -113,6 +114,9 @@ export function BookingClient() {
   const [sel, setSel] = useState<{ start: number; end: number } | null>(null); // committed range
   const [mine, setMine] = useState<MyBooking[]>([]);
   const [busyAction, setBusyAction] = useState(false);
+  // Out of co-working days: a decision point (buy a pass / change plan), not just a red line.
+  const [blocked, setBlocked] = useState<'no-allowance' | 'needs-plan-or-pass' | null>(null);
+  const [buyPass, setBuyPass] = useState(false);
   // Inline amend (move a booking's date/time, same room) — parity with the dashboard,
   // which already allowed this while the Book tab only offered Cancel.
   const [editId, setEditId] = useState<string | null>(null);
@@ -334,6 +338,7 @@ export function BookingClient() {
     if (!sel || !spaceId) return;
     setBusyAction(true);
     setMsg(null);
+    setBlocked(null);
     const r = await createBooking({ spaceId, date, start: minToHHMM(sel.start), end: minToHHMM(sel.end) });
     if (r.ok) {
       setMsg('Booked ✓');
@@ -343,7 +348,9 @@ export function BookingClient() {
       await reloadAvail();
       await loadMine();
     } else {
-      setMsg(friendly(r.data?.error));
+      const code = r.data?.error ?? '';
+      if (code === 'no-allowance' || code === 'needs-plan-or-pass') setBlocked(code);
+      else setMsg(friendly(code));
     }
     setBusyAction(false);
   }
@@ -694,6 +701,29 @@ export function BookingClient() {
             <p className={styles.bookMsg} role="status">
               {msg}
             </p>
+          ) : null}
+          <BuyPassSheet
+            open={buyPass}
+            onClose={() => setBuyPass(false)}
+            onPurchased={async () => {
+              setBuyPass(false);
+              setBlocked(null);
+              setMsg('Day pass added — you can book now.');
+            }}
+          />
+          {blocked ? (
+            <div className={styles.noDays} role="status">
+              <strong className={styles.noDaysTitle}>{blocked === 'needs-plan-or-pass' ? 'You’ll need a plan or a day pass' : 'You’ve no co-working days left'}</strong>
+              <p className={styles.noDaysBody}>Booking a room or pod uses one of your co-working days for that day. Add a day pass for one-offs, or change plan if you’re here often — then book.</p>
+              <div className={styles.noDaysActions}>
+                <button type="button" className={styles.noDaysPrimary} onClick={() => setBuyPass(true)}>
+                  Buy a day pass
+                </button>
+                <a className={styles.noDaysGhost} href="/plan/">
+                  {blocked === 'needs-plan-or-pass' ? 'Choose a plan' : 'Change plan'}
+                </a>
+              </div>
+            </div>
           ) : null}
 
           {loadingAvail ? (

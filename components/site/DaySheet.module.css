@@ -305,3 +305,13 @@
     animation: none;
   }
 }
+
+/* .blockedPrimary is now a <button> in places — keep it identical to the link version. */
+.blockedPrimary,
+.blockedGhost {
+  font: inherit;
+  cursor: pointer;
+}
+.blockedPrimary {
+  border: none;
+}

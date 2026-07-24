@@ -605,3 +605,55 @@
   font-weight: var(--fw-semibold);
   font-size: var(--text-sm);
 }
+
+/* Out-of-days prompt on the room-booking flow — same two ways forward as the check-in sheet:
+   buy a pass right here, or change plan. Gold wash, not a red error. */
+.noDays {
+  margin: 12px 0 0;
+  padding: 14px;
+  border: 1px solid var(--gold-300);
+  border-radius: var(--radius-lg);
+  background: var(--gold-100);
+}
+.noDaysTitle {
+  display: block;
+  font-size: var(--text-base);
+  font-weight: var(--fw-bold);
+  color: var(--ink-900);
+}
+.noDaysBody {
+  margin: 6px 0 0;
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  color: var(--text-body);
+}
+.noDaysActions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 12px;
+}
+.noDaysPrimary,
+.noDaysGhost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 11px 12px;
+  border-radius: var(--radius-pill);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: var(--fw-bold);
+  text-decoration: none;
+  cursor: pointer;
+}
+.noDaysPrimary {
+  background: var(--ink-900);
+  color: var(--sand-50);
+  border: none;
+}
+.noDaysGhost {
+  background: var(--surface-card);
+  color: var(--ink-900);
+  border: 1px solid var(--border-subtle);
+}

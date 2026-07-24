@@ -506,3 +506,13 @@
   color: var(--ink-900);
   border: 1px solid var(--border-subtle);
 }
+
+/* .blockedPrimary is now a <button> in places — keep it identical to the link version. */
+.blockedPrimary,
+.blockedGhost {
+  font: inherit;
+  cursor: pointer;
+}
+.blockedPrimary {
+  border: none;
+}

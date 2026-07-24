@@ -560,6 +560,39 @@ export default async function handler(req) {
       return json(await partnerStatement(partner, { month: url2.searchParams.get('month') || undefined }));
     }
     if (action === 'spaces') return json({ spaces: await allSpaces() });
+    if (action === 'rules') {
+      // Diagnostic: every active recurring RULE + privatisation + company/block, with how the code
+      // PARSES it — so a "why isn't With You showing?" can be answered from the data itself (is the
+      // slots= token present? which weekdays? is it detected as a rule?).
+      const recs = await listAllRecords(T.bookings, {
+        filterByFormula: `AND({Status}='Confirmed', OR({Kind}='Block', {Kind}='External', {Kind}='Company', {Kind}='Privatisation'))`,
+      });
+      const spaceRecs = await listRecords(T.spaces, {});
+      const spaceName = (id) => (spaceRecs.find((x) => x.id === id)?.fields?.[F.spaces.name]) || id || '—';
+      const rules = recs.map((r) => {
+        const f = r.fields;
+        const notes = String(f[F.bookings.notes] || '');
+        const parsed = parsePrivatisationSlots(notes);
+        const spaceId = Array.isArray(f[F.bookings.space]) ? f[F.bookings.space][0] : f[F.bookings.space] || null;
+        return {
+          id: r.id,
+          kind: f[F.bookings.kind] || '',
+          space: spaceName(spaceId),
+          who: f[F.bookings.company] || f[F.bookings.name] || f[F.bookings.email] || '',
+          title: f[F.bookings.title] || '',
+          start: isoToLondonDate(f[F.bookings.date]) || '',
+          cadence: parsed?.cadence || null,
+          weekdays: parsed?.weekdays || [],
+          hasToken: /slots=(week|month):[\d-]+/.test(notes),
+          isRule: isRecurringBlockRule(r),
+          isPrivatisation: f[F.bookings.kind] === 'Privatisation',
+          notes: notes.slice(0, 160),
+        };
+      });
+      // Rules/privatisations first, then plain dated company/block rows.
+      rules.sort((a, b) => (b.isRule || b.isPrivatisation ? 1 : 0) - (a.isRule || a.isPrivatisation ? 1 : 0) || String(a.start).localeCompare(String(b.start)));
+      return json({ rules });
+    }
     if (action === 'activity') {
       const u = new URL(req.url);
       const email = u.searchParams.get('member') || '';

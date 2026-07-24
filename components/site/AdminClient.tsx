@@ -30,8 +30,10 @@ import {
   adminCancel,
   amendBooking,
   adminGetTourBlocks,
+  adminGetRules,
   adminBlockTours,
   type TourBlock,
+  type ActiveRule,
   adminGetWeekendRequests,
   adminApproveWeekend,
   adminDeclineWeekend,
@@ -278,7 +280,7 @@ export function AdminClient() {
           Comms
         </button>
         <button type="button" className={`${styles.tab} ${tab === 'rooms' ? styles.tabOn : ''}`} onClick={() => setTab('rooms')}>
-          Rooms &amp; bookings
+          Rooms
         </button>
         <button type="button" className={`${styles.tab} ${tab === 'ledger' ? styles.tabOn : ''}`} onClick={() => setTab('ledger')}>
           Ledger
@@ -287,7 +289,7 @@ export function AdminClient() {
           Events
         </button>
         <button type="button" className={`${styles.tab} ${tab === 'content' ? styles.tabOn : ''}`} onClick={() => setTab('content')}>
-          Perks &amp; Rewards
+          Rewards
         </button>
         <button type="button" className={`${styles.tab} ${tab === 'partners' ? styles.tabOn : ''}`} onClick={() => setTab('partners')}>
           Partners &amp; float
@@ -299,7 +301,7 @@ export function AdminClient() {
           Post
         </button>
         <button type="button" className={`${styles.tab} ${tab === 'screens' ? styles.tabOn : ''}`} onClick={() => setTab('screens')}>
-          Screens &amp; resources
+          Resources
         </button>
       </div>
 
@@ -360,10 +362,10 @@ export function AdminClient() {
               { id: 'ledger', label: 'Audit ledger', icon: 'book-open' },
               { id: 'post', label: 'Post', icon: 'mail' },
               { id: 'events', label: 'Events', icon: 'party-popper' },
-              { id: 'content', label: 'Perks & Rewards', icon: 'gift' },
+              { id: 'content', label: 'Rewards', icon: 'gift' },
               { id: 'partners', label: 'Partners & float', icon: 'pound-sterling' },
               { id: 'birthdays', label: 'Birthdays', icon: 'cake' },
-              { id: 'screens', label: 'Screens & resources', icon: 'monitor' },
+              { id: 'screens', label: 'Resources', icon: 'monitor' },
             ] as { id: AdminTab; label: string; icon: IconName }[]).map((t) => (
               <button
                 key={t.id}
@@ -1464,6 +1466,8 @@ function RoomsPane() {
   const [weekStart, setWeekStart] = useState<string>(() => mondayISO(firstWeekday()));
   const [focusDay, setFocusDay] = useState<string>(() => firstWeekday());
   const [weekBookings, setWeekBookings] = useState<Record<string, AdminBooking[]>>({});
+  const [rules, setRules] = useState<ActiveRule[] | null>(null);
+  const [rulesOpen, setRulesOpen] = useState(false);
   // Two ways to read the week: "By room" stacks each meeting room + pod as its own lane across the
   // five weekdays (spot a room's free/busy at a glance); "By day" is the original day-column view.
   const [viewMode, setViewMode] = useState<'room' | 'day'>('room');
@@ -1757,8 +1761,49 @@ function RoomsPane() {
     );
   }
 
+  async function loadRules() {
+    if (!rulesOpen && rules === null) {
+      const r = await adminGetRules();
+      if (r.ok) setRules(r.data.rules);
+    }
+    setRulesOpen((v) => !v);
+  }
+
   return (
     <div>
+      {/* Diagnostic: what recurring rules / privatisations / company blocks actually exist, and how
+          the code parses each — so a "why isn't this weekly block showing?" is answered from data. */}
+      <div className={styles.rulesPanel}>
+        <button type="button" className={styles.rulesToggle} onClick={loadRules} aria-expanded={rulesOpen}>
+          {rulesOpen ? '▾' : '▸'} Recurring &amp; privatisation rules{rules ? ` (${rules.length})` : ''}
+        </button>
+        {rulesOpen ? (
+          rules === null ? (
+            <p className={styles.state}>Loading…</p>
+          ) : rules.length === 0 ? (
+            <p className={styles.state}>No recurring rules, privatisations or company blocks on file.</p>
+          ) : (
+            <div className={styles.rulesList}>
+              {rules.map((r) => (
+                <div key={r.id} className={styles.ruleRow}>
+                  <span className={styles.ruleRoom}>{r.space}</span>
+                  <span className={styles.ruleKind}>{r.isPrivatisation ? 'Privatisation' : r.kind}</span>
+                  <span className={styles.ruleWho}>{r.who || r.title || '—'}</span>
+                  <span className={styles.ruleWhen}>
+                    {r.isPrivatisation || r.isRule
+                      ? `${r.cadence === 'month' ? 'Monthly' : 'Weekly'} · ${r.weekdays.map((d) => ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri'][d] || d).join(', ') || '—'} · from ${r.start}`
+                      : `One-off · ${r.start}`}
+                  </span>
+                  <span className={r.isRule || r.isPrivatisation ? styles.ruleOk : styles.ruleWarn}>
+                    {r.isPrivatisation ? 'shows all-day' : r.isRule ? 'shows every week' : r.hasToken ? 'token but not a rule' : 'one-off only — not recurring'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )
+        ) : null}
+      </div>
+
       <div className={styles.weekSection}>
         <div className={styles.weekHead}>
           <span className={styles.panelTitle}>This week’s bookings</span>
