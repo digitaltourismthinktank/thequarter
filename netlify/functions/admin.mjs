@@ -17,6 +17,7 @@ import { londonWallClockToISO, isoToLondonMin, isoToLondonDate, hhmmToMin, londo
 import { PLAN_NAMES, allowanceForMember, setMemberPlan, clearMemberPlan, renewMember, formatDate, liveRollover, MS_ROLLOVER, MS_ROLLOVER_EXP, addMonthsISO, todayISO } from './_quarter-sync.mjs';
 import { listRewards, listPerks, listFloats, floatStatus, awardPoints, reverseCheckinPoints, redeemReward, partnerPayouts, markPartnerPaid, partnerStatement } from './_rewards.mjs';
 import { plannedConsumed, refundPlannedDay, consumePlannedDay } from './checkin.mjs';
+import { logActivity, readActivity } from './_activity.mjs';
 import { sendEmail, emailShell, escapeHtml, OPS_EMAIL, fmtDateLong } from './_email.mjs';
 import { pushToEmail } from './_push.mjs';
 import { roomHoursCap } from './_entitlement.mjs';
@@ -30,6 +31,16 @@ const PAUSED = 'pln_paused-fns0m38';
 const json = (b, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { 'content-type': 'application/json' } });
 
 const planIdOf = (c) => (typeof c === 'string' ? c : c?.planId);
+
+// Who performed an admin action, and a display name for the affected member — for the audit log.
+const adminActor = (me) => `Admin: ${me?.auth?.email || me?.email || 'staff'}`;
+const mDisp = (m) => {
+  const cf = m?.customFields || {};
+  return [cf['first-name'], cf['last-name']].filter(Boolean).join(' ').trim() || m?.auth?.email || m?.email || '';
+};
+const liveRoll = (m) => Math.max(0, Number(m?.customFields?.['days-rollover']) || 0);
+const carnetRem = (m) => Math.max(0, Number(m?.metaData?.carnet?.remaining) || 0);
+const pointsOf = (m) => Math.max(0, Math.round(Number(m?.metaData?.points) || 0));
 
 /**
  * Find bookings and check-ins that shouldn't exist: made by an account with no plan, no
@@ -105,6 +116,121 @@ async function accessAudit() {
   flags.sort((a, b) => a.date.localeCompare(b.date) || a.email.localeCompare(b.email));
   return { flags, scanned: { members: ent.size, checkins: checkinRows.length, bookings: bookingRows.length } };
 }
+
+const POST_TABLE = 'tblpYalqRYkaGnLXp';
+
+/**
+ * The admin AUDIT LEDGER, assembled read-side. Merges the durable records that already exist —
+ * check-ins (with their day cost + funding marker), room/company/block bookings, the points ledger,
+ * redemptions, post logs — with the write-time Activity log (manual adjustments, plan changes,
+ * pauses, renewals). Returns one chronological feed so staff can see, per member or per day, that
+ * an action had the CORRESPONDING money movement: a check-in that took a day, a cancel that gave it
+ * back, points that reversed. `base` names where each row lives so it can be traced.
+ *
+ * Filter by member email and/or a date window. Bounded to the most recent MAX rows so a wide,
+ * member-less range can't return an unbounded payload.
+ */
+async function activityFeed({ email, from, to }) {
+  const emailLC = email ? String(email).toLowerCase() : null;
+  const MAX = 800;
+  const range = (field) => {
+    const cl = [];
+    if (from) cl.push(`DATETIME_FORMAT({${field}},'YYYY-MM-DD')>='${esc(from)}'`);
+    if (to) cl.push(`DATETIME_FORMAT({${field}},'YYYY-MM-DD')<='${esc(to)}'`);
+    return cl;
+  };
+  const filt = (emailField, dateField) => {
+    const cl = range(dateField);
+    if (emailLC) cl.push(`LOWER({${emailField}})='${esc(emailLC)}'`);
+    return cl.length ? `AND(${cl.join(',')})` : '';
+  };
+
+  const [checkins, bookings, points, redemptions, post, writeLog] = await Promise.all([
+    listAllRecords(T.checkins, { filterByFormula: filt('Member email', 'Date') }).catch(() => []),
+    listAllRecords(T.bookings, { filterByFormula: filt('Member email', 'Date') }).catch(() => []),
+    listAllRecords(T.pointsLedger, { filterByFormula: filt('Member email', 'At') }).catch(() => []),
+    listAllRecords(T.redemptions, { filterByFormula: filt('Member email', 'At') }).catch(() => []),
+    listAllRecords(POST_TABLE, { byName: true, filterByFormula: filt('Member email', 'Arrived') }).catch(() => []),
+    readActivity({ email: emailLC, from, to }).catch(() => []),
+  ]);
+
+  const events = [];
+
+  for (const r of checkins) {
+    const f = r.fields;
+    const st = f[F.checkins.status] || '';
+    const date = isoToLondonDate(f[F.checkins.date]);
+    const dc = Number(f[F.checkins.dayCost]) || 0;
+    const len = f[F.checkins.length] || 'Full';
+    const notes = String(f[F.checkins.notes] || '');
+    const funding = /carnet pass/i.test(notes) ? 'day pass' : /unlimited/i.test(notes) ? 'unlimited' : /roll:/i.test(notes) ? 'incl. rollover' : dc > 0 ? 'plan days' : '';
+    const cancelled = st === 'Cancelled';
+    events.push({
+      id: `ci-${r.id}`, at: `${date}T09:00:00`, type: cancelled ? 'day-cancelled' : st === 'Checked-in' ? 'check-in' : st === 'Paid' ? 'day-pass' : st === 'Requested' ? 'weekend-request' : 'day-booked',
+      email: String(f[F.checkins.email] || '').toLowerCase(), name: f[F.checkins.name] || '', actor: f[F.checkins.source] || '', base: 'Check-ins', date,
+      summary: `${st || 'Booked'} · ${len}${funding ? ` · ${funding}` : ''}`,
+      days: dc > 0 ? (cancelled ? dc : -dc) : 0,
+    });
+  }
+  for (const r of bookings) {
+    const f = r.fields;
+    const kind = f[F.bookings.kind] || 'Member';
+    if (kind === 'Privatisation') continue;
+    const date = isoToLondonDate(f[F.bookings.date]);
+    const st = f[F.bookings.status] || '';
+    events.push({
+      id: `bk-${r.id}`, at: `${date}T${String(minToHHMMsafe(f[F.bookings.start]))}:00`, type: st === 'Cancelled' ? 'booking-cancelled' : kind === 'Company' ? 'company-booking' : kind === 'Block' || kind === 'External' ? 'block' : 'room-booking',
+      email: String(f[F.bookings.email] || '').toLowerCase(), name: f[F.bookings.name] || f[F.bookings.company] || '', actor: f[F.bookings.source] || '', base: 'Bookings', date,
+      summary: `${f[F.bookings.title] || 'Room/pod'}${st && st !== 'Confirmed' ? ` · ${st}` : ''}`,
+    });
+  }
+  for (const r of points) {
+    const f = r.fields;
+    const at = f[F.pointsLedger.at] || null;
+    const delta = Number(f[F.pointsLedger.delta]) || 0;
+    events.push({
+      id: `pt-${r.id}`, at: at || '', type: 'points', email: String(f[F.pointsLedger.email] || '').toLowerCase(), name: '', actor: '', base: 'Points ledger', date: at ? String(at).slice(0, 10) : '',
+      summary: `${f[F.pointsLedger.reason] || 'points'} ${delta > 0 ? '+' : ''}${delta}${f[F.pointsLedger.ref] ? ` (${f[F.pointsLedger.ref]})` : ''}`,
+      points: delta,
+    });
+  }
+  for (const r of redemptions) {
+    const f = r.fields;
+    const at = f[F.redemptions.at] || null;
+    const cost = Number(f[F.redemptions.cost]) || 0;
+    events.push({
+      id: `rd-${r.id}`, at: at || '', type: 'redemption', email: String(f[F.redemptions.email] || '').toLowerCase(), name: '', actor: '', base: 'Redemptions', date: at ? String(at).slice(0, 10) : '',
+      summary: `Redeemed ${f[F.redemptions.reward] || 'reward'}${f[F.redemptions.status] ? ` · ${f[F.redemptions.status]}` : ''}`,
+      points: -Math.abs(cost),
+    });
+  }
+  for (const r of post) {
+    const f = r.fields;
+    const arrived = f['Arrived'] ? String(f['Arrived']).slice(0, 10) : '';
+    events.push({
+      id: `po-${r.id}`, at: arrived ? `${arrived}T08:00:00` : '', type: 'post', email: String(f['Member email'] || '').toLowerCase(), name: f['Member name'] || '', actor: f['Logged by'] || '', base: 'Post', date: arrived,
+      summary: `${f['Item'] || 'Post'} · ${f['Status'] || ''}`.trim(),
+    });
+  }
+  for (const a of writeLog) {
+    const dDays = num2(a.after?.days) - num2(a.before?.days);
+    const dRoll = num2(a.after?.roll) - num2(a.before?.roll);
+    const dPass = num2(a.after?.passes) - num2(a.before?.passes);
+    const dPts = num2(a.after?.points) - num2(a.before?.points);
+    events.push({
+      id: `ac-${a.id}`, at: a.at || '', type: a.action, email: a.email, name: a.name, actor: a.actor, base: a.base || 'Activity', date: a.at ? String(a.at).slice(0, 10) : '',
+      summary: a.summary, days: dDays || undefined, roll: dRoll || undefined, passes: dPass || undefined, points: dPts || undefined, detail: a.detail || '',
+    });
+  }
+
+  events.sort((x, y) => (x.at < y.at ? 1 : x.at > y.at ? -1 : 0));
+  const truncated = events.length > MAX;
+  return { events: events.slice(0, MAX), total: events.length, truncated, activityLive: writeLog.length > 0 || undefined };
+}
+const num2 = (v) => (v == null || v === '' || Number.isNaN(Number(v)) ? 0 : Number(v));
+const minToHHMMsafe = (iso) => {
+  try { const m = isoToLondonMin(iso); return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`; } catch { return '00:00'; }
+};
 
 async function listAllMembers() {
   const admin = memberstackAdmin.init(MS_SECRET);
@@ -434,6 +560,14 @@ export default async function handler(req) {
       return json(await partnerStatement(partner, { month: url2.searchParams.get('month') || undefined }));
     }
     if (action === 'spaces') return json({ spaces: await allSpaces() });
+    if (action === 'activity') {
+      const u = new URL(req.url);
+      const email = u.searchParams.get('member') || '';
+      const today = londonNow().dateStr;
+      const from = u.searchParams.get('from') || addDays(today, -30);
+      const to = u.searchParams.get('to') || addDays(today, 30);
+      return json(await activityFeed({ email, from, to }));
+    }
     if (action === 'calendar') {
       const date = new URL(req.url).searchParams.get('date');
       if (!date) return json({ error: 'missing-date' }, 400);
@@ -616,7 +750,11 @@ export default async function handler(req) {
   if (action === 'adjustDays') {
     if (!body.memberId) return json({ error: 'missing-member' }, 400);
     const admin = memberstackAdmin.init(MS_SECRET);
-    await admin.members.update({ id: body.memberId, data: { customFields: { 'days-remaining': String(body.days ?? '') } } });
+    const beforeM = await admin.members.retrieve({ id: body.memberId }).then((r) => r?.data).catch(() => null);
+    const prevDays = Number(beforeM?.customFields?.['days-remaining']);
+    const nextDays = String(body.days ?? '');
+    await admin.members.update({ id: body.memberId, data: { customFields: { 'days-remaining': nextDays } } });
+    await logActivity({ action: 'adjust-days', actor: adminActor(me), memberEmail: beforeM?.auth?.email || beforeM?.email, memberName: mDisp(beforeM), base: 'Memberstack', summary: `Set plan days to ${nextDays}`, before: { days: prevDays }, after: { days: Number(nextDays) } });
     return json({ ok: true });
   }
 
@@ -634,7 +772,9 @@ export default async function handler(req) {
     } else {
       cf[MS_ROLLOVER_EXP] = '';
     }
+    const beforeR = await admin.members.retrieve({ id: body.memberId }).then((r) => r?.data).catch(() => null);
     await admin.members.update({ id: body.memberId, data: { customFields: cf } });
+    await logActivity({ action: 'adjust-rollover', actor: adminActor(me), memberEmail: beforeR?.auth?.email || beforeR?.email, memberName: mDisp(beforeR), base: 'Memberstack', summary: `Set rolled-over days to ${n}`, before: { roll: liveRoll(beforeR) }, after: { roll: n } });
     return json({ ok: true });
   }
 
@@ -653,6 +793,7 @@ export default async function handler(req) {
     const total = Math.max(0, (Number(c.total) || 0) + Math.max(0, n));
     const expires = new Date(Date.now() + 365 * 86400000).toISOString().slice(0, 10);
     await admin.members.update({ id: body.memberId, data: { metaData: { ...(m.metaData || {}), carnet: { remaining, total, expires } } } });
+    await logActivity({ action: 'grant-passes', actor: adminActor(me), memberEmail: m?.auth?.email || m?.email, memberName: mDisp(m), base: 'Memberstack', summary: `${n > 0 ? 'Granted' : 'Removed'} ${Math.abs(n)} day ${Math.abs(n) === 1 ? 'pass' : 'passes'}`, before: { passes: Math.max(0, Number(c.remaining) || 0) }, after: { passes: remaining } });
     return json({ ok: true, carnet: { remaining, total, expires } });
   }
 
@@ -1012,7 +1153,9 @@ export default async function handler(req) {
     const r = await admin.members.retrieve({ id: body.memberId });
     const m = r?.data;
     if (!m) return json({ error: 'not-found' }, 404);
+    const before = pointsOf(m);
     const balance = await awardPoints(m, delta, 'adjust', body.reason || 'admin adjust');
+    await logActivity({ action: 'adjust-points', actor: adminActor(me), memberEmail: m?.auth?.email || m?.email, memberName: mDisp(m), base: 'Points ledger', summary: `Adjusted points by ${delta > 0 ? '+' : ''}${delta}${body.reason ? ` (${body.reason})` : ''}`, before: { points: before }, after: { points: Number(balance) || before + delta } });
     return json({ ok: true, balance });
   }
   if (action === 'redeemForMember') {

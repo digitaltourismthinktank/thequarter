@@ -383,6 +383,10 @@ export interface PostItem {
   photoRequested: boolean;
   postedOn: string | null;
   collectedOn: string | null;
+  /** Member cleared it from their dashboard (still in their Post history + on file for staff). */
+  archived?: boolean;
+  /** Member hid it from their history entirely (still on file for staff). */
+  removed?: boolean;
 }
 export interface AdminPostItem extends PostItem {
   memberName: string;
@@ -402,6 +406,11 @@ export const choosePost = (id: string, handling: 'scan' | 'forward' | 'collect',
     body: { action: 'choose', id, handling, ...(opts?.permission ? { permission: true } : {}) },
   });
 export const requestEnvelopePhoto = (id: string) => call<{ ok: boolean }>('post', { method: 'POST', body: { action: 'requestPhoto', id } });
+/** Member-side visibility of their own post. `archive` clears a dealt-with item off the dashboard
+ *  (kept in their Post history); `remove` hides it from their history too; both keep the staff record.
+ *  `unarchive`/`restore` reverse them. Needs the two checkbox fields on the Post table. */
+export const setPostVisibility = (id: string, action: 'archive' | 'unarchive' | 'remove' | 'restore') =>
+  call<{ ok: boolean; error?: string; detail?: string }>('post', { method: 'POST', body: { action, id } });
 export const adminPostQueue = () => call<{ items: AdminPostItem[] }>('post?action=queue');
 export const adminLogPost = (b: { memberId: string; type: string; sender?: string; tags?: string[] }) =>
   call<{ ok: boolean }>('post', { method: 'POST', body: { action: 'log', ...b } });
@@ -494,6 +503,33 @@ export interface AdminSpace {
 export const adminGetMembers = () => call<{ members: AdminMember[] }>('admin?action=members');
 export const adminGetSpaces = () => call<{ spaces: AdminSpace[] }>('admin?action=spaces');
 export const adminGetCalendar = (date: string) => call<{ date: string; bookings: AdminBooking[] }>(`admin?action=calendar&date=${date}`);
+
+/** One row of the admin audit ledger. Deltas (days/roll/passes/points) are signed movements where
+ *  known; `base` names the Airtable table / system the underlying record lives in. */
+export interface ActivityEvent {
+  id: string;
+  at: string;
+  type: string;
+  email: string;
+  name: string;
+  actor: string;
+  base: string;
+  date: string;
+  summary: string;
+  days?: number;
+  roll?: number;
+  passes?: number;
+  points?: number;
+  detail?: string;
+}
+export const adminActivity = (params: { member?: string; from?: string; to?: string }) => {
+  const q = new URLSearchParams();
+  q.set('action', 'activity');
+  if (params.member) q.set('member', params.member);
+  if (params.from) q.set('from', params.from);
+  if (params.to) q.set('to', params.to);
+  return call<{ events: ActivityEvent[]; total: number; truncated?: boolean; activityLive?: boolean }>(`admin?${q.toString()}`);
+};
 export const adminBlock = (b: {
   spaceId: string;
   date: string;

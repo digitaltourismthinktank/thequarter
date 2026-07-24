@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { getMyPost, choosePost, requestEnvelopePhoto, type PostItem } from '@/lib/booking';
+import { getMyPost, choosePost, requestEnvelopePhoto, setPostVisibility, type PostItem } from '@/lib/booking';
 import { SITE } from '@/lib/site';
 import { CardUpdate } from './CardUpdate';
 import { cn } from '@/lib/cn';
@@ -137,8 +137,11 @@ export function PostCard({ variant = 'hero', className }: { variant?: 'hero' | '
     };
   }, [refresh]);
 
-  const waiting = (items ?? []).filter((i) => i.status === 'Waiting');
-  const inProgress = (items ?? []).filter((i) => i.status !== 'Waiting' && i.status !== 'Collected');
+  // A member can CLEAR a dealt-with item off the dashboard (archive) or hide it entirely (remove) —
+  // either way it drops out of the prompt here (their full history lives on the Post page).
+  const visible = (items ?? []).filter((i) => !i.archived && !i.removed);
+  const waiting = visible.filter((i) => i.status === 'Waiting');
+  const inProgress = visible.filter((i) => i.status !== 'Waiting' && i.status !== 'Collected');
   const active = waiting.length + inProgress.length;
 
   async function act(fn: () => Promise<{ ok: boolean; data?: { error?: string; detail?: string } }>, ok: string) {
@@ -150,6 +153,13 @@ export function PostCard({ variant = 'hero', className }: { variant?: 'hero' | '
     await refresh();
   }
 
+  async function doArchive(id: string) {
+    // Clear a dealt-with item off the dashboard. It stays in the member's Post history (and on file
+    // for staff); if the Post table isn't set up for this yet the backend says so plainly.
+    setBusyId(id);
+    await act(() => setPostVisibility(id, 'archive'), 'Cleared — you’ll find it any time under All my post.');
+    setBusyId(null);
+  }
   async function doScan(id: string) {
     setBusyId(id);
     await act(() => choosePost(id, 'scan', { permission: true }), 'Thanks — we’ll scan it and email you. The original stays in your pigeon hole to collect any time.');
@@ -332,15 +342,24 @@ export function PostCard({ variant = 'hero', className }: { variant?: 'hero' | '
                 // eslint-disable-next-line @next/next/no-img-element
                 <img className={styles.envelope} src={it.photoUrl} alt="Envelope" />
               ) : null}
-              {it.scanUrl ? (
-                <div className={styles.viewLinks}>
+              <div className={styles.viewLinks}>
+                {it.scanUrl ? (
                   <a className={styles.readScan} href={it.scanUrl} target="_blank" rel="noreferrer">
                     View / download the scan →
                   </a>
-                </div>
-              ) : null}
+                ) : null}
+                {/* Done with it? Clear it off here — it stays retrievable under All my post. */}
+                <button type="button" className={styles.clearBtn} onClick={() => doArchive(it.id)} disabled={busyId === it.id}>
+                  {busyId === it.id ? 'Clearing…' : 'Clear'}
+                </button>
+              </div>
             </div>
           ))}
+          {variant !== 'strip' ? (
+            <a href="/post" className={styles.allPost}>
+              All my post &amp; parcels →
+            </a>
+          ) : null}
         </>
       )}
 

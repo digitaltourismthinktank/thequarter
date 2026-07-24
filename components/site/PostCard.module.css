@@ -329,3 +329,35 @@
   color: var(--gold-700);
   font-weight: var(--fw-bold);
 }
+
+/* "Clear" a dealt-with item off the dashboard (archives it; stays under All my post). */
+.clearBtn {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill);
+  background: var(--surface-card);
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: var(--fw-semibold);
+  padding: 5px 12px;
+  cursor: pointer;
+}
+.clearBtn:hover {
+  color: var(--ink-900);
+  border-color: var(--ink-900);
+}
+.clearBtn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.allPost {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: var(--text-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--gold-700);
+  text-decoration: none;
+}
+.allPost:hover {
+  text-decoration: underline;
+}

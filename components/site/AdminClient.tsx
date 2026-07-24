@@ -92,6 +92,7 @@ import { isAdminEmail } from '@/lib/admin';
 import { unlockSound } from '@/lib/feedback';
 import { CommsPane } from './CommsPane';
 import { useAlertChime } from './useAlertChime';
+import { AdminLedgerPane } from './AdminLedger';
 import styles from './AdminClient.module.css';
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || 'https://thequarter.work';
@@ -183,7 +184,7 @@ function daysToBirthday(bday: string | null): number | null {
   return Math.round((next.getTime() - today.getTime()) / 86400000);
 }
 
-const ADMIN_TABS = ['today', 'members', 'comms', 'rooms', 'post', 'events', 'content', 'partners', 'birthdays', 'screens'] as const;
+const ADMIN_TABS = ['today', 'members', 'comms', 'rooms', 'ledger', 'post', 'events', 'content', 'partners', 'birthdays', 'screens'] as const;
 type AdminTab = (typeof ADMIN_TABS)[number];
 const tabFromHash = (): AdminTab => {
   if (typeof window === 'undefined') return 'today';
@@ -279,6 +280,9 @@ export function AdminClient() {
         <button type="button" className={`${styles.tab} ${tab === 'rooms' ? styles.tabOn : ''}`} onClick={() => setTab('rooms')}>
           Rooms &amp; bookings
         </button>
+        <button type="button" className={`${styles.tab} ${tab === 'ledger' ? styles.tabOn : ''}`} onClick={() => setTab('ledger')}>
+          Ledger
+        </button>
         <button type="button" className={`${styles.tab} ${tab === 'events' ? styles.tabOn : ''}`} onClick={() => setTab('events')}>
           Events
         </button>
@@ -307,6 +311,8 @@ export function AdminClient() {
         <CommsPane />
       ) : tab === 'rooms' ? (
         <RoomsPane />
+      ) : tab === 'ledger' ? (
+        <AdminLedgerPane />
       ) : tab === 'post' ? (
         <AdminPostPane />
       ) : tab === 'events' ? (
@@ -351,6 +357,7 @@ export function AdminClient() {
           <div className={styles.moreSheet} onClick={(e) => e.stopPropagation()}>
             <span className={styles.moreTitle}>More tools</span>
             {([
+              { id: 'ledger', label: 'Audit ledger', icon: 'book-open' },
               { id: 'post', label: 'Post', icon: 'mail' },
               { id: 'events', label: 'Events', icon: 'party-popper' },
               { id: 'content', label: 'Perks & Rewards', icon: 'gift' },

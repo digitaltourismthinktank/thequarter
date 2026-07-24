@@ -53,6 +53,8 @@ const PF = {
   notes: 'Notes', // long text
   loggedBy: 'Logged by', // text (staff email)
   notified: 'Notified', // checkbox
+  archived: 'Member archived', // checkbox — member cleared it from their dashboard (still on file)
+  removed: 'Member removed', // checkbox — member hid it from their history entirely (still on file for staff)
 };
 
 const json = (b, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { 'content-type': 'application/json' } });
@@ -104,6 +106,8 @@ function shapeMine(r) {
     photoRequested: !!f[PF.photoReq],
     postedOn: f[PF.postedOn] || null,
     collectedOn: f[PF.collectedOn] || null,
+    archived: !!f[PF.archived],
+    removed: !!f[PF.removed],
   };
 }
 /** The staff view — adds who it's for + forwarding detail. */
@@ -268,6 +272,29 @@ export default async function handler(req) {
     }
 
     // ---- Admin: log an incoming item, then notify the member ----
+    // ---- Member: clear / restore / remove an item from THEIR OWN view (record kept for staff) ----
+    // "Archive" drops a dealt-with item off the dashboard prompt but keeps it in the member's Post
+    // history; "remove" hides it from the member entirely; both leave the Airtable row for the audit
+    // trail. Writing these needs the two checkbox fields on the Post table (see PF.archived/removed);
+    // until they exist the write 400s with a clear message rather than silently doing nothing.
+    if (body.action === 'archive' || body.action === 'unarchive' || body.action === 'remove' || body.action === 'restore') {
+      if (!body.id) return json({ error: 'missing-id' }, 400);
+      const row = await getRow(body.id);
+      if (!row) return json({ error: 'not-found' }, 404);
+      if (String(row.fields[PF.email] || '').toLowerCase() !== email) return json({ error: 'forbidden' }, 403);
+      const fields =
+        body.action === 'archive' ? { [PF.archived]: true }
+        : body.action === 'unarchive' ? { [PF.archived]: false }
+        : body.action === 'remove' ? { [PF.removed]: true }
+        : { [PF.removed]: false }; // restore
+      try {
+        await updateRecord(POST, body.id, fields, { typecast: true });
+        return json({ ok: true });
+      } catch (e) {
+        return json({ error: 'not-configured', detail: 'Add the "Member archived" and "Member removed" checkbox fields to the Post table.' }, 400);
+      }
+    }
+
     if (body.action === 'log') {
       if (!isAdmin(me)) return json({ error: 'forbidden' }, 403);
       if (!body.memberId) return json({ error: 'missing-member' }, 400);
