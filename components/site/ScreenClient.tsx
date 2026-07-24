@@ -252,7 +252,7 @@ function TransportBand() {
   // Cap each column so the board stays a bounded height whatever the timetable throws at it — a
   // quiet-hour board and a rush-hour one with a dozen services take the same space, and a long bus
   // list can never push the room cards off the fixed-height canvas (the cut-off people reported).
-  const MAX_DEPARTURES = 8;
+  const MAX_DEPARTURES = 6;
 
   return (
     <section className={styles.transport} aria-label="Live departures">

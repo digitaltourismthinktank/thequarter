@@ -978,7 +978,10 @@
      longer matches its coordinate space and would hide rows that actually fit. A generous ceiling in
      canvas pixels stays as a backstop only. */
   .transport {
-    max-height: 420px;
+    /* Hard ceiling in canvas pixels so the departures band can never grow into the room cards on a
+       busy evening. Six rows + header sit comfortably under this; anything beyond is clipped, which
+       on a lobby board is fine — the next few departures are what matters. */
+    max-height: 300px;
   }
   .trGrid,
   .trCol {
