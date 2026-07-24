@@ -12,22 +12,10 @@
   background: var(--surface-page);
 }
 .screen {
-  /* Sized + scaled inline from the measured viewport. The fallbacks below are what renders before
-     the first measurement, and on a narrow viewport where scaling is deliberately skipped. */
+  /* Fallback (before the first measurement, and on a narrow phone where scaling is skipped): the
+     plain responsive flow, filling the viewport. */
   width: 100%;
   height: 100dvh;
-  /* NO max-height here: the canvas is deliberately TALLER than the window (a 1512x800 window draws
-     a 1920x1016 canvas that is then scaled down), and a max-height of 100dvh would clamp it
-     straight back to the window and undo the scaling. The stage clips instead. */
-  /* Anchored top-left, and scaled from the same corner. Centring does NOT work here: the canvas is
-     WIDER than the viewport before scaling, and CSS grid/flex refuse to give an overflowing item a
-     negative offset — it stays at the start and overflows the end. Scaling about the centre then
-     left the whole screen pushed in by half the overflow (204px at 1512 wide). From the top-left
-     corner the maths is unconditional: scaled size == viewport size, at 0,0. */
-  position: absolute;
-  top: 0;
-  left: 0;
-  transform-origin: top left;
   overflow: hidden;
   overscroll-behavior: none;
   background: var(--surface-page);
@@ -39,6 +27,16 @@
   flex-direction: column;
   gap: clamp(14px, 2vh, 30px);
   font-family: var(--font-sans);
+}
+/* Measured mode: a fixed design-size canvas centred in the stage and scaled to contain (see
+   useFitCanvas). left/top 50% + translate(-50%,-50%) centres by the canvas's OWN size, then the
+   inline scale() shrinks about the centre — so the canvas sits dead-centre with even letterbox
+   bars, whatever the display's aspect ratio, and its composition never changes. */
+.scaled {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform-origin: center center;
 }
 /* Entrance overview: rooms + workspaces flex to fill the space between the hero and the
    What's-on footer, so the wall display is contained to one screen (never scrolls). */
@@ -975,10 +973,12 @@
   .screen > .block {
     align-self: stretch;
   }
-  /* The departures band is the biggest block and grows with the number of services, so cap it as a
-     share of the viewport and clip the overflow rows — it can never squeeze the rooms off screen. */
+  /* The departures band is bounded by CAPPING the number of rows rendered (see MAX_DEPARTURES),
+     not by a viewport-relative clip — the canvas is now a fixed 1080-tall design, so a `vh` clip no
+     longer matches its coordinate space and would hide rows that actually fit. A generous ceiling in
+     canvas pixels stays as a backstop only. */
   .transport {
-    max-height: 36vh;
+    max-height: 420px;
   }
   .trGrid,
   .trCol {

@@ -249,12 +249,17 @@ function TransportBand() {
   // Nothing to show at all (trains not live yet + no buses now) — hide rather than show a shell.
   if (!trainsLive && !buses.length && !trains.west.length && !trains.east.length) return null;
 
+  // Cap each column so the board stays a bounded height whatever the timetable throws at it — a
+  // quiet-hour board and a rush-hour one with a dozen services take the same space, and a long bus
+  // list can never push the room cards off the fixed-height canvas (the cut-off people reported).
+  const MAX_DEPARTURES = 8;
+
   return (
     <section className={styles.transport} aria-label="Live departures">
       <div className={styles.trGrid}>
-        <TrainColumn title="Canterbury West" sub="London St Pancras · Ramsgate" rows={trains.west} live={!!trainsLive} />
-        <TrainColumn title="Canterbury East" sub="London Victoria · Dover" rows={trains.east} live={!!trainsLive} />
-        <BusColumn rows={buses} />
+        <TrainColumn title="Canterbury West" sub="London St Pancras · Ramsgate" rows={trains.west.slice(0, MAX_DEPARTURES)} live={!!trainsLive} />
+        <TrainColumn title="Canterbury East" sub="London Victoria · Dover" rows={trains.east.slice(0, MAX_DEPARTURES)} live={!!trainsLive} />
+        <BusColumn rows={buses.slice(0, MAX_DEPARTURES)} />
       </div>
       <div className={styles.trFoot}>
         <span className={styles.trWalk}>≈ 10-min walk to either station</span>
@@ -347,11 +352,16 @@ function useFitCanvas() {
         setBox(null);
         return;
       }
-      const designW = vw >= vh ? 1920 : 1080;
-      const scale = vw / designW;
-      // Height follows the display's real aspect, so the canvas fills it exactly — no letterboxing,
-      // and no guessing at how tall the screen "should" be.
-      setBox({ width: designW, height: Math.round(vh / scale), scale });
+      // A FIXED design canvas (16:9 landscape / 9:16 portrait) scaled to CONTAIN — the smaller of the
+      // two axis ratios — and centred. The composition is therefore always the exact one that was
+      // laid out and checked; it is only ever shrunk to fit, never reflowed into a shorter/taller
+      // shape that could clip the departures board or an event card. Odd aspect ratios get a little
+      // letterbox in the page colour, which is a far better failure than cut-off content.
+      const landscape = vw >= vh;
+      const designW = landscape ? 1920 : 1080;
+      const designH = landscape ? 1080 : 1920;
+      const scale = Math.min(vw / designW, vh / designH);
+      setBox({ width: designW, height: designH, scale });
     };
     measure();
     window.addEventListener('resize', measure);
@@ -626,8 +636,8 @@ function EntranceScreen() {
   return (
     <div className={styles.stage}>
       <div
-        className={`${styles.screen}${fit && fit.height <= 950 ? ` ${styles.compact}` : ''}`}
-        style={fit ? { width: `${fit.width}px`, height: `${fit.height}px`, transform: `scale(${fit.scale})` } : undefined}
+        className={`${styles.screen}${fit ? ` ${styles.scaled}` : ''}`}
+        style={fit ? { width: `${fit.width}px`, height: `${fit.height}px`, transform: `translate(-50%, -50%) scale(${fit.scale})` } : undefined}
       >
       {/* Wall displays often run on old machines where the browser's own full-screen is
           fiddly to reach — this puts it one tap away. Fades back once you're in. */}
