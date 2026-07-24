@@ -979,9 +979,10 @@
      canvas pixels stays as a backstop only. */
   .transport {
     /* Hard ceiling in canvas pixels so the departures band can never grow into the room cards on a
-       busy evening. Six rows + header sit comfortably under this; anything beyond is clipped, which
+       busy evening. Five rows + header sit comfortably under this; anything beyond is clipped, which
        on a lobby board is fine — the next few departures are what matters. */
-    max-height: 300px;
+    max-height: 258px;
+    margin-top: clamp(8px, 1.2vh, 16px);
   }
   .trGrid,
   .trCol {
