@@ -103,9 +103,11 @@ export function NotificationsBell({ scope = 'member' }: { scope?: NotifyScope })
     }
     if (n.url) {
       setOpen(false);
-      // In-app links route client-side; anything else (rare) gets a full nav.
+      // Only follow same-app paths (client-side) or explicit http(s) links. Anything else —
+      // e.g. a javascript:/data: scheme — is ignored. url is written server-side today, but this
+      // keeps a hostile url inert even if a future flow ever let member input reach a payload.
       if (n.url.startsWith('/')) router.push(n.url);
-      else window.location.assign(n.url);
+      else if (/^https?:\/\//i.test(n.url)) window.location.assign(n.url);
     }
   };
 

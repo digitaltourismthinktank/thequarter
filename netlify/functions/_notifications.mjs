@@ -74,18 +74,23 @@ function scopeFormula({ recipient, audience }) {
 }
 
 /**
- * List a scope's inbox (newest first, excluding cleared rows). Returns [] when unconfigured.
+ * List a scope's inbox (newest first, excluding cleared rows). Returns { notifications, unread }.
+ * `unread` counts EVERY unread row in the scope, not just the returned page — so the bell's badge
+ * stays accurate even when there are more than `limit` notifications. Returns an empty result when
+ * unconfigured.
  * @param {object} o { recipient, audience='member', limit=60 }
  */
 export async function listNotifications({ recipient, audience = 'member', limit = 60 } = {}) {
-  if (!TABLE) return [];
+  if (!TABLE) return { notifications: [], unread: 0 };
   try {
     const rows = await listAllRecords(TABLE, {
       byName: true,
       filterByFormula: `AND(${scopeFormula({ recipient, audience })},NOT({${NF.cleared}}=1))`,
       sort: [{ field: NF.at, direction: 'desc' }],
     });
-    return rows.slice(0, limit).map((r) => ({
+    // Count unread across the WHOLE result set before paginating, so >limit unread never undercounts.
+    const unread = rows.reduce((n, r) => n + (r.fields[NF.read] === true ? 0 : 1), 0);
+    const notifications = rows.slice(0, limit).map((r) => ({
       id: r.id,
       at: r.fields[NF.at] || null,
       title: r.fields[NF.title] || '',
@@ -94,9 +99,10 @@ export async function listNotifications({ recipient, audience = 'member', limit 
       kind: r.fields[NF.kind] || '',
       read: r.fields[NF.read] === true,
     }));
+    return { notifications, unread };
   } catch (err) {
     console.error('[notifications] list failed', String(err?.message || err));
-    return [];
+    return { notifications: [], unread: 0 };
   }
 }
 

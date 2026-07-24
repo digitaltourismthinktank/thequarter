@@ -50,7 +50,6 @@ export default async function handler(req) {
     }
   }
 
-  const notifications = await listNotifications(key);
-  const unread = notifications.filter((n) => !n.read).length;
+  const { notifications, unread } = await listNotifications(key);
   return json({ ok: true, configured: true, notifications, unread });
 }
