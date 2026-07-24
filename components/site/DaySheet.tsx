@@ -408,7 +408,17 @@ export function DaySheet({
                 aria-checked={length === 'Half'}
                 className={cn(styles.choice, length === 'Half' && styles.choiceOn)}
                 disabled={busy}
-                onClick={() => (editing ? change('Half', period) : setLength('Half'))}
+                onClick={() => {
+                  if (editing) {
+                    change('Half', period);
+                  } else {
+                    // Fresh check-in/booking: pick the sensible half from the clock so a 10pm check-in
+                    // that taps "Half day" lands on Afternoon, not Morning. checkinNow only — a future
+                    // day has no time-of-day to infer.
+                    setLength('Half');
+                    if (checkinNow) setPeriod(londonHourNow() >= 13 ? 'pm' : 'am');
+                  }
+                }}
               >
                 <span className={styles.choiceTitle}>Half day</span>
                 <span className={styles.choiceSub}>{isPass ? 'Covered by your pass' : 'Morning or afternoon · uses ½ day'}</span>

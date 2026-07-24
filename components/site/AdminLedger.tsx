@@ -6,6 +6,102 @@ import styles from './AdminLedger.module.css';
 
 const iso = (d: Date) => d.toISOString().slice(0, 10);
 const daysAgo = (n: number) => iso(new Date(Date.now() - n * 86400000));
+const daysAhead = (n: number) => iso(new Date(Date.now() + n * 86400000));
+
+/** Turn the raw actor/source into something a person can read. Booking/check-in rows carry a Source
+ *  ('Self'/'Web'/'Kiosk'/'Admin'); write-log rows carry "Admin: email". */
+function actorLabel(raw: string, nameByEmail: Record<string, string>): string {
+  const a = String(raw || '').trim();
+  if (!a) return '';
+  const m = a.match(/^admin:\s*(.+)$/i);
+  if (m) {
+    const who = nameByEmail[m[1].toLowerCase()] || m[1];
+    return `Admin — ${who}`;
+  }
+  const lc = a.toLowerCase();
+  if (lc === 'self' || lc === 'web') return 'the member';
+  if (lc === 'kiosk' || lc === 'reception') return 'the reception screen';
+  if (lc === 'admin') return 'staff';
+  if (lc === 'system (cron)' || lc === 'cron' || lc === 'system') return 'the system (overnight)';
+  return a;
+}
+
+/** A stylised, past-capable date field — a button showing the value, opening a branded month
+ *  calendar. Replaces the raw <input type="date"> (whose native popup can't be themed). */
+function StyledDate({ label, value, min, max, onChange }: { label: string; value: string; min?: string; max?: string; onChange: (iso: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const wrap = useRef<HTMLDivElement | null>(null);
+  const [view, setView] = useState(() => value.slice(0, 7)); // YYYY-MM in view
+  useEffect(() => {
+    if (open) setView(value.slice(0, 7));
+  }, [open, value]);
+  useEffect(() => {
+    const onDoc = (e: MouseEvent) => {
+      if (wrap.current && !wrap.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, []);
+  const [vy, vm] = view.split('-').map(Number);
+  const first = new Date(Date.UTC(vy, vm - 1, 1));
+  const lead = (first.getUTCDay() + 6) % 7; // Mon=0
+  const days = new Date(Date.UTC(vy, vm, 0)).getUTCDate();
+  const cells: (string | null)[] = [];
+  for (let i = 0; i < lead; i++) cells.push(null);
+  for (let d = 1; d <= days; d++) cells.push(`${view}-${String(d).padStart(2, '0')}`);
+  const shift = (n: number) => {
+    const d = new Date(Date.UTC(vy, vm - 1 + n, 1));
+    setView(`${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`);
+  };
+  const label2 = value ? new Date(`${value}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Pick a date';
+  const monthLabel = first.toLocaleDateString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+  return (
+    <div className={styles.field} ref={wrap}>
+      <span>{label}</span>
+      <button type="button" className={styles.dateBtn} onClick={() => setOpen((v) => !v)}>
+        {label2}
+      </button>
+      {open ? (
+        <div className={styles.cal}>
+          <div className={styles.calHead}>
+            <button type="button" onClick={() => shift(-1)} aria-label="Previous month">
+              ‹
+            </button>
+            <span>{monthLabel}</span>
+            <button type="button" onClick={() => shift(1)} aria-label="Next month">
+              ›
+            </button>
+          </div>
+          <div className={styles.calDow}>
+            {['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'].map((d) => (
+              <span key={d}>{d}</span>
+            ))}
+          </div>
+          <div className={styles.calGrid}>
+            {cells.map((iso, i) =>
+              iso === null ? (
+                <span key={`x${i}`} />
+              ) : (
+                <button
+                  key={iso}
+                  type="button"
+                  className={`${styles.calDay} ${iso === value ? styles.calDayOn : ''}`}
+                  disabled={(min && iso < min) || (max && iso > max) || false}
+                  onClick={() => {
+                    onChange(iso);
+                    setOpen(false);
+                  }}
+                >
+                  {Number(iso.slice(-2))}
+                </button>
+              ),
+            )}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 /** Human label + tone for each event type. Tone drives the little type chip's colour. */
 const TYPE_META: Record<string, { label: string; tone: 'day' | 'money' | 'points' | 'admin' | 'post' | 'neutral' }> = {
@@ -62,11 +158,11 @@ function Delta({ value, unit }: { value: number | undefined; unit: string }) {
   );
 }
 
-function toCsv(events: ActivityEvent[]): string {
-  const head = ['When', 'Type', 'Member', 'Email', 'By', 'Summary', 'Days', 'Rollover', 'Passes', 'Points', 'Base'];
+function toCsv(events: ActivityEvent[], nameByEmail: Record<string, string>, idByEmail: Record<string, string>): string {
+  const head = ['When', 'Type', 'Member', 'Email', 'Member ID', 'By', 'Summary', 'Days', 'Rollover', 'Passes', 'Points', 'Base'];
   const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const rows = events.map((e) =>
-    [fmtWhen(e.at), typeMeta(e.type).label, e.name, e.email, e.actor, e.summary, e.days ?? '', e.roll ?? '', e.passes ?? '', e.points ?? '', e.base]
+    [fmtWhen(e.at), typeMeta(e.type).label, e.name || nameByEmail[e.email] || '', e.email, idByEmail[e.email] || '', e.actor, e.summary, e.days ?? '', e.roll ?? '', e.passes ?? '', e.points ?? '', e.base]
       .map(esc)
       .join(','),
   );
@@ -82,7 +178,9 @@ export function AdminLedgerPane() {
   const today = iso(new Date());
   const [member, setMember] = useState(''); // the resolved email we query on
   const [from, setFrom] = useState(daysAgo(30));
-  const [to, setTo] = useState(today);
+  // The window reaches into the FUTURE by default: a booking made for next week (or a future booking
+  // that's just been cancelled) is dated at ITS date, so a `to` of today would hide it.
+  const [to, setTo] = useState(daysAhead(45));
   const [filter, setFilter] = useState('all');
   // Member typeahead — search by name (like the room-booking admin), resolve to their email.
   const [members, setMembers] = useState<AdminMember[]>([]);
@@ -131,6 +229,20 @@ export function AdminLedgerPane() {
       .slice(0, 8);
   }, [members, memberQuery]);
 
+  // email → name / member id, so points & redemption rows (which only carry an email) can show the
+  // member's NAME, and every row can carry a discreet unique id to tell two similar people apart.
+  const { nameByEmail, idByEmail } = useMemo(() => {
+    const n: Record<string, string> = {};
+    const i: Record<string, string> = {};
+    for (const m of members) {
+      const e = (m.email ?? '').toLowerCase();
+      if (!e) continue;
+      if (m.name) n[e] = m.name;
+      if (m.id) i[e] = m.id;
+    }
+    return { nameByEmail: n, idByEmail: i };
+  }, [members]);
+
   function chooseMember(m: AdminMember) {
     setMember((m.email ?? '').toLowerCase());
     setMemberQuery(m.name || m.email || '');
@@ -152,7 +264,7 @@ export function AdminLedgerPane() {
   }, [events, filter, q]);
 
   function downloadCsv() {
-    const blob = new Blob([toCsv(shown)], { type: 'text/csv;charset=utf-8' });
+    const blob = new Blob([toCsv(shown, nameByEmail, idByEmail)], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -207,14 +319,8 @@ export function AdminLedgerPane() {
             ) : null}
           </div>
         </div>
-        <label className={styles.field}>
-          <span>From</span>
-          <input type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} />
-        </label>
-        <label className={styles.field}>
-          <span>To</span>
-          <input type="date" value={to} min={from} onChange={(e) => setTo(e.target.value)} />
-        </label>
+        <StyledDate label="From" value={from} max={to} onChange={setFrom} />
+        <StyledDate label="To" value={to} min={from} onChange={setTo} />
         <button type="button" className={styles.apply} onClick={load} disabled={loading}>
           {loading ? 'Loading…' : 'Apply'}
         </button>
@@ -233,7 +339,7 @@ export function AdminLedgerPane() {
             className={styles.preset}
             onClick={() => {
               setFrom(p.from);
-              setTo(today);
+              setTo(daysAhead(45)); // always keep upcoming bookings in view
             }}
           >
             {p.label}
@@ -265,17 +371,26 @@ export function AdminLedgerPane() {
         <ol className={styles.feed}>
           {shown.map((e) => {
             const m = typeMeta(e.type);
+            // Points/redemption rows carry only an email — fill the name from the members list.
+            const name = e.name || nameByEmail[e.email] || '';
+            const mid = idByEmail[e.email] || '';
+            const actor = actorLabel(e.actor, nameByEmail);
             return (
               <li key={e.id} className={styles.row}>
                 <span className={styles.when}>{fmtWhen(e.at)}</span>
                 <span className={`${styles.type} ${styles[`tone_${m.tone}`]}`}>{m.label}</span>
                 <span className={styles.body}>
                   <span className={styles.rowMain}>
-                    {e.name || e.email || '—'}
-                    {e.name && e.email ? <span className={styles.rowEmail}> · {e.email}</span> : null}
+                    {name || e.email || '—'}
+                    {name && e.email ? <span className={styles.rowEmail}> · {e.email}</span> : null}
+                    {mid ? (
+                      <span className={styles.rowId} title={`Member ID ${mid}`}>
+                        #{mid.replace(/^mem_/, '').slice(-6)}
+                      </span>
+                    ) : null}
                   </span>
                   <span className={styles.rowSummary}>{e.summary}</span>
-                  {e.actor ? <span className={styles.rowActor}>by {e.actor}</span> : null}
+                  {actor ? <span className={styles.rowActor}>by {actor}</span> : null}
                 </span>
                 <span className={styles.deltas}>
                   <Delta value={e.days} unit="day" />

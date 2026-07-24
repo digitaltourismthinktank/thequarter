@@ -776,7 +776,22 @@ export default async function handler(req) {
       await updateRecord(T.bookings, body.id, { [F.bookings.notes]: newNotes });
       return json({ ok: true, scope: 'occurrence' });
     }
+    // Read the row first so the audit line can name the booking + member, then cancel + log. The
+    // aggregation shows cancelled bookings at their booking DATE; this write-log entry records the
+    // cancellation at the moment it happened, with which staff member did it.
+    const brecs = await listRecords(T.bookings, { filterByFormula: `RECORD_ID()='${esc(body.id)}'`, maxRecords: 1 });
+    const br = brecs[0];
     await updateRecord(T.bookings, body.id, { [F.bookings.status]: 'Cancelled' });
+    if (br) {
+      await logActivity({
+        action: 'booking-cancelled',
+        actor: adminActor(me),
+        memberEmail: br.fields[F.bookings.email] || '',
+        memberName: br.fields[F.bookings.name] || br.fields[F.bookings.company] || '',
+        base: 'Bookings',
+        summary: `Cancelled ${br.fields[F.bookings.title] || 'a booking'} (${isoToLondonDate(br.fields[F.bookings.date]) || ''})`,
+      });
+    }
     return json({ ok: true });
   }
 

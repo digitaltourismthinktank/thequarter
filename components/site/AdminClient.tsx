@@ -1511,11 +1511,24 @@ function RoomsPane() {
   }, []);
 
   const weekDays = Array.from({ length: 5 }, (_, i) => addDaysISO(weekStart, i)); // Mon–Fri ISO
-  // Meeting rooms first, phone pods last — the order lanes stack in the "By room" view. Hot-desk
-  // workspaces aren't room-booked, so they're left out of this schedule.
+  // Which spaces have ANY booking this week — so a workspace that's been privatised or company-blocked
+  // (e.g. The Vineyard held by With You) still appears as a lane in "By room". Without this, blocks on
+  // hot-desk workspaces showed in "By day" but vanished from "By room", which only listed meeting
+  // rooms + pods.
+  const bookedSpaceIds = new Set(
+    Object.values(weekBookings)
+      .flat()
+      .map((b) => b.space)
+      .filter(Boolean),
+  );
+  // Meeting rooms first, phone pods last, then any booked workspace — the order lanes stack in the
+  // "By room" view. An UN-booked hot-desk workspace stays out (it isn't room-booked).
   const orderedSpaces = [...spaces]
-    .filter((s) => s.type !== 'Workspace')
-    .sort((a, b) => (a.type === 'Phone pod' ? 1 : 0) - (b.type === 'Phone pod' ? 1 : 0));
+    .filter((s) => s.type !== 'Workspace' || bookedSpaceIds.has(s.id))
+    .sort((a, b) => {
+      const rank = (s: (typeof spaces)[number]) => (s.type === 'Workspace' ? 2 : s.type === 'Phone pod' ? 1 : 0);
+      return rank(a) - rank(b);
+    });
   const sortDay = (a: AdminBooking, b: AdminBooking) => (b.allDay ? 1 : 0) - (a.allDay ? 1 : 0) || a.startMin - b.startMin;
 
   // Fetch the whole visible week — one calendar call per weekday, in parallel. Each response
