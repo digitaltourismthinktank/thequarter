@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ds/Button';
 import { cn } from '@/lib/cn';
-import { getMyBookings, getSpaces, cancelBooking, amendBooking, type MyBooking, sortBookings } from '@/lib/booking';
+import { getMyBookings, getSpaces, cancelBooking, amendBooking, announceBalancesChanged, type MyBooking, sortBookings } from '@/lib/booking';
 import styles from './MyBookingsCard.module.css';
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -59,6 +59,7 @@ export function MyBookingsCard({ className }: { className?: string }) {
   const [eStart, setEStart] = useState('');
   const [eEnd, setEEnd] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
   const todayIso = new Date().toISOString().slice(0, 10);
 
   async function refresh() {
@@ -78,7 +79,17 @@ export function MyBookingsCard({ className }: { className?: string }) {
 
   async function cancel(id: string) {
     setBusy(true);
-    await cancelBooking(id);
+    setNote(null);
+    const r = await cancelBooking(id);
+    if (r.ok) {
+      // Be honest about the co-working day. Cancelling the booking releases the day ONLY when
+      // nothing else needs it; if the member has already checked in that day, the day stays used and
+      // the check-in is untouched — say so, and point to where they'd undo it.
+      if (r.data?.stillCheckedIn) setNote('Booking cancelled. You’re still checked in that day, so the co-working day stays used — cancel your check-in from Home if you’re not coming in.');
+      else if (r.data?.dayRefunded) setNote('Booking cancelled — your co-working day for that date is back in your balance.');
+      else setNote('Booking cancelled.');
+      announceBalancesChanged();
+    }
     await refresh();
     setBusy(false);
   }
@@ -196,6 +207,7 @@ export function MyBookingsCard({ className }: { className?: string }) {
           </div>
         </>
       )}
+      {note ? <p className={styles.note}>{note}</p> : null}
     </div>
   );
 }

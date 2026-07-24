@@ -53,27 +53,29 @@ export function RegisteredAddressCard({
       </div>
       <p className={styles.help}>Use this as your official business and mailing address — the one to give Companies House, HMRC and your bank.</p>
 
-      {/* The co-working day that comes with Hybrid — one a month, so members can plan a day in. */}
-      <a className={styles.allowance} href="/book">
-        <span className={styles.allowanceIcon} aria-hidden="true">
-          ☕
-        </span>
-        <span className={styles.allowanceText}>
-          <strong>
-            {hasDays ? (
-              daysLeft && daysLeft > 0 ? `${daysLeft} co-working ${daysLeft === 1 ? 'day' : 'days'} to use` : 'This month’s co-working day is used'
-            ) : (
-              'A co-working day a month'
-            )}
-          </strong>
-          <span className={styles.allowanceSub}>
-            Included with Hybrid — a day a month to work in{renewal ? ` · resets ${renewal}` : ''}. Tap to book yours.
-          </span>
-        </span>
-        <span className={styles.allowanceArrow} aria-hidden="true">
-          →
-        </span>
-      </a>
+      {/* The co-working day that comes with Hybrid — one a month. When there's a day to use, this
+          books it; once it's used the tap should offer MORE days (the Plan page), not send them
+          back to a booking screen they can't complete. */}
+      {(() => {
+        const dayToUse = hasDays && daysLeft != null && daysLeft > 0;
+        return (
+          <a className={styles.allowance} href={dayToUse ? '/book' : '/plan/#passes'}>
+            <span className={styles.allowanceIcon} aria-hidden="true">
+              ☕
+            </span>
+            <span className={styles.allowanceText}>
+              <strong>{dayToUse ? `${daysLeft} co-working ${daysLeft === 1 ? 'day' : 'days'} to use` : hasDays ? 'This month’s co-working day is used' : 'A co-working day a month'}</strong>
+              <span className={styles.allowanceSub}>
+                Included with Hybrid — a day a month to work in{renewal ? ` · resets ${renewal}` : ''}.{' '}
+                {dayToUse ? 'Tap to book yours.' : 'Need more days? Add a day pass or change plan.'}
+              </span>
+            </span>
+            <span className={styles.allowanceArrow} aria-hidden="true">
+              →
+            </span>
+          </a>
+        );
+      })()}
     </div>
   );
 }

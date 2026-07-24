@@ -152,6 +152,8 @@ export function RoomBooking({ roomName, price }: { roomName: string; price: { ha
   const [freeDone, setFreeDone] = useState(false);
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Out of co-working days: a decision point, not just an error line — show buy/change CTAs.
+  const [blocked, setBlocked] = useState<'no-allowance' | 'needs-plan-or-pass' | null>(null);
   const [serverLines, setServerLines] = useState<RoomQuoteLine[] | null>(null);
   // TEST COMP: a secret ?test=<code> routes to the server's env-gated comp path (skips Stripe).
   const [testCode, setTestCode] = useState('');
@@ -355,6 +357,7 @@ export function RoomBooking({ roomName, price }: { roomName: string; price: { ha
     if (v) return setError(v);
     if (PREVIEW) return setError('Booking connects on the live site — this is a preview.');
     setError(null);
+    setBlocked(null);
     setWorking(true);
     const r = await roomMemberFree({
       spaceId: spaceId!,
@@ -374,11 +377,14 @@ export function RoomBooking({ roomName, price }: { roomName: string; price: { ha
       setError(ERRORS['cap-exceeded']);
       return;
     }
-    setError(ERRORS[r.data?.error ?? ''] ?? 'We couldn’t book that just now — please try again or enquire below.');
+    const code = r.data?.error ?? '';
+    if (code === 'no-allowance' || code === 'needs-plan-or-pass') { setBlocked(code); return; }
+    setError(ERRORS[code] ?? 'We couldn’t book that just now — please try again or enquire below.');
   }
 
   async function toPayment() {
     setError(null);
+    setBlocked(null);
     const v = validate();
     if (v) return setError(v);
     if (!member && !company.trim()) return setError(ERRORS['missing-company']);
@@ -409,7 +415,7 @@ export function RoomBooking({ roomName, price }: { roomName: string; price: { ha
       return;
     }
     if (!r.ok || !r.data.clientSecret) {
-      setError(ERRORS[r.data?.error ?? ''] ?? 'We couldn’t start the booking just now — please try again or enquire below.');
+      { const code = r.data?.error ?? ''; if (code === 'no-allowance' || code === 'needs-plan-or-pass') { setBlocked(code); } else setError(ERRORS[code] ?? 'We couldn’t start the booking just now — please try again or enquire below.'); }
       return;
     }
     setServerLines(r.data.lines || null);
@@ -802,6 +808,16 @@ export function RoomBooking({ roomName, price }: { roomName: string; price: { ha
           </>
         )}
 
+        {blocked ? (
+          <div className={styles.blocked} role="status">
+            <strong className={styles.blockedTitle}>{blocked === 'needs-plan-or-pass' ? 'You’ll need a plan or a day pass' : 'You’ve no co-working days left'}</strong>
+            <p className={styles.blockedBody}>Booking a room or pod uses one of your co-working days for that date, and you’ve none left. Add a day pass for one-offs, or change plan if you’re here often.</p>
+            <div className={styles.blockedActions}>
+              <a className={styles.blockedPrimary} href="/plan/#passes">Buy a day pass</a>
+              <a className={styles.blockedGhost} href="/plan/">{blocked === 'needs-plan-or-pass' ? 'Choose a plan' : 'Change plan'}</a>
+            </div>
+          </div>
+        ) : null}
         {error ? <p className={styles.err}>{error}</p> : null}
         <p className={styles.note}>
           Questions about your booking? <a href="#enquire">Chat to us</a>.

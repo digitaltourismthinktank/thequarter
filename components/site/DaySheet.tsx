@@ -1,11 +1,22 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Icon } from '@/components/ds/Icon';
 import { cn } from '@/lib/cn';
 import { reserveDay, checkInToday, cancelReservation, changeCheckinLength, announceBalancesChanged, type DayPeriod } from '@/lib/booking';
 import { haptic, playChime } from '@/lib/feedback';
 import styles from './DaySheet.module.css';
+
+/** The hour (0–23) right now in London — so a same-day check-in can assume the sensible length.
+ *  Falls back to the device clock if Intl is unhappy. */
+function londonHourNow(): number {
+  try {
+    return Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', hour: '2-digit', hour12: false }).format(new Date())) % 24;
+  } catch {
+    return new Date().getHours();
+  }
+}
 
 export type DaySheetDay = {
   id: string;
@@ -43,6 +54,10 @@ function friendly(code?: string): string {
       return 'That day has already been and gone.';
     case 'change-unsupported':
       return 'To change this day, cancel it and book again.';
+    case 'held-by-booking':
+      return 'This day is held by a room or pod booking — cancel that booking to free the day.';
+    case 'past-day':
+      return 'That day has already passed.';
     case 'no-booking':
       return 'That day isn’t booked any more — pull to refresh.';
     case 'no-token':
@@ -121,7 +136,7 @@ export function DaySheet({
   const [done, setDone] = useState<{ title: string; detail: string | null } | null>(null);
   const [confirmCancel, setConfirmCancel] = useState(false);
 
-  // Open fresh every time, seeded from the day being edited.
+  // Open fresh every time.
   useEffect(() => {
     if (!open) return;
     setError(null);
@@ -129,9 +144,23 @@ export function DaySheet({
     setDone(null);
     setBusy(false);
     setConfirmCancel(false);
-    setLength(existing?.length === 'Half' ? 'Half' : 'Full');
-    setPeriod(existing?.period === 'pm' ? 'pm' : 'am');
-  }, [open, existing?.id, existing?.length, existing?.period]);
+    if (existing) {
+      // Editing a booked/checked-in day → seed from what it already is.
+      setLength(existing.length === 'Half' ? 'Half' : 'Full');
+      setPeriod(existing.period === 'pm' ? 'pm' : 'am');
+    } else if (checkinNow) {
+      // Arriving now → assume the sensible length from the clock, but leave every option one tap
+      // away. Someone checking in after lunch almost always means the afternoon half, not a full
+      // day they've already half-missed; before 1pm, morning is the natural default for a half.
+      const afternoon = londonHourNow() >= 13;
+      setLength(afternoon ? 'Half' : 'Full');
+      setPeriod(afternoon ? 'pm' : 'am');
+    } else {
+      // Planning a future day — no time-of-day to infer, so start on a full day.
+      setLength('Full');
+      setPeriod('am');
+    }
+  }, [open, checkinNow, existing?.id, existing?.length, existing?.period]);
 
   useEffect(() => {
     if (!open) return;
@@ -230,9 +259,15 @@ export function DaySheet({
       setError(friendly(r.data?.error));
       haptic([8, 40, 8]);
     } else {
+      // A checked-in day that's cancelled hands the day back AND reverses the check-in points —
+      // say so plainly, so a points drop is never a surprise.
+      const parts: string[] = [];
+      if (r.data?.refunded) parts.push('that day’s back in your balance');
+      const pts = r.data?.pointsReversed ?? 0;
+      if (pts > 0) parts.push(`${pts} check-in ${pts === 1 ? 'point' : 'points'} reversed`);
       setDone({
-        title: 'Day cancelled',
-        detail: r.data?.refunded ? 'That day’s gone back into your balance.' : 'Nothing had been taken for it, so there’s nothing to credit back.',
+        title: attended ? 'Check-in cancelled' : 'Day cancelled',
+        detail: parts.length ? `${parts.join(' · ')}.` : 'Nothing had been taken for it, so there’s nothing to credit back.',
       });
       haptic(12);
       announceBalancesChanged();
@@ -241,7 +276,9 @@ export function DaySheet({
     setBusy(false);
   }
 
-  return (
+  const lengthSummary = length === 'Half' ? `half day · ${period === 'pm' ? 'afternoon' : 'morning'}` : 'full day';
+
+  const sheet = (
     <div className={styles.overlay} role="dialog" aria-modal="true" aria-label={editing ? 'Change this day' : 'Book this day'} onClick={onClose}>
       <div className={styles.sheet} onClick={(e) => e.stopPropagation()}>
         <span className={styles.grab} aria-hidden="true" />
@@ -258,16 +295,93 @@ export function DaySheet({
               Done
             </button>
           </div>
+        ) : attended ? (
+          /* Already in today. Lead with the confirmation — a tick and "You're checked in" — so it
+             reads as done, THEN offer changing the length or cancelling underneath as the secondary
+             thing it is. (This used to be a faint line of text with all the emphasis on the change.) */
+          <>
+            <div className={styles.inHeader}>
+              <span className={styles.inTick} aria-hidden="true">
+                <Icon name="check" size={22} color="var(--ink-900)" strokeWidth={2.8} />
+              </span>
+              <div className={styles.inHeadText}>
+                <h2 className={styles.title}>You&rsquo;re checked in</h2>
+                <p className={styles.meta}>
+                  {longDate(date)} · {lengthSummary}
+                </p>
+              </div>
+            </div>
+            <p className={styles.changeLabel}>Staying longer, or leaving? Change or cancel below.</p>
+
+            <div className={styles.choices} role="radiogroup" aria-label="Day length">
+              <button
+                type="button"
+                role="radio"
+                aria-checked={length === 'Full'}
+                className={cn(styles.choice, length === 'Full' && styles.choiceOn)}
+                disabled={busy}
+                onClick={() => change('Full')}
+              >
+                <span className={styles.choiceTitle}>Full day</span>
+                <span className={styles.choiceSub}>{isPass ? 'Covered by your pass' : '9am–6pm · uses 1 day'}</span>
+              </button>
+              <button
+                type="button"
+                role="radio"
+                aria-checked={length === 'Half'}
+                className={cn(styles.choice, length === 'Half' && styles.choiceOn)}
+                disabled={busy}
+                onClick={() => change('Half', period)}
+              >
+                <span className={styles.choiceTitle}>Half day</span>
+                <span className={styles.choiceSub}>{isPass ? 'Covered by your pass' : 'Morning or afternoon · uses ½ day'}</span>
+              </button>
+            </div>
+
+            {length === 'Half' ? (
+              <div className={styles.choices} role="radiogroup" aria-label="Which half of the day">
+                <button type="button" role="radio" aria-checked={period === 'am'} className={cn(styles.choice, styles.choiceSlim, period === 'am' && styles.choiceOn)} disabled={busy} onClick={() => change('Half', 'am')}>
+                  <span className={styles.choiceTitle}>Morning</span>
+                  <span className={styles.choiceSub}>9am–1pm</span>
+                </button>
+                <button type="button" role="radio" aria-checked={period === 'pm'} className={cn(styles.choice, styles.choiceSlim, period === 'pm' && styles.choiceOn)} disabled={busy} onClick={() => change('Half', 'pm')}>
+                  <span className={styles.choiceTitle}>Afternoon</span>
+                  <span className={styles.choiceSub}>1pm–6pm</span>
+                </button>
+              </div>
+            ) : null}
+
+            {error ? <p className={styles.error}>{error}</p> : null}
+
+            {confirmCancel ? (
+              <div className={styles.confirmRow}>
+                <p className={styles.confirmAsk}>Cancel your check-in? The day goes back to your balance and the check-in points are reversed.</p>
+                <div className={styles.confirmBtns}>
+                  <button type="button" className={styles.ghost} onClick={() => setConfirmCancel(false)} disabled={busy}>
+                    Keep it
+                  </button>
+                  <button type="button" className={styles.danger} onClick={release} disabled={busy}>
+                    {busy ? 'Cancelling…' : 'Yes, cancel'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button type="button" className={styles.linkDanger} onClick={() => setConfirmCancel(true)} disabled={busy}>
+                Cancel my check-in
+              </button>
+            )}
+            <button type="button" className={cn(styles.cta, styles.ctaQuiet)} onClick={onClose}>
+              Close
+            </button>
+          </>
         ) : (
           <>
             <h2 className={styles.title}>{editing ? longDate(date) : checkinNow ? 'Checking in today' : `Coming in on ${longDate(date)}?`}</h2>
             <p className={styles.meta}>
               {editing
-                ? attended
-                  ? `You’re in for a ${length === 'Half' ? `half day · ${period === 'pm' ? 'afternoon' : 'morning'}` : 'full day'}. Staying longer? Change it below.`
-                  : isPass
-                    ? 'Booked with a day pass — a pass covers the whole day either way.'
-                    : `Currently a ${length === 'Half' ? `half day · ${period === 'pm' ? 'afternoon' : 'morning'}` : 'full day'}.`
+                ? isPass
+                  ? 'Booked with a day pass — a pass covers the whole day either way.'
+                  : `Currently a ${lengthSummary}.`
                 : checkinNow
                   ? longDate(date)
                   : 'How long are you in for?'}
@@ -338,22 +452,23 @@ export function DaySheet({
                 <p className={styles.blockedBody}>
                   {blocked === 'needs-plan-or-pass'
                     ? 'Coming in draws on a membership plan or a day pass.'
-                    : 'Your plan’s days for this period are all used. Add a day pass for one-offs, or move up a plan if you’re here more often than it allows.'}
+                    : 'Your plan’s days for this period are all used. Add a day pass for one-offs, or change plan if you’re here more often than it allows.'}
                 </p>
                 <div className={styles.blockedActions}>
                   <a className={styles.blockedPrimary} href="/plan/#passes">
                     Buy a day pass
                   </a>
                   <a className={styles.blockedGhost} href="/plan/">
-                    {blocked === 'needs-plan-or-pass' ? 'Choose a plan' : 'Move up a plan'}
+                    {blocked === 'needs-plan-or-pass' ? 'Choose a plan' : 'Change plan'}
                   </a>
                 </div>
               </div>
             ) : null}
 
+            {/* A booked-but-not-yet-attended day: change its length above, or release it here. */}
             {editing ? (
               <>
-                {attended ? null : confirmCancel ? (
+                {confirmCancel ? (
                   <div className={styles.confirmRow}>
                     <p className={styles.confirmAsk}>Cancel this day?</p>
                     <div className={styles.confirmBtns}>
@@ -388,4 +503,11 @@ export function DaySheet({
       </div>
     </div>
   );
+
+  // Portal to <body>: the sheet is a viewport-fixed overlay, but it was rendered deep inside the
+  // dashboard where a transformed/animated ancestor (the collapsible plan-ahead panel) traps
+  // position:fixed to that ancestor's box — which is exactly why the sheet appeared BEHIND the
+  // membership card and clashed with the page instead of covering it. Rendering into <body> frees
+  // it from every such stacking trap.
+  return typeof document !== 'undefined' ? createPortal(sheet, document.body) : null;
 }

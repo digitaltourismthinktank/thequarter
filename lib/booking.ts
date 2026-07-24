@@ -74,6 +74,8 @@ export interface CheckinStatus {
    *  fields are admin-restricted from the client). */
   rollover?: number;
   rolloverExpiry?: string | null;
+  /** Live day-pass wallet (carnet) count, so the card shows it fresh. */
+  carnetRemaining?: number;
   planned: { id: string; date: string; length: 'Full' | 'Half'; kind?: 'pass' | 'reserved'; period?: DayPeriod | null; in?: boolean }[];
   requested?: { id: string; date: string; length: 'Full' | 'Half'; period?: DayPeriod | null }[];
 }
@@ -98,7 +100,7 @@ export const sortBookings = <T extends { date: string; startMin: number }>(bs: T
 export const createBooking = (b: { spaceId: string; date: string; start: string; end: string }) =>
   call<{ ok: boolean; id: string }>('bookings', { method: 'POST', body: { action: 'book', ...b } });
 export const cancelBooking = (bookingId: string) =>
-  call<{ ok: boolean }>('bookings', { method: 'POST', body: { action: 'cancel', bookingId } });
+  call<{ ok: boolean; dayRefunded?: boolean; stillCheckedIn?: boolean }>('bookings', { method: 'POST', body: { action: 'cancel', bookingId } });
 /** Move a booking to a new date/time (same room). Paid bookings are ops-only. */
 export const amendBooking = (bookingId: string, date: string, start: string, end: string) =>
   call<{ ok: boolean }>('bookings', { method: 'POST', body: { action: 'amend', bookingId, date, start, end } });
@@ -356,7 +358,7 @@ export const reserveDay = (date: string, length: 'Full' | 'Half', period?: DayPe
     error?: string;
   }>('checkin', { method: 'POST', body: { action: 'reserve', date, length, ...(length === 'Half' && period ? { period } : {}) } });
 export const cancelReservation = (id: string) =>
-  call<{ ok: boolean; refunded?: boolean }>('checkin', { method: 'POST', body: { action: 'cancel', id } });
+  call<{ ok: boolean; refunded?: boolean; pointsReversed?: number }>('checkin', { method: 'POST', body: { action: 'cancel', id } });
 
 /** Fired after any action that moves the member's day balance or carnet passes, so the dashboard
  *  day tile + the carnet pane can refresh instantly instead of waiting for a reload. */

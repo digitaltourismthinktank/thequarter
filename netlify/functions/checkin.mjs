@@ -15,7 +15,7 @@ import { verifyMember, memberEmail, memberName, tokenFromRequest } from './_memb
 import { listRecords, createRecord, updateRecord, T, F, airtableReady, esc } from './_airtable.mjs';
 import { londonNow, addDays, isoToLondonDate } from './_time.mjs';
 import { allowanceForMember, liveRollover, addMonthsISO, MS_ROLLOVER, MS_ROLLOVER_EXP } from './_quarter-sync.mjs';
-import { awardPoints, checkinBonusesThisMonth, earnBoostForMember, CHECKIN_BONUS, CHECKIN_QUIET_BONUS, CHECKIN_BONUS_CAP } from './_rewards.mjs';
+import { awardPoints, reverseCheckinPoints, checkinBonusesThisMonth, earnBoostForMember, CHECKIN_BONUS, CHECKIN_QUIET_BONUS, CHECKIN_BONUS_CAP } from './_rewards.mjs';
 import { isQuietDay } from './_busyness.mjs';
 import { isClosedDay } from './_holidays.mjs';
 import { sendEmail, emailShell, escapeHtml, OPS_EMAIL, fmtDateLong } from './_email.mjs';
@@ -611,6 +611,9 @@ export default async function handler(req) {
       // split regardless of the Memberstack field visibility.
       rollover: liveRollover(vm.member),
       rolloverExpiry: vm.member.customFields?.['rollover-expiry'] || null,
+      // Live day-pass wallet, so the dashboard card can show it fresh (and a 0-plan-days member
+      // with passes still sees a way in).
+      carnetRemaining: Math.max(0, Number(vm.member.metaData?.carnet?.remaining) || 0),
       planned: upcoming,
       requested: requested.map((r) => ({
         id: r.id,
@@ -873,24 +876,60 @@ export default async function handler(req) {
     // then can't fund it.
     const roll = liveRollover(me, target);
     if (delta > 0 && planNum + roll + 1e-9 < delta) return json({ error: 'no-allowance' }, 400);
-    // Stamp the row's new cost FIRST, THEN move the balance — so a failure between the two leaves an
-    // UN-charged change (a re-tap reads the new dayCost, computes delta 0, and no-ops), never a
-    // double-charge. This matches consumePlannedDay's stamp-first discipline. (Previously the order
-    // was reversed, so a mid-write failure could double-charge on re-tap.)
-    await updateRecord(T.checkins, row.id, { [F.checkins.length]: newLen, [F.checkins.notes]: buildNotes(), [F.checkins.dayCost]: newCost });
+
+    // Keep the row's rollover marker HONEST across a length change — this is the crux of the bug the
+    // money audit found. Both directions used to leave the original `roll:X` token untouched while
+    // the day's cost changed, so a later cancel refunded against a stale split: shortening a
+    // rollover-funded day credited the whole 0.5 to the permanent plan bucket, laundering an
+    // expiring rollover day into a permanent one; extending under-recorded the extra rollover spent.
+    // We now recompute the rollover share and re-stamp the token so refundPlannedDay always repays
+    // the right buckets. `withRoll` swaps the token inside the notes buildNotes() produced.
+    const rm = notes.match(/roll:([\d.]+)(?:@([\d-]*))?/i);
+    const oldFromRoll = rm ? Math.min(oldCost, Math.max(0, parseFloat(rm[1]) || 0)) : 0;
+    let rollExp = (rm && rm[2]) || String(me.customFields?.[MS_ROLLOVER_EXP] || '').trim();
+    const withRoll = (n, fr, exp) => {
+      const base = String(n).split('·').map((s) => s.trim()).filter((s) => s && !/^roll:/i.test(s)).join(' · ');
+      const fr4 = Math.round(fr * 1e4) / 1e4;
+      return fr4 > 1e-9 ? [base, `roll:${fr4}@${exp || ''}`].filter(Boolean).join(' · ') : base;
+    };
+    let newFromRoll = oldFromRoll;
+    let buckets = null;
     if (delta > 0) {
       // Extend: spend the extra fraction — rollover first (it expires), then plan days.
       const s = splitSpend(planNum, roll, delta);
-      await setDayBuckets(me.id, spendFields(s));
+      newFromRoll = oldFromRoll + s.fromRoll;
+      if (s.fromRoll > 0) rollExp = String(me.customFields?.[MS_ROLLOVER_EXP] || '').trim() || rollExp;
+      buckets = spendFields(s);
       newBalance = String(s.newPlan + s.newRoll);
     } else if (delta < 0) {
-      // Shorten: give the fraction back to the plan bucket (mirrors refundPlannedDay's convention).
-      const current = parseDays(me.customFields?.['days-remaining']);
-      if (current !== null) {
-        newBalance = String(current + -delta);
-        await setDays(me.id, newBalance);
+      // Shorten: refund the fraction to the SAME buckets it came from, in proportion, so an expiring
+      // rollover day is handed back as rollover (not converted to a permanent plan day).
+      const ratio = oldCost > 0 ? newCost / oldCost : 0;
+      newFromRoll = oldFromRoll * ratio;
+      const creditRoll = oldFromRoll - newFromRoll;
+      const creditPlan = -delta - creditRoll;
+      const fields = {};
+      const curPlan = parseDays(me.customFields?.['days-remaining']);
+      if (curPlan !== null) {
+        newBalance = String(Math.round((curPlan + creditPlan) * 1e4) / 1e4);
+        fields['days-remaining'] = newBalance;
       }
+      if (creditRoll > 1e-9) {
+        fields[MS_ROLLOVER] = String(Math.round((liveRollover(me, londonNow().dateStr) + creditRoll) * 1e4) / 1e4);
+        // Restore the expiry the spend cleared, never a later one (that would be its own laundering).
+        const cur = String(me.customFields?.[MS_ROLLOVER_EXP] || '').trim();
+        const keep = cur && rollExp ? (cur < rollExp ? cur : rollExp) : cur || rollExp;
+        if (keep) {
+          fields[MS_ROLLOVER_EXP] = keep;
+          rollExp = keep;
+        }
+      }
+      buckets = Object.keys(fields).length ? fields : null;
     }
+    // Stamp the row (new cost + honest rollover token) FIRST, THEN move the balance — a failure
+    // between the two leaves an un-charged change a re-tap no-ops, never a double-charge.
+    await updateRecord(T.checkins, row.id, { [F.checkins.length]: newLen, [F.checkins.notes]: withRoll(buildNotes(), newFromRoll, rollExp), [F.checkins.dayCost]: newCost });
+    if (buckets) await setDayBuckets(me.id, buckets);
     return json({ ok: true, length: newLen, dayDelta: delta, balance: newBalance });
   }
 
@@ -953,7 +992,10 @@ export default async function handler(req) {
     if (!r) return json({ error: 'not-found' }, 404);
     if (String(r.fields[F.checkins.email] || '').toLowerCase() !== email) return json({ error: 'forbidden' }, 403);
     const st = r.fields[F.checkins.status];
-    if (st !== 'Planned' && st !== 'Requested') return json({ error: 'only-planned-cancellable' }, 400);
+    // Checked-in is cancellable now too: a member who came in and realised they don't need to be can
+    // undo it — the day goes back and the check-in points are reversed (below). Only Cancelled/Paid
+    // rows are off-limits here.
+    if (st !== 'Planned' && st !== 'Requested' && st !== 'Checked-in') return json({ error: 'only-planned-cancellable' }, 400);
     // This co-working day may be HELD by a room/pod booking on the same date (a booking books the
     // day). Refunding it here while the booking stays live would be a free room — so refuse, and
     // send them to cancel the booking instead (which releases the day). A plain reserve with no
@@ -978,6 +1020,7 @@ export default async function handler(req) {
     // staff-fixable MISSED credit — never a DOUBLE credit, and never a still-'Planned'+spent row
     // the member could also walk in on for free. Capture the spent state before the write flips it.
     const wasConsumed = plannedConsumed(r);
+    const wasAttended = st === 'Checked-in';
     await updateRecord(T.checkins, body.id, { [F.checkins.status]: 'Cancelled' });
     let refunded = false;
     if (wasConsumed) {
@@ -990,7 +1033,19 @@ export default async function handler(req) {
         console.error('[checkin] refund-after-cancel failed', body.id, e);
       }
     }
-    return json({ ok: true, refunded });
+    // A cancelled check-in also gives back its check-in bonus — the visit didn't happen, so the
+    // points for it shouldn't stand (and a check-in/cancel loop mustn't farm points). Refund the day
+    // FIRST (customFields/carnet) then reverse points (metaData.points): different Memberstack keys,
+    // so no clobber. Only for a genuine attendance row — a plain reserved day earned no bonus.
+    let pointsReversed = 0;
+    if (wasAttended) {
+      try {
+        pointsReversed = await reverseCheckinPoints(me, email, rDate);
+      } catch (e) {
+        console.error('[checkin] points-reversal-after-cancel failed', body.id, e);
+      }
+    }
+    return json({ ok: true, refunded, pointsReversed });
   }
 
   return json({ error: 'unknown-action' }, 400);

@@ -59,6 +59,36 @@
   margin: 12px 0 0;
 }
 
+/* Already-checked-in confirmation — leads the sheet with a tick and "You're checked in", so it
+   reads as done first and the change/cancel controls sit under it as the secondary action. */
+.inHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 2px;
+}
+.inTick {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-pill);
+  background: var(--gold-500);
+}
+.inHeadText {
+  min-width: 0;
+}
+.changeLabel {
+  margin: 16px 0 0;
+  font-size: var(--text-xs);
+  font-weight: var(--fw-semibold);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  color: var(--text-muted);
+}
+
 /* The choice itself. Deliberately big, two-line, full-width targets rather than the little pill
    segments this used to be: members read the pills as a label, not a question, and told us the
    app never asked them. Each states what it costs, so the decision is made with the price in view. */

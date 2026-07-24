@@ -457,3 +457,52 @@
     position: static;
   }
 }
+
+/* Out-of-days prompt — mirrors the check-in sheet's, so a member hitting the wall here gets the
+   same two ways forward (buy a pass / change plan) instead of a dead-end line of text. */
+.blocked {
+  margin: 14px 0 0;
+  padding: 14px;
+  border: 1px solid var(--gold-300);
+  border-radius: var(--radius-lg);
+  background: var(--gold-100);
+}
+.blockedTitle {
+  display: block;
+  font-size: var(--text-base);
+  font-weight: var(--fw-bold);
+  color: var(--ink-900);
+}
+.blockedBody {
+  margin: 6px 0 0;
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  color: var(--text-body);
+}
+.blockedActions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 12px;
+}
+.blockedPrimary,
+.blockedGhost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 11px 12px;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-sm);
+  font-weight: var(--fw-bold);
+  text-decoration: none;
+}
+.blockedPrimary {
+  background: var(--ink-900);
+  color: var(--sand-50);
+}
+.blockedGhost {
+  background: var(--surface-card);
+  color: var(--ink-900);
+  border: 1px solid var(--border-subtle);
+}

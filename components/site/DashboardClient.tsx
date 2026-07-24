@@ -43,11 +43,11 @@ export function DashboardClient() {
   // Plan days + rollover come from the SERVER (fresh after any spend, and readable even when the
   // rollover fields are admin-restricted from the client). Re-fetched on the balances-changed event
   // so checking in / booking updates the day tile instantly, not on reload.
-  const [srv, setSrv] = useState<{ balance: string | null; rollover: number; rolloverExpiry: string | null } | null>(null);
+  const [srv, setSrv] = useState<{ balance: string | null; rollover: number; rolloverExpiry: string | null; carnetRemaining?: number } | null>(null);
   useEffect(() => {
     const load = () =>
       getCheckinToday().then((r) => {
-        if (r.ok) setSrv({ balance: r.data.balance ?? null, rollover: r.data.rollover ?? 0, rolloverExpiry: r.data.rolloverExpiry ?? null });
+        if (r.ok) setSrv({ balance: r.data.balance ?? null, rollover: r.data.rollover ?? 0, rolloverExpiry: r.data.rolloverExpiry ?? null, carnetRemaining: r.data.carnetRemaining });
       });
     load();
     const onChange = () => load();
@@ -214,6 +214,10 @@ export function DashboardClient() {
   const planNum = Number.isFinite(serverDays) ? serverDays : Number.isFinite(daysNum) ? daysNum : 0;
   const totalDays = planNum + rollNum;
   const rollExpLabel = rollExp ? new Date(`${rollExp}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '';
+  // Day-pass wallet (carnet) — prefer the server's live count (fresh after a spend), fall back to
+  // the member's metaData. Surfaced on the card so a member with 0 plan days but passes in the
+  // wallet still sees a way in, not just "0 days left".
+  const passes = srv && typeof srv.carnetRemaining === 'number' ? Math.max(0, srv.carnetRemaining) : Math.max(0, Number((member.metaData as { carnet?: { remaining?: number } } | undefined)?.carnet?.remaining) || 0);
 
   // "Your days" StatTile content (paused / unlimited / metered / unset). Shows the TOTAL spendable,
   // with the plan-vs-rolled-over split in the hint.
@@ -365,9 +369,13 @@ export function DashboardClient() {
               </div>
               <span className={styles.mSumPlan}>{isPaused ? 'Paused' : slug ? cap(slug) : hasPlan ? 'Member' : 'Guest'}</span>
             </div>
-            {hasPlan ? (
+            {hasPlan || passes > 0 ? (
               <div className={styles.mSumStats}>
-                <span>{isUnlimited ? <b>Unlimited</b> : <><b>{daysValue}</b> {isPaused ? 'held' : 'days left'}</>}</span>
+                {hasPlan ? <span>{isUnlimited ? <b>Unlimited</b> : <><b>{isUnlimited ? '' : planNum}</b> {isPaused ? 'held' : 'plan days'}</>}</span> : null}
+                {/* Wallet + rollover always show when they exist, on every plan — so "0 plan days"
+                    never reads as "no way in" when there are passes or rolled-over days to spend. */}
+                {rollNum > 0 ? <span><b>{rollNum}</b> rolled over</span> : null}
+                {passes > 0 ? <span><b>{passes}</b> {passes === 1 ? 'pass' : 'passes'}</span> : null}
                 <span>Door <b>{doorCode ?? '—'}</b></span>
               </div>
             ) : null}

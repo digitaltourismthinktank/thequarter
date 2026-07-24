@@ -15,7 +15,7 @@ import { verifyMember, isAdmin, tokenFromRequest } from './_member.mjs';
 import { listRecords, listAllRecords, createRecord, updateRecord, deleteRecord, T, F, airtableReady, esc } from './_airtable.mjs';
 import { londonWallClockToISO, isoToLondonMin, isoToLondonDate, hhmmToMin, londonNow, holdReleased, addDays } from './_time.mjs';
 import { PLAN_NAMES, allowanceForMember, setMemberPlan, clearMemberPlan, renewMember, formatDate, liveRollover, MS_ROLLOVER, MS_ROLLOVER_EXP, addMonthsISO, todayISO } from './_quarter-sync.mjs';
-import { listRewards, listPerks, listFloats, floatStatus, awardPoints, redeemReward, partnerPayouts, markPartnerPaid, partnerStatement } from './_rewards.mjs';
+import { listRewards, listPerks, listFloats, floatStatus, awardPoints, reverseCheckinPoints, redeemReward, partnerPayouts, markPartnerPaid, partnerStatement } from './_rewards.mjs';
 import { plannedConsumed, refundPlannedDay, consumePlannedDay } from './checkin.mjs';
 import { sendEmail, emailShell, escapeHtml, OPS_EMAIL, fmtDateLong } from './_email.mjs';
 import { pushToEmail } from './_push.mjs';
@@ -915,10 +915,17 @@ export default async function handler(req) {
         // destroyed the member's pass outright (Day cost is 0 on those rows), and a rollover-funded
         // day was repaid into the wrong bucket. refundPlannedDay handles carnet, the rollover/plan
         // split and the settlement rule (it refuses to pay out on a debit that never landed).
-        if (m) await refundPlannedDay(m, r);
+        if (m) {
+          await refundPlannedDay(m, r);
+          // Undo the check-in bonus too, to the same bucket rule as a member self-cancel — a removed
+          // check-in shouldn't leave the points for a visit that no longer counts. Idempotent + only
+          // acts on a date that actually earned a check-in bonus, so it's safe on a Planned row.
+          const rDate = isoToLondonDate(r.fields[F.checkins.date]);
+          await reverseCheckinPoints(m, email, rDate);
+        }
       }
     } catch {
-      /* refund is best-effort — the cancel already succeeded */
+      /* refund/reversal is best-effort — the cancel already succeeded */
     }
     return json({ ok: true });
   }

@@ -134,8 +134,15 @@ export function CarnetCard() {
     setBusy(false);
     if (error) return setPayErr(error.message || 'That payment didn’t go through — please try again.');
     if (paymentIntent && (paymentIntent.status === 'succeeded' || paymentIntent.status === 'processing')) {
+      const one = buying === 1;
       setBuying(null);
-      setMsg('Thanks — your passes are being added. This can take a moment to show.');
+      // A pass lands in the wallet and is theirs for a year — say what they can do with it, not just
+      // "added". One pass vs a book reads a little differently.
+      setMsg(
+        one
+          ? 'Thanks — your day pass is being added to your wallet. Use it to check in today, or any day within the next year.'
+          : 'Thanks — your passes are being added to your wallet, ready to use any day within the next year. This can take a moment to show.',
+      );
       // The webhook top-up can lag a moment, so poll briefly.
       let n = 0;
       const t = setInterval(async () => {

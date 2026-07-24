@@ -528,7 +528,10 @@ export default async function handler(req) {
         console.error('[bookings] release-day after cancel failed', bookingId, e);
       }
     }
-    return json({ ok: true, dayRefunded: !!released?.refunded });
+    // Tell the client whether a check-in still stands for that date, so it can say plainly that
+    // cancelling the booking did NOT cancel the check-in (the day stays used) and that's a separate
+    // action — rather than leaving the member to assume the day came back.
+    return json({ ok: true, dayRefunded: !!released?.refunded, stillCheckedIn: released?.reason === 'checked-in' });
   }
 
   return json({ error: 'unknown-action' }, 400);

@@ -141,6 +141,45 @@ export async function awardPoints(member, delta, reason, ref = '') {
   return next;
 }
 
+/**
+ * Reverse the check-in bonus points a member earned for a given date — used when a check-in is
+ * cancelled (they came in, then left; or an admin removes it). Finds the checkin/checkin-quiet
+ * ledger rows stamped with that date as their Ref, posts ONE compensating negative row, and drops
+ * the member's points balance by the same amount. Balance only — lifetime points (which drive
+ * levels) are left intact, matching awardPoints' rule that a negative delta never demotes a level.
+ *
+ * Idempotent: a `checkin-reversed` row for the date short-circuits a repeat, so a retry after a
+ * partial failure can't double-deduct. Writes ONLY metaData.points (Memberstack merges by top-level
+ * key), so it never disturbs carnet/other keys. Returns the number of points reversed.
+ */
+export async function reverseCheckinPoints(member, email, dateStr) {
+  if (!member || !email || !dateStr) return 0;
+  const lc = String(email).toLowerCase();
+  const rows = await listRecords(T.pointsLedger, {
+    filterByFormula: `AND(LOWER({Member email})='${esc(lc)}', {Ref}='${esc(dateStr)}', OR({Reason}='checkin', {Reason}='checkin-quiet', {Reason}='checkin-reversed'))`,
+  });
+  if (rows.some((r) => r.fields[F.pointsLedger.reason] === 'checkin-reversed')) return 0; // already reversed
+  const total = rows.reduce((s, r) => s + Math.max(0, Number(r.fields[F.pointsLedger.delta]) || 0), 0);
+  if (total <= 0) return 0;
+  await createRecord(
+    T.pointsLedger,
+    {
+      [F.pointsLedger.entry]: `checkin-reversed-${dateStr}`,
+      [F.pointsLedger.email]: email,
+      [F.pointsLedger.delta]: -total,
+      [F.pointsLedger.reason]: 'checkin-reversed',
+      [F.pointsLedger.ref]: dateStr,
+      [F.pointsLedger.at]: new Date().toISOString(),
+    },
+    { typecast: true }, // creates the 'checkin-reversed' Reason option if the select doesn't have it
+  );
+  const next = Math.max(0, memberPoints(member) - total);
+  const admin = memberstackAdmin.init(MS_SECRET);
+  await admin.members.update({ id: member.id, data: { metaData: { points: next } } });
+  if (member.metaData) member.metaData.points = next;
+  return total;
+}
+
 /** Count this member's check-in bonus rows in a given London YYYY-MM (for the cap). */
 export async function checkinBonusesThisMonth(email, yyyymm) {
   const rows = await listRecords(T.pointsLedger, {
